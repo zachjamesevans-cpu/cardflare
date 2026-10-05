@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { StoreUpdate } from "@/lib/supabase/types";
+import { removeGift } from "@/lib/stores/gifts";
 import type { ListingState } from "@/lib/stores/listing-schema";
 
 /**
@@ -105,6 +106,9 @@ export async function setTierAction(
 
   if (!storeId) return { status: "error", message: "No store." };
 
+  /* "Back to free" ends a beta gift too, or the green bar would go on
+     counting days on a store that has nothing. */
+  if (!ultra) await removeGift(storeId);
   const ok = await setFields(storeId, { tier: ultra ? "ultra" : "free" });
 
   return ok

@@ -7,6 +7,7 @@ import { EditSignInEmailForm, EditStoreForm } from "@/components/admin/edit-stor
 import { DeletePanel } from "@/components/admin/delete-panel";
 import { MergePanel, type MergeCandidate } from "@/components/admin/merge-panel";
 import { ResendSetupLinkForm } from "@/components/admin/resend-setup-link";
+import { StoreGiftControl } from "@/components/admin/store-gift-control";
 import { StoreListingControls } from "@/components/admin/store-listing-controls";
 import { VendorBooths, VendorInventoryReadonly } from "@/components/admin/store-detail";
 import { duplicatesOf, likelyDuplicates } from "@/lib/admin/duplicates";
@@ -24,7 +25,15 @@ import { findStoreById, listEventsForStore } from "@/lib/events/repository";
 import { resolveCode, sweepStaleRooms } from "@/lib/events/rooms";
 import { listRoomFlares } from "@/lib/lists/repository";
 import { boothsForStore, listInventory, listShows } from "@/lib/shows/repository";
+import { giftDaysLeft, isGiftChoice, type GiftChoice } from "@/lib/stores/gift-shared";
+import {
+  giftFacts,
+  giftForStore,
+  giftIsLive,
+  type StoreGift,
+} from "@/lib/stores/gifts";
 import { storeGameLine } from "@/lib/stores/page";
+import { planDate } from "@/lib/stores/ultra";
 import { listStores } from "@/lib/stores/repository";
 
 export const metadata: Metadata = {
@@ -149,6 +158,49 @@ export default async function AdminStorePage({
   );
 }
 
+/**
+ * The gift control's words, worked out here so the client gets plain
+ * props: "Founding Store, Ultra for life", "60 days of Ultra, ends Dec 4,
+ * 2026, 23 days left", "Gift ended Oct 1, 2026" or "No gift".
+ */
+function giftControlProps(gift: StoreGift | null): {
+  summary: string;
+  live: boolean;
+  current: GiftChoice;
+} {
+  if (!gift) return { summary: "No gift", live: false, current: "none" };
+
+  if (!giftIsLive(gift)) {
+    /* A timed gift past its day that the sweep has not reached yet has
+       no ended stamp; its last day is when it ended. */
+    const ended = planDate(gift.endedAt ?? gift.until);
+    return {
+      summary: ended ? `Gift ended ${ended}` : "Gift ended",
+      live: false,
+      current: "none",
+    };
+  }
+
+  if (gift.kind === "founding") {
+    return {
+      summary: "Founding Store, Ultra for life",
+      live: true,
+      current: "founding",
+    };
+  }
+
+  const facts = giftFacts(gift);
+  const daysLeft = gift.until ? giftDaysLeft(gift.until) : 0;
+  const choice = String(gift.days ?? "");
+  return {
+    summary: `${gift.days} days of Ultra, ends ${facts.untilLabel}, ${daysLeft} ${
+      daysLeft === 1 ? "day" : "days"
+    } left`,
+    live: true,
+    current: isGiftChoice(choice) ? choice : "none",
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* The record itself: rename in place, never re-invite                        */
 /* -------------------------------------------------------------------------- */
@@ -182,7 +234,11 @@ async function StoreDetailsSection({
     tier: string;
   };
 }) {
-  const members = await listStoreMembers(store.id);
+  const [members, gift] = await Promise.all([
+    listStoreMembers(store.id),
+    giftForStore(store.id),
+  ]);
+  const giftProps = giftControlProps(gift);
 
   return (
     <section className="flex flex-col gap-5" aria-labelledby="details-heading">
@@ -209,6 +265,8 @@ async function StoreDetailsSection({
         verified={store.verified_at !== null}
         ultra={store.tier === "ultra"}
       />
+
+      <StoreGiftControl storeId={store.id} {...giftProps} />
 
       <Card>
         <EditStoreForm

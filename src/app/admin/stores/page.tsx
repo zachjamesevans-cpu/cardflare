@@ -17,6 +17,8 @@ import { listLiveRooms, sweepStaleRooms } from "@/lib/events/rooms";
 import { countOpenFlares } from "@/lib/lists/repository";
 import { listStores } from "@/lib/stores/repository";
 import { directorySchemaReady } from "@/lib/stores/discovery";
+import { FOUNDING_STORE_CAP } from "@/lib/stores/gift-shared";
+import { foundingStoresTaken } from "@/lib/stores/gifts";
 
 export const metadata: Metadata = {
   title: "Stores",
@@ -33,7 +35,13 @@ export default async function AdminStoresPage() {
 
   await sweepStaleRooms();
 
-  const [stores, liveRooms] = await Promise.all([listStores(), listLiveRooms()]);
+  const [stores, liveRooms, foundingTaken] = await Promise.all([
+    listStores(),
+    listLiveRooms(),
+    foundingStoresTaken(),
+  ]);
+  /* What the invitation's Founding Store option says is left of ten. */
+  const foundingLeft = Math.max(0, FOUNDING_STORE_CAP - foundingTaken);
   const flareCounts = await countOpenFlares(liveRooms.map((room) => room.eventId));
 
   /*
@@ -211,7 +219,7 @@ export default async function AdminStoresPage() {
         </div>
 
         <Card>
-          <InviteStoreForm />
+          <InviteStoreForm foundingLeft={foundingLeft} />
         </Card>
       </section>
     </div>

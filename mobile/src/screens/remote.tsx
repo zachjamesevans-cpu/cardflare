@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Alert, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { describeError, getMe, type Me } from "../api";
+import { GiftBar } from "../gift-bar";
 import { controlTimer, getHub, type HubView } from "../remote-api";
 import type { RemoteOp, RemoteTimer } from "../remote-wire";
 import { readRoomTimer } from "../room-timer-wire";
@@ -231,6 +232,10 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
         />
       }
     >
+      {/* The console's green bar, for an owner: same words, top of the
+          screen, so the days left are seen where the store is run. */}
+      {store?.gift ? <GiftBar bar={store.gift} /> : null}
+
       {stale && (
         <View
           style={{

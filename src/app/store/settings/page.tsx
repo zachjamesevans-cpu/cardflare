@@ -12,6 +12,7 @@ import { StorePageForm } from "@/components/stores/store-page-form";
 import { StoreTabs } from "@/components/stores/store-tabs";
 import { Card } from "@/components/ui/card";
 import { loadStoreConsole } from "@/lib/stores/console";
+import { giftForStore, ultraOfferFor } from "@/lib/stores/gifts";
 import { storePageFor } from "@/lib/stores/page";
 import { storePlan, ultraIsSellable } from "@/lib/stores/ultra";
 
@@ -38,7 +39,15 @@ export default async function StoreSettingsPage({
   /* Owner-only: `loadStoreConsole` has already turned an organizer
      away from this path, so everyone who gets here may write the page
      and see the plan. */
-  const [plan, page] = await Promise.all([storePlan(store.id), storePageFor(store.id)]);
+  const [plan, page, offer, gift] = await Promise.all([
+    storePlan(store.id),
+    storePageFor(store.id),
+    ultraOfferFor(store.id),
+    giftForStore(store.id),
+  ]);
+  /* A live Founding Store has nothing to start; an ended one keeps its
+     price like any other beta store. */
+  const founding = gift?.kind === "founding" && !gift.endedAt;
 
   return (
     <AppShell
@@ -120,7 +129,9 @@ export default async function StoreSettingsPage({
           storeId={store.id}
           plan={plan}
           sellable={ultraIsSellable()}
-          notice={billingNotice(params)}
+          offer={offer}
+          founding={founding}
+          notice={billingNotice(params, offer.beta)}
         />
       </section>
     </AppShell>

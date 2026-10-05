@@ -33,6 +33,8 @@ export interface PublicStore {
   website: string | null;
   verified: boolean;
   ultra: boolean;
+  /** One of the ten Founding Stores: wears the mark on its page. */
+  founding: boolean;
   unclaimed: boolean;
   /**
    * What the store says about itself, or null. Only a claimed store can
@@ -162,7 +164,7 @@ export async function publicStore(
   const { data, error } = await admin
     .from("stores")
     .select(
-      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description, logo_image, cover_image, hours, timezone, early_board_hours",
+      "id, name, city, region, address_line, postal_code, phone, website, claim_status, tier, verified_at, listing_state, description, logo_image, cover_image, hours, timezone, early_board_hours, gift_kind, gift_ended_at",
     )
     .eq("id", storeId)
     .maybeSingle();
@@ -190,6 +192,7 @@ export async function publicStore(
     website: data.website,
     verified: data.verified_at !== null,
     ultra: data.tier === "ultra",
+    founding: data.gift_kind === "founding" && data.gift_ended_at === null,
     unclaimed: data.claim_status === "unclaimed",
     description: data.description,
     attribution: source?.[0]?.attribution ?? null,

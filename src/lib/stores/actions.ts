@@ -8,8 +8,11 @@ import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { sendEmail } from "@/lib/email/client";
 import { storeInviteEmail } from "@/lib/email/store-invite";
+import type { GiftFacts } from "@/lib/email/store-gift";
 import { siteUrl } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { FOUNDING_STORE_CAP } from "./gift-shared";
+import { alertFounderOfGift, foundingStoresTaken, giftFacts, grantGift } from "./gifts";
 import { inviteStore } from "./repository";
 import {
   inviteStoreSchema,
@@ -45,6 +48,7 @@ export async function inviteStoreAction(
     contactEmail: text(formData, "contactEmail"),
     city: text(formData, "city"),
     region: text(formData, "region"),
+    gift: text(formData, "gift") || "none",
   });
 
   if (!parsed.success) {
@@ -52,6 +56,19 @@ export async function inviteStoreAction(
       status: "error",
       message: "Please fix the highlighted fields and try again.",
       fieldErrors: toInviteFieldErrors(parsed.error),
+    };
+  }
+
+  /* The ten Founding Stores are counted before anything is made, so a
+     full cap is a plain refusal rather than a store with no gift. */
+  if (
+    parsed.data.gift === "founding" &&
+    (await foundingStoresTaken()) >= FOUNDING_STORE_CAP
+  ) {
+    return {
+      status: "error",
+      message: `All ${FOUNDING_STORE_CAP} Founding Store places are taken. Pick a timed gift instead.`,
+      fieldErrors: { gift: "No founding places left." },
     };
   }
 
@@ -80,6 +97,25 @@ export async function inviteStoreAction(
    */
   const setupLink = await generateSetupLink(parsed.data.contactEmail);
 
+  /* The gift lands before the email, so the email can say it. A failed
+     grant still invites; the admin page can give it again. */
+  let gift: GiftFacts | null = null;
+  if (parsed.data.gift !== "none") {
+    const granted = await grantGift(result.store.id, parsed.data.gift);
+    if (granted.ok) {
+      gift = giftFacts(granted.gift);
+      await alertFounderOfGift(
+        "granted",
+        result.store.name,
+        granted.gift.kind === "founding"
+          ? "was invited as a Founding Store: Ultra, free for life."
+          : `was invited with ${granted.gift.days} days of Ultra.`,
+      );
+    } else {
+      console.error(`The invitation's gift did not land: ${granted.reason}`);
+    }
+  }
+
   // The store exists from here on. Email failure must not read as failure to
   // invite — the admin can resend, and the account is already provisioned.
   const email = await sendEmail(
@@ -89,6 +125,7 @@ export async function inviteStoreAction(
       siteUrl(),
       setupLink,
       parsed.data.kind,
+      gift,
     ),
   );
 

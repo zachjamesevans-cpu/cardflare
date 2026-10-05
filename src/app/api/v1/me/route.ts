@@ -9,15 +9,27 @@ import {
   listWants,
   postedCardStores,
 } from "@/lib/players/wants";
+import type { GiftBar } from "@/lib/stores/gift-shared";
+import { giftBarFor } from "@/lib/stores/gifts";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { postedLabel } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
 
-/** The stores an account runs, named, for the remote's picker. */
-async function staffedStores(
-  userId: string,
-): Promise<{ storeId: string; name: string; code: string; role: "owner" | "staff" }[]> {
+/**
+ * The stores an account runs, named, for the remote's picker. An owner's
+ * row carries the green bar too (a beta gift's days, or the trial's),
+ * so the app says what the console says.
+ */
+async function staffedStores(userId: string): Promise<
+  {
+    storeId: string;
+    name: string;
+    code: string;
+    role: "owner" | "staff";
+    gift: GiftBar | null;
+  }[]
+> {
   const memberships = await apiStaffStores(userId);
   if (memberships.length === 0) return [];
   const { data } = await getSupabaseAdmin()
@@ -28,12 +40,19 @@ async function staffedStores(
       memberships.map((m) => m.storeId),
     );
   const byId = new Map((data ?? []).map((row) => [row.id, row]));
-  return memberships.flatMap((m) => {
+  const rows = memberships.flatMap((m) => {
     const store = byId.get(m.storeId);
-    return store
-      ? [{ storeId: m.storeId, name: store.name, code: store.join_code, role: m.role }]
-      : [];
+    return store ? [{ m, store }] : [];
   });
+  return Promise.all(
+    rows.map(async ({ m, store }) => ({
+      storeId: m.storeId,
+      name: store.name,
+      code: store.join_code,
+      role: m.role,
+      gift: m.role === "owner" ? await giftBarFor(m.storeId).catch(() => null) : null,
+    })),
+  );
 }
 
 /**

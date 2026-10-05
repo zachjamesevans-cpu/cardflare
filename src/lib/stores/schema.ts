@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { GIFT_CHOICES } from "./gift-shared";
+
 function optionalText(max: number) {
   return z
     .string()
@@ -31,6 +33,8 @@ export const inviteStoreSchema = z.object({
     .transform((value) => value.toLowerCase()),
   city: optionalText(80),
   region: optionalText(80),
+  /** Ultra, given with the invitation: none, 30/60/90 days, or founding. */
+  gift: z.enum(GIFT_CHOICES).default("none"),
 });
 
 export type InviteStoreInput = z.infer<typeof inviteStoreSchema>;

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Store as StoreIcon } from "lucide-react";
+import { Sparkles, Store as StoreIcon } from "lucide-react";
 
 import { ProfileCover } from "@/components/players/profile-cover";
 import { UltraMark } from "@/components/stores/ultra-mark";
@@ -24,11 +24,15 @@ import { Card } from "@/components/ui/card";
  * different things: Verified is trust an admin granted, Ultra is the
  * plan the store pays for. The placeholder mark stands in for a logo
  * the store has not uploaded; an unclaimed listing never has one.
+ *
+ * A Founding Store, one of the ten that got cardflare off the ground,
+ * wears one more mark beside Ultra, for as long as it is one.
  */
 export function StorePageHeader({
   name,
   verified,
   ultra,
+  founding = false,
   unclaimed,
   city,
   region,
@@ -40,6 +44,8 @@ export function StorePageHeader({
   name: string;
   verified: boolean;
   ultra: boolean;
+  /** One of the ten Founding Stores. */
+  founding?: boolean;
   unclaimed: boolean;
   city: string | null;
   region: string | null;
@@ -79,10 +85,20 @@ export function StorePageHeader({
           {verified && <VerifiedMark className="size-5" />}
         </Heading>
 
-        {ultra && (
-          <p className="text-xs font-semibold tracking-[0.14em] text-text-secondary uppercase">
-            cardflare <UltraMark /> store
-          </p>
+        {(ultra || founding) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {ultra && (
+              <p className="text-xs font-semibold tracking-[0.14em] text-text-secondary uppercase">
+                cardflare <UltraMark /> store
+              </p>
+            )}
+            {founding && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-accent/60 px-2 py-0.5 text-xs font-semibold text-accent">
+                <Sparkles className="size-3.5" aria-hidden="true" />
+                Founding Store
+              </span>
+            )}
+          </div>
         )}
 
         {place && <p className="text-sm text-text-secondary">{place}</p>}

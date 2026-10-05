@@ -1,5 +1,6 @@
 import { getViewer } from "@/lib/auth/session";
 import { consoleRole } from "@/lib/stores/console";
+import { GiftBar } from "./gift-bar";
 import { StoreTabsNav, type StoreTabId } from "./store-tabs-nav";
 
 /**
@@ -40,10 +41,15 @@ export async function StoreTabs({ storeId }: { storeId: string }) {
   const viewer = await getViewer();
   const role = consoleRole(viewer, storeId);
 
+  /* The green bar sits above the tabs on every console page, in its own
+     column so it spans the full width whatever row the tabs land in. */
   return (
-    <StoreTabsNav
-      storeId={storeId}
-      tabs={role === "owner" ? OWNER_TABS : ORGANIZER_TABS}
-    />
+    <div className="flex w-full flex-col gap-4">
+      <GiftBar storeId={storeId} owner={role === "owner"} />
+      <StoreTabsNav
+        storeId={storeId}
+        tabs={role === "owner" ? OWNER_TABS : ORGANIZER_TABS}
+      />
+    </div>
   );
 }

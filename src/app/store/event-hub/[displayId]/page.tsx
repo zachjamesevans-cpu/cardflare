@@ -15,6 +15,7 @@ import { buttonStyles } from "@/components/ui/button";
 import { loadStoreConsole } from "@/lib/stores/console";
 import { qrSvgFor } from "@/lib/stores/setup-qr";
 import { tierHasFeature } from "@/lib/stores/ultra-access";
+import { GiftBar } from "@/components/stores/gift-bar";
 import { ConsoleLocked } from "@/components/stores/ultra-locked";
 import { moveTimerToScreenAction } from "@/lib/event-hub/actions";
 import { displayPayload } from "@/lib/event-hub/display-payload";
@@ -99,6 +100,10 @@ export default async function ManageScreenPage({
       areas={areas}
       currentArea={`/store?as=${store.id}`}
     >
+      {/* No tab bar on a single screen's page, so the green bar is drawn
+          here directly: every console page carries it. */}
+      <GiftBar storeId={store.id} owner={store.role === "owner"} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href={backHref}

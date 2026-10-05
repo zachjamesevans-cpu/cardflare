@@ -15,6 +15,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { giftCheckoutTerms } from "./gifts";
 import { createStoreAccount } from "./self-serve";
 import {
   ULTRA_TRIAL_DAYS,
@@ -151,6 +152,15 @@ async function sendToCheckout(
     redirect(settings);
   }
 
+  /*
+   * A store that was in the beta keeps Ultra at the founding price, and
+   * gets no second free trial: during a live gift the first charge is
+   * the gift's last day, after it the plan starts now. A Founding Store
+   * has nothing to pay for.
+   */
+  const beta = await giftCheckoutTerms(storeId);
+  if (beta?.founding) redirect(settings);
+
   const session = await createCheckoutSession({
     tier: "ultra",
     storeId,
@@ -158,7 +168,9 @@ async function sendToCheckout(
     customerId: existing?.stripe_customer_id ?? undefined,
     successUrl: `${origin}${setup}&checkout=success&session_id={CHECKOUT_SESSION_ID}`,
     cancelUrl: `${origin}${settings}&checkout=cancelled`,
-    trialDays: existing ? undefined : ULTRA_TRIAL_DAYS,
+    priceId: beta?.priceId ?? null,
+    trialEnd: beta?.trialEnd ?? undefined,
+    trialDays: existing || beta ? undefined : ULTRA_TRIAL_DAYS,
   });
 
   if (!session.ok) redirect(`${settings}&checkout=failed`);
