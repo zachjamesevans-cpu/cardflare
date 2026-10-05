@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import {
@@ -15,6 +16,7 @@ import {
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { ThreadTradeBlock, TradeTrigger } from "@/components/local/thread-trade-block";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { ReportSheet } from "@/components/players/report-sheet";
 import { blockPlayerAction } from "@/lib/players/safety-actions";
 import { Button } from "@/components/ui/button";
@@ -56,9 +58,10 @@ const DEVICE_CHOICE_KEY = "cf-local-device";
  *
  * Two halves on one screen, because they are one loop: the Flares
  * people near you have posted, and the conversations those Flares
- * started. "I have this" is the hinge — it opens a thread tied to that
- * exact card, so every conversation begins with its subject already on
- * the table. There is deliberately no other way to message anybody.
+ * started. "I have this" is the hinge: it writes into the person's one
+ * conversation with that exact card drawn above the message, so the
+ * subject is on the table. A profile's Message button opens the same
+ * conversation with nothing attached.
  *
  * Distance is a number the server computed; no coordinate ever reaches
  * this component. When the player has given no location at all, the
@@ -402,36 +405,58 @@ function RadiusRow({
   );
 }
 
+/**
+ * One conversation, one person: Instagram's Messages row. The founder
+ * (2026-10-04): "Conversation should be person. Like this, showing
+ * their profile pic." So the row is their face, their name, and the
+ * last thing said; a card offer lives inside the conversation as a
+ * message, never on the row. Unread is a dot, not a count.
+ */
 function ThreadRow({ thread, onOpen }: { thread: ThreadSummary; onOpen: () => void }) {
+  const unread = thread.unread > 0;
+  const preview = thread.lastMessagePreview ?? "";
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="flex w-full items-center gap-3 border-t border-border p-3 text-left first:border-t-0 hover:bg-elevated"
+      className="flex w-full items-center gap-3 border-t border-border px-3 py-2.5 text-left first:border-t-0 hover:bg-elevated"
     >
-      <Thumb imageUrl={thread.imageUrl} />
+      <PlayerAvatar
+        displayName={thread.withName}
+        seed={thread.withPlayerId}
+        avatarUrl={thread.withAvatarUrl}
+        size="lg"
+        className="size-14! text-lg!"
+      />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-semibold text-text-primary">
-          {thread.withName}
-          {/* A direct message has no card: the name stands alone. */}
-          {thread.cardName && (
-            <span className="font-normal text-text-muted"> · {thread.cardName}</span>
+        <span
+          className={cn(
+            "block truncate text-text-primary",
+            unread ? "font-bold" : "font-medium",
           )}
+        >
+          {thread.withName}
         </span>
-        <span className="block truncate text-sm text-text-secondary">
-          {thread.lastMessagePreview ?? ""}
-        </span>
-      </span>
-      <span className="flex shrink-0 flex-col items-end gap-1">
-        <span className="text-xs text-text-muted">
-          {agoLabel(thread.lastMessageAt)}
-        </span>
-        {thread.unread > 0 && (
-          <span className="min-w-5 rounded-full bg-accent px-1.5 text-center text-xs leading-5 font-bold text-accent-contrast">
-            {thread.unread}
+        <span
+          className={cn(
+            "flex min-w-0 text-sm",
+            unread ? "font-semibold text-text-primary" : "text-text-secondary",
+          )}
+        >
+          <span className="truncate">
+            {thread.lastFromYou ? "You: " + preview : preview}
           </span>
-        )}
+          <span className="shrink-0 whitespace-pre">
+            {" · "}
+            {agoLabel(thread.lastMessageAt)}
+          </span>
+        </span>
       </span>
+      {unread && (
+        <span className="size-2.5 shrink-0 rounded-full bg-accent">
+          <span className="sr-only">Unread</span>
+        </span>
+      )}
     </button>
   );
 }
@@ -584,6 +609,7 @@ function ThreadView({
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
+  const [withAvatarUrl, setWithAvatarUrl] = useState<string | null>(null);
   /* Block's inline question, and whether it has landed. */
   const [asking, setAsking] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -613,6 +639,7 @@ function ThreadView({
       setTrade(thread.trade);
       setMeet(thread.meet);
       setWithPlayerId(thread.withPlayerId ?? null);
+      setWithAvatarUrl(thread.withAvatarUrl ?? null);
     });
     /* onBack is stable enough for a mount effect; re-running on its
        identity would reload the thread on every parent render. */
@@ -693,10 +720,29 @@ function ThreadView({
           <ChevronLeft className="size-4" aria-hidden="true" />
           {LOCAL_ENABLED ? "Local" : "Messages"}
         </button>
-        <div className="min-w-0 flex-1 text-center">
-          <p className="truncate font-semibold text-text-primary">
-            {withName ?? "Conversation"}
-          </p>
+        <div className="flex min-w-0 flex-1 flex-col items-center">
+          {/* Their face beside their name, and both open their
+              profile: the conversation is the person. */}
+          {withPlayerId ? (
+            <Link
+              href={`/p/${withPlayerId}`}
+              className="flex max-w-full min-w-0 items-center gap-2 hover:opacity-80"
+            >
+              <PlayerAvatar
+                displayName={withName ?? "Player"}
+                seed={withPlayerId}
+                avatarUrl={withAvatarUrl}
+                size="sm"
+              />
+              <span className="truncate font-semibold text-text-primary">
+                {withName ?? "Conversation"}
+              </span>
+            </Link>
+          ) : (
+            <p className="truncate font-semibold text-text-primary">
+              {withName ?? "Conversation"}
+            </p>
+          )}
           {/* The subject, when the thread has one. A direct message
               is about whatever the two of them say it is. */}
           {cardName && (
@@ -721,21 +767,32 @@ function ThreadView({
             <div
               key={message.id}
               className={cn(
-                "max-w-[85%] rounded-[var(--radius-control)] px-3 py-2 text-sm",
-                message.yours
-                  ? "self-end bg-accent text-accent-contrast"
-                  : "self-start bg-elevated text-text-primary",
+                "flex max-w-[85%] flex-col gap-1",
+                message.yours ? "items-end self-end" : "items-start self-start",
               )}
             >
-              <p className="break-words whitespace-pre-wrap">{message.body}</p>
-              <p
+              {/* The card a message is about ("I have this", a nearby
+                  match), on the sender's side just above the words, so
+                  "I have this one" reads as being about that card. */}
+              {message.card && <CardBubble card={message.card} />}
+              <div
                 className={cn(
-                  "mt-1 text-[10px]",
-                  message.yours ? "text-accent-contrast/70" : "text-text-muted",
+                  "rounded-[var(--radius-control)] px-3 py-2 text-sm",
+                  message.yours
+                    ? "bg-accent text-accent-contrast"
+                    : "bg-elevated text-text-primary",
                 )}
               >
-                {agoLabel(message.sentAt)}
-              </p>
+                <p className="break-words whitespace-pre-wrap">{message.body}</p>
+                <p
+                  className={cn(
+                    "mt-1 text-[10px]",
+                    message.yours ? "text-accent-contrast/70" : "text-text-muted",
+                  )}
+                >
+                  {agoLabel(message.sentAt)}
+                </p>
+              </div>
             </div>
           ))
         )}
@@ -1000,9 +1057,29 @@ function FlareGroup({
   );
 }
 
+/** The card a message carries, small, opening the card's page. */
+function CardBubble({ card }: { card: NonNullable<ThreadMessage["card"]> }) {
+  return (
+    <Link
+      href={`/cards/${card.cardId}`}
+      className="flex max-w-full items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2 hover:bg-elevated"
+    >
+      <Thumb imageUrl={card.imageUrl} />
+      <span className="min-w-0">
+        <span className="block truncate text-sm font-semibold text-text-primary">
+          {card.name}
+        </span>
+        <span className="block truncate font-mono text-xs text-text-muted">
+          {card.number}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
 function Thumb({ imageUrl }: { imageUrl: string | null }) {
   return (
-    <span className="block w-12 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
+    <span className="block w-11 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
       <span className="block aspect-[60/84] w-full">
         {imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */

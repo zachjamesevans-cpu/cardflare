@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { MESSAGE_MAX_LENGTH } from "@/lib/local/shared";
@@ -24,7 +25,7 @@ export async function GET(
   const thread = await readThread(threadId, player.playerId);
   if (!thread.ok) return Response.json({ ok: false }, { status: 404 });
 
-  return Response.json(thread);
+  return Response.json(absoluteImageUrls(thread));
 }
 
 const sendSchema = z.object({

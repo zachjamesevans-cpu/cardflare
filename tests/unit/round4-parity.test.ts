@@ -110,14 +110,17 @@ describe("Wanted from you ends in Message, not Go", () => {
 });
 
 describe("a thread view never assumes a card", () => {
+  /* The Messages row names no card at all since one conversation per
+     person (tests/unit/dm-person-parity.test.ts); the thread view keeps
+     its "About" line only for a thread that has a card. */
   it("on the website: the card line only when there is one", () => {
-    expect(web.local).toContain("{thread.cardName && (");
+    expect(web.local).not.toContain("{thread.cardName &&");
     expect(web.local).toContain("{cardName && (");
     expect(web.local).toContain("About {cardName}");
   });
 
   it("in the app", () => {
-    expect(app.local).toMatch(/thread\.cardName\s*(\?|&&)/);
+    expect(app.local).not.toContain("thread.cardName");
     expect(app.thread).toMatch(/cardName\s*(\?|&&)/);
   });
 });

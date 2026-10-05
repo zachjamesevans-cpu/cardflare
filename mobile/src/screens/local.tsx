@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
@@ -18,7 +17,7 @@ import {
 import { LOCAL_RADII, MESSAGE_MAX_LENGTH, agoLabel, milesLabel } from "../local-shared";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
-import { RemoteImage } from "../remote-image";
+import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 import {
@@ -390,89 +389,80 @@ function RadiusRow({ current, onSaved }: { current: number; onSaved: () => void 
   );
 }
 
-/** The card's face, or a speech bubble for a conversation with no card. */
-function Thumb({ uri }: { uri: string | null }) {
-  return (
-    <View
-      style={{
-        width: 48,
-        aspectRatio: 60 / 84,
-        borderRadius: 4,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        overflow: "hidden",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      {uri ? (
-        <RemoteImage uri={uri} style={{ width: "100%", height: "100%" }} />
-      ) : (
-        <Ionicons name="chatbubble-outline" size={20} color={colors.textMuted} />
-      )}
-    </View>
-  );
-}
-
 /**
- * One conversation: who, and the card when there is one. A direct
- * message, opened from a profile, is about nothing in particular, so
- * its row is the name alone.
+ * One conversation, one person: Instagram's Messages row. The founder
+ * (2026-10-04): "Conversation should be person. Like this, showing
+ * their profile pic." So the row is their face, their name, and the
+ * last thing said; a card offer lives inside the conversation as a
+ * message, never on the row. Unread is a dot, not a count. Plain rows,
+ * no Card box, the way the screenshot reads.
  */
 function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void }) {
+  const unread = thread.unread > 0;
+  const preview = thread.lastMessagePreview ?? "";
   return (
     <Tap onPress={onOpen}>
-      <Card>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
-          <Thumb uri={thread.imageUrl} />
-          <View style={{ flex: 1, minWidth: 0 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing(3),
+          paddingVertical: spacing(1),
+        }}
+      >
+        <PlayerAvatar
+          displayName={thread.withName}
+          seed={thread.withPlayerId}
+          avatarUrl={thread.withAvatarUrl}
+          size={56}
+        />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              color: colors.textPrimary,
+              fontSize: 15,
+              fontWeight: unread ? "700" : "500",
+            }}
+          >
+            {thread.withName}
+          </Text>
+          <View style={{ flexDirection: "row", marginTop: 2 }}>
             <Text
               numberOfLines={1}
-              style={{ color: colors.textPrimary, fontWeight: "700" }}
+              style={{
+                flexShrink: 1,
+                color: unread ? colors.textPrimary : colors.textSecondary,
+                fontSize: 13,
+                fontWeight: unread ? "600" : "400",
+              }}
             >
-              {thread.withName}
-              {thread.cardName ? (
-                <Text style={{ color: colors.textMuted, fontWeight: "400" }}>
-                  {"  ·  "}
-                  {thread.cardName}
-                </Text>
-              ) : null}
+              {thread.lastFromYou ? "You: " + preview : preview}
             </Text>
             <Text
-              numberOfLines={1}
-              style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}
+              style={{
+                color: unread ? colors.textPrimary : colors.textSecondary,
+                fontSize: 13,
+                fontWeight: unread ? "600" : "400",
+              }}
             >
-              {thread.lastMessagePreview ?? ""}
+              {" · "}
+              {agoLabel(thread.lastMessageAt)}
             </Text>
-          </View>
-          <View style={{ alignItems: "flex-end", gap: spacing(1) }}>
-            <Muted>{agoLabel(thread.lastMessageAt)}</Muted>
-            {thread.unread > 0 && (
-              <View
-                style={{
-                  minWidth: 20,
-                  borderRadius: 999,
-                  backgroundColor: colors.accent,
-                  paddingHorizontal: 6,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.accentContrast,
-                    fontSize: 12,
-                    fontWeight: "800",
-                    textAlign: "center",
-                    lineHeight: 20,
-                  }}
-                >
-                  {thread.unread}
-                </Text>
-              </View>
-            )}
           </View>
         </View>
-      </Card>
+        {unread ? (
+          <View
+            accessibilityLabel="Unread"
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: colors.accent,
+            }}
+          />
+        ) : null}
+      </View>
     </Tap>
   );
 }

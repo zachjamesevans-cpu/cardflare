@@ -4,6 +4,7 @@ import { notifyThreadTrade } from "@/lib/notifications/notify";
 import { awardTradeEmbers } from "@/lib/players/embers";
 import { recordTradeFound } from "@/lib/players/hunts";
 import { blockedBetween } from "@/lib/players/safety";
+import { conversationIdFor } from "@/lib/local/pairs";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { disputeTrade } from "./repository";
 import { THREAD_TRADE_QUANTITY_MAX } from "./thread-trade-copy";
@@ -25,6 +26,10 @@ import { THREAD_TRADE_QUANTITY_MAX } from "./thread-trade-copy";
  * Flare or a saved want is about exactly one card, so nobody retypes
  * it. A direct message is about nothing in particular, so there the
  * person saying "We traded" picks the card and says which way it went.
+ *
+ * Every pair has one conversation now (`src/lib/local/pairs.ts`), so a
+ * trade is written on the pair's chat even when it was said from an
+ * old link to a thread on a Flare; that anchor still names the card.
  *
  * ONE PENDING TRADE PER CONVERSATION. Until the other side has
  * answered, or the window has closed, a second "We traded" is refused:
@@ -107,13 +112,14 @@ export async function latestThreadTrade(
 ): Promise<ThreadTrade | null> {
   if (!isSupabaseConfigured()) return null;
   const admin = getSupabaseAdmin();
+  const conversationId = (await conversationIdFor(threadId)) ?? threadId;
 
   const { data: row } = await admin
     .from("trades")
     .select(
       "id, card_id, quantity, requester_player_id, holder_player_id, proposed_by, confirmed_at, acknowledged_at, paid_at, disputed_at, flare_id",
     )
-    .eq("thread_id", threadId)
+    .eq("thread_id", conversationId)
     .order("confirmed_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -168,7 +174,7 @@ async function closeFlareAsTraded(flareId: string, quantity: number): Promise<vo
 }
 
 export interface ProposeInput {
-  /** Required on a direct message; ignored when the thread has a card. */
+  /** Required on a direct message; on an old anchor link, wins over its card. */
   cardId?: string | null;
   printingId?: string | null;
   quantity: number;
@@ -200,11 +206,12 @@ export async function proposeThreadTrade(
   if (await blockedBetween(viewerId, otherId)) return { ok: false, reason: "closed" };
 
   const admin = getSupabaseAdmin();
+  const conversationId = (await conversationIdFor(threadId)) ?? threadId;
 
   const { data: open } = await admin
     .from("trades")
     .select("id")
-    .eq("thread_id", threadId)
+    .eq("thread_id", conversationId)
     .is("acknowledged_at", null)
     .is("paid_at", null)
     .is("disputed_at", null)
@@ -234,7 +241,9 @@ export async function proposeThreadTrade(
   let flareId: string | null = null;
   let authorSaid = false;
 
-  if (thread.flare_id) {
+  /* The conversation screen always offers the card picker now; a card
+     picked there wins over an old anchor's own. */
+  if (thread.flare_id && !input.cardId) {
     const { data: flare } = await admin
       .from("flares")
       .select("id, card_id, printing_id")
@@ -247,7 +256,7 @@ export async function proposeThreadTrade(
     requesterId = thread.author_player_id;
     holderId = thread.responder_player_id;
     authorSaid = viewerId === thread.author_player_id;
-  } else if (thread.want_id) {
+  } else if (thread.want_id && !input.cardId) {
     const { data: want } = await admin
       .from("player_wants")
       .select("id, card_id")
@@ -284,7 +293,7 @@ export async function proposeThreadTrade(
     .from("trades")
     .insert({
       event_id: null,
-      thread_id: threadId,
+      thread_id: conversationId,
       flare_id: flareId,
       requester_session_id: null,
       holder_session_id: null,
@@ -307,9 +316,9 @@ export async function proposeThreadTrade(
 
   if (flareId && authorSaid) await closeFlareAsTraded(flareId, quantity);
 
-  await notifyThreadTrade(threadId, inserted.id, viewerId, otherId, "proposed");
+  await notifyThreadTrade(conversationId, inserted.id, viewerId, otherId, "proposed");
 
-  const trade = await latestThreadTrade(threadId, viewerId);
+  const trade = await latestThreadTrade(conversationId, viewerId);
   return trade ? { ok: true, trade } : { ok: false, reason: "unavailable" };
 }
 

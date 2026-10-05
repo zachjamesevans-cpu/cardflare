@@ -25,6 +25,7 @@ export function absoluteImageUrls<T>(value: T): T {
     for (const [key, inner] of Object.entries(node as Record<string, unknown>)) {
       out[key] =
         (key === "avatarUrl" ||
+          key === "withAvatarUrl" ||
           key === "imageUrl" ||
           key === "frontImageUrl" ||
           key === "url") &&
