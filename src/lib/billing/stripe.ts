@@ -194,10 +194,17 @@ export async function createCheckoutSession(entry: {
    * they cancel from the billing portal first.
    */
   trialDays?: number;
+  /**
+   * Unix seconds of the first charge, in place of `trialDays`: a store
+   * keeping Ultra during its beta gift pays from the gift's last day.
+   */
+  trialEnd?: number;
+  /** A price other than the tier's own: the founding price. */
+  priceId?: string | null;
 }): Promise<StripeResult<{ id: string; url: string }>> {
   if (!isTier(entry.tier)) return { ok: false, reason: "stripe-error" };
 
-  const price = stripePriceId(entry.tier);
+  const price = entry.priceId || stripePriceId(entry.tier);
   if (!price) return { ok: false, reason: "not-configured" };
 
   const metadata = {
@@ -221,7 +228,11 @@ export async function createCheckoutSession(entry: {
     metadata,
     subscription_data: {
       metadata,
-      ...(entry.trialDays ? { trial_period_days: entry.trialDays } : {}),
+      ...(entry.trialEnd
+        ? { trial_end: entry.trialEnd }
+        : entry.trialDays
+          ? { trial_period_days: entry.trialDays }
+          : {}),
     },
   });
 }

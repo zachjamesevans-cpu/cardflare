@@ -72,8 +72,10 @@ as a lockup — no font can drift from art.
   white card (alpha from distance-to-white, colours un-composited so
   the glow keeps its green) into
   `public/brand/cardflare-wordmark-cut.png` for the web and
-  `mobile/assets/wordmark.png` for the app. The `Logo` component and
-  the app header draw those; nothing else should.
+  `mobile/assets/wordmark.png` for the app. The `Logo` component, the
+  app header and the emails (`src/lib/email/store-gift.ts`, where the
+  master's white card would sit on the dark message as a white box)
+  draw those; nothing else should.
 - **In prose, titles and the app's home-screen name** the word is still
   TEXT — always lowercase "cardflare", set in whatever face the copy
   around it uses. There is no display font any more; body text,

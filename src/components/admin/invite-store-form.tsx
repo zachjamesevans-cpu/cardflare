@@ -9,6 +9,11 @@ import { Select, TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { inviteStoreAction } from "@/lib/stores/actions";
 import {
+  FOUNDING_STORE_CAP,
+  GIFT_CHOICE_LABELS,
+  GIFT_CHOICES,
+} from "@/lib/stores/gift-shared";
+import {
   INVITE_STORE_IDLE,
   type InviteEmailOutcome,
   type InviteStoreFieldErrors,
@@ -102,7 +107,17 @@ function InviteOutcome({
   );
 }
 
-export function InviteStoreForm() {
+/**
+ * The Founding Store option says how many places are left, and cannot be
+ * picked once there are none. The server counts again on submit; this
+ * is only so nobody picks a place that is not there.
+ */
+function giftOptionLabel(choice: (typeof GIFT_CHOICES)[number], foundingLeft: number) {
+  if (choice !== "founding") return GIFT_CHOICE_LABELS[choice];
+  return `${GIFT_CHOICE_LABELS.founding}, ${foundingLeft} of ${FOUNDING_STORE_CAP} left`;
+}
+
+export function InviteStoreForm({ foundingLeft }: { foundingLeft: number }) {
   const [state, formAction] = useActionState(inviteStoreAction, INVITE_STORE_IDLE);
 
   // As with the waitlist form, React resets an uncontrolled form once the
@@ -151,6 +166,32 @@ export function InviteStoreForm() {
           >
             <option value="lgs">Game store</option>
             <option value="vendor">Card-show vendor</option>
+          </Select>
+        </Field>
+
+        {/* Ultra, given with the invitation: no card, no Stripe. */}
+        <Field
+          name="gift"
+          label="Gift"
+          hint="No card needed. They get Ultra the moment they sign in."
+          error={errorFor(state, "gift")}
+        >
+          <Select
+            {...fieldIds("gift")}
+            name="gift"
+            defaultValue="none"
+            aria-invalid={errorFor(state, "gift") ? true : undefined}
+            aria-describedby={describedBy("gift", !!errorFor(state, "gift"), true)}
+          >
+            {GIFT_CHOICES.map((choice) => (
+              <option
+                key={choice}
+                value={choice}
+                disabled={choice === "founding" && foundingLeft <= 0}
+              >
+                {giftOptionLabel(choice, foundingLeft)}
+              </option>
+            ))}
           </Select>
         </Field>
 

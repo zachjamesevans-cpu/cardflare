@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
+import type { GiftBar } from "./gift-copy";
 import { clearCache } from "./cache";
 import type { RoomTimerWire } from "./room-timer-wire";
 
@@ -587,9 +588,23 @@ export interface Me {
    * The stores this account may RUN, for the timer remote: owners and
    * organizers (the TO badge) alike. Optional so a build against an
    * older server reads it as nobody, which locks nothing.
+   *
+   * An owner's row carries `gift`, the green bar the store console draws
+   * (a beta gift's days, a Founding Store, or the trial's); null for an
+   * organizer, and absent from an older server.
    */
-  staff?: { storeId: string; name: string; code: string; role: "owner" | "staff" }[];
+  staff?: {
+    storeId: string;
+    name: string;
+    code: string;
+    role: "owner" | "staff";
+    gift?: GiftBar | null;
+  }[];
 }
+
+/* The green bar's state lives beside its words, with no app imports,
+   so the website's tests can read it. */
+export type { GiftBar } from "./gift-copy";
 
 export const getMe = () => call<Me>("GET", "/api/v1/me");
 
@@ -3355,6 +3370,8 @@ export interface PublicStore {
   website: string | null;
   verified: boolean;
   ultra: boolean;
+  /** One of the ten Founding Stores: wears the mark. Absent from an older server. */
+  founding?: boolean;
   unclaimed: boolean;
   /** What the store says about itself. Absent from an older server. */
   description?: string | null;

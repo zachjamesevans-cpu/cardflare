@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Linking, ScrollView, Text, View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
 import {
@@ -220,18 +220,31 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
             {store.verified ? <VerifiedMark size={20} /> : null}
           </View>
 
-          {store.ultra ? (
-            <Text
+          {store.ultra || store.founding ? (
+            <View
               style={{
-                color: colors.textSecondary,
-                fontSize: 11,
-                fontWeight: "600",
-                letterSpacing: 1.5,
-                textTransform: "uppercase",
+                flexDirection: "row",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: spacing(2),
               }}
             >
-              cardflare <Text style={{ color: colors.accent }}>Ultra</Text> store
-            </Text>
+              {store.ultra ? (
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: "600",
+                    letterSpacing: 1.5,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  cardflare <Text style={{ color: colors.accent }}>Ultra</Text> store
+                </Text>
+              ) : null}
+              {/* One of the ten Founding Stores, beside the Ultra mark. */}
+              {store.founding ? <FoundingMark /> : null}
+            </View>
           ) : null}
 
           {store.city || store.region ? (
@@ -626,6 +639,41 @@ function ClaimForm({
       <Button label="Cancel" variant="secondary" onPress={onCancel} />
 
       <ErrorLine message={error} />
+    </View>
+  );
+}
+
+/**
+ * The Founding Store mark: one of the ten stores that got cardflare off
+ * the ground, Ultra for life. An accent outline rather than a fill, so it
+ * sits beside the Ultra line without shouting over the name.
+ */
+function FoundingMark() {
+  return (
+    <View
+      accessibilityLabel="Founding Store"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(1),
+        borderColor: colors.accent,
+        borderWidth: 1,
+        borderRadius: 999,
+        paddingHorizontal: spacing(2),
+        paddingVertical: 2,
+      }}
+    >
+      <Ionicons name="sparkles" size={12} color={colors.accent} />
+      <Text
+        style={{
+          color: colors.accent,
+          fontSize: 11,
+          fontWeight: "700",
+          letterSpacing: 0.6,
+        }}
+      >
+        Founding Store
+      </Text>
     </View>
   );
 }

@@ -20,21 +20,36 @@ import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
  * what /ultra is for. Stripe's cancel and failure doors, and the
  * billing portal, all come back here so the notice lands beside the
  * card it is about. A successful checkout lands in the setup wizard.
+ *
+ * A store that was in the beta is never offered a free trial: the
+ * checkout gives it none (the gift was the trial), so the button reads
+ * "Keep Ultra" and the terms say its own price. A Founding Store has
+ * nothing to start at all.
  */
 export function BillingCard({
   storeId,
   plan,
   sellable,
+  offer,
+  founding,
   notice,
 }: {
   storeId: string;
   plan: StorePlan;
   sellable: boolean;
+  /** From `ultraOfferFor`: whether the store was in the beta, and its price. */
+  offer: { beta: boolean; price: string };
+  /** A live Founding Store: Ultra for life, nothing to pay. */
+  founding: boolean;
   /** What the query string said on arrival, already turned into words. */
   notice: BillingNotice | null;
 }) {
-  const line = planLine(plan);
-  const canStart = plan.state === "none" || plan.state === "ended";
+  const canStart = !founding && (plan.state === "none" || plan.state === "ended");
+  const line = founding
+    ? "Founding Store. Ultra is yours, free, for life."
+    : canStart && offer.beta
+      ? `${offer.price} a month, locked in for life. Cancel any time from Settings.`
+      : planLine(plan);
   const canManage = "canManage" in plan && plan.canManage;
 
   return (
@@ -70,9 +85,11 @@ export function BillingCard({
             <form action={startUltraCheckoutAction}>
               <input type="hidden" name="storeId" value={storeId} />
               <Button type="submit" size="sm">
-                {plan.state === "none"
-                  ? `Start your ${ULTRA_TRIAL_DAYS}-day free trial`
-                  : "Start Ultra again"}
+                {offer.beta
+                  ? "Keep Ultra"
+                  : plan.state === "none"
+                    ? `Start your ${ULTRA_TRIAL_DAYS}-day free trial`
+                    : "Start Ultra again"}
               </Button>
             </form>
           ) : (
@@ -133,13 +150,24 @@ export interface BillingNotice {
   tone: "success" | "neutral" | "danger";
 }
 
-export function billingNotice(params: { checkout?: string }): BillingNotice | null {
+export function billingNotice(
+  params: { checkout?: string },
+  /* A store from the beta has no trial to start, so nothing may say so. */
+  beta = false,
+): BillingNotice | null {
   if (params.checkout === "success") {
-    return { text: "Welcome to Ultra. Your free trial has started.", tone: "success" };
+    return {
+      text: beta
+        ? "Welcome to Ultra. It is yours to keep."
+        : "Welcome to Ultra. Your free trial has started.",
+      tone: "success",
+    };
   }
   if (params.checkout === "cancelled") {
     return {
-      text: "Checkout was closed. Your store is ready; start the trial whenever you like.",
+      text: beta
+        ? "Checkout was closed. Your store is ready; keep Ultra whenever you like."
+        : "Checkout was closed. Your store is ready; start the trial whenever you like.",
       tone: "neutral",
     };
   }

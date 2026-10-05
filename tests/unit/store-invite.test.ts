@@ -106,7 +106,9 @@ describe("storeInviteEmail", () => {
       "https://cardflare.gg",
     );
 
-    expect(email.html).not.toContain("<img");
+    /* The wordmark is the one real image; the name must not add another. */
+    expect(email.html).not.toContain("<img src=x");
+    expect(email.html.match(/<img /g)).toHaveLength(1);
     expect(email.html).toContain("&lt;img");
   });
 

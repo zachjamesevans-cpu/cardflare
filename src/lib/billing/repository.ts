@@ -307,13 +307,26 @@ export async function syncStoreTierFromSubscription(storeId: string): Promise<vo
 
   const [subscription, { data: store }] = await Promise.all([
     subscriptionForStore(storeId),
-    admin.from("stores").select("tier").eq("id", storeId).maybeSingle(),
+    admin
+      .from("stores")
+      .select("tier, gift_kind, gift_until, gift_ended_at")
+      .eq("id", storeId)
+      .maybeSingle(),
   ]);
 
   if (!store || !subscription) return;
 
   const entitled = entitledTier(subscription);
   const paid = entitled === "ultra" || entitled === "max" ? entitled : null;
+
+  /* A live beta gift holds Ultra up whatever the subscription does; the
+     gift sweep lowers it when the gift ends. */
+  const gifted =
+    store.gift_kind !== null &&
+    store.gift_ended_at === null &&
+    (store.gift_kind === "founding" ||
+      (store.gift_until !== null && Date.parse(store.gift_until) > Date.now()));
+  if (!paid && gifted) return;
 
   const next =
     paid && store.tier !== paid ? paid : !paid && store.tier !== "free" ? "free" : null;

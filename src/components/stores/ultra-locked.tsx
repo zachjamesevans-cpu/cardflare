@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { Area } from "@/lib/auth/areas";
 import { SITE } from "@/lib/site";
+import { ultraOfferFor } from "@/lib/stores/gifts";
 import { storePlan } from "@/lib/stores/ultra";
 import { startUltraCheckoutAction } from "@/lib/stores/ultra-actions";
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
@@ -37,8 +38,9 @@ export async function UltraLocked({
   heading?: string;
 }) {
   /* A store whose trial is spent does not get a second one, so the
-     button must not promise it. */
-  const plan = await storePlan(storeId);
+     button must not promise it. Nor does a store that was in the beta:
+     the gift was its trial, so it keeps Ultra at its own price. */
+  const [plan, offer] = await Promise.all([storePlan(storeId), ultraOfferFor(storeId)]);
   const again = plan.state !== "none";
 
   return (
@@ -65,18 +67,22 @@ export async function UltraLocked({
           >
             <input type="hidden" name="storeId" value={storeId} />
             <Button type="submit" size="lg">
-              {again
-                ? "Start Ultra again"
-                : `Start your ${ULTRA_TRIAL_DAYS}-day free trial`}
+              {offer.beta
+                ? "Keep Ultra"
+                : again
+                  ? "Start Ultra again"
+                  : `Start your ${ULTRA_TRIAL_DAYS}-day free trial`}
             </Button>
             <Link href="/ultra" className="text-sm text-accent hover:text-accent-hover">
               Everything in Ultra
             </Link>
           </form>
           <p className="text-xs text-text-muted">
-            {again
-              ? `${ULTRA_PRICE_LABEL} a month. Cancel any time from Settings.`
-              : `${ULTRA_PRICE_LABEL} a month after ${ULTRA_TRIAL_DAYS} days. Cancel before day ${ULTRA_TRIAL_DAYS} from Settings and nothing is charged.`}
+            {offer.beta
+              ? `${offer.price} a month, locked in for life. Cancel any time from Settings.`
+              : again
+                ? `${ULTRA_PRICE_LABEL} a month. Cancel any time from Settings.`
+                : `${ULTRA_PRICE_LABEL} a month after ${ULTRA_TRIAL_DAYS} days. Cancel before day ${ULTRA_TRIAL_DAYS} from Settings and nothing is charged.`}
           </p>
         </div>
       ) : (

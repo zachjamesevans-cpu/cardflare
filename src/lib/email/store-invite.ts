@@ -1,6 +1,21 @@
 import { SITE } from "@/lib/site";
 import { ULTRA_PRICE_LABEL, ULTRA_TRIAL_DAYS } from "@/lib/stores/ultra-schema";
 import type { EmailMessage } from "./client";
+import { EMAIL_COLOR as COLOR, escapeHtml } from "./palette";
+import {
+  emailButton,
+  emailFooter,
+  emailHeadline,
+  emailLink,
+  emailParagraph,
+  emailPerks,
+  emailShell,
+  emailTicket,
+  giftTicket,
+  perksText,
+  ticketText,
+  type GiftFacts,
+} from "./store-gift";
 
 /**
  * Sent when a store is added to the beta.
@@ -14,40 +29,24 @@ import type { EmailMessage } from "./client";
  * tapping it signs the store in and lands them on the setup screen with their
  * address already filled in.
  *
- * It expires — an hour by default — and a shop owner reads email the next
+ * It expires, an hour by default, and a shop owner reads email the next
  * morning, so the message says so plainly and gives the one-step way to get
  * another. That paragraph is not boilerplate; it is the difference between a
  * dead link and a recovered one.
  *
- * Styling follows the waitlist email: inline styles, no images, a real
- * plain-text alternative.
+ * The founder wanted the store invitation to be "a super good email that is
+ * poppy and cool and exciting that they are part of the cardflare beta", so
+ * the store variants are drawn from the gift emails' pieces (store-gift.ts):
+ * a lime "You're in.", the gift as a ticket in huge type, three rows of what
+ * they get, one big button. The player variant keeps its quieter layout.
  */
-const COLOR = {
-  canvas: "#0e1116",
-  surface: "#151a21",
-  border: "#2a323d",
-  accent: "#c6ee4f",
-  accentContrast: "#0e1116",
-  textPrimary: "#f2f5f7",
-  textSecondary: "#b3becc",
-  textMuted: "#8593a4",
-};
 
 /*
- * The step after setting a password, for a game store: invited stores
- * start the Ultra trial from their console (the founder's plan for this
- * round of invites), so the email says what that is and what it costs.
+ * The step after setting a password, for a game store invited without a
+ * gift: invited stores start the Ultra trial from their console, so the
+ * email says what that is and what it costs.
  */
 const ULTRA_LINE = `Once you are in, your console has one button to start your ${ULTRA_TRIAL_DAYS}-day free trial of ${SITE.name} Ultra: FlareCast on your TV with Auto Mode running the rounds, your singles matched to every Flare in the room, and posts to your followers. ${ULTRA_PRICE_LABEL} a month after that; cancel before day ${ULTRA_TRIAL_DAYS} and nothing is charged.`;
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 export function storeInviteEmail(
   storeName: string,
@@ -63,33 +62,30 @@ export function storeInviteEmail(
   setupLink?: string | null,
   /** Changes one paragraph: what the recipient is being invited to *do*. */
   kind: "lgs" | "vendor" | "player" = "lgs",
+  /** Ultra given with the invitation, or null for the ordinary trial line. */
+  gift: GiftFacts | null = null,
 ): EmailMessage {
+  if (kind === "player") return playerInvite(storeName, to, origin, setupLink);
+
   const name = escapeHtml(storeName);
   const signInUrl = `${origin}/login`;
+  const founding = gift?.kind === "founding";
 
-  /*
-   * A player is not a store, and this message told them they were: the
-   * subject and the headline both read "Zach is in the cardflare beta",
-   * which is the sentence a shop gets with a person's name dropped into
-   * it. Found by walking the invitation paths rather than by anybody
-   * receiving one, which is the only reason it had not been reported.
-   *
-   * The store wording stays exactly as it was — it was written for a
-   * shop owner and it is right.
-   */
-  const headline =
-    kind === "player"
-      ? `Your ${SITE.name} account is ready, ${name}.`
-      : `${name} is in the ${SITE.name} beta.`;
-
-  const subject =
-    kind === "player"
-      ? `Your ${SITE.name} account is ready`
+  const subject = founding
+    ? `${storeName} is a ${SITE.name} Founding Store 🎉`
+    : gift
+      ? `You're in: ${storeName} is in the ${SITE.name} beta 🎉`
       : `${storeName} is in the ${SITE.name} beta`;
+
+  const storeLine = (who: string) =>
+    founding
+      ? `${who} is a ${SITE.name} Founding Store.`
+      : `${who} is in the ${SITE.name} beta.`;
+
   /*
    * The fallback, and the recovery path when the one-click link has expired.
    * An invited account exists with no password, so "choose a password" and "I
-   * forgot mine" are the same flow underneath — and sending a store to a
+   * forgot mine" are the same flow underneath, and sending a store to a
    * sign-in form they cannot yet complete is how the first real invitation
    * went wrong once already.
    */
@@ -100,9 +96,106 @@ export function storeInviteEmail(
    * The two messages have to differ, and rendering both proved they did not.
    * With no link the button already points at the reset page, so telling the
    * reader "if the button has expired, go to the reset page" sent them to the
-   * URL they had just tapped — a loop that reads as a broken email. The
+   * URL they had just tapped: a loop that reads as a broken email. The
    * fallback promises one extra step instead, because that is what happens.
    */
+  const lead = setupLink
+    ? "Your account is ready on this address. One tap below finishes it: pick a password and you are in."
+    : "Your account is ready on this address. Ask for a link below and we will email you one that sets your password.";
+
+  const buttonLabel = setupLink ? "Claim your store" : "Choose a password";
+
+  const followUp = setupLink
+    ? `The button expires after a while. If it has, use ${emailLink(passwordUrl, `${SITE.domain}/login/reset`)} and we will send a fresh one to this address.`
+    : "The page will ask for this address, then email you a link. It expires after a while, so open it when you have a minute.";
+
+  const intro =
+    kind === "vendor"
+      ? `${SITE.name} helps card-show attendees find the exact cards they want, and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for.`
+      : `${SITE.name} helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it.`;
+
+  const ticket = gift ? giftTicket(gift) : null;
+  const perks = kind === "vendor" ? "vendor" : "lgs";
+
+  const html = emailShell(
+    origin,
+    `${emailHeadline("You're in.", storeLine(name))}
+      ${emailParagraph(intro, ticket ? "0 0 24px" : "0 0 16px")}
+      ${ticket ? emailTicket(ticket) : ""}
+      ${!gift && kind === "lgs" ? emailParagraph(ULTRA_LINE, "0 0 24px") : ""}
+      ${emailPerks(perks)}
+      ${emailParagraph(lead, "0 0 20px")}
+      ${emailButton(primaryUrl, buttonLabel)}
+      ${emailParagraph(followUp, "0 0 24px")}
+      ${emailFooter(
+        `Once your password is set, sign in any time at ${emailLink(signInUrl, `${SITE.domain}/login`)}. Not expecting this? Reply and let us know; nothing happens until you sign in.`,
+      )}`,
+  );
+
+  const middle = setupLink
+    ? [
+        "Your account is ready on this address. One link below finishes it - pick",
+        "a password and you are in.",
+        "",
+        `Claim your store: ${setupLink}`,
+        "",
+        "That link expires after a while. If it has, go to the address below and we",
+        "will send a fresh one.",
+        "",
+        `New link: ${passwordUrl}`,
+      ]
+    : [
+        "Your account is ready on this address. Ask for a link below and we will",
+        "email you one that sets your password.",
+        "",
+        `Choose a password: ${passwordUrl}`,
+        "",
+        "That page will ask for this address, then email you a link. It expires",
+        "after a while, so open it when you have a minute.",
+      ];
+
+  const text = [
+    "You're in.",
+    storeLine(storeName),
+    "",
+    intro,
+    "",
+    ...(ticket ? [...ticketText(ticket), ""] : []),
+    ...(!gift && kind === "lgs" ? [ULTRA_LINE, ""] : []),
+    ...perksText(perks),
+    "",
+    ...middle,
+    "",
+    `Sign in: ${signInUrl}`,
+    "",
+    "---",
+    "Not expecting this? Reply and let us know - nothing happens until you sign in.",
+  ].join("\n");
+
+  return { to, subject, html, text };
+}
+
+/**
+ * The player's invitation, in the quieter layout it has always had.
+ *
+ * A player is not a store, and this message once told them they were: the
+ * subject and the headline both read "Zach is in the cardflare beta", which
+ * is the sentence a shop gets with a person's name dropped into it. Found
+ * by walking the invitation paths rather than by anybody receiving one.
+ */
+function playerInvite(
+  displayName: string,
+  to: string,
+  origin: string,
+  setupLink?: string | null,
+): EmailMessage {
+  const name = escapeHtml(displayName);
+  const signInUrl = `${origin}/login`;
+  const headline = `Your ${SITE.name} account is ready, ${name}.`;
+  const subject = `Your ${SITE.name} account is ready`;
+  const passwordUrl = `${origin}/login/reset`;
+  const primaryUrl = setupLink ?? passwordUrl;
+
   const lead = setupLink
     ? "Your account is ready on this address. One tap below finishes it: pick a password and you are in."
     : "Your account is ready on this address. Ask for a link below and we will email you one that sets your password.";
@@ -129,20 +222,11 @@ export function storeInviteEmail(
       </h1>
 
       <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
-        ${
-          kind === "vendor"
-            ? "cardflare helps card-show attendees find the exact cards they want, and walks them straight to your booth. Upload your inventory before the show, singles and slabs alike, and buyers arrive already knowing you have what they came for."
-            : kind === "player"
-              ? "A cardflare account makes your wants follow you: post a card once, and every cardflare room you walk into offers to post it again until you find it. No account is ever needed just to trade; this one is for keeping your hunt across stores."
-              : "cardflare helps players at your events find the cards they need from other people already in the room. You're one of the first stores trying it."
-        }
+        A cardflare account makes your wants follow you: post a card once, and
+        every cardflare room you walk into offers to post it again until you
+        find it. No account is ever needed just to trade; this one is for
+        keeping your hunt across stores.
       </p>
-
-      ${
-        kind === "lgs"
-          ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">${ULTRA_LINE}</p>`
-          : ""
-      }
 
       <p style="margin:0 0 24px;font-size:16px;line-height:1.6;color:${COLOR.textSecondary};">
         ${lead}
@@ -189,33 +273,14 @@ export function storeInviteEmail(
         "after a while, so open it when you have a minute.",
       ];
 
-  const intro =
-    kind === "player"
-      ? [
-          "A cardflare account makes your wants follow you: post a card once, and",
-          "every cardflare room you walk into offers to post it again until you",
-          "find it. No account is needed just to trade - this one keeps your hunt",
-          "across stores.",
-        ]
-      : kind === "vendor"
-        ? [
-            "cardflare helps card-show attendees find the exact cards they want -",
-            "and walks them straight to your booth. Upload your inventory before",
-            "the show, singles and slabs alike.",
-          ]
-        : [
-            "cardflare helps players at your events find the cards they need from other",
-            "people already in the room. You're one of the first stores trying it.",
-          ];
-
   const text = [
-    kind === "player"
-      ? `Your ${SITE.name} account is ready, ${storeName}.`
-      : `${storeName} is in the ${SITE.name} beta.`,
+    `Your ${SITE.name} account is ready, ${displayName}.`,
     "",
-    ...intro,
+    "A cardflare account makes your wants follow you: post a card once, and",
+    "every cardflare room you walk into offers to post it again until you",
+    "find it. No account is needed just to trade - this one keeps your hunt",
+    "across stores.",
     "",
-    ...(kind === "lgs" ? [ULTRA_LINE, ""] : []),
     ...middle,
     "",
     `Sign in: ${signInUrl}`,
@@ -224,12 +289,7 @@ export function storeInviteEmail(
     "Not expecting this? Reply and let us know - nothing happens until you sign in.",
   ].join("\n");
 
-  return {
-    to,
-    subject,
-    html,
-    text,
-  };
+  return { to, subject, html, text };
 }
 
 /** The player flavour, named for what it is at the call site. */

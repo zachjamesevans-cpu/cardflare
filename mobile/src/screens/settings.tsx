@@ -27,6 +27,7 @@ import {
   signOut,
   unblockPlayer,
 } from "../api";
+import { GiftBar } from "../gift-bar";
 import { formatHandle } from "../handle";
 import {
   AsyncButton,
@@ -212,6 +213,11 @@ export function SettingsScreen() {
     }, []),
   );
 
+  /* The stores this account owns that carry a bar; nobody else's. */
+  const ownedGifts = (me?.staff ?? []).flatMap((row) =>
+    row.role === "owner" && row.gift ? [{ ...row, gift: row.gift }] : [],
+  );
+
   return (
     <ScrollView
       contentContainerStyle={{
@@ -220,6 +226,20 @@ export function SettingsScreen() {
         gap: spacing(4),
       }}
     >
+      {/*
+       * YOUR STORE: the console's green bar, for an owner whose store has
+       * one (a beta gift's days, a Founding Store, or the trial's). Said
+       * once per store, named, and absent for everyone else.
+       */}
+      {ownedGifts.length > 0 ? (
+        <View style={{ gap: spacing(2) }}>
+          <Title>{ownedGifts.length === 1 ? "Your store" : "Your stores"}</Title>
+          {ownedGifts.map((row) => (
+            <GiftBar key={row.storeId} bar={row.gift} storeName={row.name} />
+          ))}
+        </View>
+      ) : null}
+
       {me?.collection && (
         <Card>
           <Title>Your collection</Title>

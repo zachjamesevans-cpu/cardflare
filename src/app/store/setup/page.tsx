@@ -7,10 +7,12 @@ import { CounterCode } from "@/components/events/counter-code";
 import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { TimezoneSuggest } from "@/components/events/timezone-suggest";
 import { AppShell } from "@/components/layout/app-shell";
+import { GiftBar } from "@/components/stores/gift-bar";
 import { AddScreenForm } from "@/components/stores/add-screen-form";
 import { WelcomeHero } from "@/components/stores/onboarding";
 import { UltraLocked } from "@/components/stores/ultra-locked";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
+import { giftForStore } from "@/lib/stores/gifts";
 import {
   ORGANIZER_DESCRIPTION,
   OrganizerList,
@@ -116,6 +118,10 @@ export default async function StoreSetupPage({
       currentArea={currentArea}
     >
       <div className="flex flex-col gap-6">
+        {/* The wizard has no tab bar, and a gifted store lands here
+            first: the bar says how long the gift runs from day one. */}
+        <GiftBar storeId={store.id} owner={store.role === "owner"} />
+
         <StepDots storeId={store.id} step={step} />
 
         {step === "welcome" && (
@@ -240,7 +246,12 @@ async function PageStep({
   tier: string;
   timeZone: string;
 }) {
-  const page = await storePageFor(storeId);
+  /* The preview wears the Founding Store mark the public page would. */
+  const [page, gift] = await Promise.all([
+    storePageFor(storeId),
+    giftForStore(storeId),
+  ]);
+  const founding = gift?.kind === "founding" && !gift.endedAt;
 
   return (
     <StepFrame
@@ -282,6 +293,7 @@ async function PageStep({
               name={page.name}
               verified={false}
               ultra={tier === "ultra"}
+              founding={founding}
               unclaimed={false}
               city={page.city}
               region={page.region}

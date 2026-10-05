@@ -122,6 +122,7 @@ export default async function StoreProfilePage({
         name={store.name}
         verified={store.verified}
         ultra={store.ultra}
+        founding={store.founding}
         unclaimed={store.unclaimed}
         city={store.city}
         region={store.region}

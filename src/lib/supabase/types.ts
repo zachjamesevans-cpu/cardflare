@@ -89,7 +89,17 @@ export type StoreRow = {
   hours: StoreHoursJson | null;
   /** When the owner finished or skipped the setup wizard. */
   onboarding_completed_at: string | null;
+  /* Ultra given in the beta; see src/lib/stores/gifts.ts. */
+  gift_kind: StoreGiftKind | null;
+  gift_started_at: string | null;
+  gift_until: string | null;
+  gift_days: number | null;
+  gift_week_notice_at: string | null;
+  gift_day_notice_at: string | null;
+  gift_ended_at: string | null;
 };
+
+export type StoreGiftKind = "timed" | "founding";
 
 /** One day's opening, or null for closed. Times are "HH:MM", 24-hour. */
 export type StoreHoursJson = ({ open: string; close: string } | null)[];
@@ -157,6 +167,13 @@ export type StoreInsert = Omit<
   | "listing_state"
   | "verified_at"
   | "verified_by"
+  | "gift_kind"
+  | "gift_started_at"
+  | "gift_until"
+  | "gift_days"
+  | "gift_week_notice_at"
+  | "gift_day_notice_at"
+  | "gift_ended_at"
 > & {
   address_line?: string | null;
   postal_code?: string | null;
@@ -205,6 +222,14 @@ export type StoreUpdate = Partial<Omit<StoreInsert, "verified_at" | "verified_by
   cover_image?: string | null;
   hours?: StoreHoursJson | null;
   onboarding_completed_at?: string | null;
+  /* The gift: written only by src/lib/stores/gifts.ts, behind an admin. */
+  gift_kind?: StoreGiftKind | null;
+  gift_started_at?: string | null;
+  gift_until?: string | null;
+  gift_days?: number | null;
+  gift_week_notice_at?: string | null;
+  gift_day_notice_at?: string | null;
+  gift_ended_at?: string | null;
 };
 
 export type StoreMemberRow = {
