@@ -28,6 +28,7 @@ import {
 } from "react-native";
 
 import type { OfferItem, OfferOutcome } from "./api";
+import { BINDER_OFFER_COPY } from "./binder-offer-copy";
 import { getFoilKit } from "./foil";
 import { listOf, reviewLabel } from "./offer-copy";
 /* A cycle, knowingly: the review sheet is built from these primitives
@@ -227,6 +228,31 @@ export interface ZoomHave {
    * server's reason when it refused.
    */
   onOffer: (items: OfferItem[], note: string) => Promise<OfferOutcome>;
+  /*
+   * THE SAME STACK ON A TRADE BINDER. The founder: "Any card in a
+   * trade binder you should be able to do the same stack as making an
+   * offer on their trade cards." A binder card is a ZoomHave like any
+   * Flare's: `postId` is the binder, `posterName` its owner,
+   * `flareId` the binder entry. The three fields below are all the
+   * difference there is, and a Flare leaves every one of them out.
+   */
+  /**
+   * Which way the toggle points. "have" (the default): the toggle
+   * reads "I have this card", on a Flare somebody wants. "want": the website's
+   * BINDER_OFFER_COPY, "I want this card", a card somebody is
+   * trading; the review then says the binder's send label and note
+   * placeholder.
+   */
+  verb?: "have" | "want";
+  /** A refusal, in words, when it is not a Flare's. */
+  failure?: (caught: unknown) => string;
+  /**
+   * Given, the viewer closes once a send lands, and calls this when
+   * it is gone, so the screen can say what happened over a screen
+   * with nothing else on it (the binder's "Sent to Mia." and its Open
+   * chat). Left out, the viewer stays open and its strip confirms.
+   */
+  onSent?: () => void;
 }
 
 /**
@@ -585,7 +611,13 @@ function ZoomHaveForm({
               <Ionicons name="checkmark" size={18} color={colors.accent} />
             ) : null}
             <Text style={[styles.buttonLabel, added && { color: colors.textPrimary }]}>
-              {added ? "Added to your offer" : "I have this card"}
+              {have.verb === "want"
+                ? added
+                  ? BINDER_OFFER_COPY.picked
+                  : BINDER_OFFER_COPY.want
+                : added
+                  ? "Added to your offer"
+                  : "I have this card"}
             </Text>
           </Tap>
         </>
@@ -801,7 +833,9 @@ export function CardImage({
     }
   }, [open, fade]);
 
-  const close = () => {
+  /* `after` runs once the viewer is gone: a binder's send says what
+     happened over the screen, not over a modal on its way out. */
+  const closeThen = (after?: () => void) => {
     Animated.timing(fade, {
       toValue: 0,
       duration: 120,
@@ -812,8 +846,10 @@ export function CardImage({
       if (!owned) setOwnPicks({});
       setReviewing(false);
       setSent(null);
+      after?.();
     });
   };
+  const close = () => closeThen();
 
   const frame = {
     width,
@@ -1314,7 +1350,22 @@ export function CardImage({
               setPicks(next);
             }}
             send={door.onOffer}
+            /* A binder's words; a Flare's when these are undefined. */
+            sendLabel={door.verb === "want" ? BINDER_OFFER_COPY.send : undefined}
+            notePlaceholder={
+              door.verb === "want" ? BINDER_OFFER_COPY.notePlaceholder : undefined
+            }
+            failure={door.failure}
             onSent={(outcome) => {
+              /* A door that says it itself: the picks go, the viewer
+                 closes, and the screen speaks once it has. */
+              if (door.onSent) {
+                const said = door.onSent;
+                setPicks({});
+                setReviewing(false);
+                closeThen(said);
+                return;
+              }
               const refused = outcome.refused ?? [];
               const taken = Object.keys(picks).filter((id) => !refused.includes(id));
               setSent((previous) => ({

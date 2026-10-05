@@ -351,15 +351,24 @@ export function ThreadScreen() {
               gap: spacing(1),
             }}
           >
-            {/* The card a message is about ("I have this", a nearby
-                match), on the sender's side just above the words, so
-                "I have this one" reads as being about that card. */}
-            {item.card ? (
+            {/* The cards a message is about ("I have this", a nearby
+                match, an offer on a binder), on the sender's side just
+                above the words, so "I have this one" reads as being
+                about that card. An offer on a binder carries several:
+                each its own bubble, stacked. An older server sends
+                only `card`. */}
+            {(item.cards && item.cards.length > 0
+              ? item.cards
+              : item.card
+                ? [item.card]
+                : []
+            ).map((card, index) => (
               <CardBubble
-                card={item.card}
+                key={`${card.cardId}-${index}`}
+                card={card}
                 onOpen={(cardId) => navigation.navigate("Card", { cardId })}
               />
-            ) : null}
+            ))}
             <View
               style={{
                 backgroundColor: item.yours ? colors.accent : colors.elevated,

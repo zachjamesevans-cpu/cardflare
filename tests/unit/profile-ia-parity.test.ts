@@ -59,7 +59,11 @@ const web = {
   ownBinders: read("src/app/profile/binders/page.tsx"),
   playerBinders: read("src/app/p/[playerId]/binders/page.tsx"),
   ownBinder: read("src/app/profile/binders/[binderId]/page.tsx"),
-  playerBinder: read("src/app/p/[playerId]/binders/[binderId]/page.tsx"),
+  /* The page is a thin door now; its body is PublicBinder, shared with
+     the share link /b/<id>. */
+  playerBinder:
+    read("src/app/p/[playerId]/binders/[binderId]/page.tsx") +
+    read("src/components/binder/public-binder.tsx"),
   oldOwnBinder: read("src/app/profile/binder/page.tsx"),
   oldPlayerBinder: read("src/app/p/[playerId]/binder/page.tsx"),
   profileLib: read("src/lib/players/profile.ts"),

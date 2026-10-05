@@ -353,6 +353,22 @@ export async function readBinder(
 }
 
 /**
+ * Whose binder this is, from its id alone: the share link
+ * (cardflare.gg/b/<id>) carries nothing else. Null when there is no such
+ * binder. Says nothing about whether the viewer may open it; `readBinder`
+ * still decides that.
+ */
+export async function binderOwner(binderId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const { data } = await getSupabaseAdmin()
+    .from("binders")
+    .select("player_id")
+    .eq("id", binderId)
+    .maybeSingle();
+  return data?.player_id ?? null;
+}
+
+/**
  * Every binder the viewer may open, in the owner's order. A visitor
  * sees only the ones up for trade; the owner sees all of theirs.
  */

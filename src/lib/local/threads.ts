@@ -84,6 +84,11 @@ export interface ThreadMessage {
     number: string;
     imageUrl: string | null;
   } | null;
+  /**
+   * Every card it carries, in order (an offer on a trade binder carries
+   * several); `card` is the first, for the builds that read only it.
+   */
+  cards: { cardId: string; name: string; number: string; imageUrl: string | null }[];
 }
 
 function trimmedBody(raw: string): string | null {
@@ -422,16 +427,26 @@ async function appendMessage(
   senderId: string,
   recipientId: string,
   body: string,
-  context?: { flareCardId?: string },
+  context?: { flareCardId?: string; cardIds?: string[] },
 ): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
+
+  /* Every card the message carries; the first is also `card_id`, which
+     is all the builds before many-card messages read. */
+  const cardIds =
+    context?.cardIds && context.cardIds.length > 0
+      ? context.cardIds
+      : context?.flareCardId
+        ? [context.flareCardId]
+        : [];
 
   const { error } = await admin.from("flare_messages").insert({
     thread_id: threadId,
     sender_player_id: senderId,
     body,
-    card_id: context?.flareCardId ?? null,
+    card_id: cardIds[0] ?? null,
+    card_ids: cardIds,
   });
 
   if (error) {
@@ -441,9 +456,31 @@ async function appendMessage(
 
   await admin.from("flare_threads").update({ last_message_at: now }).eq("id", threadId);
 
-  await notifyMessageReceived(threadId, senderId, recipientId, body, context);
+  await notifyMessageReceived(threadId, senderId, recipientId, body, {
+    flareCardId: cardIds[0],
+  });
 
   return true;
+}
+
+/**
+ * A message carrying cards, into the pair's one conversation: an offer
+ * on somebody's trade binder (`src/lib/binder/offers.ts`). The caller
+ * has checked the block and the cards; this only writes and rings.
+ */
+export async function sendCardsMessage(
+  senderId: string,
+  recipientId: string,
+  body: string,
+  cardIds: string[],
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const conversation = await pairThreadId(recipientId, senderId);
+  if (!conversation) return null;
+  const sent = await appendMessage(conversation, senderId, recipientId, body, {
+    cardIds,
+  });
+  return sent ? conversation : null;
 }
 
 export async function sendThreadMessage(
@@ -707,7 +744,7 @@ export async function readThread(
   const [{ data: messages }, { data: other }, meet, trade] = await Promise.all([
     admin
       .from("flare_messages")
-      .select("id, sender_player_id, body, created_at, card_id")
+      .select("id, sender_player_id, body, created_at, card_id, card_ids")
       .eq("thread_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(200),
@@ -724,11 +761,13 @@ export async function readThread(
   const ordered = [...(messages ?? [])].reverse();
 
   /* The cards messages were about, one query each for facts and art. */
-  const cardIds = [
-    ...new Set(
-      ordered.flatMap((message) => (message.card_id ? [message.card_id] : [])),
-    ),
-  ];
+  const carried = (message: { card_id: string | null; card_ids: string[] | null }) =>
+    message.card_ids && message.card_ids.length > 0
+      ? message.card_ids
+      : message.card_id
+        ? [message.card_id]
+        : [];
+  const cardIds = [...new Set(ordered.flatMap(carried))];
   const cardById = new Map<
     string,
     { name: string; number: string; imageUrl: string | null }
@@ -791,21 +830,17 @@ export async function readThread(
     withPlayerId: otherId,
     withAvatarUrl: avatarSrc(other?.avatar_url),
     messages: ordered.map((message) => {
-      const card = message.card_id ? cardById.get(message.card_id) : undefined;
+      const cards = carried(message).flatMap((cardId) => {
+        const card = cardById.get(cardId);
+        return card ? [{ cardId, ...card }] : [];
+      });
       return {
         id: message.id,
         body: message.body,
         sentAt: message.created_at,
         yours: message.sender_player_id === viewerId,
-        card:
-          card && message.card_id
-            ? {
-                cardId: message.card_id,
-                name: card.name,
-                number: card.number,
-                imageUrl: card.imageUrl,
-              }
-            : null,
+        card: cards[0] ?? null,
+        cards,
       };
     }),
     meet,

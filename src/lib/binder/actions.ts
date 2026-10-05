@@ -15,6 +15,12 @@ import {
   saveBinderSettings,
 } from "./binder";
 import { isBinderCover, type BinderCoverId } from "./covers";
+import {
+  BINDER_OFFER_MAX_CARDS,
+  BINDER_OFFER_NOTE_MAX,
+  binderOfferSentLine,
+} from "./offer-copy";
+import { offerOnBinder } from "./offers";
 
 /**
  * The binders' Server Actions, for the website. The app goes through
@@ -191,4 +197,53 @@ export async function deleteBinderAction(binderId: string): Promise<Outcome> {
   if (!result.ok) return { ok: false, message: NO_SUCH };
   repaint(player.id, which);
   return { ok: true };
+}
+
+const offerSchema = z.object({
+  items: z
+    .array(z.object({ entryId: z.guid(), quantity: z.number().int().min(1).max(99) }))
+    .min(1)
+    .max(BINDER_OFFER_MAX_CARDS),
+  note: z.string().max(BINDER_OFFER_NOTE_MAX).nullable(),
+});
+
+/**
+ * "Send offer" in somebody's trade binder: the picked cards, as one
+ * message in your conversation with them. Answers the conversation's id
+ * so the viewer can offer "Open the chat".
+ */
+export async function offerOnBinderAction(
+  binderId: string,
+  input: unknown,
+): Promise<
+  { ok: true; threadId: string; message: string } | { ok: false; message: string }
+> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to make an offer." };
+  const id = binderIdOf(binderId);
+  const parsed = offerSchema.safeParse(input);
+  if (!id || !parsed.success) return { ok: false, message: "Pick a card first." };
+
+  const sent = await offerOnBinder(id, player.id, parsed.data.items, parsed.data.note);
+  if (!sent.ok) {
+    return {
+      ok: false,
+      message:
+        sent.reason === "yours"
+          ? "That's your own binder."
+          : sent.reason === "blocked"
+            ? "You can't message this player."
+            : sent.reason === "not-found"
+              ? "This binder isn't up for trade any more."
+              : sent.reason === "empty"
+                ? "Those cards aren't in the binder any more."
+                : "Could not send that. Try again in a moment.",
+    };
+  }
+  revalidatePath("/inbox");
+  return {
+    ok: true,
+    threadId: sent.threadId,
+    message: binderOfferSentLine(sent.ownerName),
+  };
 }

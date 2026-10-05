@@ -1119,16 +1119,19 @@ export type FlareMessageRow = {
   read_at: string | null;
   /** The card this message offered or asked about, or null. */
   card_id: string | null;
+  /** Every card it carries, in order; card_id is the first. */
+  card_ids: string[];
 };
 
 export type FlareMessageInsert = Omit<
   FlareMessageRow,
-  "id" | "created_at" | "read_at" | "card_id"
+  "id" | "created_at" | "read_at" | "card_id" | "card_ids"
 > & {
   id?: string;
   created_at?: string;
   read_at?: string | null;
   card_id?: string | null;
+  card_ids?: string[];
 };
 
 export type PlayerInsert = Omit<

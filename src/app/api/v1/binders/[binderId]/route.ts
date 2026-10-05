@@ -1,20 +1,31 @@
 import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
-import { deleteBinder, readBinder, saveBinderSettings } from "@/lib/binder/binder";
+import {
+  binderOwner,
+  deleteBinder,
+  readBinder,
+  saveBinderSettings,
+} from "@/lib/binder/binder";
 import { binderIdSchema, forOldBuild, settingsSchema } from "../_shared";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ binderId: string }> };
 
-/** One of your binders: read it, change its settings, or delete it. */
+/**
+ * A binder by its id: one of yours, or somebody's binder up for trade
+ * (the share link, cardflare.gg/b/<id>, opens the app here with nothing
+ * but the id). `readBinder` still hides a private binder from anyone but
+ * its owner. Change its settings or delete it: yours only.
+ */
 export async function GET(request: Request, { params }: Params): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
   const id = binderIdSchema.safeParse((await params).binderId);
   if (!id.success) return Response.json({ error: "not-found" }, { status: 404 });
-  const binder = await readBinder(player.playerId, player.playerId, id.data);
+  const owner = (await binderOwner(id.data)) ?? player.playerId;
+  const binder = await readBinder(owner, player.playerId, id.data);
   if (!binder) return Response.json({ error: "not-found" }, { status: 404 });
   return Response.json(absoluteImageUrls({ binder: forOldBuild(binder) }));
 }

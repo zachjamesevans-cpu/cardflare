@@ -124,7 +124,11 @@ describe("a message that carries a card draws the card above its words", () => {
   });
 
   it("on the website: the bubble opens the card page", () => {
-    expect(web).toContain("{message.card && <CardBubble card={message.card} />}");
+    /* Every card a message carries now (an offer on a binder carries
+       several), with the one card standing in for older messages. */
+    expect(web).toContain("<MessageCards message={message} />");
+    expect(fn(web, "MessageCards")).toContain("? [message.card]");
+    expect(fn(web, "MessageCards")).toContain("<CardBubble key=");
     const bubble = fn(web, "CardBubble");
     expect(bubble).toContain("href={`/cards/${card.cardId}`}");
     expect(bubble).toContain("<Thumb imageUrl={card.imageUrl} />");
@@ -136,7 +140,8 @@ describe("a message that carries a card draws the card above its words", () => {
   });
 
   it("in the app: the bubble opens the Card screen", () => {
-    expect(app.thread).toContain("{item.card ? (");
+    /* Every card a message carries, `card` alone from an older server. */
+    expect(app.thread).toContain("? [item.card]");
     expect(app.thread).toContain('navigation.navigate("Card", { cardId })');
     const bubble = fn(app.thread, "CardBubble");
     expect(bubble).toContain("onOpen(card.cardId)");

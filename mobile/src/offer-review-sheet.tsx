@@ -70,6 +70,9 @@ export function OfferReviewSheet({
   onClose,
   onBack,
   send,
+  sendLabel = "Send offer",
+  notePlaceholder = "A note, like where you will be (optional)",
+  failure = offerErrorMessage,
 }: {
   postId: string;
   posterName: string;
@@ -88,6 +91,18 @@ export function OfferReviewSheet({
   onBack?: () => void;
   /** The door the offer goes through; the post's own when not given. */
   send?: (items: OfferItem[], message: string) => Promise<OfferOutcome>;
+  /*
+   * The words, where the offer is not on a Flare. An offer on a trade
+   * binder says the website's BINDER_OFFER_COPY.send and its note
+   * placeholder, and its refusals in the binder's own sentences. Left
+   * out, every Flare path reads exactly as it always has.
+   */
+  /** The send button's label. */
+  sendLabel?: string;
+  /** The note field's placeholder. */
+  notePlaceholder?: string;
+  /** A refusal, in words. `offerErrorMessage` when not given. */
+  failure?: (caught: unknown) => string;
 }) {
   const insets = useSafeAreaInsets();
   const [message, setMessage] = useState("");
@@ -128,7 +143,7 @@ export function OfferReviewSheet({
       );
       onSent({ offered, refused });
     } catch (caught) {
-      setError(offerErrorMessage(caught));
+      setError(failure(caught));
     }
   };
 
@@ -282,7 +297,7 @@ export function OfferReviewSheet({
                 <Input
                   value={message}
                   onChangeText={setMessage}
-                  placeholder="A note, like where you will be (optional)"
+                  placeholder={notePlaceholder}
                   maxLength={280}
                   multiline
                   style={{ minHeight: 64, textAlignVertical: "top" }}
@@ -290,7 +305,7 @@ export function OfferReviewSheet({
                 <View style={{ flexDirection: "row", gap: spacing(2) }}>
                   <View style={{ flex: 1 }}>
                     <AsyncButton
-                      label="Send offer"
+                      label={sendLabel}
                       pendingLabel="Sending…"
                       disabled={lines.length === 0}
                       onPress={submit}

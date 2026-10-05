@@ -7,6 +7,7 @@ import type { RoomTimerWire } from "./room-timer-wire";
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
 import type { BinderCoverId } from "./binder-covers";
+import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
 
@@ -2260,6 +2261,39 @@ export const removeBinderCard = (entryId: string, binderId: string) =>
 export const reorderBinder = (entryIds: string[], binderId: string) =>
   call<{ binder: Binder }>("PUT", `${binderPath(binderId)}/order`, { entryIds });
 
+/** One card of an offer on a binder: its entry, and how many copies. */
+export interface BinderOfferItem {
+  entryId: string;
+  quantity: number;
+}
+
+/**
+ * "Send offer" in somebody's trade binder: the picked cards as one
+ * message in the pair's one conversation, the website's
+ * `offerOnBinderAction`. Answers the conversation's id, so the screen
+ * can open it, and the sentence to say ("Sent to Mia. It's in your
+ * messages."). A refusal is an ApiError whose code is the server's
+ * reason; `binderOfferError` says it in words.
+ */
+export const offerOnBinder = (
+  binderId: string,
+  items: BinderOfferItem[],
+  note: string | null,
+) =>
+  call<{ ok: true; threadId: string; message: string }>(
+    "POST",
+    `/api/v1/binders/${encodeURIComponent(binderId)}/offer`,
+    { items, note },
+  );
+
+/** A refused offer on a binder, in the website's sentence for it. */
+export function binderOfferError(caught: unknown): string {
+  if (!(caught instanceof ApiError)) return binderOfferFailure("");
+  if (caught.status === 401) return binderOfferFailure("unauthorized");
+  if (caught.status === 400) return binderOfferFailure("invalid");
+  return binderOfferFailure(caught.code);
+}
+
 /**
  * A new profile picture, sent the only way this network allows.
  *
@@ -3593,6 +3627,17 @@ export interface LocalThreadMessage {
     number: string;
     imageUrl: string | null;
   } | null;
+  /**
+   * Every card the message carries, `card` first: an offer on a
+   * binder carries several. Absent from an older server, where `card`
+   * is the only one.
+   */
+  cards?: {
+    cardId: string;
+    name: string;
+    number: string;
+    imageUrl: string | null;
+  }[];
 }
 
 export const listLocalThreads = () =>

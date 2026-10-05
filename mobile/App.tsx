@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
   NavigationContainer,
+  type LinkingOptions,
   type Theme,
   createNavigationContainerRef,
 } from "@react-navigation/native";
@@ -677,6 +678,37 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
  */
 const navigationRef = createNavigationContainerRef<StackParams>();
 
+/**
+ * Links that open the app, and where they land.
+ *
+ * One so far: a binder's share link, https://cardflare.gg/b/<id>. iOS
+ * hands it to the app because app.json claims applinks:cardflare.gg
+ * and the website's apple-app-site-association names /b/*; the
+ * cardflare:// scheme carries the same path. Either lands on the
+ * Binder screen with nothing but the id, which asks the server for any
+ * binder by id and reads `yours` from the answer.
+ *
+ * `initialRouteName: "Tabs"` puts the tabs under a binder opened from
+ * a cold start, so Back has somewhere to go. Every other path matches
+ * nothing and is ignored, so a link the app does not know leaves the
+ * screen where it was.
+ *
+ * The prefixes are written out rather than built with expo-linking's
+ * createURL: that package is not installed, it carries native code, and
+ * a TestFlight build has no exp:// URL for it to make. www is listed
+ * because the apex answers with a redirect to it, so a link can reach
+ * the phone in either spelling.
+ */
+const linking: LinkingOptions<StackParams> = {
+  prefixes: ["cardflare://", "https://cardflare.gg", "https://www.cardflare.gg"],
+  config: {
+    initialRouteName: "Tabs",
+    screens: {
+      Binder: "b/:binderId",
+    },
+  },
+};
+
 function openNotificationLink(response: Notifications.NotificationResponse | null) {
   const url = response?.notification.request.content.data?.url;
   if (typeof url !== "string" || !url.startsWith("/") || !navigationRef.isReady()) {
@@ -781,6 +813,7 @@ export default function App() {
     <StartupGuard>
       <NavigationContainer
         ref={navigationRef}
+        linking={linking}
         theme={theme}
         onReady={() => {
           void Notifications.getLastNotificationResponseAsync()

@@ -43,7 +43,7 @@ describe("every pair has one conversation", () => {
     expect(wantOpen.slice(0, 3000)).toContain(
       "pairThreadId(want.player_id, responderPlayerId)",
     );
-    expect(lib).toContain("card_id: context?.flareCardId ?? null");
+    expect(lib).toContain("card_id: cardIds[0] ?? null");
   });
 
   it("writes an old anchor link's message into the conversation", () => {
@@ -77,7 +77,7 @@ describe("reading the conversation", () => {
   it("draws the newest messages oldest first, each with its card", () => {
     expect(readFn).toContain('.order("created_at", { ascending: false }) .limit(200)');
     expect(readFn).toContain("[...(messages ?? [])].reverse()");
-    expect(readFn).toContain("cardId: message.card_id,");
+    expect(readFn).toContain("card: cards[0] ?? null,");
   });
 
   it("clears a notice rung on the old anchor id as well", () => {

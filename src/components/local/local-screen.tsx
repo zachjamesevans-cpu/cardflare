@@ -771,10 +771,13 @@ function ThreadView({
                 message.yours ? "items-end self-end" : "items-start self-start",
               )}
             >
-              {/* The card a message is about ("I have this", a nearby
-                  match), on the sender's side just above the words, so
-                  "I have this one" reads as being about that card. */}
-              {message.card && <CardBubble card={message.card} />}
+              {/* The cards a message is about ("I have this", a nearby
+                  match, an offer on a trade binder), on the sender's
+                  side just above the words, so "I have this one" reads
+                  as being about that card. An offer on a binder carries
+                  several, so every one is drawn, wrapping onto a new
+                  row when they do not fit. */}
+              <MessageCards message={message} />
               <div
                 className={cn(
                   "rounded-[var(--radius-control)] px-3 py-2 text-sm",
@@ -1058,6 +1061,33 @@ function FlareGroup({
 }
 
 /** The card a message carries, small, opening the card's page. */
+/**
+ * Every card a message carries, as bubbles. `cards` is the whole list;
+ * a message from before many-card messages has only `card`, so that
+ * one stands in when the list is empty.
+ */
+function MessageCards({ message }: { message: ThreadMessage }) {
+  const cards =
+    message.cards && message.cards.length > 0
+      ? message.cards
+      : message.card
+        ? [message.card]
+        : [];
+  if (cards.length === 0) return null;
+  return (
+    <div
+      className={cn(
+        "flex max-w-full flex-wrap gap-1.5",
+        message.yours ? "justify-end" : "justify-start",
+      )}
+    >
+      {cards.map((card, index) => (
+        <CardBubble key={`${card.cardId}-${index}`} card={card} />
+      ))}
+    </div>
+  );
+}
+
 function CardBubble({ card }: { card: NonNullable<ThreadMessage["card"]> }) {
   return (
     <Link
