@@ -27,6 +27,14 @@ import { MAX_OFFER_MESSAGE } from "@/lib/matching/schema";
  * line allows, and a Remove; the viewer's picks come in as one copy
  * each and this is where they become three. Removing the last line
  * closes the review: there is nothing left to review.
+ *
+ * The same sheet reviews an offer on a trade binder's cards. That one
+ * sends a message rather than raising a hand, so its words come in as
+ * props (the send button, the note's placeholder and limit) and it
+ * closes on a send instead of saying "Offer sent": the binder says
+ * what happened, with the way into the chat. Every prop has the
+ * Flare's value as its default, so a Flare review is drawn exactly as
+ * it always was.
  */
 
 export interface OfferLine {
@@ -96,6 +104,10 @@ export function OfferReview({
   onRemove,
   onSubmit,
   onSent,
+  sendLabel = "Send offer",
+  notePlaceholder = "Where to find you, or what you would take for them",
+  noteMax = MAX_OFFER_MESSAGE,
+  closeOnSent = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -107,6 +119,17 @@ export function OfferReview({
   onSubmit: (message: string) => Promise<OfferOutcome>;
   /** Called once an offer landed, so the caller can clear its selection. */
   onSent: () => void;
+  /** The send button's word. A binder's offer says its own. */
+  sendLabel?: string;
+  /** What the empty message field suggests. */
+  notePlaceholder?: string;
+  /** The message's limit. */
+  noteMax?: number;
+  /**
+   * Close on a send rather than saying "Offer sent" here: the caller
+   * says what happened (a binder's offer, with its way into the chat).
+   */
+  closeOnSent?: boolean;
 }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +169,11 @@ export function OfferReview({
         );
         return;
       }
+      if (closeOnSent) {
+        onSent();
+        close();
+        return;
+      }
       setSent({ offered: outcome.offered ?? lines.length, refused: outcome.refused });
       onSent();
     });
@@ -172,7 +200,7 @@ export function OfferReview({
               disabled={pending || lines.length === 0}
               className="w-full"
             >
-              {pending ? "Sending…" : "Send offer"}
+              {pending ? "Sending…" : sendLabel}
             </Button>
           </div>
         )
@@ -258,9 +286,9 @@ export function OfferReview({
             <Textarea
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              maxLength={MAX_OFFER_MESSAGE}
+              maxLength={noteMax}
               rows={2}
-              placeholder="Where to find you, or what you would take for them"
+              placeholder={notePlaceholder}
               className="min-h-0"
             />
           </label>

@@ -4,6 +4,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   LayoutAnimation,
   Modal,
@@ -11,6 +12,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   Switch,
   Text,
   View,
@@ -36,9 +38,11 @@ import {
   ApiError,
   BINDER_NAME_MAX,
   addBinderCard,
+  binderOfferError,
   deleteBinder,
   describeError,
   getBinder,
+  offerOnBinder,
   openDirectThread,
   removeBinderCard,
   reorderBinder,
@@ -47,10 +51,16 @@ import {
   type Binder,
   type BinderCard,
   type BinderSettingsPatch,
+  type OfferItem,
+  type OfferOutcome,
 } from "../api";
 import { BinderCover } from "../binder-cover";
 import { BINDER_COVERS, BINDER_LAYOUT, POCKETS_PER_PAGE } from "../binder-covers";
+import { BINDER_OFFER_COPY, binderOfferSentLine } from "../binder-offer-copy";
 import { CardPicker } from "../card-picker";
+import { binderShareUrl } from "../config";
+import { inYourOfferLine } from "../offer-copy";
+import { OfferReviewSheet } from "../offer-review-sheet";
 import {
   AddPocket,
   Copies,
@@ -78,6 +88,8 @@ import {
   Muted,
   Tap,
   type ZoomCard,
+  type ZoomHave,
+  type ZoomPicks,
 } from "../ui";
 
 /**
@@ -91,8 +103,26 @@ import {
  * about them); off, it is private and only the owner opens it. Pages
  * of nine pockets, three by three, turned with a swipe, dots under
  * them. A tap on a pocket is the card large, in the one viewer every
- * shelf uses, with nothing to offer: the binder is not answerable
- * yet, that is a later round.
+ * shelf uses.
+ *
+ * SOMEBODY ELSE'S BINDER UP FOR TRADE IS ANSWERABLE, with the Flare
+ * viewer's own stack. The founder: "Any card in a trade binder you
+ * should be able to do the same stack as making an offer on their
+ * trade cards - like scrolling through them with the same UI as
+ * making an offer on someone's flares. Can then DM them about them."
+ * So every card carries a ZoomHave whose verb is "want" ("I want this
+ * card"), the picks live here so a close keeps them ("2 in your offer
+ * · Review" under the pockets, as on a Feed card), and the review
+ * sends them through POST /api/v1/binders/<id>/offer as one message
+ * in the pair's conversation. Then "Sent to Mia. It's in your
+ * messages." with Open chat. The owner's binder has none of it.
+ *
+ * SHARE, at the top: https://cardflare.gg/b/<id>, which opens the
+ * binder on the website for anyone and in the app for anyone who has
+ * it (App.tsx's linking routes `b/:binderId` here with nothing but the
+ * id, and the server answers any binder by id, saying in `yours`
+ * whether it is the viewer's). A private binder has no link to share:
+ * the owner is told to turn on Up for trade.
  *
  * The owner adds cards through the card picker, opened from the "+"
  * in any empty pocket (the trailing page always has one), holds a
@@ -180,6 +210,20 @@ export function BinderScreen({
   /* The page frame's width, as laid out; nothing is drawn before it is known. */
   const [pageWidth, setPageWidth] = useState(0);
   const pager = useRef<ScrollView>(null);
+  /* The offer being built on somebody's trade binder, entryId ->
+     copies: here rather than in the viewer, so a close keeps it. */
+  const [picks, setPicks] = useState<ZoomPicks>({});
+  /* The review, opened from "N in your offer · Review". */
+  const [reviewing, setReviewing] = useState(false);
+  /* What the last send answered: the conversation Open chat goes to. */
+  const lastSent = useRef<{ threadId: string } | null>(null);
+
+  /* Another binder in the same screen (a share link opened over this
+     one) starts with an empty offer. */
+  useEffect(() => {
+    setPicks({});
+    setReviewing(false);
+  }, [id]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -188,8 +232,11 @@ export function BinderScreen({
       setBinder(fresh);
       setError(null);
     } catch (caught) {
+      /* By id alone (a share link) a binder that is not up for trade
+         is a plain 404, which reads the same as "private" here. */
       setError(
-        caught instanceof ApiError && caught.code === "private"
+        caught instanceof ApiError &&
+          (caught.code === "private" || caught.code === "not-found")
           ? "private"
           : describeError(caught),
       );
@@ -208,19 +255,48 @@ export function BinderScreen({
      opens the settings sheet, where the website's title row has it. */
   useEffect(() => {
     if (!binder) return;
+    /*
+     * Share, beside the pencil: the link that opens this binder on
+     * the website or in the app. Read from the live setting, so the
+     * switch flipped in the sheet a moment ago is the one obeyed. A
+     * private binder has no public link, so the owner is told how to
+     * give it one rather than handed a link that opens for nobody.
+     */
+    const share = () => {
+      if (!binder.forTrade) {
+        Alert.alert("Turn on Up for trade to share this binder.");
+        return;
+      }
+      const url = binderShareUrl(binder.id);
+      void Share.share({ message: url, url }).catch(() => {});
+    };
     navigation.setOptions({
       title: binderTitle(binder),
-      headerRight: binder.yours
-        ? () => (
-            <Tap
-              onPress={() => setSettingsOpen(true)}
-              hitSlop={8}
-              accessibilityLabel="Binder settings"
-            >
-              <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
-            </Tap>
-          )
-        : undefined,
+      headerRight:
+        binder.yours || binder.forTrade
+          ? () => (
+              <View
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}
+              >
+                <Tap onPress={share} hitSlop={8} accessibilityLabel="Share binder">
+                  <Ionicons name="share-outline" size={22} color={colors.textPrimary} />
+                </Tap>
+                {binder.yours ? (
+                  <Tap
+                    onPress={() => setSettingsOpen(true)}
+                    hitSlop={8}
+                    accessibilityLabel="Binder settings"
+                  >
+                    <Ionicons
+                      name="pencil-outline"
+                      size={22}
+                      color={colors.textPrimary}
+                    />
+                  </Tap>
+                ) : null}
+              </View>
+            )
+          : undefined,
     });
   }, [binder, navigation]);
 
@@ -269,7 +345,12 @@ export function BinderScreen({
     }
   };
 
+  /* The server says whose it is. A share link arrives with the id
+     alone, so "no playerId" no longer means "mine". */
   const yours = binder?.yours ?? false;
+  /* An offer is somebody else's binder, up for trade. The server
+     answers only a signed-in player, so anyone looking is one. */
+  const offering = Boolean(binder && !binder.yours && binder.forTrade);
   const allCards = binder?.cards ?? [];
   const cards =
     filter === "hunts" ? allCards.filter((card) => card.onYourHunt) : allCards;
@@ -364,6 +445,59 @@ export function BinderScreen({
 
   /* The whole binder is one shelf in the viewer, so a swipe in the
      large view walks every card, not just this page's nine. */
+  /*
+   * The send, for the viewer and for the review under the pockets
+   * alike: every pick in one call, the entry standing where a Flare
+   * stands in the Flare viewer. It answers what the review expects of
+   * a Flare's door (everything taken, since the server takes all or
+   * nothing) and keeps the conversation for Open chat.
+   */
+  const ownerName = binder.ownerName;
+  const sendOffer = async (items: OfferItem[], note: string): Promise<OfferOutcome> => {
+    const result = await offerOnBinder(
+      id,
+      items.map((item) => ({ entryId: item.flareId, quantity: item.quantity })),
+      note.trim() || null,
+    );
+    lastSent.current = { threadId: result.threadId };
+    return { offered: items.length, refused: [] };
+  };
+  /* Once the send has landed and whatever it was sent from is gone:
+     the picks go, and the sentence the website says, with the way to
+     the conversation it went into. */
+  const afterSend = () => {
+    setPicks({});
+    const threadId = lastSent.current?.threadId;
+    Alert.alert(binderOfferSentLine(ownerName), undefined, [
+      ...(threadId
+        ? [
+            {
+              text: "Open chat",
+              onPress: () => navigation.navigate("LocalThread", { threadId }),
+            },
+          ]
+        : []),
+      { text: "OK", style: "cancel" as const },
+    ]);
+  };
+  const haveOf = (card: BinderCard): ZoomHave | null =>
+    offering
+      ? {
+          postId: binder.id,
+          posterName: ownerName,
+          flareId: card.entryId,
+          name: card.name,
+          state: "open",
+          youOffered: false,
+          remaining: card.quantity,
+          onOffer: sendOffer,
+          verb: "want",
+          failure: binderOfferError,
+          onSent: afterSend,
+        }
+      : null;
+  const offer = offering ? { picks, onPicks: setPicks, haveOf } : null;
+
   const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     name: card.name,
@@ -371,7 +505,9 @@ export function BinderScreen({
     caption: card.printingLabel,
     note: card.note,
     direction: "showcase",
+    have: haveOf(card),
   }));
+  const inOffer = Object.keys(picks).length;
 
   /* The held card rides with the gesture, not the list: after a drop
      on Remove it is already off the shelf while the overlay fades. */
@@ -450,6 +586,7 @@ export function BinderScreen({
                   /* Only the page under the finger has a target pocket. */
                   target={drag.held && drag.held.page === index ? drag.target : null}
                   onAdd={() => setAdding(true)}
+                  offer={offer}
                 />
               ))}
             </ScrollView>
@@ -479,6 +616,32 @@ export function BinderScreen({
 
         <PageDots at={at} of={pageCount} />
 
+        {/* "2 in your offer · Review": the picks stay in sight while
+            the viewer is closed, and Review is the door straight to
+            them. The Feed card's line, the same words. */}
+        {offering && inOffer > 0 ? (
+          <View
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+          >
+            <Ionicons name="checkmark-circle" size={15} color={colors.accent} />
+            <Text
+              style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}
+            >
+              {inYourOfferLine(inOffer)}
+            </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
+            <Tap
+              onPress={() => setReviewing(true)}
+              hitSlop={8}
+              accessibilityLabel="Review your offer"
+            >
+              <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+                Review
+              </Text>
+            </Tap>
+          </View>
+        ) : null}
+
         {cards.length === 0 && !yours ? <Muted>Nothing to trade yet.</Muted> : null}
 
         {yours ? (
@@ -496,6 +659,41 @@ export function BinderScreen({
           <MessageOwner playerId={binder.ownerId} name={binder.ownerName} />
         )}
       </ScrollView>
+
+      {/* The review from the line under the pockets: the viewer's own,
+          with the binder's words, sending through the same door. */}
+      {offering && reviewing && inOffer > 0 ? (
+        <OfferReviewSheet
+          postId={binder.id}
+          posterName={ownerName}
+          lines={Object.entries(picks).map(([entryId, quantity]) => {
+            const card = allCards.find((entry) => entry.entryId === entryId);
+            return {
+              flareId: entryId,
+              name: card?.name ?? "one card",
+              imageUrl: card?.imageUrl ?? null,
+              printingLabel: card?.printingLabel ?? null,
+              quantity,
+              max: card?.quantity ?? 1,
+            };
+          })}
+          onChange={(entryId, quantity) => {
+            const next = { ...picks };
+            if (quantity <= 0) delete next[entryId];
+            else next[entryId] = quantity;
+            setPicks(next);
+          }}
+          send={sendOffer}
+          sendLabel={BINDER_OFFER_COPY.send}
+          notePlaceholder={BINDER_OFFER_COPY.notePlaceholder}
+          failure={binderOfferError}
+          onSent={() => {
+            setReviewing(false);
+            afterSend();
+          }}
+          onClose={() => setReviewing(false)}
+        />
+      ) : null}
 
       {yours ? (
         <AddCardsSheet
@@ -536,6 +734,16 @@ export function BinderScreen({
       ) : null}
     </>
   );
+}
+
+/**
+ * The offer on somebody's trade binder, as a pocket needs it: the
+ * picks the screen holds, and the card's door into the viewer.
+ */
+interface BinderOffer {
+  picks: ZoomPicks;
+  onPicks: (picks: ZoomPicks) => void;
+  haveOf: (card: BinderCard) => ZoomHave | null;
 }
 
 /**
@@ -901,6 +1109,7 @@ function BinderPage({
   drag,
   target,
   onAdd,
+  offer,
 }: {
   geometry: Geometry;
   cards: BinderCard[];
@@ -912,6 +1121,8 @@ function BinderPage({
   /** The pocket on this page under the held card, or null. */
   target: number | null;
   onAdd: () => void;
+  /** The offer being built, on somebody's trade binder; null otherwise. */
+  offer: BinderOffer | null;
 }) {
   const { pocketWidth, pocketHeight } = geometry;
 
@@ -950,6 +1161,7 @@ function BinderPage({
             handlers={drag.handlersFor(card.entryId)}
             onPickUp={() => drag.pickUp(card.entryId)}
             onTouchEnd={drag.onTouchEnd}
+            offer={offer}
           />
         );
       })}
@@ -983,6 +1195,7 @@ function BinderPocket({
   handlers,
   onPickUp,
   onTouchEnd,
+  offer,
 }: {
   card: BinderCard;
   /** This pocket's place on its page. */
@@ -998,6 +1211,7 @@ function BinderPocket({
   handlers: GestureResponderHandlers | undefined;
   onPickUp: () => void;
   onTouchEnd: () => void;
+  offer: BinderOffer | null;
 }) {
   const { pocketWidth: width } = geometry;
 
@@ -1051,6 +1265,9 @@ function BinderPocket({
         siblings={shelf}
         position={position}
         onLongPress={yours ? onPickUp : undefined}
+        have={offer ? offer.haveOf(card) : null}
+        picks={offer?.picks}
+        onPicks={offer?.onPicks}
       />
     </Pocket>
   );

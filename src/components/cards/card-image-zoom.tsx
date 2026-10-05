@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -26,11 +27,12 @@ import {
   type OfferLine,
   type OfferOutcome,
 } from "@/components/flares/offer-review";
-import { Button } from "@/components/ui/button";
+import { Button, buttonStyles } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
+import { cn } from "@/lib/cn";
 import { listOf, offerFailureMessage, reviewLabel } from "@/lib/feed/offer-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { CardState } from "@/lib/feed/post-schema";
@@ -88,7 +90,36 @@ export interface ZoomCard {
    * and on a card that already traded.
    */
   have?: ZoomHave | null;
+  /**
+   * The ask on a card in somebody's trade binder. The founder: "Any
+   * card in a trade binder you should be able to do the same stack as
+   * making an offer on their trade cards." So it is the Feed's toggle
+   * and tray, in the binder's own words. Null on your own binder and
+   * on one that is not up for trade.
+   */
+  ask?: ZoomAsk | null;
 }
+
+/**
+ * The binder's ask: a toggle that picks the card into the offer the
+ * binder holds (see `OfferPicksContext`), or, for somebody signed out,
+ * the way in. The words are the caller's, so this file says nothing a
+ * binder has not said.
+ */
+export type ZoomAsk =
+  | {
+      mode: "pick";
+      /** What the offer keys the card by: the pocket's entry id. */
+      key: string;
+      /** The toggle, unpicked and picked. */
+      want: string;
+      picked: string;
+      /** The most cards one offer carries. */
+      max: number;
+      /** What the last send said, and the conversation it went to. */
+      sent: { message: string; href: string } | null;
+    }
+  | { mode: "sign-in"; href: string; label: string };
 
 export interface ZoomHave {
   postId: string;
@@ -287,6 +318,7 @@ interface ZoomSend {
  * cap its stepper stops at.
  */
 export interface OfferableCard {
+  /** The key the send uses: the Flare's id, or a binder pocket's entry id. */
   flareId: string;
   name: string;
   imageUrl: string | null;
@@ -346,12 +378,20 @@ export interface OfferBuild {
   submit: (message: string) => Promise<OfferOutcome>;
 }
 
+/**
+ * Where an offer goes when it is not a Feed post's: a trade binder's
+ * offer sends its lines as one message. Given one, the hook hands the
+ * lines over and leaves the outcome to it.
+ */
+export type OfferSend = (lines: OfferLine[], message: string) => Promise<OfferOutcome>;
+
 /** The post's offer, when a viewer is drawn inside one. */
 export const OfferPicksContext = createContext<OfferBuild | null>(null);
 
 export function useOfferBuild(
   postId: string | null,
   cards: OfferableCard[],
+  send?: OfferSend,
 ): OfferBuild {
   const [picks, setPicks] = useState<Readonly<Record<string, number>>>({});
   const [sends, setSends] = useState<Readonly<Record<string, ZoomSend>>>({});
@@ -403,6 +443,8 @@ export function useOfferBuild(
     });
 
   const submit = async (message: string): Promise<OfferOutcome> => {
+    /* A binder's offer: its own send, its own outcome. */
+    if (send) return send(lines, message);
     if (!postId) {
       return { ok: false, message: offerFailureMessage("unknown"), refused: [] };
     }
@@ -563,6 +605,76 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: OfferBuild })
   );
 }
 
+/**
+ * The ask on a card in a trade binder, at the foot of the zoom: the
+ * Feed's toggle and tray, drawn the same, in the binder's words. A
+ * send's outcome sits above them, with the way into the chat. Somebody
+ * signed out gets the way in instead of the toggle.
+ */
+function ZoomAskBlock({ ask, offers }: { ask: ZoomAsk; offers: OfferBuild }) {
+  if (ask.mode === "sign-in") {
+    return (
+      <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-2">
+        <Link href={ask.href} className={cn(buttonStyles("primary", "md"), "w-full")}>
+          {ask.label}
+        </Link>
+      </div>
+    );
+  }
+
+  const added = Boolean(offers.picks[ask.key]);
+  const count = offers.count;
+  const full = !added && count >= ask.max;
+
+  return (
+    <div onClick={(event) => event.stopPropagation()} className="flex flex-col gap-2">
+      {ask.sent && count === 0 && (
+        <ZoomSaid>
+          <p className="min-w-0 flex-1 basis-40">
+            <span className="font-medium text-accent">{ask.sent.message}</span>
+          </p>
+          <Link
+            href={ask.sent.href}
+            className="shrink-0 font-semibold text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+          >
+            Open the chat
+          </Link>
+        </ZoomSaid>
+      )}
+      <Button
+        type="button"
+        variant={added ? "secondary" : "primary"}
+        aria-pressed={added}
+        disabled={full}
+        onClick={() => offers.toggle(ask.key)}
+        className="w-full"
+      >
+        {added && <Check className="size-4 text-accent" aria-hidden="true" />}
+        {added ? ask.picked : ask.want}
+      </Button>
+      {full && (
+        <p className="text-center text-xs leading-5 text-text-muted">
+          One offer carries up to {ask.max} cards.
+        </p>
+      )}
+      {/* The tray, as the Feed's: the accent once anything is picked,
+          and its room kept before then so nothing below moves. */}
+      {count > 0 ? (
+        <Button
+          type="button"
+          variant="primary"
+          onClick={offers.openReview}
+          className="w-full"
+        >
+          {reviewLabel(count)}
+        </Button>
+      ) : (
+        <span aria-hidden="true" className="block h-11" />
+      )}
+    </div>
+  );
+}
+
 /** Long enough to read as a movement, short enough not to be in the way. */
 const OPEN_MS = 220;
 
@@ -616,6 +728,7 @@ export function CardImageZoom({
   youHave: ownYouHave = null,
   offer: ownOffer = null,
   have: ownHave = null,
+  ask: ownAsk = null,
   siblings,
   position = 0,
   thumbClassName,
@@ -669,6 +782,8 @@ export function CardImageZoom({
   offer?: ZoomOffer | null;
   /** The offer on a Feed post. See `ZoomCard.have`. */
   have?: ZoomHave | null;
+  /** The ask on a trade binder's card. See `ZoomCard.ask`. */
+  ask?: ZoomAsk | null;
   /** Sizes the thumbnail; the carousel view renders cards art-first. */
   thumbClassName?: string;
   /** The thumbnail's drawn width for the image optimiser, when it is not the 56px default. */
@@ -744,6 +859,7 @@ export function CardImageZoom({
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
+  const ask = shown ? (shown.ask ?? null) : ownAsk;
 
   const [warm, setWarm] = useState(false);
   const [sharp, setSharp] = useState(false);
@@ -1046,7 +1162,9 @@ export function CardImageZoom({
    * the sheet is the one way to say you have the card, so a card with
    * no art still opens to it.
    */
-  if ((!enabled || !isRenderableImageUrl(ownImageUrl)) && !ownOffer) return thumbnail;
+  if ((!enabled || !isRenderableImageUrl(ownImageUrl)) && !ownOffer && !ownAsk) {
+    return thumbnail;
+  }
 
   const intent = () => {
     if (isOpen.current) return;
@@ -1320,7 +1438,9 @@ export function CardImageZoom({
              * found the switch disorienting: "show a loading icon or
              * something until it fully loads."
              */}
-            {!sharp && (
+            {/* A binder's card with no art opens for its ask, and has
+                nothing coming, so it says nothing is. */}
+            {!sharp && (large || !ask) && (
               <span
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 grid place-items-center"
@@ -1389,6 +1509,7 @@ export function CardImageZoom({
               ride along to the next card. */}
           {offer && <ZoomOfferBlock key={`offer-${at}`} offer={offer} />}
           {have && <ZoomHaveBlock have={have} offers={offers} />}
+          {ask && <ZoomAskBlock ask={ask} offers={offers} />}
         </div>
       </dialog>
 

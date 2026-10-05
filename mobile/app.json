@@ -22,7 +22,8 @@
       "appleTeamId": "J2N92N3SMA",
       "entitlements": {
         "com.apple.developer.usernotifications.communication": true
-      }
+      },
+      "associatedDomains": ["applinks:www.cardflare.gg", "applinks:cardflare.gg"]
     },
     "android": {
       "package": "gg.cardflare.app",

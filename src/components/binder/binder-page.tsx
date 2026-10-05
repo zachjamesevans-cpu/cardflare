@@ -1,8 +1,17 @@
 "use client";
 
-import { useState, useTransition, type DragEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+  type DragEvent,
+  type ReactNode,
+} from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Check, Pencil, Share2 } from "lucide-react";
 
 import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
@@ -15,11 +24,31 @@ import {
   PageDots,
   PocketTile,
 } from "@/components/binder/pockets";
-import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import {
+  CardImageZoom,
+  OfferPicksContext,
+  useOfferBuild,
+  type OfferBuild,
+  type OfferSend,
+  type OfferableCard,
+  type ZoomAsk,
+  type ZoomCard,
+} from "@/components/cards/card-image-zoom";
+import { InYourOffer } from "@/components/feed/post-actions";
+import { OfferReview } from "@/components/flares/offer-review";
 import { Sheet } from "@/components/ui/sheet";
-import { removeBinderCardAction, reorderBinderAction } from "@/lib/binder/actions";
+import {
+  offerOnBinderAction,
+  removeBinderCardAction,
+  reorderBinderAction,
+} from "@/lib/binder/actions";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import type { BinderCoverId } from "@/lib/binder/covers";
+import {
+  BINDER_OFFER_COPY,
+  BINDER_OFFER_MAX_CARDS,
+  BINDER_OFFER_NOTE_MAX,
+} from "@/lib/binder/offer-copy";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 
@@ -29,8 +58,23 @@ import { cn } from "@/lib/cn";
  * Drawn the way a binder sits on a table: three by three pockets per
  * page, always (the founder: "Just have a 3x3."), arrows and dots to
  * turn it, and a tap on any pocket opens the card large in the same
- * viewer every other card on the site opens in, with no offer
- * control: the binder is not answerable yet, this round.
+ * viewer every other card on the site opens in.
+ *
+ * A trade binder is answerable. The founder: "Any card in a trade
+ * binder you should be able to do the same stack as making an offer
+ * on their trade cards - like scrolling through them with the same UI
+ * as making an offer on someone's flares. Can then DM them about
+ * them." So a signed-in visitor's viewer carries the Feed's stack: a
+ * toggle on each card ("I want this card"), the tray, the bar under
+ * the pages, and the same review, whose send is one message in the
+ * pair's conversation (`offerOnBinderAction`). Somebody signed out is
+ * shown the way in instead. The owner, and a binder that is not up for
+ * trade, get the viewer as it was.
+ *
+ * And shareable: "Add a public link that can be shared for binders so
+ * they can view it on web or app." Share, at the top, hands the system
+ * share sheet cardflare.gg/b/<id>, or copies it. On the owner's private
+ * binder it stays, and says what would make it shareable.
  *
  * The owner's tools are the page itself. The founder (round 3): "the
  * add cards button and edit button are completely redundant because
@@ -103,6 +147,7 @@ export function BinderView({
   playerGames = [],
   title,
   footer = null,
+  offerAs = null,
 }: {
   binder: Binder;
   imagesEnabled: boolean;
@@ -112,6 +157,12 @@ export function BinderView({
   title: string | null;
   /** A visitor's one control under the page: the message door. */
   footer?: ReactNode;
+  /**
+   * Who may make an offer on the cards: a signed-in "player" who is
+   * not the owner and not blocked either way, or a signed-out "guest",
+   * who is shown the way in. Null for everyone else.
+   */
+  offerAs?: "player" | "guest" | null;
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
@@ -133,6 +184,8 @@ export function BinderView({
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<DropSpot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** Share was pressed on the owner's private binder. */
+  const [shareRefused, setShareRefused] = useState(false);
   const [pending, start] = useTransition();
 
   const list =
@@ -152,6 +205,70 @@ export function BinderView({
     ...Array.from({ length: perPage - shown.length }, () => null),
   ];
 
+  /*
+   * THE OFFER, as the Feed post's. The picks live here, for the page's
+   * life, and reach every pocket's viewer through `OfferPicksContext`,
+   * so a card picked from one pocket is still picked when the viewer is
+   * opened from another. Keyed by the pocket's entry id, capped at the
+   * copies in the pocket. The send is the binder's: one message.
+   */
+  const asking = !binder.yours && settings.forTrade && offerAs !== null;
+  const picking = asking && offerAs === "player";
+  const offerable = useMemo<OfferableCard[]>(
+    () =>
+      picking
+        ? cards.map((card) => ({
+            flareId: card.entryId,
+            name: card.name,
+            imageUrl: card.imageUrl,
+            printingLabel: card.printingLabel,
+            max: Math.max(1, card.quantity),
+          }))
+        : [],
+    [picking, cards],
+  );
+  /** What the last send said, and the conversation it went to. */
+  const [sent, setSent] = useState<{ message: string; threadId: string } | null>(null);
+  const sendOffer: OfferSend = async (lines, message) => {
+    const result = await offerOnBinderAction(binder.id, {
+      items: lines.map((line) => ({ entryId: line.key, quantity: line.quantity })),
+      note: message.trim() || null,
+    });
+    if (!result.ok) return { ok: false, message: result.message, refused: [] };
+    setSent({ message: result.message, threadId: result.threadId });
+    return { ok: true, offered: lines.length, refused: [] };
+  };
+  const build = useOfferBuild(null, offerable, sendOffer);
+  const offers: OfferBuild = {
+    ...build,
+    /* Never past what one offer carries; a new pick starts a new offer. */
+    toggle: (key) => {
+      if (!(key in build.picks) && build.count >= BINDER_OFFER_MAX_CARDS) return;
+      setSent(null);
+      build.toggle(key);
+    },
+  };
+  const chat = sent ? `/local?thread=${encodeURIComponent(sent.threadId)}` : null;
+
+  const askFor = (card: BinderCard): ZoomAsk | null => {
+    if (!asking) return null;
+    if (!picking) {
+      return {
+        mode: "sign-in",
+        href: `/login?next=/b/${binder.id}`,
+        label: BINDER_OFFER_COPY.signIn,
+      };
+    }
+    return {
+      mode: "pick",
+      key: card.entryId,
+      want: BINDER_OFFER_COPY.want,
+      picked: BINDER_OFFER_COPY.picked,
+      max: BINDER_OFFER_MAX_CARDS,
+      sent: sent && chat ? { message: sent.message, href: chat } : null,
+    };
+  };
+
   const zoomCards: ZoomCard[] = list.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.name,
@@ -159,6 +276,7 @@ export function BinderView({
     caption: card.printingLabel,
     note: card.note,
     direction: "showcase",
+    ask: askFor(card),
   }));
 
   const act = (work: () => Promise<{ ok: true } | { ok: false; message: string }>) => {
@@ -247,10 +365,13 @@ export function BinderView({
   const countLine = `${binder.count} ${binder.count === 1 ? "card" : "cards"}`;
   const line = binderLine(settings.forTrade, binder.yours, binder.ownerName);
 
-  return (
+  /* The name a share sheet and a chat preview give the link. */
+  const shareTitle = `${binder.ownerName}'s ${settings.name}`;
+
+  const view = (
     <div className="flex w-full flex-col gap-4">
-      {/* The title row: the words on the left, and for the owner the
-          pencil on the right that opens the settings sheet. */}
+      {/* The title row: the words on the left; on the right, Share,
+          and for the owner the pencil that opens the settings sheet. */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           {title && (
@@ -263,17 +384,35 @@ export function BinderView({
             {countLine} · Page {page + 1} of {pages}
           </p>
         </div>
-        {binder.yours && (
-          <button
-            type="button"
-            aria-label="Binder settings"
-            onClick={() => setSettingsOpen(true)}
-            className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-          >
-            <Pencil className="size-4" aria-hidden="true" />
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {(binder.yours || settings.forTrade) && (
+            <ShareBinder
+              binderId={binder.id}
+              title={shareTitle}
+              forTrade={settings.forTrade}
+              onPrivate={() => setShareRefused(true)}
+            />
+          )}
+          {binder.yours && (
+            <button
+              type="button"
+              aria-label="Binder settings"
+              onClick={() => setSettingsOpen(true)}
+              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Share on a private binder: no link to give, so the reason,
+          inline, until Up for trade is on. */}
+      {shareRefused && !settings.forTrade && (
+        <p role="status" className="text-sm text-text-secondary">
+          {PRIVATE_SHARE_LINE}
+        </p>
+      )}
 
       {!binder.yours && binder.onYourHunts > 0 && (
         <div className="flex gap-2" role="group" aria-label="Show">
@@ -389,6 +528,7 @@ export function BinderView({
                       enabled={imagesEnabled}
                       siblings={zoomCards}
                       position={list.indexOf(card)}
+                      ask={askFor(card)}
                       thumbClassName="w-full"
                       thumb={<PocketTile card={card} imagesEnabled={imagesEnabled} />}
                     />
@@ -451,6 +591,26 @@ export function BinderView({
 
       {pages > 1 && <PageDots pages={pages} page={page} onPick={setAt} />}
 
+      {/* "2 in your offer · Review", the Feed post's bar, while
+          anything is picked; once an offer goes, what it said and the
+          way into the chat. */}
+      {picking && (
+        <div className="flex flex-col items-center gap-1 text-center">
+          <InYourOffer />
+          {sent && chat && offers.count === 0 && (
+            <p role="status" className="text-sm text-text-secondary">
+              <span className="font-semibold text-accent">{sent.message}</span>{" "}
+              <Link
+                href={chat}
+                className="font-semibold text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              >
+                Open the chat
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
+
       {binder.yours && cards.length > 0 && (
         <p className="text-center text-xs text-text-muted">
           Hold a card to move it, or drop it on Remove.
@@ -499,7 +659,111 @@ export function BinderView({
       ) : (
         footer
       )}
+
+      {/* The review, once for every pocket: the Flare's sheet, in the
+          binder's words, closing on a send so the page can say where
+          the offer went. */}
+      {picking && (
+        <OfferReview
+          open={offers.reviewOpen}
+          onClose={offers.closeReview}
+          lines={offers.lines}
+          onQuantity={offers.setQuantity}
+          onRemove={offers.remove}
+          onSubmit={offers.submit}
+          onSent={offers.clear}
+          sendLabel={BINDER_OFFER_COPY.send}
+          notePlaceholder={BINDER_OFFER_COPY.notePlaceholder}
+          noteMax={BINDER_OFFER_NOTE_MAX}
+          closeOnSent
+        />
+      )}
     </div>
+  );
+
+  /* The picks reach every pocket's viewer, and the bar, from here. */
+  return picking ? (
+    <OfferPicksContext.Provider value={offers}>{view}</OfferPicksContext.Provider>
+  ) : (
+    view
+  );
+}
+
+/** What the owner of a private binder is told when they press Share. */
+const PRIVATE_SHARE_LINE = "Turn on Up for trade to share this binder.";
+
+/**
+ * SHARE, at the top of the binder. The link is cardflare.gg/b/<id>,
+ * which opens the binder on the web for anyone and in the app on a
+ * phone that has it. A phone's own share sheet when there is one (a
+ * dismissed sheet is not an error); anywhere else the link is copied
+ * and the button says so for two seconds, because a button that copies
+ * silently gets pressed four times. A private binder has no link to
+ * give, so on the owner's the button stays and says, beside it, what
+ * would make it shareable: never a dead press.
+ */
+function ShareBinder({
+  binderId,
+  title,
+  forTrade,
+  onPrivate,
+}: {
+  binderId: string;
+  title: string;
+  /** The live Up for trade setting, not the one the page loaded with. */
+  forTrade: boolean;
+  /** Pressed on a private binder: the page says why there is no link. */
+  onPrivate: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
+  }, []);
+
+  const share = async () => {
+    if (!forTrade) {
+      onPrivate();
+      return;
+    }
+    const url = `${window.location.origin}/b/${binderId}`;
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (error) {
+        /* Dismissed: they changed their mind, and that is the end of it. */
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        /* Refused for another reason: copying still works. */
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* Clipboard refused: nothing more to offer here. */
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={() => void share()}
+      aria-live="polite"
+      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+    >
+      {copied ? (
+        <Check className="size-4 text-accent" aria-hidden="true" />
+      ) : (
+        <Share2 className="size-4" aria-hidden="true" />
+      )}
+      {copied ? "Link copied" : "Share"}
+    </button>
   );
 }
 

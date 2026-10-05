@@ -45,7 +45,11 @@ const web = {
   settings: read("src/components/binder/binder-settings.tsx"),
   add: read("src/components/binder/add-binder-card.tsx"),
   ownBinder: read("src/app/profile/binders/[binderId]/page.tsx"),
-  playerBinder: read("src/app/p/[playerId]/binders/[binderId]/page.tsx"),
+  /* The page is a thin door now; its body is PublicBinder, shared with
+     the share link /b/<id>. */
+  playerBinder:
+    read("src/app/p/[playerId]/binders/[binderId]/page.tsx") +
+    read("src/components/binder/public-binder.tsx"),
   ownProfile: read("src/app/profile/page.tsx"),
   playerProfile: read("src/app/p/[playerId]/page.tsx"),
 };
