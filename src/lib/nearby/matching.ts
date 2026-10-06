@@ -11,6 +11,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 
 import { milesLabel } from "./shared";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * Nearby matching: who near you is hunting a card you will trade.
@@ -275,7 +276,7 @@ export async function nearbyMatchesForHolder(
         playerId: wanter.id,
         displayName: wanter.display_name,
         avatarUrl: avatarSrc(avatarPathFor(wanter)),
-        frame: wanter.equipped_avatar_frame,
+        frame: wornFrame(wanter),
         ring: wear.get(wanter.id)?.ring ?? null,
         aura: wear.get(wanter.id)?.aura ?? null,
         ringArt: wear.get(wanter.id)?.ringArt ?? null,

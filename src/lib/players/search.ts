@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarWearFor } from "./equips";
 import { avatarPathFor, avatarSrc } from "./profile-image";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * A value inside a PostgREST `.or()` filter, quoted.
@@ -81,7 +82,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
     displayName: row.display_name,
     handle: row.handle,
     avatarUrl: avatarSrc(avatarPathFor(row)),
-    frame: row.equipped_avatar_frame,
+    frame: wornFrame(row),
     ring: wear.get(row.id)?.ring ?? null,
     aura: wear.get(row.id)?.aura ?? null,
   }));

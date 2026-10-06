@@ -28,6 +28,7 @@ import {
   type PostSocial,
 } from "./post-queries";
 import { POST_COMMENT_MAX, type CardState, type PostComment } from "./post-schema";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * A Flare post as something people can answer under, not just walk to.
@@ -330,7 +331,7 @@ async function facesFor(playerIds: string[]): Promise<
     out.set(row.id, {
       displayName: row.display_name,
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
     });

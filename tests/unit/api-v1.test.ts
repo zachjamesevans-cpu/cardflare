@@ -389,13 +389,14 @@ describe("notifications inbox", () => {
             display_name: "Kaito",
             avatar_url: "avatars/kaito/1.jpg",
             avatar_animated: null,
-            tier: "free",
+            /* Pro: a frame is only drawn on a tier that wears. */
+            tier: "pro",
             equipped_avatar_frame: "ember-edge",
           },
         ],
         error: null,
       },
-      { data: [{ id: "kaito", tier: "free" }], error: null },
+      { data: [{ id: "kaito", tier: "pro" }], error: null },
     );
 
     const response = await notifications.GET(request("GET"));

@@ -5,12 +5,20 @@ import { organizerStoresFor, type OrganizerStore } from "@/lib/stores/staff";
 
 import { cardArt, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
-import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
+import {
+  freeSlugFor,
+  ownedCosmetics,
+  ownsCosmetic,
+  tierMayWear,
+  wearingNeedsPro,
+  type Equipped,
+} from "./cosmetics";
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
 import { doneWantKeys, listOfferings, listWants, wantKey } from "./wants";
 import { tierAllows } from "@/lib/tiers";
+import { wornFrame } from "./worn-frame";
 import type { CosmeticArtFile } from "./art-files";
 import {
   AVATAR_MAX_BYTES,
@@ -199,6 +207,8 @@ async function loadProfile(
     deckLabel: row.deckLabel,
   }));
 
+  const dresses = tierAllows(player.tier, "cosmetics");
+
   return {
     playerId: player.id,
     displayName: player.display_name,
@@ -215,13 +225,24 @@ async function loadProfile(
     embersEarned: player.embers_badge ?? player.embers_earned,
     embersBalance: player.embers_balance,
     tier: player.tier,
-    equipped: {
-      avatarFrame: player.equipped_avatar_frame,
-      frame: player.equipped_frame,
-      holo: player.equipped_holo,
-      effect: player.equipped_effect,
-    },
-    showcase,
+    /*
+     * Worn only while the tier wears. Wearing is Pro (see setEquip and
+     * wearingNeedsPro), and a free or lapsed player's old picks stay in
+     * the columns underneath - so the read is where they come off, the
+     * same way getEquips takes a lapsed Pro's ring off. A null slot is
+     * the free item, which every tier may show.
+     */
+    equipped: dresses
+      ? {
+          avatarFrame: player.equipped_avatar_frame,
+          frame: player.equipped_frame,
+          holo: player.equipped_holo,
+          effect: player.equipped_effect,
+        }
+      : { avatarFrame: null, frame: null, holo: null, effect: null },
+    showcase: dresses
+      ? showcase
+      : showcase.map((entry) => ({ ...entry, frame: null, holo: null })),
     organizerAt,
     binders,
     flares,
@@ -385,7 +406,7 @@ export async function roomIdentitiesFor(
     identities.set(row.id, {
       embersEarned: row.embers_badge ?? row.embers_earned,
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame ?? freeFrame,
+      frame: wornFrame(row) ?? freeFrame,
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
       ringArt: wear.get(row.id)?.ringArt ?? null,
@@ -554,7 +575,10 @@ async function wearableOrNull(
     .maybeSingle();
 
   if (!item || item.kind !== kind) return null;
-  return ownsCosmetic(item, await ownedCosmetics(playerId)) ? slug : null;
+  if (!ownsCosmetic(item, await ownedCosmetics(playerId))) return null;
+  /* Dressing a showcase card is wearing, and wearing is Pro. */
+  if (wearingNeedsPro(item) && !(await tierMayWear(playerId))) return null;
+  return slug;
 }
 
 export async function addToShowcase(

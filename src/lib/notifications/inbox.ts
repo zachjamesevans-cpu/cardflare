@@ -4,6 +4,7 @@ import { avatarWearFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * The player's inbox, for the website AND the app.
@@ -116,7 +117,7 @@ async function actorsFor(ids: (string | null)[]): Promise<Map<string, InboxActor
       playerId: row.id,
       displayName: row.display_name,
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
       ringArt: wear.get(row.id)?.ringArt ?? null,
