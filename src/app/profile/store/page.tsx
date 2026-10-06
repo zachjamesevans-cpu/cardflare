@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Flame } from "lucide-react";
+import { Flame } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
@@ -10,6 +9,7 @@ import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
 import { packItemLabels } from "@/lib/packs/labels";
 import { listSealedPacks } from "@/lib/packs/repository";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { Card } from "@/components/ui/card";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
@@ -84,13 +84,7 @@ export default async function EmberStorePage() {
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/profile"
-              className="inline-flex items-center gap-1.5 text-sm text-text-secondary underline-offset-4 transition-colors hover:text-text-primary hover:underline"
-            >
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              Back to your profile
-            </Link>
+            <BackLink href="/profile" />
 
             {/*
              * Deliberately NOT an EmberBadge. That component says

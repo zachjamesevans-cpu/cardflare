@@ -2,26 +2,32 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { Fragment, useCallback, useEffect, useState, useTransition } from "react";
 import {
+  Ban,
   Check,
   ChevronLeft,
+  Flag,
+  Handshake,
   Loader2,
   MapPin,
   MessageCircle,
-  Send,
-  Store,
+  RefreshCw,
+  UserRound,
 } from "lucide-react";
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { PostalAsk } from "@/components/feed/postal-ask";
-import { ThreadTradeBlock, TradeTrigger } from "@/components/local/thread-trade-block";
+import { MessageComposer } from "@/components/local/message-composer";
+import { ThreadTradeBlock } from "@/components/local/thread-trade-block";
+import { threadTimeLabel } from "@/components/local/thread-time";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { ReportSheet } from "@/components/players/report-sheet";
 import { blockPlayerAction } from "@/lib/players/safety-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
+import { DotsMenu, type MenuItem } from "@/components/ui/menu";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -33,21 +39,15 @@ import {
   sendMessageAction,
   setLocalRadiusAction,
 } from "@/lib/local/actions";
-import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import type { LocalFeed, LocalFlare } from "@/lib/local/feed";
+import { messageRuns, tidyMessage } from "@/lib/local/message-runs";
 import {
   LOCAL_RADII,
   MESSAGE_MAX_LENGTH,
   agoLabel,
   milesLabel,
 } from "@/lib/local/shared";
-import type {
-  MeetSuggestion,
-  ThreadMessage,
-  ThreadRead,
-  ThreadSummary,
-} from "@/lib/local/threads";
-import { meetLine, suggestText } from "@/lib/nearby/meet";
+import type { ThreadMessage, ThreadRead, ThreadSummary } from "@/lib/local/threads";
 import type { ProposeInput, ThreadTrade } from "@/lib/trades/thread-trades";
 import { cn } from "@/lib/cn";
 
@@ -589,9 +589,16 @@ function OpenThreadComposer({
 }
 
 /**
- * One conversation. Loaded fresh on open — reading is the receipt —
- * and refreshed after every send. No live socket in v1; the Refresh
- * button is the honest version of one.
+ * One conversation. Loaded fresh on open (reading is the receipt) and
+ * refreshed after every send. No live socket in v1; the refresh button
+ * in the header is the honest version of one, the app's pull-to-refresh.
+ *
+ * Instagram's chat, on both platforms. The header is a plain chevron,
+ * their face, their name with the @handle under it (face and name open
+ * their profile), and a ⋯ that holds everything else: View profile, We
+ * traded, Report, Block. The founder: Block and Report were "a massive
+ * button in the chat". The messages run together the way messageRuns
+ * says, and the box under them grows to five lines.
  */
 function ThreadView({
   threadId,
@@ -604,14 +611,15 @@ function ThreadView({
   imagesEnabled: boolean;
   playerGames: readonly string[];
 }) {
+  const router = useRouter();
   const [messages, setMessages] = useState<ThreadMessage[] | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
   const [withName, setWithName] = useState<string | null>(null);
   const [kind, setKind] = useState<ThreadRead["kind"]>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
-  const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
   const [withAvatarUrl, setWithAvatarUrl] = useState<string | null>(null);
+  const [withHandle, setWithHandle] = useState<string | null>(null);
   /* Block's inline question, and whether it has landed. */
   const [asking, setAsking] = useState(false);
   const [blocked, setBlocked] = useState(false);
@@ -622,7 +630,7 @@ function ThreadView({
 
   /* "We traded": the form's open state, the call in flight, and what a
      refusal said. Its own transition, so marking a trade never greys
-     out the Send button beside it. */
+     out the Send button under it. */
   const [composingTrade, setComposingTrade] = useState(false);
   const [tradeError, setTradeError] = useState<string | null>(null);
   const [tradePending, startTrade] = useTransition();
@@ -639,9 +647,9 @@ function ThreadView({
       setWithName(thread.withName);
       setKind(thread.kind);
       setTrade(thread.trade);
-      setMeet(thread.meet);
       setWithPlayerId(thread.withPlayerId ?? null);
       setWithAvatarUrl(thread.withAvatarUrl ?? null);
+      setWithHandle(thread.withHandle ?? null);
     });
     /* onBack is stable enough for a mount effect; re-running on its
        identity would reload the thread on every parent render. */
@@ -677,8 +685,9 @@ function ThreadView({
     load();
   }, [load]);
 
+  /* Blank lines at either end are trimmed; nothing left is not sent. */
   function send() {
-    const body = draft.trim();
+    const body = tidyMessage(draft);
     if (!body) return;
     setError(null);
     startTransition(async () => {
@@ -694,9 +703,9 @@ function ThreadView({
   }
 
   /*
-   * Block, where "End this conversation" used to be. Conversations do
-   * not end now, the way a DM does not; the block is how somebody is
-   * stopped, with the profile's own words.
+   * Block, from the ⋯. Conversations do not end, the way a DM does
+   * not; the block is how somebody is stopped, with the profile's own
+   * words, asked once more before it happens.
    */
   function block() {
     if (!withPlayerId) return;
@@ -711,52 +720,120 @@ function ThreadView({
     });
   }
 
+  /* "We traded" is offered while no claim is waiting: one trade at a
+     time per conversation. Its flow is the one it always was. */
+  const canSayTraded =
+    messages !== null &&
+    !blocked &&
+    !composingTrade &&
+    (trade === null || trade.status !== "pending");
+
+  const menu: MenuItem[] = [
+    ...(withPlayerId
+      ? [
+          {
+            key: "profile",
+            label: "View profile",
+            icon: <UserRound />,
+            onSelect: () => router.push(`/p/${withPlayerId}`),
+          },
+        ]
+      : []),
+    ...(canSayTraded
+      ? [
+          {
+            key: "traded",
+            label: "We traded",
+            icon: <Handshake />,
+            onSelect: () => {
+              setTradeError(null);
+              setComposingTrade(true);
+            },
+          },
+        ]
+      : []),
+    {
+      key: "report",
+      label: "Report",
+      icon: <Flag />,
+      onSelect: () => setReporting(true),
+    },
+    ...(withPlayerId && !blocked
+      ? [
+          {
+            key: "block",
+            label: "Block",
+            icon: <Ban />,
+            onSelect: () => setAsking(true),
+          },
+        ]
+      : []),
+  ];
+
+  const name = withName ?? "Conversation";
+  const runs = messages ? messageRuns(messages) : [];
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Instagram's chat header: chevron, face, name over @handle, ⋯. */}
       <div className="flex items-center gap-2">
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+          aria-label="Back"
+          className="-ml-2 flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-primary hover:bg-elevated"
         >
-          <ChevronLeft className="size-4" aria-hidden="true" />
-          {LOCAL_ENABLED ? "Local" : "Messages"}
+          <ChevronLeft className="size-6" aria-hidden="true" />
         </button>
-        <div className="flex min-w-0 flex-1 flex-col items-center">
-          {/* Their face beside their name, and both open their
-              profile: the conversation is the person. */}
-          {withPlayerId ? (
-            <Link
-              href={`/p/${withPlayerId}`}
-              className="flex max-w-full min-w-0 items-center gap-2 hover:opacity-80"
-            >
-              <PlayerAvatar
-                displayName={withName ?? "Player"}
-                seed={withPlayerId}
-                avatarUrl={withAvatarUrl}
-                size="sm"
-              />
-              <span className="truncate font-semibold text-text-primary">
-                {withName ?? "Conversation"}
+        {withPlayerId ? (
+          <Link
+            href={`/p/${withPlayerId}`}
+            className="flex min-w-0 flex-1 items-center gap-2.5 hover:opacity-80"
+          >
+            <PlayerAvatar
+              displayName={withName ?? "Player"}
+              seed={withPlayerId}
+              avatarUrl={withAvatarUrl}
+              size="sm"
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="truncate leading-tight font-semibold text-text-primary">
+                {name}
               </span>
-            </Link>
-          ) : (
-            <p className="truncate font-semibold text-text-primary">
-              {withName ?? "Conversation"}
-            </p>
-          )}
-          {/* The subject, when the thread has one. A direct message
-              is about whatever the two of them say it is. */}
-          {cardName && (
-            <p className="truncate text-xs text-text-muted">About {cardName}</p>
-          )}
-        </div>
-        <Button type="button" size="sm" variant="ghost" onClick={load}>
-          Refresh
-        </Button>
+              {withHandle && (
+                <span className="truncate text-xs leading-tight text-text-muted">
+                  @{withHandle}
+                </span>
+              )}
+            </span>
+          </Link>
+        ) : (
+          <p className="min-w-0 flex-1 truncate font-semibold text-text-primary">
+            {name}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={load}
+          aria-label="Refresh"
+          disabled={pending}
+          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted hover:bg-elevated hover:text-text-primary disabled:cursor-wait"
+        >
+          <RefreshCw
+            className={cn("size-4", pending && "animate-spin")}
+            aria-hidden="true"
+          />
+        </button>
+        <DotsMenu items={menu} label={`More about ${name}`} />
       </div>
 
-      <Card className="flex min-h-64 flex-col gap-2">
+      {/* The subject, when the thread has one. A direct message is
+          about whatever the two of them say it is. */}
+      {cardName && (
+        <p className="-mt-2 truncate text-xs text-text-muted">About {cardName}</p>
+      )}
+
+      <Card className="flex min-h-64 flex-col">
         {messages === null ? (
           <p role="status" className="flex justify-center py-8">
             <Spinner />
@@ -765,41 +842,65 @@ function ThreadView({
         ) : messages.length === 0 ? (
           <p className="py-8 text-center text-text-muted">No messages yet.</p>
         ) : (
-          messages.map((message) => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex max-w-[85%] flex-col gap-1",
-                message.yours ? "items-end self-end" : "items-start self-start",
-              )}
-            >
-              {/* The cards a message is about ("I have this", a nearby
-                  match, an offer on a trade binder), on the sender's
-                  side just above the words, so "I have this one" reads
-                  as being about that card. An offer on a binder carries
-                  several, so every one is drawn, wrapping onto a new
-                  row when they do not fit. */}
-              <MessageCards message={message} />
-              <div
-                className={cn(
-                  "rounded-[var(--radius-control)] px-3 py-2 text-sm",
-                  message.yours
-                    ? "bg-accent text-accent-contrast"
-                    : "bg-elevated text-text-primary",
+          messages.map((message, index) => {
+            const run = runs[index];
+            return (
+              <Fragment key={message.id}>
+                {/* A time line only where the talk paused. */}
+                {run?.showTime && (
+                  <p className="pt-2 pb-3 text-center text-[11px] font-medium text-text-muted first:pt-0">
+                    {threadTimeLabel(message.sentAt)}
+                  </p>
                 )}
-              >
-                <p className="break-words whitespace-pre-wrap">{message.body}</p>
-                <p
+                <div
                   className={cn(
-                    "mt-1 text-[10px]",
-                    message.yours ? "text-accent-contrast/70" : "text-text-muted",
+                    "flex items-end gap-2",
+                    message.yours ? "justify-end" : "justify-start",
+                    run?.joinsNext ? "pb-0.5" : "pb-3 last:pb-0",
                   )}
                 >
-                  {agoLabel(message.sentAt)}
-                </p>
-              </div>
-            </div>
-          ))
+                  {/* Their face once per run, beside its last message,
+                      and a space the same width beside the rest so the
+                      bubbles line up. Never your own face. */}
+                  {!message.yours &&
+                    (run?.showFace ? (
+                      <PlayerAvatar
+                        displayName={withName ?? "Player"}
+                        seed={withPlayerId ?? threadId}
+                        avatarUrl={withAvatarUrl}
+                        size="sm"
+                        className="size-6! text-[10px]!"
+                      />
+                    ) : (
+                      <span className="size-6 shrink-0" aria-hidden="true" />
+                    ))}
+                  <div
+                    className={cn(
+                      "flex max-w-[80%] min-w-0 flex-col gap-1",
+                      message.yours ? "items-end self-end" : "items-start self-start",
+                    )}
+                  >
+                    {/* The cards a message is about ("I have this", a
+                        nearby match, an offer on a trade binder), on
+                        the sender's side just above the words. An offer
+                        on a binder carries several, so every one is
+                        drawn, wrapping when they do not fit. */}
+                    <MessageCards message={message} />
+                    <div
+                      className={cn(
+                        "rounded-[18px] px-3 py-2 text-sm",
+                        message.yours
+                          ? "bg-accent text-accent-contrast"
+                          : "bg-elevated text-text-primary",
+                      )}
+                    >
+                      <p className="break-words whitespace-pre-wrap">{message.body}</p>
+                    </div>
+                  </div>
+                </div>
+              </Fragment>
+            );
+          })
         )}
       </Card>
 
@@ -810,64 +911,7 @@ function ThreadView({
         </p>
       ) : (
         <div className="flex flex-col gap-2">
-          {/* Somewhere public to meet, suggested rather than asked for.
-              A store, never an address: the mission is the trade at a
-              counter or an event, and this is the nudge towards it. */}
-          {meet && (
-            <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3">
-              <p className="flex items-center gap-2 text-xs font-semibold text-text-primary">
-                <Store className="size-4 text-accent" aria-hidden="true" />
-                Meet somewhere public
-              </p>
-              <p className="text-xs text-text-secondary">{meetLine(meet)}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="self-start"
-                onClick={() => setDraft((current) => suggestText(current, meet))}
-              >
-                Suggest {meet.storeName}
-              </Button>
-            </div>
-          )}
-          {/* The trade, between the messages and the composer: what was
-              settled last, a claim waiting on one side, or the form.
-              Hidden with the rest once the conversation is ended. */}
-          {messages !== null && (
-            <ThreadTradeBlock
-              trade={trade}
-              kind={kind}
-              cardName={cardName}
-              withName={withName}
-              imagesEnabled={imagesEnabled}
-              playerGames={playerGames}
-              onPropose={propose}
-              onAnswer={answer}
-              pending={tradePending}
-              error={tradeError}
-              composing={composingTrade}
-              onComposingChange={(open) => {
-                setTradeError(null);
-                setComposingTrade(open);
-              }}
-            />
-          )}
-          <div className="flex items-end gap-2">
-            <Textarea
-              rows={2}
-              maxLength={MESSAGE_MAX_LENGTH}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              aria-label="Message"
-              className="flex-1"
-            />
-            <Button type="button" size="sm" onClick={send} disabled={pending}>
-              <Send className="size-4" aria-hidden="true" />
-              Send
-            </Button>
-          </div>
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {/* Block's question, asked from the ⋯. */}
           {asking && (
             <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border p-3">
               <p className="text-sm font-semibold text-text-primary">
@@ -898,36 +942,39 @@ function ThreadView({
               </div>
             </div>
           )}
-          {/* Two quiet exits side by side: block them, or tell us about it.
-              Report files the conversation, not the person, so the
-              admin opens the thread the reporter was actually in. */}
-          <div className="flex items-center gap-4">
-            {/* "We traded" leads the row, and only while there is no
-                claim waiting: one trade at a time per conversation. */}
-            {messages !== null &&
-              !composingTrade &&
-              (trade === null || trade.status !== "pending") && (
-                <TradeTrigger onClick={() => setComposingTrade(true)} />
-              )}
-            {withPlayerId && (
-              <button
-                type="button"
-                onClick={() => setAsking(true)}
-                className="text-xs text-text-muted hover:text-text-secondary"
-              >
-                Block
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setReporting(true)}
-              className="text-xs text-text-muted hover:text-text-secondary"
-            >
-              Report
-            </button>
-          </div>
+          {/* The trade, between the messages and the composer: what was
+              settled last, a claim waiting on one side, or the form the
+              ⋯'s "We traded" opens. */}
+          {messages !== null && (
+            <ThreadTradeBlock
+              trade={trade}
+              kind={kind}
+              cardName={cardName}
+              withName={withName}
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              onPropose={propose}
+              onAnswer={answer}
+              pending={tradePending}
+              error={tradeError}
+              composing={composingTrade}
+              onComposingChange={(open) => {
+                setTradeError(null);
+                setComposingTrade(open);
+              }}
+            />
+          )}
+          <MessageComposer
+            value={draft}
+            onChange={setDraft}
+            onSend={send}
+            pending={pending}
+          />
+          {error && <p className="text-sm text-danger">{error}</p>}
         </div>
       )}
+      {/* Report files the conversation, not the person, so the admin
+          opens the thread the reporter was actually in. */}
       <ReportSheet
         open={reporting}
         onClose={() => setReporting(false)}

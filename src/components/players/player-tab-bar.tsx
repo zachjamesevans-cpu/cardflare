@@ -1,8 +1,8 @@
 import { UndoToastHost } from "@/components/feed/undo-toast";
 import { getViewer } from "@/lib/auth/session";
+import { unreadMessages } from "@/lib/local/threads";
 import { playerForUser } from "@/lib/players/accounts";
 import { getPlayerSession } from "@/lib/players/session";
-import { unreadCount } from "@/lib/notifications/inbox";
 import { PlayerTabs } from "./player-tabs";
 
 /**
@@ -13,8 +13,10 @@ import { PlayerTabs } from "./player-tabs";
  * marketing visitor reading the homepage gets no bottom bar, and a
  * store owner in the dashboard has their own navigation.
  *
- * The unread badge is resolved here rather than in the client bar so
- * the count arrives with the page instead of after it.
+ * The unread dot is resolved here rather than in the client bar so
+ * the count arrives with the page instead of after it. It is the
+ * unread MESSAGES now, on the Messages tab; the notifications' dot
+ * rides the Feed's bell.
  *
  * The take-down toast's host rides with the bar. A post that is taken
  * down leaves the page on the refresh, and the toast that offers to
@@ -39,7 +41,7 @@ export async function PlayerTabBar() {
 
   return (
     <>
-      <PlayerTabs unread={playerId ? await unreadCount(playerId) : 0} />
+      <PlayerTabs unread={playerId ? await unreadMessages(playerId) : 0} />
       <UndoToastHost />
     </>
   );

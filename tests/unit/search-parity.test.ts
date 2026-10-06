@@ -85,8 +85,8 @@ describe("search, from the Feed", () => {
   });
 
   it("the website's Feed icon opens the combined search, built on the three actions", () => {
-    expect(web.feedPage).toContain("<FeedSearch />");
-    expect(web.feedSearch).toContain("<EverythingSearch />");
+    expect(web.feedPage).toContain("<FeedSearch");
+    expect(web.feedSearch).toContain("<EverythingSearch account={account} />");
     expect(web.feedSearch).not.toContain("PlayerSearch");
     /* The profile keeps its own player search. */
     expect(web.playerSearch).toContain("export function PlayerSearch");

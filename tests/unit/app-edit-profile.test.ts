@@ -75,11 +75,13 @@ describe("Edit profile, the app's screen", () => {
     expect(screen).toContain("handleWhileTyping(next)");
   });
 
-  it("is a stack screen titled Edit profile, with Back to the profile", () => {
+  it("is a stack screen titled Edit profile, with the plain back chevron", () => {
     expect(app).toContain("EditProfile: undefined;");
     expect(app).toContain('name="EditProfile"');
     expect(app).toContain('title: "Edit profile"');
-    expect(app).toContain('EditProfile: "Profile"');
+    /* Round 16: back is a chevron with no words, on every screen. */
+    expect(app).not.toContain("BACK_LABELS");
+    expect(app).not.toContain("headerBackTitle");
     expect(profile).toContain('navigation.navigate("EditProfile")');
     expect(profile).toContain('label="Edit profile"');
   });
@@ -117,12 +119,14 @@ describe("the picker", () => {
   });
 });
 
-describe("the flame on the centre tab", () => {
+describe("the centre tab", () => {
   const app = read("mobile/App.tsx");
 
-  it("is the website's glyph, filled when open and outlined when not", () => {
-    expect(app).toContain('focused: "flame"');
-    expect(app).toContain('idle: "flame-outline"');
+  it("is the raised + (round 16), and never the old mark image", () => {
+    /* The flame gave way to the raised accent + that posts a Flare;
+       tests/unit/r16-app-nav.test.ts pins it. */
+    expect(app).toContain("function PostButton(");
+    expect(app).toContain('<Ionicons name="add"');
     expect(app).not.toContain("MarkIcon");
     expect(app).not.toContain("cardflare-mark.png");
     /* The mark still has a home: the pack shop. */

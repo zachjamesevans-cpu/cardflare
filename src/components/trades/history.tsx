@@ -15,6 +15,7 @@ import {
   Undo2,
 } from "lucide-react";
 
+import { FlareHistoryRow } from "@/components/trades/flare-history-row";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
@@ -22,11 +23,12 @@ import { formatLocalDate, LocalDate, useMounted } from "@/components/ui/local-da
 import { DotsMenu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
 import { deleteLoggedTradeAction } from "@/lib/trades/logged-actions";
+import type { FlareHistoryEntry } from "@/lib/flares/history";
 import type { TradeHistoryEntry, TradeHistoryTotals } from "@/lib/trades/history";
 
 /**
- * The pieces of the trade history, shared by the card on the profile
- * and the full page so the two draw a trade the same way.
+ * The pieces of History, shared by the profile's Trades pane and the
+ * full page so the two draw a trade the same way.
  *
  * One row is one card and which way it went: "Got Luffy from Kaito",
  * "Gave Zoro to Tyler", the store and the day under it, and the
@@ -269,52 +271,97 @@ export function TradeHistoryRow({
   );
 }
 
-/** Which way the trades shown went: both, to you, or from you. */
-export type HistoryFilter = "all" | "got" | "gave";
+/** What History shows: everything, the trades, or the past Flares. */
+export type HistoryFilter = "all" | "trades" | "flares";
 
 const FILTERS: { key: HistoryFilter; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "got", label: "Got" },
-  { key: "gave", label: "Gave" },
+  { key: "trades", label: "Trades" },
+  { key: "flares", label: "Flares" },
 ];
 
+type HistoryItem =
+  | { kind: "trade"; at: string; trade: TradeHistoryEntry }
+  | { kind: "flare"; at: string; flare: FlareHistoryEntry };
+
 /**
- * The full list: three chips over one card per month, newest first.
- * The filter is this screen's alone; the totals above it keep saying
- * what the whole history adds up to.
+ * History: the trades and the past Flares, three chips over one card
+ * per month, newest first. All merges the two by date. The trade rows
+ * are Pro exactly as they were: locked, the server sent none, and the
+ * blurred stand-in and the pitch take their place. The Flare rows are
+ * free, a player's own log of their own posts. The app's History draws
+ * the same chips in the same order.
  */
-export function TradeHistoryList({ trades }: { trades: TradeHistoryEntry[] }) {
+export function HistoryList({
+  locked,
+  totals,
+  trades,
+  flares,
+}: {
+  locked: boolean;
+  totals: TradeHistoryTotals;
+  trades: TradeHistoryEntry[];
+  flares: FlareHistoryEntry[];
+}) {
   const [filter, setFilter] = useState<HistoryFilter>("all");
   const mounted = useMounted();
 
-  const shown = trades.filter(
-    (trade) => filter === "all" || (filter === "got" ? trade.got : !trade.got),
-  );
+  const showTrades = filter !== "flares";
+  const showFlares = filter !== "trades";
+
+  const items: HistoryItem[] = [
+    ...(showTrades && !locked
+      ? trades.map((trade) => ({
+          kind: "trade" as const,
+          at: trade.confirmedAt,
+          trade,
+        }))
+      : []),
+    ...(showFlares
+      ? flares.map((flare) => ({ kind: "flare" as const, at: flare.endedAt, flare }))
+      : []),
+  ].sort((a, b) => b.at.localeCompare(a.at));
 
   /*
    * One card per month, so a year of Fridays reads as a calendar.
    *
    * Grouped in the reader's clock once there is one. The server and
    * the hydration pass group by UTC, which is the same answer for all
-   * but a trade in the last hours of a month, and draw the heading
+   * but an entry in the last hours of a month, and draw the heading
    * blank; the first browser render regroups and writes it. Grouping
    * on the server by the reader's zone is not possible, and grouping
-   * by UTC and labelling locally would file a trade under the wrong
+   * by UTC and labelling locally would file an entry under the wrong
    * heading, which is the bug this replaces.
    */
-  const months: { label: string; trades: TradeHistoryEntry[] }[] = [];
-  for (const trade of shown) {
-    const label = monthOf(trade.confirmedAt, mounted ? undefined : "UTC");
+  const months: { label: string; items: HistoryItem[] }[] = [];
+  for (const item of items) {
+    const label = monthOf(item.at, mounted ? undefined : "UTC");
     const last = months[months.length - 1];
-    if (last && last.label === label) last.trades.push(trade);
-    else months.push({ label, trades: [trade] });
+    if (last && last.label === label) last.items.push(item);
+    else months.push({ label, items: [item] });
   }
+
+  const empty =
+    filter === "trades"
+      ? {
+          title: "Nothing traded yet",
+          body: "Confirm a trade in a room, or log one you made elsewhere, and it lands here.",
+        }
+      : filter === "flares"
+        ? {
+            title: "No past Flares yet",
+            body: "A Flare lands here once it is found, traded or taken down.",
+          }
+        : {
+            title: "Nothing here yet",
+            body: "Your trades, and your Flares once they are found, traded or taken down, land here.",
+          };
 
   return (
     <div className="flex flex-col gap-5">
       <div
         role="radiogroup"
-        aria-label="Which trades to show"
+        aria-label="What to show"
         className="flex flex-wrap items-center gap-2"
       >
         {FILTERS.map((option) => (
@@ -336,33 +383,48 @@ export function TradeHistoryList({ trades }: { trades: TradeHistoryEntry[] }) {
         ))}
       </div>
 
-      {months.length === 0 ? (
-        <Card className="flex flex-col gap-1">
-          <p className="font-semibold text-text-primary">
-            {trades.length === 0 ? "Nothing traded yet" : "Nothing that way yet"}
-          </p>
-          <p className="text-sm text-text-secondary">
-            {trades.length === 0
-              ? "Confirm a trade in a room, or log one you made elsewhere, and it lands here."
-              : filter === "got"
-                ? "No card has come to you yet."
-                : "No card has left your binder yet."}
-          </p>
-        </Card>
-      ) : (
-        months.map((month) => (
-          <Card key={month.label} className="flex flex-col gap-3 p-4">
-            <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
-              <LocalDate iso={month.trades[0].confirmedAt} format="month" />
-            </p>
-            <ul className="flex flex-col">
-              {month.trades.map((trade) => (
-                <TradeHistoryRow key={trade.id} trade={trade} />
-              ))}
-            </ul>
+      {showTrades && <TradeHistoryTotalsRow totals={totals} />}
+
+      {/* Pro gating, unchanged: no trade rows were sent to hide. */}
+      {showTrades && locked && (
+        <div className="relative">
+          <Card className="p-4">
+            <LockedRows count={6} />
           </Card>
-        ))
+          <TradeHistoryWall count={totals.trades} />
+        </div>
       )}
+
+      {months.length === 0
+        ? /* Locked, the wall above already says what is not here. */
+          !(locked && showTrades) && (
+            <Card className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">{empty.title}</p>
+              <p className="text-sm text-text-secondary">{empty.body}</p>
+            </Card>
+          )
+        : months.map((month) => (
+            <Card key={month.label} className="flex flex-col gap-3 p-4">
+              <p className="text-xs font-medium tracking-wide text-text-muted uppercase">
+                <LocalDate iso={month.items[0].at} format="month" />
+              </p>
+              <ul className="flex flex-col">
+                {month.items.map((item) =>
+                  item.kind === "trade" ? (
+                    <TradeHistoryRow
+                      key={`trade-${item.trade.id}`}
+                      trade={item.trade}
+                    />
+                  ) : (
+                    <FlareHistoryRow
+                      key={`flare-${item.flare.flareId}`}
+                      flare={item.flare}
+                    />
+                  ),
+                )}
+              </ul>
+            </Card>
+          ))}
     </div>
   );
 }
@@ -463,7 +525,7 @@ export function TradeHistoryCard({
     <Card className="relative flex flex-col gap-4 overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-1">
-          <p className="font-semibold text-text-primary">Trade history</p>
+          <p className="font-semibold text-text-primary">History</p>
           <p className="text-sm text-text-secondary">
             Every card you got and gave, so the binder never surprises you.
           </p>
@@ -501,7 +563,7 @@ export function TradeHistoryCard({
           >
             {totals.trades > recent.length
               ? `See all ${totals.trades} trades`
-              : "See your trade history"}
+              : "See your history"}
           </Link>
         </>
       )}

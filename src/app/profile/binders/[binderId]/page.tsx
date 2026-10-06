@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { BinderView } from "@/components/binder/binder-page";
 import { AppShell } from "@/components/layout/app-shell";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
@@ -68,13 +67,7 @@ export default async function OwnBinderPage({
         }
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Link
-            href="/profile?tab=binders"
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to your binders
-          </Link>
+          <BackLink href="/profile?tab=binders" />
 
           {/* The shell names the page; the view draws the line under it. */}
           <BinderView

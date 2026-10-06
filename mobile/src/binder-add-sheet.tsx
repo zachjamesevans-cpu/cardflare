@@ -264,6 +264,7 @@ export function BinderAddSheet({
       style={{ flex: 1 }}
       contentContainerStyle={{ gap: spacing(3), paddingBottom: spacing(4) }}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
     >
       {pasted === null ? (
         <>

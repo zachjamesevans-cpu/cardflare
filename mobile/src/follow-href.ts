@@ -48,7 +48,7 @@ export async function followHref(
   }
   if (href === "/local" || href.startsWith("/local?")) {
     if (LOCAL_ENABLED) navigation.navigate("Tabs", { screen: "Local" });
-    else navigation.navigate("Messages");
+    else navigation.navigate("Tabs", { screen: "Messages" });
     return;
   }
   if (href === "/profile/settings") {
@@ -59,8 +59,13 @@ export async function followHref(
     navigation.navigate("Tabs", { screen: "Profile" });
     return;
   }
-  if (href === "/feed" || href === "/inbox") {
-    navigation.navigate("Tabs", { screen: href === "/feed" ? "Feed" : "Inbox" });
+  if (href === "/feed") {
+    navigation.navigate("Tabs", { screen: "Feed" });
+    return;
+  }
+  /* The notices are a screen behind the Feed's bell, not a tab. */
+  if (href === "/inbox") {
+    navigation.navigate("Inbox");
     return;
   }
   /* Nights holds the second tab unless Local has it; with Local on

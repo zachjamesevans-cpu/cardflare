@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SheetBackdrop } from "./action-menu";
+import { SwipeToClose } from "./sheet-swipe";
 import type { FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
 import { availableLabel, cardsLabel, GONE_LABEL, printingLabel } from "./flare-copy";
@@ -158,8 +159,10 @@ export function FlareCardsSheet({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
-          <Pressable
-            onPress={() => undefined}
+          {/* Left edge or a pull down from the title row closes it
+              (src/sheet-swipe.tsx), and it claims its own taps. */}
+          <SwipeToClose
+            onClose={onClose}
             style={{
               backgroundColor: colors.surface,
               borderTopLeftRadius: radius.panel,
@@ -191,6 +194,7 @@ export function FlareCardsSheet({
             <>
               <ScrollView
                 style={{ flexGrow: 0 }}
+                keyboardDismissMode="on-drag"
                 contentContainerStyle={{ gap: spacing(2) }}
               >
                 {open.cards.map((card) => {
@@ -372,7 +376,7 @@ export function FlareCardsSheet({
                 <Muted>All found. Nothing left to offer on.</Muted>
               ) : null}
             </>
-          </Pressable>
+          </SwipeToClose>
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>

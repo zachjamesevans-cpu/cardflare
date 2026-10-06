@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { CardPageView } from "@/components/cards/card-page";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { cardPage } from "@/lib/cards/card-page";
@@ -57,13 +57,7 @@ export default async function CardRoute({
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-4">
-          <Link
-            href="/feed"
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to the Feed
-          </Link>
+          <BackLink href="/feed" />
 
           <Card className="flex flex-col gap-4 p-4 sm:p-6">
             <CardPageView

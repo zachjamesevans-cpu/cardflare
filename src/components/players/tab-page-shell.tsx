@@ -18,12 +18,16 @@ import { SITE } from "@/lib/site";
 export function TabPageShell({
   title,
   trailing,
+  trailingCount = 1,
   children,
 }: {
   /** The page's name for screen readers; nothing draws it. */
   title: string;
-  /** The one control on the right of the wordmark, when there is one. */
+  /** The controls on the right of the wordmark, when there are any. */
   trailing?: React.ReactNode;
+  /** How many round buttons `trailing` holds, so the blank on the left
+      matches it and the wordmark stays centred. */
+  trailingCount?: 1 | 2;
   children: React.ReactNode;
 }) {
   return (
@@ -32,12 +36,16 @@ export function TabPageShell({
         id="main"
         className="flex min-h-dvh flex-col items-center gap-4 px-2 pt-6 pb-16 sm:px-6"
       >
-        {/* The wordmark, centred, and the one door out to other people
-            on the right. Same place on both platforms. The blank on the
+        {/* The wordmark, centred, and the doors out on the right: on
+            the Feed, search and the notifications bell. Same place on
+            both platforms. The blank on the
             left keeps the mark centred whether or not there is a door. */}
         <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
           <h1 className="sr-only">{title}</h1>
-          <span aria-hidden="true" className="size-9 shrink-0" />
+          <span
+            aria-hidden="true"
+            className={trailingCount === 2 ? "h-9 w-20 shrink-0" : "size-9 shrink-0"}
+          />
           <span className="flex flex-1 justify-center">
             <Link href="/feed" aria-label={`${SITE.name} Feed`}>
               <Logo size={30} priority />

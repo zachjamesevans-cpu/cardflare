@@ -143,15 +143,16 @@ describe("the Messages door in the Inbox", () => {
     expect(app.inbox).toContain("Messages");
     expect(app.inbox).toContain(SENTENCE);
     expect(app.inbox).toContain("chatbubble");
-    expect(app.inbox).toContain('navigate("Messages")');
+    /* Round 16: Messages is a tab now. */
+    expect(app.inbox).toContain('navigate("Tabs", { screen: "Messages" })');
   });
 
-  it("has a way back to the Inbox from Messages, and the Inbox tab stays lit", () => {
-    expect(web.local).toContain('href="/inbox"');
-    expect(web.local).toContain("<ArrowLeft");
-    expect(web.local).toMatch(/\n\s+Inbox\n/);
+  it("keeps the Messages tab lit while a conversation is read", () => {
+    /* Round 16: Messages is a tab of its own, so the page has no way
+       back to the Inbox; the tab owns /local, conversation open or not. */
+    expect(web.local).not.toContain('href="/inbox"');
+    expect(web.tabs).toContain('label: "Messages"');
     expect(web.tabs).toContain('!LOCAL_ENABLED && pathname.startsWith("/local")');
-    expect(web.tabs).toContain('tab.href === "/inbox" && inboxOwnsLocal');
   });
 });
 
@@ -161,13 +162,13 @@ describe("dates render once, in the reader's clock", () => {
       'import { formatLocalDate, LocalDate, useMounted } from "@/components/ui/local-date"',
     );
     expect(web.history).toContain('<LocalDate iso={trade.confirmedAt} format="day" />');
+    /* Round 16: History's months hold trades and past Flares, each
+       dated by `at` (a trade's confirmedAt, a Flare's endedAt). */
     expect(web.history).toContain(
-      '<LocalDate iso={month.trades[0].confirmedAt} format="month" />',
+      '<LocalDate iso={month.items[0].at} format="month" />',
     );
     /* The month groups follow the reader's clock, not the server's. */
-    expect(web.history).toContain(
-      'monthOf(trade.confirmedAt, mounted ? undefined : "UTC")',
-    );
+    expect(web.history).toContain('monthOf(item.at, mounted ? undefined : "UTC")');
     /* The helpers stay exported for anything that already has a clock. */
     expect(web.history).toContain("export function dayOf(");
     expect(web.history).toContain("export function monthOf(");

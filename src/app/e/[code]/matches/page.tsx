@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Flame } from "lucide-react";
+import { Flame } from "lucide-react";
 
 import { MatchList } from "@/components/events/match-list";
 import { NightShell } from "@/components/events/night-header";
 import { AccountPitch } from "@/components/players/account-pitch";
+import { BackLink } from "@/components/ui/back-link";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
@@ -65,15 +65,7 @@ export default async function NightMatchesPage({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
-  const back = (
-    <Link
-      href={`/e/${normalized}`}
-      className="inline-flex items-center gap-1.5 text-sm text-text-secondary underline-offset-4 hover:underline"
-    >
-      <ArrowLeft className="size-4" aria-hidden="true" />
-      {event.name}
-    </Link>
-  );
+  const back = <BackLink href={`/e/${normalized}`} />;
 
   if (!playerId) {
     return (

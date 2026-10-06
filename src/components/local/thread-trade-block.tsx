@@ -69,9 +69,9 @@ export function ThreadTradeBlock({
   pending: boolean;
   error: string | null;
   /**
-   * Whether the form is open. The thread screen controls this so the
-   * "We traded" trigger can sit in its own row of text buttons; left
-   * out, the block keeps the state itself and draws the trigger.
+   * Whether the form is open. The thread screen controls this so "We
+   * traded" can live in the chat header's ⋯ menu; left out, the block
+   * keeps the state itself and draws the trigger.
    */
   composing?: boolean;
   onComposingChange?: (open: boolean) => void;
@@ -167,8 +167,8 @@ export function ThreadTradeBlock({
 }
 
 /**
- * The text button that opens the form. The thread screen draws it as
- * the first item in its row with "End this conversation" and "Report".
+ * The text button that opens the form, when the block keeps its own
+ * state. The thread screen offers "We traded" from its ⋯ instead.
  */
 export function TradeTrigger({
   onClick,

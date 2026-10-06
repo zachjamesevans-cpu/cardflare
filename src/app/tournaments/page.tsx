@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
+import { BackLink } from "@/components/ui/back-link";
 import { Card } from "@/components/ui/card";
 import { GAME_IDS, GAME_PROFILES, NIGHT_BASICS } from "@/lib/event-hub/game-profiles";
 
@@ -46,12 +46,7 @@ export default async function TournamentsPage({
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-8">
       <div className="flex flex-col gap-2">
-        <Link
-          href={backHref(from)}
-          className="flex w-fit items-center gap-1.5 text-sm font-medium text-text-secondary hover:text-text-primary"
-        >
-          <ArrowLeft className="size-4" aria-hidden /> Back
-        </Link>
+        <BackLink href={backHref(from)} />
         <h1 className="text-3xl font-bold tracking-tight text-text-primary">
           New to tournaments?
         </h1>

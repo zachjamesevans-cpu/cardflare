@@ -65,9 +65,15 @@ export async function offerOnBinder(
     picked.map(({ card, quantity }) => ({ name: card.name, quantity })),
     note,
   );
-  const threadId = await sendCardsMessage(viewerId, ownerId, body, [
-    ...new Set(picked.map(({ card }) => card.cardId)),
-  ]);
+  /* Each picked entry once, with the printing the owner put in the
+     binder, so the chat shows the same art the binder does. */
+  const threadId = await sendCardsMessage(
+    viewerId,
+    ownerId,
+    body,
+    picked.map(({ card }) => card.cardId),
+    picked.map(({ card }) => card.printingId),
+  );
   if (!threadId) return { ok: false, reason: "unavailable" };
 
   return { ok: true, threadId, count: picked.length, ownerName: binder.ownerName };

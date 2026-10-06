@@ -6,6 +6,7 @@ import { Bell, ChevronRight, MessageCircle } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { InboxList } from "@/components/inbox/inbox-list";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
@@ -23,7 +24,9 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * The app's Inbox tab, on the website.
+ * The notifications, opened from the bell at the Feed's top right.
+ * It was the app's Inbox tab until round 16 gave that slot to
+ * Messages; the page, its rows and its address are unchanged.
  *
  * The backbone has been recording these since Milestone 13 and email
  * has been delivering them, but the only way to read the inbox itself
@@ -68,7 +71,12 @@ export default async function InboxPage() {
 
         <div className="flex w-full max-w-2xl flex-col gap-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-xl font-bold text-text-primary">Inbox</h1>
+            {/* Opened from the Feed's bell now, not a tab, so it has a
+                way back to where it was opened. */}
+            <span className="flex items-center gap-1">
+              <BackLink href="/feed" />
+              <h1 className="text-xl font-bold text-text-primary">Inbox</h1>
+            </span>
             {unread > 0 && (
               <form action={markInboxReadAction}>
                 <Button type="submit" variant="ghost" size="sm">

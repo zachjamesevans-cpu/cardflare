@@ -16,6 +16,7 @@ import { GameSearchField } from "./game-chips";
 import { ALL_GAMES, resolveGameScope, searchPlaceholder } from "./game-scope";
 import { gameShortName, type GameSlug } from "./games";
 import { QuantityBadge } from "./quantity-badge";
+import { SwipeToClose } from "./sheet-swipe";
 import { colors, gutter, radius, spacing } from "./theme";
 import { Button, CardImage, Loading, Muted, Tap, Title } from "./ui";
 
@@ -283,7 +284,13 @@ export function CardSelectSheet({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View
+      {/* Left edge or a pull down from the title row closes it, the same
+          as every other sheet (src/sheet-swipe.tsx). The strip is the
+          status bar, the padding and the title row, and stops short of
+          the search field so a drag on the field is never a close. */}
+      <SwipeToClose
+        onClose={onClose}
+        pullZone={insets.top + spacing(3) + 40}
         style={{
           flex: 1,
           backgroundColor: colors.canvas,
@@ -321,6 +328,7 @@ export function CardSelectSheet({
               style={{ flex: 1 }}
               contentContainerStyle={{ gap: spacing(2), paddingBottom: spacing(4) }}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
             >
               {search.searching && search.hits.length === 0 ? <Loading /> : null}
               {search.query.trim().length >= 2 &&
@@ -558,7 +566,7 @@ export function CardSelectSheet({
             <Button label={`Done (${items.length})`} onPress={onClose} />
           </View>
         )}
-      </View>
+      </SwipeToClose>
     </Modal>
   );
 }

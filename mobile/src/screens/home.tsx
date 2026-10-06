@@ -92,6 +92,7 @@ import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
 import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
+import { useUnread } from "../unread";
 
 /**
  * The Feed tab — what is on, and who needs what you are holding.
@@ -459,6 +460,8 @@ export function HomeScreen() {
   const insets = useSafeAreaInsets();
   const tabInset = useTabBarInset();
   const header = useHeaderScroll();
+  /* Unread notices, for the dot on the bell (src/unread.ts). */
+  const unread = useUnread();
 
   /*
    * How much of the top of the list the floating header covers. Named
@@ -872,7 +875,12 @@ export function HomeScreen() {
        */}
       <PullSpinner pull={pull} refreshing={refreshing} top={headerRoom} />
 
-      <CollapsingHeader state={header} onSearch={() => navigation.navigate("Search")} />
+      <CollapsingHeader
+        state={header}
+        onSearch={() => navigation.navigate("Search")}
+        onInbox={() => navigation.navigate("Inbox")}
+        unread={unread}
+      />
       <Animated.ScrollView
         /*
          * flex: 1, and it is load-bearing rather than tidy.

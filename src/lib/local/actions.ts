@@ -180,6 +180,7 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
       withName: null,
       withPlayerId: null,
       withAvatarUrl: null,
+      withHandle: null,
       messages: [],
       meet: null,
       trade: null,

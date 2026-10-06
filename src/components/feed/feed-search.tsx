@@ -21,29 +21,46 @@ import { EverythingSearch } from "@/components/feed/everything-search";
  * player search, because somebody managing who they follow is
  * already standing there. The app's header icon opens its Search
  * screen, the same search.
+ *
+ * The bell sits beside it, at the far right: notifications moved out
+ * of the tab bar and into the Feed's corner (round 16), the way
+ * Instagram keeps its heart up there.
  */
-export function FeedSearch() {
+export function FeedSearch({
+  account = null,
+  bell,
+}: {
+  /** Whose recent searches to show: the player, or null for a guest. */
+  account?: string | null;
+  /** The notifications bell, drawn to the right of the search icon. */
+  bell?: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        aria-expanded={open}
-        aria-label={open ? "Close search" : "Search"}
-        className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-      >
-        {open ? (
-          <X className="size-4" aria-hidden="true" />
-        ) : (
-          <Search className="size-4" aria-hidden="true" />
-        )}
-      </button>
+      {/* The icons as one group, so the panel below wraps under the
+          whole header row rather than between the two. */}
+      <span className="flex shrink-0 items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          aria-expanded={open}
+          aria-label={open ? "Close search" : "Search"}
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+        >
+          {open ? (
+            <X className="size-4" aria-hidden="true" />
+          ) : (
+            <Search className="size-4" aria-hidden="true" />
+          )}
+        </button>
+        {bell}
+      </span>
 
       {open && (
         <div className="w-full">
-          <EverythingSearch />
+          <EverythingSearch account={account} />
         </div>
       )}
     </>

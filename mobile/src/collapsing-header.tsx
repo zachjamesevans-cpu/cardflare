@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
+import { UnreadDot } from "./unread-dot";
 
 /**
  * The name is the founder's ARTWORK, not text in a font. He supplied
@@ -148,9 +149,15 @@ export function settleHeader(state: HeaderScroll): void {
 export function CollapsingHeader({
   state,
   onSearch,
+  onInbox,
+  unread,
 }: {
   state: HeaderScroll;
   onSearch: () => void;
+  /** The bell: the notices, which used to be the Inbox tab. */
+  onInbox: () => void;
+  /** Unread notices; above zero, the bell wears the accent dot. */
+  unread: number;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -255,17 +262,48 @@ export function CollapsingHeader({
             contents,
           ]}
         >
-          <Tap
-            accessibilityLabel="Search"
-            onPress={onSearch}
-            style={{
-              paddingLeft: spacing(4),
-              paddingRight: spacing(4),
-              paddingVertical: spacing(2),
-            }}
-          >
-            <Ionicons name="search" size={20} color={colors.textSecondary} />
-          </Tap>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Tap
+              accessibilityLabel="Search"
+              onPress={onSearch}
+              style={{
+                paddingLeft: spacing(4),
+                paddingRight: spacing(2),
+                paddingVertical: spacing(2),
+              }}
+            >
+              <Ionicons name="search" size={20} color={colors.textSecondary} />
+            </Tap>
+            {/*
+             * THE BELL. The notices were a tab; the founder gave the slot
+             * to Messages and put them here, top right of the Feed, the
+             * way Instagram keeps its heart. The accent dot at the bell's
+             * bottom right says something is unread, and the label says
+             * it for VoiceOver.
+             */}
+            <Tap
+              accessibilityLabel={
+                unread > 0 ? "Notifications, unread" : "Notifications"
+              }
+              onPress={onInbox}
+              style={{
+                paddingLeft: spacing(2),
+                paddingRight: spacing(4),
+                paddingVertical: spacing(2),
+              }}
+            >
+              <View>
+                <Ionicons
+                  name="notifications-outline"
+                  size={21}
+                  color={colors.textSecondary}
+                />
+                {unread > 0 ? (
+                  <UnreadDot ring={colors.canvas} style={{ bottom: 0, right: -1 }} />
+                ) : null}
+              </View>
+            </Tap>
+          </View>
         </Animated.View>
       </HeaderSurface>
     </Animated.View>

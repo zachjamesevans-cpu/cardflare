@@ -4,7 +4,6 @@ import Link from "next/link";
 import {
   Ban,
   Bell,
-  ChevronLeft,
   ChevronRight,
   ClipboardList,
   KeyRound,
@@ -16,6 +15,7 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
+import { BackLink } from "@/components/ui/back-link";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FeedViewPicker } from "@/components/feed/feed-view-picker";
@@ -373,15 +373,7 @@ export default async function ProfileSettingsPage() {
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
           {/* The way out, at the top, because settings is somewhere you
               arrive from one place and leave back to the same place. */}
-          {playerId && (
-            <Link
-              href="/profile"
-              className="flex w-fit items-center gap-1.5 text-sm text-text-muted underline-offset-4 hover:text-text-secondary hover:underline"
-            >
-              <ChevronLeft className="size-4" aria-hidden="true" />
-              Back to your profile
-            </Link>
-          )}
+          {playerId && <BackLink href="/profile" />}
 
           {cards}
 

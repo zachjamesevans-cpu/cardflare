@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Wand2 } from "lucide-react";
+import { Wand2 } from "lucide-react";
 
 import { CustomizeHub } from "@/components/players/customize-hub";
+import { BackLink } from "@/components/ui/back-link";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { customizeSections, equipArea, EQUIP_AREAS } from "@/lib/players/equips";
@@ -66,13 +67,7 @@ export default async function CustomizePage({
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-col gap-2">
-          <Link
-            href="/profile"
-            className="flex w-fit items-center gap-1.5 text-sm text-text-muted transition-colors hover:text-text-secondary"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Profile
-          </Link>
+          <BackLink href="/profile" />
           <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
           <p className="text-sm text-text-secondary">{copy.blurb}</p>
           {/* Honest before anything is tapped: browsing is free, wearing

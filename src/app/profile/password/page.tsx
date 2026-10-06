@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 
 import { NewPasswordForm } from "@/components/auth/new-password-form";
 import { AppShell } from "@/components/layout/app-shell";
+import { BackLink } from "@/components/ui/back-link";
 import { getViewer } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -36,14 +36,8 @@ export default async function PasswordPage() {
       description="Set a password so you can sign in without waiting for an email."
     >
       <div className="flex max-w-md flex-col gap-5">
+        <BackLink href="/profile/settings" />
         <NewPasswordForm signedInAs={viewer.user.email ?? ""} />
-
-        <Link
-          href="/profile/settings"
-          className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
-        >
-          Back to your settings
-        </Link>
       </div>
     </AppShell>
   );

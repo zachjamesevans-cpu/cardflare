@@ -2,8 +2,8 @@ import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/nativ
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { View } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Text, View } from "react-native";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -22,7 +22,7 @@ import {
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { FlareComposer, type HandedCard } from "./flare-composer";
 import type { PostTarget } from "../flare-bits";
-import { Body, Button, Card, Loading, Muted, Title } from "../ui";
+import { Body, Button, Card, Loading, Muted, Tap, Title } from "../ui";
 import { colors, gutter, spacing } from "../theme";
 import { openRoom } from "../open-room";
 import { WantRow } from "../want-row";
@@ -261,6 +261,15 @@ export function HubScreen() {
     return settled === null || settled === "scan" ? null : settled;
   }, []);
 
+  /*
+   * Only the Flares still working. A finished one (every copy found;
+   * traded and taken-down ones the server already leaves off) used to
+   * stay here greyed out under "Found"; the founder: "past flares
+   * should live somewhere, or a flare history of sorts". They live in
+   * History now, behind the link at the foot of this list.
+   */
+  const working = wants?.filter((want) => !want.found) ?? null;
+
   /* Only the first decision ever: every later one has a paint. */
   if (target === null) {
     return <Loading />;
@@ -309,7 +318,7 @@ export function HubScreen() {
         void loadWants();
       }}
       footer={
-        wants !== null ? (
+        working !== null ? (
           <Card>
             <View
               style={{
@@ -326,18 +335,18 @@ export function HubScreen() {
                 <Title>Flares</Title>
               </View>
               <Muted>
-                {`${wants.length} ${wants.length === 1 ? "card" : "cards"}`}
+                {`${working.length} ${working.length === 1 ? "card" : "cards"}`}
               </Muted>
             </View>
 
-            {wants.length === 0 ? (
+            {working.length === 0 ? (
               <Body>
                 Post a Flare above and its cards stay here until you find them. Every
                 room, store and show you scan into helps answer this list.
               </Body>
             ) : (
               <View>
-                {wants.map((want) => (
+                {working.map((want) => (
                   <WantRow
                     key={want.id}
                     want={want}
@@ -366,6 +375,39 @@ export function HubScreen() {
                 ))}
               </View>
             )}
+
+            {/* Where the finished ones went: found, traded, taken down,
+                with who answered each. */}
+            <View
+              style={{
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                paddingTop: spacing(3),
+              }}
+            >
+              <Tap
+                onPress={() => navigation.navigate("TradeHistory")}
+                accessibilityLabel="Open History"
+                hitSlop={6}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(1.5),
+                  alignSelf: "flex-start",
+                }}
+              >
+                <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  History
+                </Text>
+              </Tap>
+            </View>
           </Card>
         ) : undefined
       }

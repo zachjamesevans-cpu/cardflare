@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { FeedSearch } from "@/components/feed/feed-search";
+import { NotificationBell } from "@/components/feed/notification-bell";
 import { Item } from "@/components/feed/feed-items";
 import {
   belongsToTab,
@@ -19,6 +20,7 @@ import { listFeed } from "@/lib/feed/repository";
 import { rememberFeed } from "@/lib/feed/memo";
 import { feedViewFor } from "@/lib/feed/view-settings";
 import { listLocals } from "@/lib/players/locals";
+import { unreadCount } from "@/lib/notifications/inbox";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -68,11 +70,29 @@ export const dynamic = "force-dynamic";
  */
 
 /* The chrome is TabPageShell, shared with a player's page: the wordmark
-   centred with the Feed behind it, the search on the right, the tab
-   bar below. */
-function Shell({ children }: { children: React.ReactNode }) {
+   centred with the Feed behind it, the search and the notifications
+   bell on the right, the tab bar below. The bell is a player's: a
+   guest has no inbox, so a guest's header is the search alone. */
+function Shell({
+  playerId = null,
+  unread = 0,
+  children,
+}: {
+  playerId?: string | null;
+  unread?: number;
+  children: React.ReactNode;
+}) {
   return (
-    <TabPageShell title="Feed" trailing={<FeedSearch />}>
+    <TabPageShell
+      title="Feed"
+      trailingCount={playerId ? 2 : 1}
+      trailing={
+        <FeedSearch
+          account={playerId}
+          bell={playerId ? <NotificationBell unread={unread} /> : undefined}
+        />
+      }
+    >
       {children}
     </TabPageShell>
   );
@@ -149,13 +169,15 @@ export default async function FeedPage({
   }
 
   const session = await sessionForPlayer(playerId);
-  const [items, locals] = await Promise.all([
+  const [items, locals, unread] = await Promise.all([
     /* Remembered for half a minute: the three tabs are filters over
        this one list, and a tab tap must not rebuild it. See memo.ts. */
     rememberFeed(playerId, () => listFeed(playerId, session?.id ?? null)),
     /* For the live-room banner below. Room lost its tab to Local, so
        the Feed is where a live room announces itself now. */
     listLocals(playerId),
+    /* The bell's dot. */
+    unreadCount(playerId),
   ]);
 
   const liveLocal = locals.find((local) => local.liveNow) ?? null;
@@ -178,7 +200,7 @@ export default async function FeedPage({
     tab === "following" ? 0 : new Set(shown.map((item) => item.section)).size;
 
   return (
-    <Shell>
+    <Shell playerId={playerId} unread={unread}>
       <FeedFilterTabs value={tab} />
 
       {/* The Room tab's job, as a banner: gone from the bar, never gone

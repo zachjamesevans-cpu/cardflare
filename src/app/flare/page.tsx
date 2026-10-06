@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame } from "lucide-react";
+import { Flame, History } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { FlareComposer } from "@/components/flares/flare-composer";
@@ -19,6 +19,7 @@ import { huntsFor } from "@/lib/players/hunts";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getPlayerSession } from "@/lib/players/session";
 import {
+  foundCardsFor,
   listOfferings,
   listWants,
   postedCardStores,
@@ -118,6 +119,7 @@ export default async function FlarePage({
               playerId,
               viewer.kind === "player" ? viewer.playerName : "You",
             ),
+            foundCardsFor(playerId),
           ])
         : [
             null,
@@ -130,10 +132,13 @@ export default async function FlarePage({
           ],
     ]);
   /* One list, both directions: what you are looking for and what you
-     are offering, since you posted both here. */
+     are offering, since you posted both here. Only the Flares still
+     working: a card whose every copy is found has finished, and lives
+     in History with the traded and taken-down ones, under the link at
+     the foot of the list. (Offerings fully answered never reach here.) */
   const wants = mergeFlareRows(
     asked && offering ? [...asked, ...offering] : (asked ?? []),
-  );
+  ).filter((want) => want.direction === "offering" || !foundCards.has(want.cardId));
 
   return (
     <>
@@ -215,11 +220,19 @@ export default async function FlarePage({
                   wants={wants.map((want) => ({
                     ...want,
                     postedWhere: posted.get(want.cardId) ?? null,
-                    found: foundCards?.has(want.cardId) ?? false,
                   }))}
                   imagesEnabled={images}
                 />
               )}
+
+              {/* Where the finished ones went: found, traded, taken down. */}
+              <Link
+                href="/profile/trades"
+                className="mt-3 inline-flex items-center gap-1.5 self-start border-t border-border pt-3 text-sm font-semibold text-text-secondary hover:text-text-primary"
+              >
+                <History className="size-4" aria-hidden="true" />
+                History
+              </Link>
             </Card>
           )}
         </div>

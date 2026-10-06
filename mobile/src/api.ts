@@ -2743,6 +2743,45 @@ export interface TradeHistory {
 export const getTradeHistory = () =>
   call<{ history: TradeHistory }>("GET", "/api/v1/trades/history");
 
+/** How a past Flare ended. Mirrors src/lib/flares/history.ts. */
+export type FlareOutcome = "found" | "traded" | "taken-down";
+
+/** Somebody who answered a past Flare. */
+export interface FlareHistoryResponder {
+  playerId: string | null;
+  name: string;
+  avatarUrl: string | null;
+  /** When they answered. */
+  at: string;
+  /** How many copies they said they could bring. */
+  quantity: number;
+  /** Your conversation with them, when there is one to open. */
+  threadId: string | null;
+}
+
+/** One past Flare: found in full, traded, or taken down. */
+export interface FlareHistoryEntry {
+  flareId: string;
+  direction: "want" | "showcase";
+  cardId: string;
+  cardName: string;
+  cardNumber: string;
+  imageUrl: string | null;
+  quantity: number;
+  outcome: FlareOutcome;
+  postedAt: string;
+  /** When it stopped being open. */
+  endedAt: string;
+  responders: FlareHistoryResponder[];
+}
+
+/**
+ * Your past Flares, newest first, with who answered each. Free for
+ * everyone, unlike trade rows: it is your own log of your own posts.
+ */
+export const getFlareHistory = () =>
+  call<{ flares: FlareHistoryEntry[] }>("GET", "/api/v1/flares/history");
+
 /**
  * A trade the player writes down themselves, for what happened off
  * CardFlare. The founder: "allow me to enter my own trades." The
@@ -3760,6 +3799,12 @@ export const readLocalThread = (threadId: string) =>
     withPlayerId?: string | null;
     /** Their face for the header, as an absolute URL, or null for the initials. */
     withAvatarUrl: string | null;
+    /**
+     * Their handle, without the at-sign, drawn under the name in the
+     * header. Optional: an older server does not send it, and a player
+     * without one gets the name alone.
+     */
+    withHandle?: string | null;
     messages: LocalThreadMessage[];
     /** Optional: an older server does not send one. */
     meet?: MeetSuggestion | null;

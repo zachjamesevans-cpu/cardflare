@@ -356,7 +356,7 @@ describe("the home screen's furniture", () => {
 
   it("puts finding a player on the feed, on both", () => {
     /* "Let's make a search icon in the top right of the main feed." */
-    expect(webPage).toContain("<FeedSearch />");
+    expect(webPage).toContain("<FeedSearch");
 
     /* It lives on the Feed screen now rather than in the navigator: the
        app's header floats over its own list so it can get out of the
