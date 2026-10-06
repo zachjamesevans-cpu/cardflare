@@ -1,7 +1,7 @@
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { syncCardQuantity } from "@/lib/players/found";
-import { listWants, removeWant, setWantQuantity } from "@/lib/players/wants";
+import { adjustWantQuantity, removeWant } from "@/lib/players/wants";
 
 export const dynamic = "force-dynamic";
 
@@ -30,22 +30,22 @@ export async function POST(
   if (!Number.isFinite(delta) || delta === 0) return badRequest("delta is required");
 
   /*
-   * A delta, not an absolute: the control is a pair of buttons, and two
-   * quick taps should land on "two more" rather than on whichever number
-   * the screen happened to be showing when the first one started.
+   * A delta, not an absolute, applied in the database in one statement:
+   * the control is a pair of buttons, and two quick taps should land on
+   * "two more" rather than on whichever number the screen happened to
+   * be showing when the first one started.
    */
-  const want = (await listWants(player.playerId)).find((entry) => entry.id === id);
-  if (!want) return badRequest("no such want");
+  const result = await adjustWantQuantity(id, player.playerId, delta);
+  if (!result.ok) {
+    return result.reason === "not-found"
+      ? badRequest("no such want")
+      : Response.json({ ok: false, error: "unavailable" }, { status: 503 });
+  }
 
-  const quantity = await setWantQuantity(
-    id,
-    player.playerId,
-    want.quantity + Math.trunc(delta),
-  );
   /* The post follows the number on the Flare screen. */
-  await syncCardQuantity(player.playerId, want.cardId, quantity, "want");
+  await syncCardQuantity(player.playerId, result.cardId, result.quantity, "want");
 
-  return Response.json({ ok: true, quantity });
+  return Response.json({ ok: true, quantity: result.quantity });
 }
 
 export async function DELETE(
