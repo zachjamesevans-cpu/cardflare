@@ -122,7 +122,7 @@ describe("the Nights screen", () => {
     expect(nights).toContain(
       '{tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}',
     );
-    expect(nights).toContain('navigation.navigate("Tabs", { screen: "Feed" })');
+    expect(nights).toContain('params: { tab: "nearby", at: Date.now() },');
   });
 
   it("keeps the code door behind the QR icon, named the old way for a screen reader", () => {

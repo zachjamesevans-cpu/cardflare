@@ -12,11 +12,12 @@ import {
 
 import {
   checkHandle,
-  describeError,
+  friendlyError,
+  type HandleAvailability,
   setGames,
   signUp,
-  type HandleAvailability,
 } from "../api";
+import { HeaderButton } from "../header";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
@@ -101,7 +102,7 @@ export function WelcomeScreen({
   onDone: () => void;
   /**
    * "account" opens straight on the sign-up form: a guest who tapped
-   * Create free account inside a room has already chosen, and the
+   * Create account inside a room has already chosen, and the
    * splash would only be a second door to walk through.
    */
   initialStep?: "splash" | "account";
@@ -237,7 +238,7 @@ function Splash({
       </Text>
 
       <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(4) }}>
-        <Button label="Create my account" onPress={onCreate} />
+        <Button label="Create account" onPress={onCreate} />
         <Button
           label="I already have an account"
           variant="secondary"
@@ -314,9 +315,16 @@ function StepShell({
         automaticallyAdjustKeyboardInsets
       >
         {onBack ? (
-          <Tap onPress={onBack} hitSlop={8}>
-            <Text style={{ color: colors.accent, fontWeight: "600" }}>‹ Back</Text>
-          </Tap>
+          /* The same chevron every pushed screen's header draws, its
+             glyph pulled out to the text margin. */
+          <View style={{ alignSelf: "flex-start", marginLeft: -10 }}>
+            <HeaderButton
+              icon="chevron-back"
+              label="Back"
+              color={colors.accent}
+              onPress={onBack}
+            />
+          </View>
         ) : null}
         <Text style={{ color: colors.textPrimary, fontSize: 26, fontWeight: "800" }}>
           {title}
@@ -451,7 +459,7 @@ function AccountStep({ onDone }: { onDone: () => void }) {
       </Muted>
       <ErrorLine message={error} />
       <AsyncButton
-        label="Create my account"
+        label="Create account"
         pendingLabel="Creating…"
         onPress={async () => {
           setError(null);
@@ -519,7 +527,7 @@ function GamesStep({ onDone }: { onDone: () => void }) {
                 borderRadius: radius.control,
                 borderWidth: 1,
                 borderColor: on ? colors.accent : colors.border,
-                backgroundColor: on ? "rgba(198, 238, 79, 0.1)" : colors.elevated,
+                backgroundColor: on ? colors.accentTint : colors.elevated,
                 paddingHorizontal: spacing(4),
                 paddingVertical: spacing(3),
               }}
@@ -566,7 +574,7 @@ function GamesStep({ onDone }: { onDone: () => void }) {
           try {
             await setGames([...picked]);
           } catch (caught) {
-            setError(describeError(caught));
+            setError(friendlyError(caught));
             return;
           }
           // Push becomes worth asking for the moment an account exists.

@@ -122,7 +122,8 @@ try {
 }
 
 export type TabParams = {
-  Feed: undefined;
+  /** `tab` lands the Feed on one of its tabs: Nights sends "nearby". */
+  Feed: { tab?: "following" | "nearby"; at?: number } | undefined;
   /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
   Search: undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
@@ -483,7 +484,7 @@ function Tabs() {
         /* The one door out to other people, top right of the main feed -
            the same place the website puts it. */
         options={{
-          title: "CardFlare",
+          title: "cardflare",
           /*
            * The Feed draws its OWN header, and the navigator's is off.
            *
@@ -597,7 +598,7 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
           contentContainerStyle={{ padding: 24, paddingTop: 96, gap: 12 }}
         >
           <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
-            CardFlare hit a problem while starting
+            cardflare hit a problem while starting
           </Text>
           <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>
             This is not supposed to happen. A screenshot of this screen is the fastest
@@ -889,11 +890,15 @@ function AppGates() {
           <Stack.Screen name="Scan" options={{ title: "Scan" }}>
             {({ navigation }) => <ScanScreen onCode={() => openRoom(navigation)} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Lab"
-            component={LabScreen}
-            options={{ title: "Design lab" }}
-          />
+          {/* Development builds only, like the Settings card that
+              opens it: a release binary has no route to it at all. */}
+          {__DEV__ ? (
+            <Stack.Screen
+              name="Lab"
+              component={LabScreen}
+              options={{ title: "Design lab" }}
+            />
+          ) : null}
           <Stack.Screen
             name="Settings"
             component={SettingsScreen}
@@ -926,7 +931,7 @@ function AppGates() {
           <Stack.Screen
             name="Store"
             component={StoreScreen}
-            options={{ title: "Embers store" }}
+            options={{ title: "Embers shop" }}
           />
           <Stack.Screen name="Customize" options={{ title: "Customize" }}>
             {({ route }) => <CustomizeScreen area={route.params?.area ?? "profile"} />}

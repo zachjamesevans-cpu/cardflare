@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState, type ReactNode } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -18,7 +18,7 @@ import { gameShortName, type GameSlug } from "./games";
 import { QuantityBadge } from "./quantity-badge";
 import { SwipeToClose } from "./sheet-swipe";
 import { colors, gutter, radius, spacing } from "./theme";
-import { Button, CardImage, Loading, Muted, Tap, Title } from "./ui";
+import { Button, CardImage, Loading, Muted, SheetClose, Tap, Title } from "./ui";
 
 /**
  * The Flare picker, on its own: search, results, tap to add, tap again
@@ -176,7 +176,7 @@ export function PickCount({
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
       <Tap
         onPress={onLess}
-        hitSlop={6}
+        hitSlop={10}
         accessibilityLabel={`One fewer ${name}`}
         style={{
           width: 24,
@@ -308,9 +308,7 @@ export function CardSelectSheet({
           }}
         >
           <Title>{title}</Title>
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-            <Ionicons name="close" size={24} color={colors.textSecondary} />
-          </Pressable>
+          <SheetClose onPress={onClose} />
         </View>
         {above}
         {body ?? (
@@ -558,7 +556,7 @@ export function CardSelectSheet({
                 {items
                   .map(
                     (item) =>
-                      `${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ""}`,
+                      `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ""}`,
                   )
                   .join(", ")}
               </Muted>

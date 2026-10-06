@@ -79,7 +79,7 @@ export function CardPageView({
                       className="size-4 shrink-0 text-accent"
                       aria-hidden="true"
                     />
-                    In your Trade binder
+                    In your trade binder
                   </li>
                 )}
                 {you.onHunt && (

@@ -19,15 +19,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StackParams } from "../App";
 import { SheetBackdrop } from "./action-menu";
 import {
-  describeError,
-  offerOnHunt,
-  removeHuntCard,
-  setFlareFound,
-  setRequestFound,
+  friendlyError,
   type Hunt,
   type HuntCard,
   type OfferItem,
+  offerOnHunt,
   type OfferOutcome,
+  removeHuntCard,
+  setFlareFound,
+  setRequestFound,
 } from "./api";
 import { POCKETS_PER_PAGE } from "./binder-covers";
 import { printingLabel } from "./flare-copy";
@@ -64,6 +64,7 @@ import {
   CardImage,
   ErrorLine,
   Muted,
+  SheetClose,
   Tap,
   Title,
   type ZoomCard,
@@ -568,7 +569,7 @@ function HuntPocket({
                 right: 4,
                 width: 18,
                 height: 18,
-                borderRadius: 9,
+                borderRadius: 999,
                 backgroundColor: colors.accent,
                 alignItems: "center",
                 justifyContent: "center",
@@ -585,13 +586,14 @@ function HuntPocket({
                 bottom: 4,
                 right: 4,
                 borderRadius: 999,
-                backgroundColor: "rgba(0,0,0,0.75)",
+                backgroundColor: colors.scrim,
                 paddingHorizontal: 5,
                 paddingVertical: 1,
               }}
             >
               <Text
-                style={{ color: colors.textPrimary, fontSize: 9, fontWeight: "700" }}
+                maxFontSizeMultiplier={1.3}
+                style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}
               >
                 {`${found}/${needed}`}
               </Text>
@@ -692,7 +694,7 @@ function HuntPocketSheet({
     try {
       await onRemove();
     } catch (caught) {
-      setRemoveError(`Could not remove that (${describeError(caught)}).`);
+      setRemoveError(`Could not remove that. ${friendlyError(caught)}`);
       setRemoving(false);
     }
   };
@@ -724,9 +726,7 @@ function HuntPocketSheet({
             }}
           >
             <Title>{done ? "All found" : "Update progress"}</Title>
-            <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </Tap>
+            <SheetClose onPress={onClose} />
           </View>
 
           {/* The art down the left, one aligned column beside it: the

@@ -14,6 +14,7 @@ import {
 import {
   buyPack,
   describeError,
+  friendlyError,
   openPack,
   type PackPull,
   type PackSeries,
@@ -162,7 +163,7 @@ export function PackShopSection({
         setMessage(
           describeError(caught).includes("402")
             ? "Not enough Embers for a pack yet."
-            : `That did not go through (${describeError(caught)}).`,
+            : `That did not go through. ${friendlyError(caught)}`,
         ),
       )
       .finally(() => setBusy(false));
@@ -180,7 +181,7 @@ export function PackShopSection({
       })
       .catch((caught) => {
         setOpening(null);
-        setMessage(`That pack could not be opened (${describeError(caught)}).`);
+        setMessage(`That pack could not be opened. ${friendlyError(caught)}`);
       });
   };
 
@@ -254,7 +255,7 @@ export function PackShopSection({
           onPress={() => setOddsOpen(false)}
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.8)",
+            backgroundColor: colors.scrim,
             alignItems: "center",
             justifyContent: "center",
             padding: spacing(5),
@@ -361,7 +362,11 @@ function PackCeremony({
     >
       {stage !== "revealed" ? (
         <>
-          <Tap onPress={onTear} disabled={stage === "tearing"}>
+          <Tap
+            onPress={onTear}
+            disabled={stage === "tearing"}
+            accessibilityLabel={`Tear open ${series.name}`}
+          >
             <PackArt
               name={series.name}
               setNumber={series.setNumber}
@@ -442,6 +447,8 @@ function FlipCard({
   return (
     <Pressable
       onPress={doFlip}
+      accessibilityRole="button"
+      accessibilityLabel={flipped ? name : "Flip card"}
       onPressIn={() =>
         Animated.timing(glow, { toValue: 1, duration: 180, useNativeDriver: true }).start()
       }
@@ -459,7 +466,7 @@ function FlipCard({
             left: -10,
             right: -10,
             bottom: -10,
-            borderRadius: 18,
+            borderRadius: radius.card,
             borderWidth: 3,
             borderColor: color,
             opacity: glow,
@@ -476,7 +483,7 @@ function FlipCard({
             position: "absolute",
             width,
             height,
-            borderRadius: 14,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.borderStrong,
             backgroundColor: "#141a2b",
@@ -501,7 +508,7 @@ function FlipCard({
             position: "absolute",
             width,
             height,
-            borderRadius: 14,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: color,
             backgroundColor: colors.elevated,

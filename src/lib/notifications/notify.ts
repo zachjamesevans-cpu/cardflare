@@ -698,7 +698,7 @@ export const TEST_NOTICES = {
   },
   "new-follower": {
     title: "Kaito followed you",
-    body: "Follow back to become trade partners.",
+    body: "Follow back and you're trade partners.",
   },
   "room-flare": {
     title: "Kaito is looking for Umbreon VMAX",
@@ -815,7 +815,7 @@ export async function notifyNewFollower(
     const body =
       (alreadyFollowing ?? 0) > 0
         ? "You follow each other now, so you're trade partners."
-        : "Follow back to become trade partners.";
+        : "Follow back and you're trade partners.";
     const path = `/p/${followerId}`;
 
     const id = await record({

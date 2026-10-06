@@ -250,6 +250,7 @@ function Shelf({
               key={item.slug}
               disabled={pending || item.equipped || !affordable}
               onPress={() => onBuy(item, slot)}
+              accessibilityLabel={item.name}
               style={{ width: TILE, gap: spacing(1), opacity: affordable ? 1 : 0.6 }}
             >
               <View>
@@ -354,22 +355,22 @@ function Shelf({
               </Text>
 
               {item.equipped ? (
-                <Text style={{ color: colors.accent, fontSize: 10, fontWeight: "600" }}>
+                <Text maxFontSizeMultiplier={1.3} style={{ color: colors.accent, fontSize: 11, fontWeight: "600" }}>
                   Equipped
                 </Text>
               ) : item.owned ? (
                 !canWear ? (
-                  <Text style={{ color: colors.textMuted, fontSize: 10 }}>
+                  <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11 }}>
                     Pro to wear
                   </Text>
                 ) : (
-                  <Text style={{ color: colors.textSecondary, fontSize: 10 }}>
+                  <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11 }}>
                     Tap to wear
                   </Text>
                 )
               ) : locked ? (
-                <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-                  {`Needs ${item.lockedUntil?.toLocaleString()} earned`}
+                <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11 }}>
+                  {`Earn ${item.lockedUntil?.toLocaleString()} Embers to unlock`}
                 </Text>
               ) : (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
@@ -379,9 +380,10 @@ function Shelf({
                     color={affordable ? colors.accent : colors.textMuted}
                   />
                   <Text
+                    maxFontSizeMultiplier={1.3}
                     style={{
                       color: affordable ? colors.accent : colors.textMuted,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: "600",
                       fontVariant: ["tabular-nums"],
                     }}

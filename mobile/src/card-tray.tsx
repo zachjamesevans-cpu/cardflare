@@ -317,7 +317,8 @@ export function CardTray({
             >
               <Ionicons name="add" size={22} color={colors.accent} />
               <Text
-                style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}
+                maxFontSizeMultiplier={1.3}
+                style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}
               >
                 Add cards
               </Text>
@@ -398,7 +399,7 @@ function TileFace({
           left: 3,
           minWidth: 18,
           height: 18,
-          borderRadius: 9,
+          borderRadius: 999,
           paddingHorizontal: 4,
           alignItems: "center",
           justifyContent: "center",
@@ -406,9 +407,10 @@ function TileFace({
         }}
       >
         <Text
+          maxFontSizeMultiplier={1.3}
           style={{
             color: index === 0 ? colors.accentContrast : colors.textPrimary,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: "700",
           }}
         >

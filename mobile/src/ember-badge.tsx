@@ -27,7 +27,7 @@ export function EmberBadge({ earned, size = "sm" }: { earned: number; size?: "sm
         borderWidth: 1,
         /* accent at 25% / 10%, matching border-accent/25 bg-accent/10. */
         borderColor: "rgba(198, 238, 79, 0.25)",
-        backgroundColor: "rgba(198, 238, 79, 0.1)",
+        backgroundColor: colors.accentTint,
         paddingHorizontal: sm ? spacing(2) : spacing(3),
         paddingVertical: sm ? spacing(0.5) : spacing(1),
       }}

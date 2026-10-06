@@ -313,7 +313,7 @@ describe("the panes' contents, own and theirs", () => {
     for (const [name, source] of platforms) {
       expect(source.flares, name).not.toContain('=== 1 ? "Flare" : "Flares"');
     }
-    expect(web.flares).toContain("No Flares yet. Post one from the Flare tab.");
+    expect(web.flares).toContain("No Flares yet. Tap + on the Feed to post one.");
     for (const [name, source] of platforms) {
       expect(source.ownProfile, name).toContain("<ProfileFlares");
       expect(source.playerProfile, name).toContain("<ProfileFlares");
@@ -385,7 +385,7 @@ describe("the panes' contents, own and theirs", () => {
     expect(web.ownProfile).toContain("Earned, all time");
     expect(web.ownProfile).toContain("{profile.embersEarned.toLocaleString()}");
     expect(web.ownProfile).toContain('href="/profile/store"');
-    expect(web.ownProfile).toMatch(/>\s*Embers store\s*</);
+    expect(web.ownProfile).toMatch(/>\s*Embers shop\s*</);
     expect(web.ownProfile).toContain("{profile.embersBalance.toLocaleString()}");
     expect(web.ownProfile).toContain("to spend");
     expect(web.playerProfile).not.toContain("Earned, all time");

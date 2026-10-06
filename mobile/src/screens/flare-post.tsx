@@ -9,15 +9,15 @@ import type { StackParams } from "../../App";
 import { ActionSheet, DotsButton } from "../action-menu";
 import {
   commentOnPost,
-  describeError,
+  friendlyError,
   getPost,
   likePost,
   offerItemsOnPost,
   POST_COMMENT_MAX,
+  type PostDetail,
   rememberRoom,
   restorePost,
   takeDownPost,
-  type PostDetail,
 } from "../api";
 import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
@@ -111,7 +111,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         comments: post.comments + 1,
       });
     } catch (caught) {
-      setError(`That did not post (${describeError(caught)}). Try again in a moment.`);
+      setError(`That did not post. ${friendlyError(caught)}`);
     }
   };
 
@@ -139,7 +139,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         });
       }
     } catch (caught) {
-      setError(`Could not take that down (${describeError(caught)}).`);
+      setError(`Could not take that down. ${friendlyError(caught)}`);
     }
   };
 
@@ -416,6 +416,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   onPress={() =>
                     navigation.navigate("PlayerProfile", { playerId: comment.playerId })
                   }
+                  accessibilityLabel={`${comment.displayName}'s profile`}
                 >
                   <PlayerAvatar
                     displayName={comment.displayName}
@@ -457,9 +458,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                         }}
                       >
                         <Text
+                          maxFontSizeMultiplier={1.3}
                           style={{
                             color: colors.accent,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: "700",
                             letterSpacing: 0.5,
                           }}

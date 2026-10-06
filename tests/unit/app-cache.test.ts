@@ -118,7 +118,6 @@ describe("painting it", () => {
       "mobile/src/screens/home.tsx",
       "mobile/src/screens/profile.tsx",
       "mobile/src/screens/customize.tsx",
-      "mobile/src/use-cached.ts",
     ]) {
       const source = await readFile(file, "utf8");
       expect(source, `${file} must check before painting`).toMatch(

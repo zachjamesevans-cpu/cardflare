@@ -13,7 +13,7 @@ import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
 import { useCopiesFound } from "./use-copies-found";
-import { Button, ErrorLine, Muted, Tap, Title } from "./ui";
+import { Button, ErrorLine, Muted, SheetClose, Title } from "./ui";
 
 /**
  * "Update progress" on your own Flare: copies found, per card.
@@ -95,9 +95,7 @@ export function FlareProgressSheet({
             }}
           >
             <Title>{done ? "All found" : "Update progress"}</Title>
-            <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={colors.textSecondary} />
-            </Tap>
+            <SheetClose onPress={onClose} />
           </View>
 
           <HuntProgress found={found} needed={needed} />

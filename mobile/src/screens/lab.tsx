@@ -208,7 +208,7 @@ export function LabScreen() {
                 borderRadius: radius.control,
                 borderWidth: 1,
                 borderColor: on ? colors.accent : colors.border,
-                backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.surface,
+                backgroundColor: on ? colors.accentTint : colors.surface,
                 paddingHorizontal: spacing(3),
                 paddingVertical: spacing(2),
               }}

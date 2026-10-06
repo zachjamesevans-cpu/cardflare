@@ -288,7 +288,7 @@ export function HubScreen() {
               The room door stays for the guest already standing at a
               counter, the same two buttons the website's guest card has. */}
           <Button
-            label="Create free account"
+            label="Create account"
             onPress={() => navigation.navigate("CreateAccount")}
           />
           <Button

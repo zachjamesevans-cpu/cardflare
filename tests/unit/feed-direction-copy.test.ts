@@ -153,11 +153,11 @@ describe("the Feed page", () => {
   });
 
   it("offers a guest the account first, and a way in second", () => {
-    expect(page).toContain("Create free account");
+    expect(page).toContain("Create account");
     expect(page).toMatch(/>\s*Sign in\s*</);
     expect(page).not.toContain("Join free");
     expect(read("src/components/players/account-pitch.tsx")).toContain(
-      "Create free account",
+      "Create account",
     );
   });
 });

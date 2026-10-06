@@ -354,7 +354,7 @@ function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
         borderRadius: 999,
         borderWidth: 1,
         borderColor: tone === "accent" ? colors.accent : colors.border,
-        backgroundColor: tone === "accent" ? "rgba(198,238,79,0.12)" : colors.elevated,
+        backgroundColor: tone === "accent" ? colors.accentTint : colors.elevated,
         paddingHorizontal: spacing(2),
         paddingVertical: 2,
       }}
@@ -551,7 +551,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
             borderRadius: radius.control,
             borderWidth: 1,
             borderColor: colors.accent,
-            backgroundColor: "rgba(198,238,79,0.1)",
+            backgroundColor: colors.accentTint,
             padding: spacing(3),
           }}
         >
@@ -618,7 +618,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
                       borderRadius: radius.control,
                       borderWidth: 1,
                       borderColor: on ? colors.accent : colors.border,
-                      backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.elevated,
+                      backgroundColor: on ? colors.accentTint : colors.elevated,
                       padding: spacing(3),
                       gap: spacing(1),
                       opacity: item.owned ? 1 : 0.45,

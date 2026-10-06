@@ -8,18 +8,18 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams, TabParams } from "../../App";
 import {
   ApiError,
-  describeError,
+  type FeedEntry,
+  friendlyError,
   getHunts,
   getMe,
   getNearbySettings,
+  type Hunt,
+  type Me,
+  type NearbySettings,
   publishFlare,
   searchCards,
   setOpenToTrades,
   storedAccessToken,
-  type FeedEntry,
-  type Hunt,
-  type Me,
-  type NearbySettings,
 } from "../api";
 import { CardTray } from "../card-tray";
 import { CardSelectSheet, lineKey, type PickedLine } from "../card-select";
@@ -487,13 +487,13 @@ export function FlareComposer({
       setError(
         code === "at-cap"
           ? target.kind === "room"
-            ? "You have hit the Flare cap for this room."
+            ? "You have as many Flares up in this room as it allows. Take one down first."
             : "You have too many Flares up. Take one down first."
           : code === "already-posted"
             ? "One of these cards is already up."
             : code === "not-migrated"
               ? "Posting isn't switched on yet. The server needs its latest update."
-              : `Could not post the Flare (${describeError(caught)}). Try again.`,
+              : `Could not post the Flare. ${friendlyError(caught)}`,
       );
     }
   };
@@ -775,7 +775,7 @@ function StepStrip({ step }: { step: Step }) {
               style={{
                 width: 18,
                 height: 18,
-                borderRadius: 9,
+                borderRadius: 999,
                 alignItems: "center",
                 justifyContent: "center",
                 backgroundColor: now || done ? colors.accent : colors.elevated,
@@ -787,9 +787,10 @@ function StepStrip({ step }: { step: Step }) {
                 <Ionicons name="checkmark" size={11} color={colors.accentContrast} />
               ) : (
                 <Text
+                  maxFontSizeMultiplier={1.3}
                   style={{
                     color: now ? colors.accentContrast : colors.textMuted,
-                    fontSize: 10,
+                    fontSize: 11,
                     fontWeight: "700",
                   }}
                 >

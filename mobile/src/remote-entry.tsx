@@ -56,7 +56,7 @@ export function DoorIconButton({
       style={{
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: 999,
         borderWidth: 1,
         /* The accent at forty percent for the ring, so it tints
            rather than glows; the glyph carries the full colour. */

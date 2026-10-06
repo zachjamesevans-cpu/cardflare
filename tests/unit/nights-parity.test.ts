@@ -181,7 +181,7 @@ describe("the Nights screen", () => {
     expect(webNights).toContain("NO_NIGHTS");
     expect(appNights).toContain("NO_NIGHTS");
     /* With a way to the Feed, where following a store happens. */
-    expect(webNights).toContain('href="/feed"');
+    expect(webNights).toContain('href="/feed?tab=nearby"');
   });
 
   it("counts the roster through playersLine on both", () => {

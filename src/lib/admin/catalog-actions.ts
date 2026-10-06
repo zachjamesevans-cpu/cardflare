@@ -333,7 +333,7 @@ export async function setPackSetStatusAction(
     status: "done",
     message:
       outcome === "published"
-        ? "Live. It shows in the Embers store from its release date."
+        ? "Live. It shows in the Embers shop from its release date."
         : "Taken off sale.",
   };
 }

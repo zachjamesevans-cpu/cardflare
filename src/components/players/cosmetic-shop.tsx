@@ -216,7 +216,7 @@ function Tile({
           )
         ) : locked ? (
           <span className="text-text-muted">
-            Needs {item.lockedUntil?.toLocaleString()} earned
+            Earn {item.lockedUntil?.toLocaleString()} Embers to unlock
           </span>
         ) : (
           <span

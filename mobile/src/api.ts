@@ -352,9 +352,9 @@ export function serverMessage(caught: unknown): string | null {
 }
 
 /**
- * A failure, named for a screen. Generic "could not load" messages cost
- * days of blind debugging; every error surface appends this instead, so
- * a screenshot of the failure IS the diagnosis: "timeout" and
+ * A failure, named for the log. Generic "could not load" messages cost
+ * days of blind debugging, so the console gets this with every error;
+ * a screen shows `friendlyError` instead. "timeout" and
  * "unauthorized (401)" point at different bugs from the same couch.
  */
 export function describeError(caught: unknown): string {
@@ -368,6 +368,35 @@ export function describeError(caught: unknown): string {
     return `${caught.code} ${caught.status}`;
   }
   return caught instanceof Error ? caught.message : "unknown";
+}
+
+/**
+ * A failure, said to a person: one plain sentence, never a code.
+ *
+ * `describeError` reads "not-found 404", which is a diagnosis, not
+ * something a player can act on. The screen shows this sentence; the
+ * code still reaches the console, so a bug report keeps its clue.
+ */
+export function friendlyError(caught: unknown): string {
+  console.warn("[cardflare]", describeError(caught));
+  if (caught instanceof ApiError) {
+    /* A plan to start, already in words: kept exactly as written. */
+    if (caught.code === "ultra-required") return describeError(caught);
+    if (caught.detail) return caught.detail;
+    const { status, code } = caught;
+    if (status === 0 || code === "bad-json" || code === "network" || code === "timeout") {
+      return "Couldn't reach cardflare. Check your connection and try again.";
+    }
+    if (status === 401) return "You've been signed out. Sign in again and retry.";
+    if (status === 403) return "That isn't available to your account.";
+    if (status === 404 || status === 410) return "That's no longer available.";
+    if (status === 409) return "That changed in the meantime. Refresh and try again.";
+    if (status === 413) return "That file is too big. Try a smaller one.";
+    if (status === 429) return "That's a lot at once. Wait a moment and try again.";
+    if (status === 400 || status === 422) return "That didn't look right. Check it and try again.";
+    if (status >= 500) return "Something went wrong on our side. Try again in a moment.";
+  }
+  return "Something went wrong. Try again.";
 }
 
 /**
@@ -1132,19 +1161,6 @@ export async function joinRoom(
 
   return result;
 }
-
-/**
- * A hunt saved straight to the account — no room involved, so a
- * midnight Flare never keeps a closed store's room warm. The next room
- * the player walks into offers to post it.
- */
-export const saveToList = (entry: {
-  cardId: string;
-  printingId?: string | null;
-  quantity: number;
-  note?: string;
-  deckLabel?: string | null;
-}) => call<{ ok: true }>("POST", "/api/v1/wants", entry);
 
 /**
  * Nudges a saved want's quantity, plus or minus, and returns where it
@@ -2546,16 +2562,6 @@ export const updateHunt = (
     ...patch,
   });
 
-export const addHuntCards = (
-  huntId: string,
-  items: { cardId: string; printingId?: string | null; quantity: number }[],
-) =>
-  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
-    action: "add-cards",
-    huntId,
-    items,
-  });
-
 /** Copies in hand for one request: "+1 found", the stepper, undo. */
 export const setRequestFound = (requestId: string, found: number) =>
   call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
@@ -2644,8 +2650,8 @@ const OFFER_REASONS = new Set([
  * A refused offer, in the website's words (src/lib/feed/offer-copy.ts),
  * keyed by the reason the server named in its 409. A 429 is the
  * throttle, which the website reads as "too-many". Anything else gets
- * the plain line with the diagnosis in brackets, so a screenshot of
- * the failure still says which failure it was.
+ * the plain line, and the diagnosis goes to the console, where a bug
+ * report can still say which failure it was.
  */
 export function offerErrorMessage(caught: unknown): string {
   const reason =
@@ -2654,9 +2660,10 @@ export function offerErrorMessage(caught: unknown): string {
         ? "too-many"
         : caught.code
       : "";
-  return OFFER_REASONS.has(reason)
-    ? offerFailureMessage(reason)
-    : `${offerFailureMessage(reason)} (${describeError(caught)})`;
+  /* The diagnosis goes to the console, not the screen: a player can do
+     nothing with "http-500", and a bug report still has it. */
+  if (!OFFER_REASONS.has(reason)) console.warn("[cardflare] offer", describeError(caught));
+  return offerFailureMessage(reason);
 }
 
 /**
@@ -2836,9 +2843,6 @@ export const setFeedView = (view: string) =>
     view,
   });
 
-export const tickHuntCard = (flareId: string, found: boolean) =>
-  call<{ hunts: Hunt[] }>("POST", "/api/v1/hunts", { flareId, found });
-
 export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
     action: liked ? "like" : "unlike",
@@ -2879,14 +2883,6 @@ export const commentOnPost = (postId: string, body: string) =>
     `/api/v1/posts/${encodeURIComponent(postId)}`,
     { action: "comment", body },
   );
-
-/** "I have this" on one card of a post, with a note for the thread. */
-export const offerFromPost = (postId: string, flareId: string, note: string) =>
-  call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
-    action: "offer",
-    flareId,
-    note,
-  });
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
 export type FeedSection =
@@ -3880,12 +3876,6 @@ export const sendLocalMessage = (threadId: string, body: string) =>
     "POST",
     `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
     { body },
-  );
-
-export const closeLocalThread = (threadId: string) =>
-  call<{ ok: boolean }>(
-    "DELETE",
-    `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
   );
 
 /**

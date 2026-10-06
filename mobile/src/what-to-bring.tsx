@@ -15,7 +15,7 @@ import {
 } from "./night-copy";
 import { NightSection } from "./night-section";
 import { colors, radius, spacing } from "./theme";
-import { CardImage, Tap, Title } from "./ui";
+import { CardImage, SheetClose, Tap, Title } from "./ui";
 
 /** How many rows sit inline; the rest are behind View list. */
 export const BRING_INLINE = 3;
@@ -150,13 +150,7 @@ export function WhatToBring({
               }}
             >
               <Title>{WHAT_TO_BRING}</Title>
-              <Tap
-                onPress={() => setOpen(false)}
-                hitSlop={8}
-                accessibilityLabel="Close"
-              >
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </Tap>
+              <SheetClose onPress={() => setOpen(false)} />
             </View>
             <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
               {bringLine(bring.length)}
@@ -194,7 +188,7 @@ function BringRow({
     >
       <Tap
         onPress={onToggle}
-        hitSlop={8}
+        hitSlop={10}
         accessibilityLabel={`${PACKED}${packed ? ", on" : ", off"}: ${row.card.name}`}
         style={{
           width: 24,

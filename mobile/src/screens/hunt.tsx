@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { describeError, getHunt, type HuntView } from "../api";
+import { friendlyError, getHunt, type HuntView } from "../api";
 import { HuntBinder } from "../hunt-binder";
 import { colors, gutter, spacing } from "../theme";
 import { Loading, Muted } from "../ui";
@@ -32,7 +32,7 @@ export function HuntScreen({ huntId }: { huntId: string }) {
       setHunt(fresh);
       setError(null);
     } catch (caught) {
-      setError(describeError(caught));
+      setError(friendlyError(caught));
     }
   }, [huntId]);
 

@@ -23,6 +23,14 @@ export const colors = {
   accentHover: "#d3fa5f",
   accentMuted: "#8ba635",
   accentContrast: "#0e1116",
+  /*
+   * The accent as a wash: a selected row, a chip that is on, the Embers
+   * badge. One strength, so "selected" reads the same on every screen
+   * instead of at 8, 10, 12 or 15 percent depending on who wrote it.
+   */
+  accentTint: "rgba(198,238,79,0.1)",
+  /* What dims the page behind a card, a badge or a sheet, one strength. */
+  scrim: "rgba(0,0,0,0.75)",
   textPrimary: "#f2f5f7",
   textSecondary: "#b3becc",
   textMuted: "#8593a4",

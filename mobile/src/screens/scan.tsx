@@ -5,7 +5,7 @@ import { Linking, StyleSheet, View } from "react-native";
 import { rememberRoom, rememberRoomGame } from "../api";
 
 import { AsyncButton, Body, Card, Title } from "../ui";
-import { colors, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 
 /**
  * The QR scanner. A cardflare code arrives as a URL (cardflare.gg/e/CODE)
@@ -19,7 +19,7 @@ export function ScanScreen({ onCode }: { onCode: (code: string) => void }) {
 
   if (!permission?.granted) {
     return (
-      <View style={{ padding: spacing(4) }}>
+      <View style={{ padding: gutter }}>
         <Card>
           <Title>Camera access</Title>
           <Body>

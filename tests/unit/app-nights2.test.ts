@@ -78,11 +78,11 @@ describe("the words", () => {
       "You're not going to anything yet. Nearby has what's coming up.",
     );
     expect(copy.PAST_EMPTY).toBe("Nothing yet. Nights you went to land here.");
-    expect(copy.BOARD_EARLY).toBe("Board open early");
+    expect(copy.BOARD_EARLY).toBe("You can post already");
     expect(copy.BOARD_EARLY_LINE).toBe("Post now so players know what to bring.");
     expect(copy.MATCHES_FOR_YOU).toBe("Matches for you");
     expect(copy.NO_MATCHES).toBe(
-      "No matches yet. Post a Flare or add to your Trade binder and Cardflare keeps looking.",
+      "No matches yet. Post a Flare or add to your trade binder and cardflare keeps looking.",
     );
     expect(copy.MUTUAL_MATCH).toBe("Mutual match");
     expect(copy.MUTUAL_LINE).toBe("You may already have the pieces for a trade.");
@@ -108,10 +108,10 @@ describe("the words", () => {
     expect(copy.wantYoursLine(1)).toBe("1 player wants cards you have");
     expect(copy.wantYoursLine(3)).toBe("3 players want cards you have");
     expect(copy.bringLine(1)).toBe(
-      "Players at this Night are looking for 1 card you own.",
+      "Players at this night are looking for 1 card you own.",
     );
     expect(copy.bringLine(5)).toBe(
-      "Players at this Night are looking for 5 cards you own.",
+      "Players at this night are looking for 5 cards you own.",
     );
     expect(copy.wantedByLine(["CHUNC"])).toBe("Wanted by CHUNC");
     expect(copy.wantedByLine(["Alex", "Jamie"])).toBe("Wanted by Alex + 1 other");

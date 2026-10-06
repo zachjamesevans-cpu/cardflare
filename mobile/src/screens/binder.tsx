@@ -36,22 +36,22 @@ import type { StackParams } from "../../App";
 import { SheetBackdrop } from "../action-menu";
 import {
   ApiError,
+  type Binder,
   BINDER_NAME_MAX,
+  type BinderCard,
   binderOfferError,
+  type BinderSettingsPatch,
   deleteBinder,
-  describeError,
+  friendlyError,
   getBinder,
+  type OfferItem,
   offerOnBinder,
+  type OfferOutcome,
   openDirectThread,
   placeBinderCard,
   removeBinderCard,
   saveBinder,
   serverMessage,
-  type Binder,
-  type BinderCard,
-  type BinderSettingsPatch,
-  type OfferItem,
-  type OfferOutcome,
 } from "../api";
 import { BinderAddSheet } from "../binder-add-sheet";
 import { BinderCover } from "../binder-cover";
@@ -86,6 +86,7 @@ import {
   Input,
   Loading,
   Muted,
+  SheetClose,
   Tap,
   type ZoomCard,
   type ZoomHave,
@@ -251,7 +252,7 @@ export function BinderScreen({
         caught instanceof ApiError &&
           (caught.code === "private" || caught.code === "not-found")
           ? "private"
-          : describeError(caught),
+          : friendlyError(caught),
       );
     }
   }, [id, playerId]);
@@ -301,7 +302,7 @@ export function BinderScreen({
       setWriteError(
         caught instanceof ApiError && caught.code === "at-cap"
           ? "Your binder is full. Two hundred cards is as many as it holds."
-          : (serverMessage(caught) ?? `That did not save (${describeError(caught)}).`),
+          : (serverMessage(caught) ?? `That did not save. ${friendlyError(caught)}`),
       );
       void load();
     }
@@ -326,7 +327,7 @@ export function BinderScreen({
     } catch (caught) {
       setDeleting(false);
       setWriteError(
-        serverMessage(caught) ?? `Could not delete it (${describeError(caught)}).`,
+        serverMessage(caught) ?? `Could not delete it. ${friendlyError(caught)}`,
       );
     }
   };
@@ -373,7 +374,7 @@ export function BinderScreen({
         setBinder((current) => (current ? { ...current, cards: before } : current));
         Alert.alert(
           "That card did not move.",
-          serverMessage(caught) ?? `Try again (${describeError(caught)}).`,
+          serverMessage(caught) ?? friendlyError(caught),
         );
         void load();
       }
@@ -1359,9 +1360,10 @@ function BinderPocket({
               }}
             >
               <Text
+                maxFontSizeMultiplier={1.3}
                 style={{
                   color: colors.accentContrast,
-                  fontSize: 8,
+                  fontSize: 11,
                   fontWeight: "700",
                   letterSpacing: 1,
                 }}
@@ -1623,9 +1625,7 @@ function BinderSettingsSheet({
               >
                 Binder settings
               </Text>
-              <Tap onPress={onClose} accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </Tap>
+              <SheetClose onPress={onClose} />
             </View>
             <ScrollView keyboardShouldPersistTaps="handled">
               <BinderSettings binder={binder} onSave={onSave} onDelete={onDelete} />

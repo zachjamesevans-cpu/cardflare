@@ -231,7 +231,7 @@ describe("the main tabs paint at once", () => {
   it("the Inbox paints the last notices, unread styling from the fresh answer", () => {
     expect(inbox).toContain('readCache<InboxItem[]>("inbox", id)');
     expect(inbox).toContain('writeCache("inbox", id, notifications)');
-    expect(inbox).toContain("const unread = fresh && !item.readAt;");
+    expect(inbox).toContain("const unread = fresh && anyUnread;");
   });
 
   it("every paint goes through the account-keyed cache with a session", () => {

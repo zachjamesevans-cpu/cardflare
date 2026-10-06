@@ -369,7 +369,7 @@ describe("notifications inbox", () => {
           id: "n2",
           kind: "new-follower",
           title: "Kaito followed you",
-          body: "Follow back to become trade partners.",
+          body: "Follow back and you're trade partners.",
           url: "/p/kaito",
           created_at: "2026-08-07T00:00:00Z",
           read_at: null,

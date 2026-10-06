@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Animated, {
@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 
-import type { StackParams } from "../../App";
+import type { StackParams, TabParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { GoingButton } from "../going-button";
 import { openRoom } from "../open-room";
@@ -393,6 +393,15 @@ export function HomeScreen() {
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
+  /* Another screen asking for a tab - Nights' "Find stores near you"
+     lands on Nearby. The tab stays mounted, so this follows the
+     param rather than reading it once. */
+  const askedFor = useRoute<RouteProp<TabParams, "Feed">>().params;
+  const asked = askedFor?.tab;
+  const askedAt = askedFor?.at;
+  useEffect(() => {
+    if (asked) setTab(asked);
+  }, [asked, askedAt]);
   /* How this player wants the Feed drawn. Anything this build does not
      recognise reads as the original card - see feedViewFrom. */
   const view = feedViewFrom(me?.player.feedView);
@@ -1251,8 +1260,8 @@ export function HomeScreen() {
                 {item.onYourListCount > 0 && (
                   <Text style={{ color: colors.accent, fontWeight: "600" }}>
                     {item.onYourListCount === 1
-                      ? "One of these is on your want list"
-                      : `${item.onYourListCount} of these are on your want list`}
+                      ? "One of these is on your Flares"
+                      : `${item.onYourListCount} of these are on your Flares`}
                   </Text>
                 )}
               </Card>
@@ -1399,7 +1408,7 @@ export function HomeScreen() {
 
                 {item.wants > 0 ? (
                   <Body>
-                    {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your want list to ask about.`}
+                    {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your Flares to ask about.`}
                   </Body>
                 ) : null}
 
@@ -1565,7 +1574,7 @@ export function HomeScreen() {
               )
             ) : item.kind === "pack" ? (
               <Card key={`pack-${index}`}>
-                <Muted>In the Embers store</Muted>
+                <Muted>In the Embers shop</Muted>
                 <Title>{item.name}</Title>
                 <Body>{item.description}</Body>
                 <Muted>
@@ -1658,7 +1667,7 @@ export function HomeScreen() {
                 )}
 
                 <Button
-                  label={item.live ? "Go to the room" : "See the board"}
+                  label={item.live ? "Open the room" : "See the board"}
                   variant="secondary"
                   onPress={() => void enter(item.code)}
                 />
@@ -1705,14 +1714,16 @@ export function HomeScreen() {
                   {heading}
                 </Text>
               ) : null}
-              {body}
-              {/* Why this is on your screen. A feed that explains itself
-                stops feeling arbitrary even when it is thin. A post
-                carries its own label in its header instead - the
-                founder: no separate text between cards. */}
+              {/* Why this is on your screen, ABOVE the card it explains:
+                under it, the line read as the next card's caption. A
+                feed that explains itself stops feeling arbitrary even
+                when it is thin. A post carries its own label in its
+                header instead - the founder: no separate text between
+                cards. */}
               {item.reason && item.kind !== "hunt" ? (
                 <Muted>{item.reason}</Muted>
               ) : null}
+              {body}
             </View>
           );
         })}
@@ -1774,7 +1785,7 @@ export function HomeScreen() {
               tonight&rsquo;s room.
             </Body>
             <Button
-              label="Go to Room"
+              label="Open the room"
               variant="secondary"
               onPress={() => openRoom(navigation)}
             />

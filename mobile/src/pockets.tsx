@@ -237,7 +237,7 @@ export function AddPocket({
       >
         +
       </Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 10, fontWeight: "600" }}>
+      <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
         Add
       </Text>
     </Tap>
