@@ -216,6 +216,9 @@ describe("GET /api/v1/me", () => {
       /* Joining a room posts their Flares to it. The default, and what
          a read that found no column gives. */
       autoPostFlares: true,
+      /* The sign-in email, for the app's Settings. A read that cannot
+         reach the auth admin gives null, not a failed /me. */
+      email: null,
     });
     expect(body.wants).toHaveLength(1);
     // The deck label rides the snapshot so the app can re-post the folder.

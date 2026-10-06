@@ -254,8 +254,8 @@ export default async function ProfileSettingsPage() {
         <div className="flex flex-col gap-1">
           <p className="font-semibold text-text-primary">Paste a deck list</p>
           <p className="text-sm text-text-secondary">
-            Every card in it becomes a Flare. Walk into any room and it offers to post
-            the lot in one go.
+            Every card in it goes up as one Flare post, so people nearby and your
+            friends see what you are after.
           </p>
         </div>
       </div>
@@ -319,8 +319,12 @@ export default async function ProfileSettingsPage() {
       <div className="flex flex-col gap-1">
         <p className="font-semibold text-text-primary">Delete your account</p>
         <p className="text-sm text-text-secondary">
-          Everything goes: profile, Flares, lists, showcase and unlocks. There is no
-          undo.
+          Everything goes: your profile, Flares, hunts, binders, showcase, trade
+          history, Embers and unlocks. There is no undo.
+        </p>
+        <p className="text-sm text-text-muted">
+          Pro through the App Store is billed by Apple: cancel it in your Apple ID
+          subscriptions too, or it keeps renewing.
         </p>
       </div>
       <DeleteAccountForm handle={handle} />

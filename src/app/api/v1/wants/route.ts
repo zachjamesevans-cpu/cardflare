@@ -115,7 +115,13 @@ export async function POST(request: Request): Promise<Response> {
           )
         : ({ ok: false, reason: "unavailable" } as const);
 
+    /* A post that failed says so, rather than "0 saved" in a 200 that
+       reads like success: the founder's Settings review found it. */
+    if (cards.length > 0 && !outcome.ok) {
+      return Response.json({ error: "could-not-post" }, { status: 503 });
+    }
     const saved = outcome.ok ? outcome.posted : 0;
+    /* Kept for older builds that read it; nothing caps a paste now. */
     const atCap = false;
 
     return Response.json({ ok: true, saved, unknown, unreadable, atCap });

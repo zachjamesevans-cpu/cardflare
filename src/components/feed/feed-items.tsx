@@ -96,7 +96,7 @@ const STARTERS = {
        other item on this screen possible. */
     variant: "secondary",
     headline: "What are you looking for?",
-    body: "Paste a deck list and every card in it becomes a want. Walk into any room and it offers to post the lot in one go.",
+    body: "Paste a deck list and every card in it goes up as one Flare post, so people nearby and your friends see what you are after.",
     label: "Paste a deck list",
     href: "/profile/settings",
   },

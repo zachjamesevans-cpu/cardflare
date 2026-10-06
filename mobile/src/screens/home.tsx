@@ -139,7 +139,7 @@ const STARTERS = {
   deck: {
     icon: "clipboard-list-outline",
     headline: "What are you looking for?",
-    body: "Paste a deck list and every card in it becomes a Flare. Walk into any room and it offers to post the lot in one go.",
+    body: "Paste a deck list and every card in it goes up as one Flare post, so people nearby and your friends see what you are after.",
     label: "Paste a deck list",
   },
 } as const;
@@ -1198,7 +1198,7 @@ export function HomeScreen() {
                   onPress={() =>
                     item.topic === "store"
                       ? openRoom(navigation)
-                      : navigation.navigate("Settings")
+                      : navigation.navigate("DeckPaste")
                   }
                 />
               </Card>
