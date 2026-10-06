@@ -95,7 +95,7 @@ export default async function InboxPage() {
                 opens early at a store you follow, it lands here.
               </p>
               <ButtonLink href="/room" variant="secondary">
-                Find a room
+                Open the room
               </ButtonLink>
             </Card>
           ) : (

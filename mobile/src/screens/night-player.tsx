@@ -247,7 +247,7 @@ function FlareTiles({
           </Text>
           {/* Only an offer is labelled: a want is what a Flare is. */}
           {f.intent === "showcase" ? (
-            <Text style={{ color: colors.textMuted, fontSize: 10 }}>Offering</Text>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11 }}>Offering</Text>
           ) : null}
         </View>
       ))}

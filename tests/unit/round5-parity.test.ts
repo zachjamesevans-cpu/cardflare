@@ -225,7 +225,9 @@ describe("copy the audit sent back", () => {
       expect(source).not.toContain("Trade partners.");
       expect(source).not.toContain("nothing to pledge");
     }
-    expect(web.notify.match(/Follow back to become trade partners\./g)).toHaveLength(2);
+    expect(web.notify.match(/Follow back and you're trade partners\./g)).toHaveLength(
+      2,
+    );
     expect(web.profile).toContain("nothing to offer on here");
   });
 

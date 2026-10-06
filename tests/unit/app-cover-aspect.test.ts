@@ -86,7 +86,7 @@ describe("the app's picker", () => {
   it("says what the server said when a commit is refused, and logs it", () => {
     /* A refused cover used to read as "try again". The server answers
        with a sentence; it reaches the screen and the console. */
-    expect(picker).toContain("describeError(caught)");
+    expect(picker).toContain("friendlyError(caught)");
     expect(picker).toContain('"cover upload failed"');
     expect(picker).toContain("console.warn(");
   });

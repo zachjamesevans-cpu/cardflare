@@ -153,7 +153,7 @@ export function ThumbRow({
               position={position}
             />
             {card.match === "other-printing" ? (
-              <Text style={{ color: colors.textMuted, fontSize: 10, lineHeight: 12 }}>
+              <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11, lineHeight: 12 }}>
                 {OTHER_PRINTING_SHORT}
               </Text>
             ) : null}

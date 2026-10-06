@@ -19,7 +19,7 @@ import { needsSetup, ownProfile } from "@/lib/players/profile";
 import { tierAllows } from "@/lib/tiers";
 
 export const metadata: Metadata = {
-  title: "Embers store",
+  title: "Embers shop",
   robots: { index: false, follow: false },
 };
 
@@ -77,7 +77,7 @@ export default async function EmberStorePage() {
       <AppShell
         area="Profile"
         email={viewer.user.email ?? ""}
-        title="Embers store"
+        title="Embers shop"
         description="Spend what you earned trading. Everything you buy is yours for good."
         areas={areas}
         currentArea={currentArea}

@@ -1,7 +1,7 @@
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 
-import { describeError, uploadAvatar } from "./api";
+import { friendlyError, uploadAvatar } from "./api";
 import { cropInPixels, type CropBox } from "./crop-box";
 
 /**
@@ -137,7 +137,7 @@ export async function uploadPicture(
       kind === "cover" ? "cover upload failed" : "picture upload failed",
       caught,
     );
-    report.say(`The picture did not go through (${describeError(caught)}). Try again.`);
+    report.say(`The picture did not go through. ${friendlyError(caught)}`);
     return false;
   } finally {
     report.busy(null);
@@ -197,7 +197,7 @@ export async function changeAnimatedPicture(report: PictureReporter): Promise<bo
     return true;
   } catch (caught) {
     console.warn("GIF upload failed", caught);
-    report.say(`The GIF did not go through (${describeError(caught)}). Try again.`);
+    report.say(`The GIF did not go through. ${friendlyError(caught)}`);
     return false;
   } finally {
     report.busy(null);

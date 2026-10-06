@@ -42,7 +42,7 @@ export function AccountPitch({ variant }: { variant: "join" | "room" }) {
       </Body>
       <View style={{ gap: spacing(2) }}>
         <Button
-          label="Create free account"
+          label="Create account"
           onPress={() => navigation.navigate("CreateAccount")}
         />
         <Tap onPress={() => navigation.navigate("SignIn")} hitSlop={6}>

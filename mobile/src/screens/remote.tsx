@@ -4,7 +4,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, RefreshControl, ScrollView, Text, View } from "react-native";
 
-import { describeError, getMe, type Me } from "../api";
+import { friendlyError, getMe, type Me } from "../api";
 import { GiftBar } from "../gift-bar";
 import { controlTimer, getHub, type HubView } from "../remote-api";
 import type { RemoteOp, RemoteTimer } from "../remote-wire";
@@ -97,7 +97,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
       .catch((caught) => {
         if (live) {
           setStaff([]);
-          setError(describeError(caught));
+          setError(friendlyError(caught));
         }
       });
     return () => {
@@ -113,7 +113,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
       setHeardAt(Date.now());
       setError(null);
     } catch (caught) {
-      setError(describeError(caught));
+      setError(friendlyError(caught));
     }
   }, [picked]);
 
@@ -150,7 +150,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
       );
       setError(null);
     } catch (caught) {
-      setError(describeError(caught));
+      setError(friendlyError(caught));
     } finally {
       setBusy((current) => {
         const next = { ...current };

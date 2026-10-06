@@ -62,23 +62,25 @@ export function ProfileFlares({
       aria-labelledby={heading ? "profile-flares" : undefined}
       aria-label={heading ? undefined : "Flares"}
     >
-      {heading ? (
-        <h2
-          id="profile-flares"
-          className="flex items-baseline gap-2 font-semibold text-text-primary"
-        >
-          Flares
-          <span className="text-sm font-normal text-text-muted tabular-nums">
-            {flares.length}
-          </span>
-        </h2>
-      ) : null /* No "N Flares" line over the grid: the header's number says it. */}
+      {
+        heading ? (
+          <h2
+            id="profile-flares"
+            className="flex items-baseline gap-2 font-semibold text-text-primary"
+          >
+            Flares
+            <span className="text-sm font-normal text-text-muted tabular-nums">
+              {flares.length}
+            </span>
+          </h2>
+        ) : null /* No "N Flares" line over the grid: the header's number says it. */
+      }
 
       {flares.length === 0 ? (
         <p className={cn("text-sm text-text-muted", !heading && INSET)}>
           {yours ? (
             <>
-              No Flares yet. Post one from the Flare tab.{" "}
+              No Flares yet. Tap + on the Feed to post one.{" "}
               <Link
                 href="/flare"
                 className="font-semibold text-accent underline-offset-4 hover:underline"

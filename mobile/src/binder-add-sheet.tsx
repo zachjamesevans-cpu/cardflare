@@ -4,16 +4,16 @@ import { ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  ApiError,
   addBinderCards,
-  describeError,
-  previewBinderList,
-  serverMessage,
+  ApiError,
   type Binder,
   type BinderAddItem,
   type BinderCard,
   type BinderListEntry,
   type CardHit,
+  friendlyError,
+  previewBinderList,
+  serverMessage,
 } from "./api";
 import {
   BINDER_ADD_COPY,
@@ -151,7 +151,7 @@ export function BinderAddSheet({
       setError(
         caught instanceof ApiError && caught.code === "at-cap"
           ? "Your binder is full. Two hundred cards is as many as it holds."
-          : (serverMessage(caught) ?? `That did not save (${describeError(caught)}).`),
+          : (serverMessage(caught) ?? `That did not save. ${friendlyError(caught)}`),
       );
     } finally {
       setBusy(false);
@@ -173,7 +173,7 @@ export function BinderAddSheet({
       });
     } catch (caught) {
       setError(
-        serverMessage(caught) ?? `Could not look that up (${describeError(caught)}).`,
+        serverMessage(caught) ?? `Could not look that up. ${friendlyError(caught)}`,
       );
     } finally {
       setLooking(false);
@@ -430,7 +430,7 @@ export function BinderAddSheet({
               />
               <Tap
                 onPress={() => less(lineKey(line))}
-                hitSlop={6}
+                hitSlop={12}
                 accessibilityLabel={`One fewer ${line.name}`}
                 style={{
                   position: "absolute",

@@ -33,6 +33,19 @@ export interface PostRef {
  * your own post, a card that already traded, an item that is not a
  * post.
  */
+/**
+ * Each count's tap box: at least 44pt tall and wide, Apple's minimum,
+ * so a thumb that lands a little off the heart still likes the post.
+ */
+const TARGET = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: spacing(1.5),
+  minHeight: 44,
+  minWidth: 44,
+} as const;
+
 export function haveFor(
   card: FeedCard | PostCard,
   post: PostRef | undefined,
@@ -112,7 +125,7 @@ export function PostSocialRow({
         onPress={toggle}
         hitSlop={6}
         accessibilityLabel={liked ? "Unlike" : "Like"}
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        style={TARGET}
       >
         <Ionicons
           name={liked ? "heart" : "heart-outline"}
@@ -134,7 +147,7 @@ export function PostSocialRow({
         disabled={threadOpen}
         hitSlop={6}
         accessibilityLabel="Show comments"
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        style={TARGET}
       >
         <Ionicons
           name={threadOpen ? "chatbubble" : "chatbubble-outline"}
@@ -156,7 +169,7 @@ export function PostSocialRow({
           onPress={onMessage}
           hitSlop={6}
           accessibilityLabel="Message them"
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+          style={TARGET}
         >
           <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
           {offers !== undefined ? (

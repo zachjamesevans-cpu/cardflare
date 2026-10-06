@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Linking, Text, View } from "react-native";
 
-import { describeError, signIn } from "../api";
+import { friendlyError, signIn } from "../api";
 import { API_BASE, authConfigured } from "../config";
 import { registerForPush } from "../push";
 import { Body, Button, Card, ErrorLine, Input, Title } from "../ui";
@@ -37,7 +37,7 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
     } catch (caught) {
       /* The keychain, usually: a throw here used to leave the button
          stuck on "Signing in…" with nothing said. */
-      setError(`Could not sign in (${describeError(caught)}). Try again.`);
+      setError(`Could not sign in. ${friendlyError(caught)}`);
     } finally {
       setBusy(false);
     }
@@ -55,8 +55,8 @@ export function SignInScreen({ onSignedIn }: { onSignedIn: () => void }) {
         <Title>Sign in</Title>
         <Body>
           The same account you use on cardflare.gg. No account? You can still scan into
-          any room as a guest; accounts are for keeping your wants and collection with
-          you.
+          any room as a guest; accounts are for keeping your Flares and collection
+          with you.
         </Body>
 
         <ErrorLine

@@ -20,7 +20,7 @@ const AUDIENCES = [
     title: "The card is closer than you think.",
     text: "Post what you need. See who has it, and where.",
     href: "/signup",
-    cta: "Create free account",
+    cta: "Create account",
     analytics: "player_signup_cta_clicked",
   },
   {

@@ -64,6 +64,15 @@ export type NightTab = keyof typeof NIGHT_TABS;
 
 export const TAB_ORDER: NightTab[] = ["going", "nearby", "past"];
 
+/**
+ * Nearby with nothing on it, for somebody who already follows a store:
+ * "follow a store" would be advice they have taken. The website's
+ * `src/components/nights/night-list.tsx` says the same.
+ */
+export const STORES_QUIET = "Your stores haven't scheduled a night yet.";
+export const SEE_NEARBY = "See what's nearby";
+export const FIND_STORES = "Find stores near you";
+
 /** The tab everyone lands on. */
 export const DEFAULT_TAB: NightTab = "going";
 
@@ -326,6 +335,10 @@ export function NightsScreen() {
   }
 
   const rows = (nights ?? []).filter((night) => tabFor(night) === tab);
+  /* Whether this player follows a store, as far as the list can say:
+     any night on any tab at a store they follow. A followed store with
+     no nights at all leaves no trace here, and reads as following none. */
+  const followsAStore = (nights ?? []).some((night) => night.following);
   const loadFailed = failed && nights === null;
 
   return (
@@ -363,17 +376,35 @@ export function NightsScreen() {
         ))}
 
         {/* Nothing on this tab: each tab's own line, the website's
-            words. Nearby keeps the Feed as the way to a store to follow. */}
+            words, and a way onward. Going points at Nearby; Nearby
+            points at the Feed's stores, in words that fit whether this
+            player already follows one. */}
         {rows.length === 0 && !loadFailed ? (
           <View style={{ paddingVertical: spacing(4), gap: spacing(3) }}>
-            <Body>
-              {tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}
-            </Body>
+            {tab === "nearby" && followsAStore ? (
+              <Body>{STORES_QUIET}</Body>
+            ) : (
+              <Body>
+                {tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}
+              </Body>
+            )}
+            {tab === "going" ? (
+              <Button
+                label={SEE_NEARBY}
+                variant="secondary"
+                onPress={() => setTab("nearby")}
+              />
+            ) : null}
             {tab === "nearby" ? (
               <Button
-                label="Open the Feed"
+                label={FIND_STORES}
                 variant="secondary"
-                onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
+                onPress={() =>
+                  navigation.navigate("Tabs", {
+                    screen: "Feed",
+                    params: { tab: "nearby", at: Date.now() },
+                  })
+                }
               />
             ) : null}
           </View>
@@ -431,9 +462,10 @@ function NightCard({
         }}
       >
         <Text
+          maxFontSizeMultiplier={1.3}
           style={{
             color: live ? colors.accent : colors.textMuted,
-            fontSize: 10,
+            fontSize: 11,
             fontWeight: "800",
             letterSpacing: 1,
           }}

@@ -2170,7 +2170,7 @@ function CarouselFlare({
           ) : null}
           {flare.note ? (
             <View style={styles.noteBadge}>
-              <Text style={styles.noteBadgeGlyph}>✎</Text>
+              <Text maxFontSizeMultiplier={1} style={styles.noteBadgeGlyph}>✎</Text>
             </View>
           ) : null}
           {/* The number, right on the card, the fan draws it, this chip
@@ -2191,7 +2191,7 @@ function CarouselFlare({
             Reserved per rail, so a board where nobody named a deck - very
             nearly every board - has no empty row in it. */}
         {reserveCaption && (
-          <Text numberOfLines={1} style={styles.tileCaption}>
+          <Text numberOfLines={1} maxFontSizeMultiplier={1.3} style={styles.tileCaption}>
             {flare.deckLabel ?? " "}
           </Text>
         )}
@@ -2209,7 +2209,8 @@ function CarouselFlare({
               style={styles.removeButton}
             >
               <Text
-                style={{ color: colors.textMuted, fontSize: 10, fontWeight: "600" }}
+                maxFontSizeMultiplier={1.3}
+                style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}
               >
                 Found it
               </Text>
@@ -2220,7 +2221,7 @@ function CarouselFlare({
               hitSlop={4}
               style={styles.takeDownButton}
             >
-              <Text style={{ color: colors.danger, fontSize: 10, fontWeight: "600" }}>
+              <Text maxFontSizeMultiplier={1.3} style={{ color: colors.danger, fontSize: 11, fontWeight: "600" }}>
                 Take down
               </Text>
             </Tap>
@@ -2551,7 +2552,7 @@ const styles = StyleSheet.create({
   },
   noteBadgeGlyph: {
     color: colors.accentContrast,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: "700",
   },
   stackGhost: {
@@ -2588,7 +2589,7 @@ const styles = StyleSheet.create({
   },
   tileCaption: {
     color: colors.textMuted,
-    fontSize: 10,
+    fontSize: 11,
     lineHeight: 13,
     minHeight: 13,
   },

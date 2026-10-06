@@ -78,10 +78,11 @@ export function DressingPicker({
               />
             </View>
             <Text
+              maxFontSizeMultiplier={1.3}
               numberOfLines={1}
               style={{
                 color: selected ? colors.accent : colors.textSecondary,
-                fontSize: 10,
+                fontSize: 11,
                 fontWeight: selected ? "700" : "400",
               }}
             >

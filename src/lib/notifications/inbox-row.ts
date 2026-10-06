@@ -48,3 +48,35 @@ export function kindIcon(kind: string): "store" | "bell" {
     ? "store"
     : "bell";
 }
+
+/**
+ * Back-to-back notices that say the same thing, as one row with a
+ * count: three "Kaito offered on Charizard" in a row read as "×3"
+ * instead of a wall. Same kind, same person, same sentence (which
+ * names the card) and the same place to go. Only consecutive ones,
+ * so the list's order still says when things happened; the newest of
+ * the run stands for it, and the run is unread if any of it is.
+ */
+export function collapseRuns<
+  T extends {
+    id: string;
+    kind: string;
+    title: string;
+    url: string | null;
+    readAt: string | null;
+    actor?: { playerId: string } | null;
+  },
+>(items: T[]): { item: T; count: number; anyUnread: boolean }[] {
+  const runs: { item: T; count: number; anyUnread: boolean; key: string }[] = [];
+  for (const n of items) {
+    const key = [n.kind, n.actor?.playerId ?? "", n.title, n.url ?? ""].join("|");
+    const last = runs[runs.length - 1];
+    if (last && last.key === key) {
+      last.count += 1;
+      if (!n.readAt) last.anyUnread = true;
+    } else {
+      runs.push({ item: n, count: 1, anyUnread: !n.readAt, key });
+    }
+  }
+  return runs.map(({ item, count, anyUnread }) => ({ item, count, anyUnread }));
+}

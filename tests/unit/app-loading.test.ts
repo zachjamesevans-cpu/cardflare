@@ -63,7 +63,9 @@ describe("Loading, the app's one loading state", () => {
     expect(read("screens/home.tsx")).toContain(
       "{!hydrated && shown.length === 0 && <Loading />}",
     );
-    expect(read("screens/inbox.tsx")).toContain("{items === null && <Loading />}");
+    expect(read("screens/inbox.tsx")).toContain(
+      "{items === null && loadError === null && <Loading />}",
+    );
   });
 });
 

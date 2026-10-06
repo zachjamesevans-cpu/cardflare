@@ -46,7 +46,7 @@ test.describe("landing page", () => {
   test("primary hero CTA opens the free signup", async ({ page }) => {
     await page.goto("/");
 
-    await page.getByRole("link", { name: "Create free account" }).first().click();
+    await page.getByRole("link", { name: "Create account" }).first().click();
 
     await expect(page).toHaveURL(/\/signup$/);
     await expect(page.getByLabel(/email/i).first()).toBeVisible();

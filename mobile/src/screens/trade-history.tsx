@@ -9,10 +9,10 @@ import type { StackParams } from "../../App";
 import { ActionSheet } from "../action-menu";
 import {
   deleteLoggedTrade,
-  describeError,
+  type FlareHistoryEntry,
+  friendlyError,
   getFlareHistory,
   getTradeHistory,
-  type FlareHistoryEntry,
   type TradeHistory,
   type TradeHistoryEntry,
 } from "../api";
@@ -130,7 +130,7 @@ export function TradeHistoryScreen() {
       }
       await load();
     } catch (caught) {
-      setError(`Could not remove that trade (${describeError(caught)}).`);
+      setError(`Could not remove that trade. ${friendlyError(caught)}`);
     }
   };
 

@@ -30,11 +30,12 @@ import { BinderList } from "../binder-list";
 import { CosmeticCard } from "../cosmetic-card";
 import { WornBackground, WornScene } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
+import { formatHandle } from "../handle";
 import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { ProfileFlares } from "../profile-flares";
-import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import {
   PROFILE_INSET,
   ProfileTabs,
@@ -114,6 +115,13 @@ export function PlayerProfileScreen() {
       live = false;
     };
   }, []);
+
+  /* The header names who this is once it is known: "@kaito", not
+     "Player". Until then the route's own title stands. */
+  const handle = profile?.handle;
+  useEffect(() => {
+    if (handle) navigation.setOptions({ title: formatHandle(handle) });
+  }, [handle, navigation]);
   /*
    * Message, beside Follow. The founder: "I should be able to go on
    * someone's profile and message them directly about anything." The
@@ -318,7 +326,11 @@ export function PlayerProfileScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", gap: spacing(2) }}>
             {profile.showcase.map((entry, index) => (
-              <Tap key={entry.id} onPress={() => setZoomed(shelf[index] ?? null)}>
+              <Tap
+                key={entry.id}
+                onPress={() => setZoomed(shelf[index] ?? null)}
+                accessibilityLabel={`View ${entry.name}`}
+              >
                 <CosmeticCard
                   imageUrl={entry.imageUrl}
                   width={SHELF_TILE}
@@ -522,7 +534,7 @@ export function PlayerProfileScreen() {
                         Blocked
                       </Text>
                     </View>
-                    <HeaderButton
+                    <ProfileActionButton
                       label="Unblock"
                       onPress={() => void setBlock(false)}
                     />
@@ -534,7 +546,7 @@ export function PlayerProfileScreen() {
                       initial={profile.follow}
                       fill
                     />
-                    <HeaderButton
+                    <ProfileActionButton
                       label="Message"
                       icon="chatbubble-outline"
                       disabled={messaging}
@@ -542,7 +554,7 @@ export function PlayerProfileScreen() {
                     />
                   </>
                 ) : guest ? (
-                  <HeaderButton
+                  <ProfileActionButton
                     label="Follow"
                     primary
                     onPress={() => navigation.navigate("CreateAccount")}

@@ -9,8 +9,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * offline ... it takes a full 7 seconds to load the full profile."
  *
  * So this is the general version: any screen's answer, keyed by name,
- * scoped to the account, expiring on its own clock. `useCached` is how
- * screens use it — this file is only the shelf.
+ * scoped to the account, expiring on its own clock. Each screen reads it
+ * and writes it itself — this file is only the shelf.
  *
  * THE RULES, WHICH ARE WHY THIS IS NOT A `setItem`:
  *

@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -24,7 +23,7 @@ import { offerFailureMessage, selectionSummary } from "./offer-copy";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
-import { AsyncButton, Button, ErrorLine, Input, Muted, Tap, Title } from "./ui";
+import { AsyncButton, Button, ErrorLine, Input, Muted, SheetClose, Tap, Title } from "./ui";
 
 /** One line of the offer being reviewed: a card on the post, and how many. */
 export interface OfferReviewLine {
@@ -183,9 +182,7 @@ export function OfferReviewSheet({
               }}
             >
               <Title>{outcome ? "Sent" : "Your offer"}</Title>
-              <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors.textSecondary} />
-              </Tap>
+              <SheetClose onPress={onClose} />
             </View>
 
             {outcome ? (

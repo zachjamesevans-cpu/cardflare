@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -7,7 +6,7 @@ import type { RoomState } from "./api";
 import { OpenToTradesTag } from "./open-to-trades-tag";
 import { PlayerAvatar } from "./player-avatar";
 import { colors, radius, spacing } from "./theme";
-import { Muted, Tap, Title } from "./ui";
+import { Muted, SheetClose, Tap, Title } from "./ui";
 
 /**
  * Who is in the room, behind the door card's meta line.
@@ -112,9 +111,7 @@ export function RoomPeopleModal({
               <Title>Who&rsquo;s here</Title>
               <Muted>{`${hereNow} here now · ${people.length} coming`}</Muted>
             </View>
-            <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-              <Ionicons name="close" size={24} color={colors.textSecondary} />
-            </Tap>
+            <SheetClose onPress={onClose} />
           </View>
 
           <ScrollView contentContainerStyle={{ gap: spacing(1.5) }}>

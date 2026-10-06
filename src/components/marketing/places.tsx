@@ -186,7 +186,7 @@ export function HeroCtas({
         className="w-full sm:w-auto"
         data-analytics-event={analyticsEvent}
       >
-        Create free account
+        Create account
       </ButtonLink>
       <ButtonLink
         href="/ultra"

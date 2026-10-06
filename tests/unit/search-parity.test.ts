@@ -148,7 +148,7 @@ describe("search, from the Feed", () => {
 
 describe("the card page", () => {
   const SECTIONS = [
-    "In your Trade binder",
+    "In your trade binder",
     "On your hunt: ",
     "You want this",
     "Post a Flare for it",

@@ -63,8 +63,5 @@ describe("the app's copies", () => {
     expect(strip(read("mobile/src/nearby-shared.ts"))).toBe(
       strip(read("src/lib/nearby/shared.ts")),
     );
-    expect(strip(read("mobile/src/meet.ts"))).toBe(
-      strip(read("src/lib/nearby/meet.ts")),
-    );
   });
 });

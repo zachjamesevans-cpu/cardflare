@@ -48,7 +48,7 @@ export function FeedFilterTabs({
               borderRadius: radius.control + 4,
               borderWidth: 1,
               borderColor: on ? colors.accent : colors.border,
-              backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.surface,
+              backgroundColor: on ? colors.accentTint : colors.surface,
               paddingVertical: spacing(2.5),
               paddingHorizontal: spacing(2),
               shadowColor: colors.accent,
@@ -64,6 +64,7 @@ export function FeedFilterTabs({
             />
             <Text
               numberOfLines={1}
+              maxFontSizeMultiplier={1.3}
               style={{
                 color: on ? colors.accent : colors.textSecondary,
                 fontSize: 13,

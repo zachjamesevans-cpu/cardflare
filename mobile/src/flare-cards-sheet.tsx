@@ -21,7 +21,7 @@ import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
-import { Button, Muted, Tap, Title, type ZoomPicks } from "./ui";
+import { Button, Muted, SheetClose, Tap, Title, type ZoomPicks } from "./ui";
 
 /**
  * The post a sheet is about: enough to list its cards and to offer on
@@ -186,9 +186,7 @@ export function FlareCardsSheet({
               <Title>
                 {selecting ? "What do you have?" : `${cardsLabel(open.cards.length)}`}
               </Title>
-              <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors.textSecondary} />
-              </Tap>
+              <SheetClose onPress={onClose} />
             </View>
 
             <>

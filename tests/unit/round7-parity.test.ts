@@ -235,11 +235,11 @@ describe("Embers are three facts, not one number three ways", () => {
       expect(source).toContain("to spend");
       expect(source).not.toContain("Earned by trading");
     }
-    expect(web.ownProfile).toMatch(/>\s*Embers store\s*</);
+    expect(web.ownProfile).toMatch(/>\s*Embers shop\s*</);
     for (const source of [web.profile, app.profile]) {
       expect(source).not.toContain("Earned, all time");
       expect(source).not.toContain("to spend");
-      expect(source).not.toMatch(/>\s*Embers store\s*</);
+      expect(source).not.toMatch(/>\s*Embers shop\s*</);
     }
   });
 

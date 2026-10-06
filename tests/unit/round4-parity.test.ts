@@ -130,7 +130,7 @@ describe("logging a trade", () => {
     "I got a card",
     "I gave a card",
     "Their name",
-    "Find on CardFlare",
+    "Find on cardflare",
     "Threw in a sleeve, cash on top, whatever you want to remember.",
     "Keep my Have list in step",
     "A card you gave comes off your Have list. A card you got goes on it.",

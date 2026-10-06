@@ -1,9 +1,8 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type { FollowedPlayer } from "./api";
 import { PlayerAvatar } from "./player-avatar";
-import { Loading, Muted, Tap } from "./ui";
+import { Loading, Muted, SheetClose, Tap } from "./ui";
 import { colors, radius, spacing } from "./theme";
 
 /**
@@ -33,7 +32,7 @@ export function PeopleSheet({
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
+          backgroundColor: colors.scrim,
           alignItems: "center",
           justifyContent: "center",
           padding: spacing(4),
@@ -68,9 +67,7 @@ export function PeopleSheet({
                 {people ? `· ${people.length}` : ""}
               </Text>
             </Text>
-            <Tap onPress={onClose} accessibilityLabel="Close">
-              <Ionicons name="close" size={22} color={colors.textMuted} />
-            </Tap>
+            <SheetClose onPress={onClose} />
           </View>
           <ScrollView>
             {people === null ? (

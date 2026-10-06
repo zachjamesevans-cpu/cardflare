@@ -6,10 +6,10 @@ import { ScrollView, View } from "react-native";
 import type { StackParams } from "../../App";
 import {
   ApiError,
-  describeError,
+  type BinderSummary,
+  friendlyError,
   listBinders,
   peekPlayer,
-  type BinderSummary,
 } from "../api";
 import { BinderList } from "../binder-list";
 import { CreateBinderSheet } from "../create-binder-sheet";
@@ -42,7 +42,7 @@ export function BindersScreen({ playerId }: { playerId?: string }) {
       setError(
         caught instanceof ApiError && caught.code === "private"
           ? "private"
-          : describeError(caught),
+          : friendlyError(caught),
       );
     }
   }, [playerId]);

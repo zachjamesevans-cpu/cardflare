@@ -25,7 +25,7 @@ function SubmitButton() {
   return (
     <Button type="submit" size="lg" disabled={pending} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
-      {pending ? "Creating your account…" : "Create my account"}
+      {pending ? "Creating your account…" : "Create account"}
     </Button>
   );
 }

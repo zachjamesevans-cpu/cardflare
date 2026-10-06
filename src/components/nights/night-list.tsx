@@ -64,6 +64,10 @@ export function NightList({
   tab: NightTab;
 }) {
   const lists = splitNights(nights);
+  /* Whether this player follows a store, as far as the list can say:
+     any night on any tab at a store they follow. The app's
+     `mobile/src/screens/nights.tsx` reads it the same way. */
+  const followsAStore = nights.some((night) => night.following);
 
   return (
     <div className="flex flex-col gap-3">
@@ -73,18 +77,30 @@ export function NightList({
       </div>
 
       <NightsTabs
+        /* Remounted on a new ?tab=, so "See what's nearby" lands there. */
+        key={tab}
         initial={tab}
         panes={{
           going: (
             <NightColumn nights={lists.going} signedIn={signedIn}>
-              <Empty line={GOING_EMPTY} />
+              <Empty line={GOING_EMPTY}>
+                <Link
+                  href="/nights?tab=nearby"
+                  className={buttonStyles("secondary", "sm")}
+                >
+                  {SEE_NEARBY}
+                </Link>
+              </Empty>
             </NightColumn>
           ),
           nearby: (
             <NightColumn nights={lists.nearby} signedIn={signedIn}>
-              <Empty line={NO_NIGHTS}>
-                <Link href="/feed" className={buttonStyles("secondary", "sm")}>
-                  Open the Feed
+              <Empty line={followsAStore ? STORES_QUIET : NO_NIGHTS}>
+                <Link
+                  href="/feed?tab=nearby"
+                  className={buttonStyles("secondary", "sm")}
+                >
+                  {FIND_STORES}
                 </Link>
               </Empty>
             </NightColumn>
@@ -121,6 +137,14 @@ function NightColumn({
 }
 
 /** One quiet line, centred, with room for one door under it. */
+/**
+ * Nearby with nothing on it, for somebody who already follows a store,
+ * and the two ways onward. The app's nights screen says the same.
+ */
+const STORES_QUIET = "Your stores haven't scheduled a night yet.";
+const SEE_NEARBY = "See what's nearby";
+const FIND_STORES = "Find stores near you";
+
 function Empty({ line, children }: { line: string; children?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-3 py-10 text-center">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { describeError } from "./api";
+import { friendlyError } from "./api";
 
 /**
  * Copies found, written optimistically, with one Undo.
@@ -72,7 +72,7 @@ export function useCopiesFound({
       .then(() => onChanged?.())
       .catch((caught) => {
         setLocal((current) => ({ ...current, [entry.key]: previous }));
-        setError(`That did not save (${describeError(caught)}). Try again.`);
+        setError(`That did not save. ${friendlyError(caught)}`);
       });
   };
 

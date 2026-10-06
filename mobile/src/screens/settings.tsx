@@ -11,13 +11,13 @@ import type { StackParams } from "../../App";
 import { API_BASE } from "../config";
 import {
   ApiError,
+  type BlockedPlayer,
   deleteAccount,
-  describeError,
+  friendlyError,
   getMe,
   getPostalCode,
   getPushPrefs,
   listBlockedPlayers,
-  type BlockedPlayer,
   type Me,
   savePostalCode,
   setAutoPost as saveAutoPost,
@@ -277,7 +277,7 @@ export function SettingsScreen() {
                   borderRadius: radius.control,
                   borderWidth: 1,
                   borderColor: on ? colors.accent : colors.border,
-                  backgroundColor: on ? "rgba(198,238,79,0.08)" : colors.elevated,
+                  backgroundColor: on ? colors.accentTint : colors.elevated,
                   padding: spacing(3),
                 }}
               >
@@ -466,11 +466,11 @@ function PushPrefSwitches({ initial }: { initial: PushPrefs | null }) {
       <Muted>{PUSH_LINE}</Muted>
       {phoneOff ? (
         <Tap
-          accessibilityLabel="Notifications are off for CardFlare. Open iOS Settings"
+          accessibilityLabel="Notifications are off for cardflare. Open iOS Settings"
           onPress={() => void Linking.openSettings()}
         >
           <Text style={{ color: colors.danger, fontSize: 13 }}>
-            Notifications are off for CardFlare on this phone, so none of these will
+            Notifications are off for cardflare on this phone, so none of these will
             arrive. Turn them on in iOS Settings →
           </Text>
         </Tap>
@@ -667,7 +667,7 @@ function DeleteAccount({ handle }: { handle: string }) {
                 setSaid(
                   caught instanceof ApiError && caught.code === "handle-mismatch"
                     ? "That is not your handle."
-                    : `The account could not be deleted (${describeError(caught)}). Try again.`,
+                    : `The account could not be deleted. ${friendlyError(caught)}`,
                 );
               }
             }}
@@ -805,7 +805,7 @@ function AccountCard({
                 setEditing(false);
                 setSaid(null);
               } catch (caught) {
-                setSaid(describeError(caught));
+                setSaid(friendlyError(caught));
               }
             }}
           />

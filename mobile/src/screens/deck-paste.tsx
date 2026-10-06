@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 
-import { type DeckPreviewEntry, describeError, previewDeckList, saveDeckList } from "../api";
+import { type DeckPreviewEntry, friendlyError, previewDeckList, saveDeckList } from "../api";
 import { parseDeckList } from "../deck-list";
 import { QuantityBadge } from "../quantity-badge";
 import { colors, gutter, spacing } from "../theme";
@@ -199,7 +199,7 @@ function DeckListField() {
                 : `Nothing to post.${unknown}`,
             );
           } catch (caught) {
-            setSaid(`That did not post (${describeError(caught)}). Try again.`);
+            setSaid(`That did not post. ${friendlyError(caught)}`);
           }
         }}
       />

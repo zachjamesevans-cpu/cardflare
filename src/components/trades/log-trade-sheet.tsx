@@ -442,7 +442,7 @@ function ChosenCard({
 }
 
 /**
- * "Find on CardFlare": the same search the People card uses, debounced
+ * "Find on cardflare": the same search the People card uses, debounced
  * the same way, with a tap picking the account instead of opening it.
  */
 function PartnerSearch({ onPick }: { onPick: (player: FoundPlayer) => void }) {
@@ -492,8 +492,8 @@ function PartnerSearch({ onPick }: { onPick: (player: FoundPlayer) => void }) {
         <TextInput
           value={query}
           onChange={(event) => search(event.target.value)}
-          placeholder="Find on CardFlare"
-          aria-label="Find on CardFlare"
+          placeholder="Find on cardflare"
+          aria-label="Find on cardflare"
           className="pl-9"
         />
       </label>

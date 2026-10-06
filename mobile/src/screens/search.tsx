@@ -13,6 +13,7 @@ import {
   type FoundPlayer,
   type FoundStore,
 } from "../api";
+import { displayCardName } from "../card-name";
 import { gameShortName } from "../games";
 import { useTabBarInset } from "../glass";
 import { formatHandle } from "../handle";
@@ -272,7 +273,7 @@ export function SearchScreen() {
                     numberOfLines={1}
                     style={{ color: colors.textPrimary, fontWeight: "600" }}
                   >
-                    {card.name}
+                    {displayCardName(card.name, card.cardNumber)}
                   </Text>
                   <Text
                     numberOfLines={1}

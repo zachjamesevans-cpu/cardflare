@@ -40,7 +40,7 @@ export function QuantityBadge({
         {
           alignSelf: "flex-start",
           borderRadius: 999,
-          backgroundColor: "rgba(0,0,0,0.75)",
+          backgroundColor: colors.scrim,
           borderWidth: 1,
           borderColor: colors.borderStrong,
           paddingHorizontal: size === "sm" ? 5 : 7,
@@ -50,9 +50,10 @@ export function QuantityBadge({
       ]}
     >
       <Text
+        maxFontSizeMultiplier={1.3}
         style={{
           color: colors.textPrimary,
-          fontSize: size === "sm" ? 9 : 12,
+          fontSize: size === "sm" ? 11 : 12,
           fontWeight: "700",
           fontVariant: ["tabular-nums"],
         }}

@@ -4,7 +4,7 @@ import { Bell, Store } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { cn } from "@/lib/cn";
 import type { InboxItem } from "@/lib/notifications/inbox";
-import { ago, kindIcon, splitTitle } from "@/lib/notifications/inbox-row";
+import { ago, collapseRuns, kindIcon, splitTitle } from "@/lib/notifications/inbox-row";
 
 /**
  * The inbox's rows, the way Instagram lays its notifications out.
@@ -24,8 +24,8 @@ import { ago, kindIcon, splitTitle } from "@/lib/notifications/inbox-row";
 export function InboxList({ items }: { items: InboxItem[] }) {
   return (
     <ul className="flex flex-col">
-      {items.map((item) => {
-        const unread = !item.readAt;
+      {collapseRuns(items).map(({ item, count, anyUnread }) => {
+        const unread = anyUnread;
         const { lead, rest } = splitTitle(item.title, item.actor?.displayName);
 
         const words = (
@@ -40,6 +40,9 @@ export function InboxList({ items }: { items: InboxItem[] }) {
               >
                 {rest}
               </span>
+              {count > 1 && (
+                <span className="font-semibold text-text-primary"> ×{count}</span>
+              )}
               <span className="text-text-muted"> {ago(item.createdAt)}</span>
             </p>
             {item.body && (

@@ -403,9 +403,10 @@ export function FlareFeedCard({
                 {item.playerId === null ? <GuestChip /> : null}
                 {item.yours ? (
                   <Text
+                    maxFontSizeMultiplier={1.3}
                     style={{
                       color: colors.textMuted,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: "700",
                       letterSpacing: 0.6,
                       borderWidth: 1,

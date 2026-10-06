@@ -453,14 +453,14 @@ export default async function ProfilePage({
                     >
                       <span className="flex flex-col gap-1">
                         <span className="font-semibold text-text-primary">
-                          Embers store
+                          Embers shop
                         </span>
                         <span className="text-sm text-text-secondary">
                           Frames, holo patterns and effects. Spend what you have earned.
                         </span>
                         <span className="text-xs text-text-muted">
-                          Packs, duplicates and gifts add to what you can spend. Trading
-                          adds to both.
+                          Embers to spend come from trades, turning up at your stores,
+                          duplicate pack pulls and gifts.
                         </span>
                       </span>
                       <span className="flex shrink-0 items-center gap-2">

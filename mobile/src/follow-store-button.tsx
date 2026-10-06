@@ -58,6 +58,7 @@ export function FollowStoreButton({
     <Tap
       disabled={busy}
       onPress={toggle}
+      hitSlop={chip ? 8 : 2}
       accessibilityLabel={following ? "Following" : "Follow"}
       style={{
         alignSelf: "flex-start",
@@ -67,7 +68,7 @@ export function FollowStoreButton({
         borderRadius: chip ? 999 : radius.control,
         borderWidth: 1,
         borderColor: following ? colors.border : `${colors.accent}66`,
-        backgroundColor: following ? colors.elevated : `${colors.accent}1a`,
+        backgroundColor: following ? colors.elevated : colors.accentTint,
         paddingHorizontal: chip ? spacing(2) : spacing(3),
         paddingVertical: chip ? spacing(0.75) : spacing(1.5),
       }}

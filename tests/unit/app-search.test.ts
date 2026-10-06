@@ -212,7 +212,7 @@ describe("the card page", () => {
   it("the You block is one line per true fact, then Post a Flare for it", () => {
     const block = between(src.card, "{you ? (", "<Section heading={located");
     expect(block).toContain(
-      "{you.inTradeBinder ? <Fact>In your Trade binder</Fact> : null}",
+      "{you.inTradeBinder ? <Fact>In your trade binder</Fact> : null}",
     );
     expect(block).toContain('{"On your hunt: "}');
     expect(block).toContain("{you.onHunt.name}");

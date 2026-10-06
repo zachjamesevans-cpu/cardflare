@@ -46,7 +46,7 @@ import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, gutter, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
 
 /**
@@ -531,7 +531,7 @@ export function ThreadScreen() {
                   <View
                     style={{
                       backgroundColor: item.yours ? colors.accent : colors.elevated,
-                      borderRadius: 18,
+                      borderRadius: radius.card,
                       paddingHorizontal: spacing(3),
                       paddingVertical: spacing(2),
                     }}

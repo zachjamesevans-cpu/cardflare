@@ -8,6 +8,8 @@ import {
   type ReactNode,
 } from "react";
 import {
+  type AccessibilityRole,
+  type AccessibilityState,
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
@@ -83,6 +85,8 @@ export function Tap({
   hitSlop,
   style,
   accessibilityLabel,
+  accessibilityRole = "button",
+  accessibilityState,
   children,
 }: PropsWithChildren<{
   onPress?: () => void;
@@ -93,6 +97,13 @@ export function Tap({
   style?: StyleProp<ViewStyle>;
   /** For taps whose only content is a glyph - a "?" names nothing. */
   accessibilityLabel?: string;
+  /**
+   * What VoiceOver calls it. A button unless said otherwise: every Tap
+   * does something when pressed, and one that is announced as plain
+   * text is one a VoiceOver user does not know to double-tap.
+   */
+  accessibilityRole?: AccessibilityRole;
+  accessibilityState?: AccessibilityState;
 }>) {
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -115,8 +126,9 @@ export function Tap({
       }
       disabled={disabled}
       hitSlop={hitSlop}
-      accessibilityRole={accessibilityLabel ? "button" : undefined}
+      accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
+      accessibilityState={disabled ? { ...accessibilityState, disabled: true } : accessibilityState}
       onPressIn={() => {
         Animated.spring(scale, {
           toValue: 0.95,
@@ -137,6 +149,40 @@ export function Tap({
     >
       {children}
     </AnimatedPressable>
+  );
+}
+
+/**
+ * The X in a sheet's top corner, the same on every sheet.
+ *
+ * Each sheet used to draw its own: a 22pt glyph with no slop on some,
+ * 8pt on others, muted on one and secondary on the next. This is one
+ * 44pt box (Apple's minimum) with the glyph in the middle, pulled back
+ * by the box's own padding so the glyph still lands where it always
+ * did and the sheet's title row does not grow.
+ */
+export function SheetClose({
+  onPress,
+  label = "Close",
+}: {
+  onPress: () => void;
+  label?: string;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityLabel={label}
+      style={{
+        width: 44,
+        height: 44,
+        marginVertical: -11,
+        marginRight: -11,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Ionicons name="close" size={22} color={colors.textSecondary} />
+    </Tap>
   );
 }
 
@@ -689,7 +735,7 @@ export function NoArt({
         {name}
       </Text>
       {cardNumber ? (
-        <Text style={{ color: colors.textMuted, fontSize: large ? 14 : 9 }}>
+        <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: large ? 14 : 11 }}>
           {cardNumber}
         </Text>
       ) : null}
@@ -977,6 +1023,7 @@ export function CardImage({
           setOpen(true);
         }}
         onLongPress={onLongPress}
+        accessibilityLabel={`View ${ownName}`}
       >
         <View
           style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.6 : 1 }}
@@ -1028,15 +1075,16 @@ export function CardImage({
               bottom: 0,
               paddingVertical: 2,
               alignItems: "center",
-              backgroundColor: state === "found" ? colors.accent : "rgba(0,0,0,0.7)",
+              backgroundColor: state === "found" ? colors.accent : colors.scrim,
               borderBottomLeftRadius: radius.control / 2,
               borderBottomRightRadius: radius.control / 2,
             }}
           >
             <Text
+              maxFontSizeMultiplier={1.3}
               style={{
                 color: state === "found" ? colors.accentContrast : colors.textSecondary,
-                fontSize: 9,
+                fontSize: 11,
                 fontWeight: "800",
                 letterSpacing: 1,
               }}
@@ -1731,7 +1779,7 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 14 },
   zoomBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    backgroundColor: colors.scrim,
   },
   zoomFill: {
     flex: 1,

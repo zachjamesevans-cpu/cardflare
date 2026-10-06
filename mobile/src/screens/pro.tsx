@@ -215,7 +215,7 @@ export function ProScreen() {
                 borderRadius: radius.control,
                 borderWidth: 1,
                 borderColor: colors.accent,
-                backgroundColor: "rgba(198,238,79,0.12)",
+                backgroundColor: colors.accentTint,
                 padding: spacing(3),
                 flexDirection: "row",
                 alignItems: "center",

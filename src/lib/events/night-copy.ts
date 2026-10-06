@@ -18,14 +18,14 @@ export const ENTER_CODE = "Enter event code";
 export const GOING_EMPTY =
   "You're not going to anything yet. Nearby has what's coming up.";
 export const PAST_EMPTY = "Nothing yet. Nights you went to land here.";
-export const BOARD_EARLY = "Board open early";
+export const BOARD_EARLY = "You can post already";
 export const BOARD_EARLY_LINE = "Post now so players know what to bring.";
 export const BOARD_EARLY_LONG =
   "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the event ends.";
 export const MATCHES_FOR_YOU = "Matches for you";
 export const SEE_ALL_MATCHES = "See all matches";
 export const NO_MATCHES =
-  "No matches yet. Post a Flare or add to your Trade binder and Cardflare keeps looking.";
+  "No matches yet. Post a Flare or add to your trade binder and cardflare keeps looking.";
 export const MUTUAL_MATCH = "Mutual match";
 export const YOU_WANT = "You want";
 export const THEY_WANT = "They want";
@@ -34,7 +34,7 @@ export const MUTUAL_LINE = "You may already have the pieces for a trade.";
 export const THEY_HAVE_WHAT_YOU_WANT = "They have what you want";
 export const THEY_WANT_WHAT_YOU_HAVE = "They want what you have";
 export const FROM_YOUR_FLARE = "You posted a Flare for this";
-export const IN_YOUR_BINDER = "In your Trade binder";
+export const IN_YOUR_BINDER = "In your trade binder";
 /**
  * Under a matched card whose printing is not the one the wanter named:
  * THEY on cards they have that you want, YOU on cards they want that
@@ -47,7 +47,7 @@ export const OTHER_PRINTING_SHORT = "Other printing";
 export const WHAT_TO_BRING = "What to bring";
 export const PACKED = "Packed";
 export const VIEW_LIST = "View list";
-export const FLARES_AT_THIS_NIGHT = "Flares at this Night";
+export const FLARES_AT_THIS_NIGHT = "Flares at this night";
 export const FLARE_FILTERS = {
   all: "All",
   hunting: "Hunting",
@@ -97,9 +97,9 @@ export function wantYoursLine(n: number): string {
   return n === 1 ? "1 player wants cards you have" : `${n} players want cards you have`;
 }
 
-/** "Players at this Night are looking for 5 cards you own." */
+/** "Players at this night are looking for 5 cards you own." */
 export function bringLine(n: number): string {
-  return `Players at this Night are looking for ${n === 1 ? "1 card" : `${n} cards`} you own.`;
+  return `Players at this night are looking for ${n === 1 ? "1 card" : `${n} cards`} you own.`;
 }
 
 /** "Wanted by CHUNC", "Wanted by Alex + 1 other", "Wanted by Alex + 2 others". */

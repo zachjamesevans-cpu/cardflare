@@ -75,7 +75,7 @@ describe("the app's copy", () => {
   /** A function's body, comments and whitespace aside. */
   function bodyOf(source: string, name: string): string {
     const match = source.match(
-      new RegExp(`(?:export )?function ${name}\\([\\s\\S]*?\\n}\\n`),
+      new RegExp(`(?:export )?function ${name}[<(][\\s\\S]*?\\n}\\n`),
     );
     if (!match) throw new Error(`No ${name} in the source`);
     return match[0]
@@ -85,7 +85,7 @@ describe("the app's copy", () => {
       .trim();
   }
 
-  it.each(["ago", "splitTitle", "kindIcon"])(
+  it.each(["ago", "splitTitle", "kindIcon", "collapseRuns"])(
     "%s says the same on both platforms",
     (name) => {
       expect(bodyOf(app, name)).toBe(bodyOf(web, name));
