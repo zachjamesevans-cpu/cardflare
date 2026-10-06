@@ -6,9 +6,12 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
 import {
+  ApiError,
   claimStore,
+  describeError,
   getStore,
   joinRoom,
+  rememberRoom,
   storedAccessToken,
   CLAIM_ROLES,
   type ClaimFields,
@@ -106,6 +109,28 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
     }).format(new Date(iso));
   const [failed, setFailed] = useState(false);
   const [claiming, setClaiming] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+
+  /*
+   * Join the room, remember THAT room, then open it. The Room screen
+   * opens whichever room is remembered, so opening before remembering
+   * (or without remembering) showed the last room the phone was in. A
+   * join that fails is said here, and nothing is opened.
+   */
+  const join = async (code: string) => {
+    setJoinError(null);
+    try {
+      await joinRoom(code);
+      await rememberRoom(code.trim().toUpperCase());
+      openRoom(navigation);
+    } catch (caught) {
+      setJoinError(
+        caught instanceof ApiError && (caught.code === "not-open" || caught.status === 404)
+          ? "That room is not open any more."
+          : `Could not join the room. Try again. (${describeError(caught)})`,
+      );
+    }
+  };
   /* Null until the token has been looked for, so neither word is drawn
      on a guess. */
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -275,8 +300,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
             onPress={() => {
               const code = store.board?.joinCode;
               if (!code) return;
-              void joinRoom(code).catch(() => {});
-              openRoom(navigation);
+              void join(code);
             }}
             style={{ color: colors.accent, fontSize: 15, fontWeight: "600" }}
           >
@@ -285,6 +309,7 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         ) : nextEvent ? (
           <Body>Next: {nextEvent}</Body>
         ) : null}
+        <ErrorLine message={joinError} />
 
         {store.description ? <Body>{store.description}</Body> : null}
 
@@ -398,13 +423,13 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
                     />
                   ) : null}
                   {night.live && night.joinCode ? (
-                    <Button
+                    <AsyncButton
                       label="Join the room"
-                      onPress={() => {
+                      pendingLabel="Joining…"
+                      onPress={async () => {
                         const code = night.joinCode;
                         if (!code) return;
-                        void joinRoom(code).catch(() => {});
-                        openRoom(navigation);
+                        await join(code);
                       }}
                     />
                   ) : null}

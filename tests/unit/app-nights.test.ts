@@ -226,7 +226,7 @@ describe("the API client", () => {
       'export const getNights = () => call<{ nights: NightItem[] }>("GET", "/api/v1/nights");',
     );
     expect(api).toMatch(
-      /export const setGoing = \(eventId: string, going: boolean\) =>\s*call<GoingAnswer>\(\s*going \? "POST" : "DELETE",\s*`\/api\/v1\/nights\/\$\{encodeURIComponent\(eventId\)\}\/going`,/,
+      /export async function setGoing\(eventId: string, going: boolean\): Promise<GoingAnswer> \{\s*const result = await call<GoingAnswer & \{ sessionToken\?: string \}>\(\s*going \? "POST" : "DELETE",\s*`\/api\/v1\/nights\/\$\{encodeURIComponent\(eventId\)\}\/going`,/,
     );
   });
 

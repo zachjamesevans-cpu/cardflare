@@ -1081,11 +1081,24 @@ export interface GoingAnswer {
  * `no-account` for a guest, `not-open` once the night has finished,
  * and `not-found` for an id it does not know.
  */
-export const setGoing = (eventId: string, going: boolean) =>
-  call<GoingAnswer>(
+export async function setGoing(eventId: string, going: boolean): Promise<GoingAnswer> {
+  const result = await call<GoingAnswer & { sessionToken?: string }>(
     going ? "POST" : "DELETE",
     `/api/v1/nights/${encodeURIComponent(eventId)}/going`,
   );
+
+  /*
+   * Handed out once, when Going had to mint the account's room identity
+   * for a phone holding none. Kept exactly as the join keeps it: a phone
+   * that dropped it would mint a new identity on every tap.
+   */
+  if (result.sessionToken) {
+    await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+  }
+
+  const { sessionToken: _token, ...answer } = result;
+  return answer;
+}
 
 export async function joinRoom(
   code: string,
