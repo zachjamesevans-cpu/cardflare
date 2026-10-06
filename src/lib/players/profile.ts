@@ -9,7 +9,7 @@ import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosm
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
-import { listOfferings, listWants } from "./wants";
+import { doneWantKeys, listOfferings, listWants, wantKey } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
@@ -164,7 +164,7 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings] =
+  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings, done] =
     await Promise.all([
       huntsFor(playerId, viewerId),
       /*
@@ -180,9 +180,14 @@ async function loadProfile(
       listBinders(playerId, viewerId),
       listWants(playerId),
       listOfferings(playerId),
+      doneWantKeys(playerId),
     ]);
 
-  const flares: ProfileFlare[] = [...wants, ...offerings].map((row) => ({
+  /* What the player is still looking for, not what they already found -
+     ticked off in a hunt or on a Flare. See `doneWantKeys`. */
+  const open = wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId)));
+
+  const flares: ProfileFlare[] = [...open, ...offerings].map((row) => ({
     id: row.id,
     cardId: row.cardId,
     cardName: row.cardName,

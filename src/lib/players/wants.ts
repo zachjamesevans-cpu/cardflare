@@ -583,6 +583,83 @@ export function postedLabel(where: PostedWhere[]): string | null {
   return `${where.length} stores`;
 }
 
+/** A saved want's identity for "is it done": the card and the printing. */
+export const wantKey = (cardId: string, printingId: string | null): string =>
+  `${cardId}|${printingId ?? ""}`;
+
+/**
+ * The wants the player has already found, by `wantKey`, whichever door
+ * they found them through.
+ *
+ * "Found" is written in three places that do not all follow each other:
+ * Remove on a saved want deletes the want; the Flare screen counts copies
+ * on the Flares; a hunt's tick counts them on the hunt request, and
+ * nothing else. The profile read saved wants alone, so a card ticked off
+ * in a hunt stayed on the profile as if still wanted - the founder, on a
+ * player's profile: "it's not showing the cards she's checked off", and
+ * "it seems kinda redundant to have people see cards they've already
+ * found". So the profile asks here instead: a want is done when a hunt
+ * request or an open want Flare for the same card and printing has every
+ * copy found, and nothing for that card and printing is still looking.
+ */
+export async function doneWantKeys(playerId: string): Promise<Set<string>> {
+  if (!isSupabaseConfigured()) return new Set();
+  const admin = getSupabaseAdmin();
+
+  const [{ data: sessions }, { data: hunts }] = await Promise.all([
+    admin.from("player_sessions").select("id").eq("player_id", playerId),
+    admin.from("hunts").select("id").eq("player_id", playerId),
+  ]);
+  const sessionIds = (sessions ?? []).map((row) => row.id);
+  const huntIds = (hunts ?? []).map((row) => row.id);
+  const owned =
+    sessionIds.length > 0
+      ? `player_id.eq.${playerId},player_session_id.in.(${sessionIds
+          .map((id) => `"${id}"`)
+          .join(",")})`
+      : `player_id.eq.${playerId}`;
+
+  const [{ data: flares }, { data: requests }] = await Promise.all([
+    admin
+      .from("flares")
+      .select("card_id, printing_id, quantity, found_quantity, hunt_request_id")
+      .or(owned)
+      .eq("status", "open")
+      .eq("intent", "want"),
+    huntIds.length > 0
+      ? admin
+          .from("hunt_requests")
+          .select("id, card_id, printing_id, quantity_needed, quantity_found")
+          .in("hunt_id", huntIds)
+          .is("removed_at", null)
+      : Promise.resolve({ data: [] as never[] }),
+  ]);
+
+  const done = new Set<string>();
+  const stillLooking = new Set<string>();
+  const completeRequests = new Set<string>();
+  for (const request of requests ?? []) {
+    const key = wantKey(request.card_id, request.printing_id);
+    if (request.quantity_found >= request.quantity_needed) {
+      done.add(key);
+      completeRequests.add(request.id);
+    } else {
+      stillLooking.add(key);
+    }
+  }
+  for (const flare of flares ?? []) {
+    const key = wantKey(flare.card_id, flare.printing_id);
+    /* A Flare answering a hunt request that is ticked off is found too,
+       whatever its own count says: a hunt's tick used to write the
+       request alone, so Flares from before that was fixed still read 0. */
+    const answered = flare.hunt_request_id && completeRequests.has(flare.hunt_request_id);
+    if (answered || (flare.found_quantity ?? 0) >= flare.quantity) done.add(key);
+    else stillLooking.add(key);
+  }
+  for (const key of stillLooking) done.delete(key);
+  return done;
+}
+
 /**
  * The cards on the player's list whose every copy is in hand: open
  * want Flares with nothing left to find, and no other open Flare for
