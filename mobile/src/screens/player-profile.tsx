@@ -1,8 +1,9 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Image,
   Modal,
   Pressable,
@@ -78,6 +79,8 @@ export function PlayerProfileScreen() {
   const route = useRoute<RouteProp<StackParams, "PlayerProfile">>();
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const { playerId } = route.params;
+  /* The scroll offset, which stretches the cover on a pull past the top. */
+  const pull = useRef(new Animated.Value(0)).current;
 
   const [profile, setProfile] = useState<PeekProfile | null>(null);
   const [failed, setFailed] = useState(false);
@@ -373,7 +376,11 @@ export function PlayerProfileScreen() {
   }));
 
   return (
-    <ScrollView
+    <Animated.ScrollView
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: pull } } }], {
+        useNativeDriver: true,
+      })}
+      scrollEventThrottle={16}
       /* One colour from the header to the bottom edge, as on your own
          profile: no canvas-black bands above the cover or under the
          last row. */
@@ -393,7 +400,8 @@ export function PlayerProfileScreen() {
           paddingTop: spacing(6),
           paddingBottom: spacing(4),
           gap: spacing(4),
-          overflow: "hidden",
+          /* No overflow clip: the cover stretches up out of the block
+             on a pull past the top. */
           backgroundColor: colors.surface,
         }}
         onLayout={(event) => {
@@ -410,6 +418,7 @@ export function PlayerProfileScreen() {
           height={COVER_HEIGHT}
           fade
           corner={0}
+          pull={pull}
         />
 
         {/* Their worn profile effect, over the whole block: above the
@@ -582,7 +591,7 @@ export function PlayerProfileScreen() {
           navigation.push("PlayerProfile", { playerId: id });
         }}
       />
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 
