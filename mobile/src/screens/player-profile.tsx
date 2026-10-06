@@ -34,7 +34,12 @@ import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { ProfileFlares } from "../profile-flares";
 import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { ProfileTabs, THEIR_TABS, type ProfilePane } from "../profile-tabs";
+import {
+  PROFILE_INSET,
+  ProfileTabs,
+  THEIR_TABS,
+  type ProfilePane,
+} from "../profile-tabs";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "../showcase-zoom";
 import { Body, Button, Card, ErrorLine, Loading, Muted, Tap } from "../ui";
@@ -370,23 +375,37 @@ export function PlayerProfileScreen() {
   return (
     <ScrollView
       contentContainerStyle={{
-        paddingHorizontal: gutter,
+        /* No gutter: the block runs to the screen's edges, the
+           founder's "extend all the way over to the edges of the
+           screen". Its rows keep their own inset. */
         paddingVertical: spacing(4),
         gap: spacing(4),
       }}
     >
       {/* The profile block: cover, picture, name, badge, shelf. */}
-      <Card
-        style={{ paddingTop: spacing(6), gap: spacing(4), overflow: "hidden" }}
+      <View
+        style={{
+          paddingTop: spacing(6),
+          paddingBottom: spacing(4),
+          gap: spacing(4),
+          overflow: "hidden",
+          backgroundColor: colors.surface,
+        }}
         onLayout={(event) => {
+          /* No border to step inside of: the block is the scene's box. */
           const { width, height } = event.nativeEvent.layout;
-          setBlockBox({ w: width - 2, h: height - 2 });
+          setBlockBox({ w: width, h: height });
         }}
       >
         {/* The cover carries down behind the picture, the name and the
-            badge, then fades into the card. The same block your own
+            badge, then fades into the block. The same block your own
             profile shows: what you see is what they see. */}
-        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
+        <CoverBanner
+          coverUrl={profile.coverUrl}
+          height={COVER_HEIGHT}
+          fade
+          corner={0}
+        />
 
         {/* Their worn profile effect, over the whole block: above the
             cover, below everything that can be tapped, where the
@@ -395,7 +414,7 @@ export function PlayerProfileScreen() {
           scene={profile.equips?.scene ?? null}
           width={blockBox.w}
           height={blockBox.h}
-          radius={radius.card - 1}
+          radius={0}
         />
 
         {/* Share, top right over the cover: the same corner your own
@@ -436,7 +455,7 @@ export function PlayerProfileScreen() {
 
         {/* The same header the owner sees, with Follow where they have
             Edit profile. Share is a link anybody can open. */}
-        <View style={{ marginTop: HEADER_TOP }}>
+        <View style={{ marginTop: HEADER_TOP, paddingHorizontal: PROFILE_INSET }}>
           <ProfileHeader
             avatar={
               <PlayerAvatar
@@ -533,7 +552,7 @@ export function PlayerProfileScreen() {
         {/* The strip and the panes under it: Flares, Hunts, Binders,
             Showcase. The four anybody may see, sliding in place. */}
         <ProfileTabs panes={panes} />
-      </Card>
+      </View>
 
       <ShowcaseZoom card={zoomed} cards={shelf} onClose={() => setZoomed(null)} />
 

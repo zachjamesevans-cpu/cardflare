@@ -27,6 +27,7 @@ import { blockPlayerAction } from "@/lib/players/safety-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
+import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
@@ -817,14 +818,14 @@ function ThreadView({
           onClick={load}
           aria-label="Refresh"
           disabled={pending}
-          className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted hover:bg-elevated hover:text-text-primary disabled:cursor-wait"
+          className={HEADER_BUTTON}
         >
           <RefreshCw
-            className={cn("size-4", pending && "animate-spin")}
+            className={cn(HEADER_ICON, pending && "animate-spin")}
             aria-hidden="true"
           />
         </button>
-        <DotsMenu items={menu} label={`More about ${name}`} />
+        <DotsMenu items={menu} label={`More about ${name}`} header />
       </div>
 
       {/* The subject, when the thread has one. A direct message is

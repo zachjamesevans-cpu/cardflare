@@ -502,7 +502,7 @@ describe("card animations and profile scenes, in the app", () => {
     for (const source of [own, theirs]) {
       const scene = source.indexOf("<WornScene");
       expect(scene).toBeGreaterThan(-1);
-      const block = source.slice(source.lastIndexOf("<Card", scene), scene);
+      const block = source.slice(source.lastIndexOf("<View", scene), scene);
       expect(block).toContain('overflow: "hidden"');
       expect(block).toContain("onLayout=");
       expect(block).toContain("<CoverBanner");

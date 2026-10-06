@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
 
+import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { cn } from "@/lib/cn";
 
 /**
@@ -32,11 +33,15 @@ export function DotsMenu({
   items,
   label = "More",
   className,
+  header = false,
 }: {
   items: MenuItem[];
   /** The button's accessible name: "More about this post". */
   label?: string;
   className?: string;
+  /** In a page's header: the header's own box and glyph size, the
+      same as the app's ellipsis (src/components/ui/header-button.ts). */
+  header?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -83,9 +88,16 @@ export function DotsMenu({
         aria-expanded={open}
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
-        className="-m-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className={
+          header
+            ? HEADER_BUTTON
+            : "-m-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        }
       >
-        <MoreHorizontal className="size-5" aria-hidden="true" />
+        <MoreHorizontal
+          className={header ? HEADER_ICON : "size-5"}
+          aria-hidden="true"
+        />
       </button>
 
       {open && (

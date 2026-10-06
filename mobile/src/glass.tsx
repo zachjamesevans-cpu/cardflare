@@ -115,8 +115,6 @@ export function GlassFill({
   );
 }
 
-
-
 /**
  * THE TAB BAR IS A BUBBLE, not a floor.
  *
@@ -147,8 +145,14 @@ export const TAB_BAR = {
    * edge, with the indicator alongside it rather than below it.
    */
   lift: 14,
-  /** The pill itself, icons and labels included. */
-  height: 58,
+  /**
+   * The pill itself. Icons only since the founder's "Delete the text
+   * below all of the tabs and tighten up the dock": 58 carried a label
+   * under each icon, 50 carries the icon with even air above and below.
+   */
+  height: 50,
+  /** Every tab's glyph; a touch larger now it carries the tab alone. */
+  icon: 26,
 } as const;
 
 /** Fully rounded: a pill, not a rounded rectangle. */

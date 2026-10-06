@@ -1,6 +1,5 @@
 import { BlurView } from "expo-blur";
-import { Ionicons } from "@expo/vector-icons";
-import { Image, View, type ViewStyle } from "react-native";
+import { Image, type ViewStyle } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -11,9 +10,9 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
-import { colors, spacing } from "./theme";
-import { Tap } from "./ui";
-import { UnreadDot } from "./unread-dot";
+import { HeaderButton } from "./header";
+import { HEADER } from "./header-metrics";
+import { colors } from "./theme";
 
 /**
  * The name is the founder's ARTWORK, not text in a font. He supplied
@@ -85,7 +84,8 @@ function HeaderSurface({
   );
 }
 
-export const HEADER_CONTENT_HEIGHT = 52;
+/** The bar under the status bar: every header's height, src/header-metrics.ts. */
+export const HEADER_CONTENT_HEIGHT = HEADER.height;
 
 export interface HeaderScroll {
   /** How far the bar is currently pushed up, 0…HEADER_CONTENT_HEIGHT. */
@@ -243,49 +243,20 @@ export function CollapsingHeader({
          * THE +, top left: Post a Flare. The founder: "Let's just make a +
          * icon in top left of feed so it's like instagram and you're making
          * a post there." The middle of the tab bar is Messages, which gets
-         * opened far more often than a Flare gets posted. Same weight as
-         * the search and the bell, the way Instagram's + sits.
-         */}
-        <Animated.View
-          style={[
-            {
-              position: "absolute",
-              left: 0,
-              top: insets.top,
-              bottom: 0,
-              justifyContent: "center",
-            },
-            contents,
-          ]}
-        >
-          <Tap
-            accessibilityLabel="Post a Flare"
-            onPress={onPost}
-            style={{
-              paddingLeft: spacing(4),
-              paddingRight: spacing(2),
-              paddingVertical: spacing(2),
-            }}
-          >
-            <Ionicons name="add" size={26} color={colors.textPrimary} />
-          </Tap>
-        </Animated.View>
-
-        {/*
-         * The positioning lives on this wrapper, NOT on the Tap.
+         * opened far more often than a Flare gets posted.
          *
-         * Tap puts its `style` on an inner Animated.View rather than on
-         * the Pressable, so `position: absolute` there takes the icon
-         * out of its own button's flow: the Pressable collapses to
-         * nothing, stays in the row beside the title, and the glyph
-         * lands under the wordmark instead of right of it. Which is
-         * exactly what it did.
+         * Both corners are HeaderButtons at HEADER.edge, the same box
+         * every pushed screen's back and ellipsis sit in, so the + lands
+         * where Back does and the bell where a conversation's ellipsis
+         * does. The positioning lives on the wrapper, NOT on the button:
+         * Tap puts its style on an inner view, so `position: absolute`
+         * there would collapse the Pressable and strand the glyph.
          */}
         <Animated.View
           style={[
             {
               position: "absolute",
-              right: 0,
+              left: HEADER.edge,
               /* Below the inset, so the glyph lines up with the wordmark
                  rather than centring against the notch as well. */
               top: insets.top,
@@ -295,37 +266,34 @@ export function CollapsingHeader({
             contents,
           ]}
         >
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {/*
-             * THE BELL. The notices were a tab; the founder gave the slot
-             * to Messages and put them here, top right of the Feed, the
-             * way Instagram keeps its heart. The accent dot at the bell's
-             * bottom right says something is unread, and the label says
-             * it for VoiceOver.
-             */}
-            <Tap
-              accessibilityLabel={
-                unread > 0 ? "Notifications, unread" : "Notifications"
-              }
-              onPress={onInbox}
-              style={{
-                paddingLeft: spacing(2),
-                paddingRight: spacing(4),
-                paddingVertical: spacing(2),
-              }}
-            >
-              <View>
-                <Ionicons
-                  name="notifications-outline"
-                  size={21}
-                  color={colors.textSecondary}
-                />
-                {unread > 0 ? (
-                  <UnreadDot ring={colors.canvas} style={{ bottom: 0, right: -1 }} />
-                ) : null}
-              </View>
-            </Tap>
-          </View>
+          <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+        </Animated.View>
+
+        {/*
+         * THE BELL. The notices were a tab; the founder gave the slot to
+         * Messages and put them here, top right of the Feed, the way
+         * Instagram keeps its heart. The accent dot at the bell's bottom
+         * right says something is unread, and the label says it for
+         * VoiceOver.
+         */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              right: HEADER.edge,
+              top: insets.top,
+              bottom: 0,
+              justifyContent: "center",
+            },
+            contents,
+          ]}
+        >
+          <HeaderButton
+            icon="notifications-outline"
+            label={unread > 0 ? "Notifications, unread" : "Notifications"}
+            onPress={onInbox}
+            dot={unread > 0}
+          />
         </Animated.View>
       </HeaderSurface>
     </Animated.View>

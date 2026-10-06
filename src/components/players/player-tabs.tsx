@@ -118,13 +118,16 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
+                /* Icons only. The founder: "Delete the text below all of
+                   the tabs and tighten up the dock. The icons explain
+                   themselves." The name stays for a screen reader. */
                 className={cn(
-                  "flex flex-col items-center gap-1 py-2 text-[11px] font-medium transition-colors active:scale-95",
+                  "flex h-12 items-center justify-center transition-colors active:scale-95",
                   active ? "text-accent" : "text-text-muted hover:text-text-secondary",
                 )}
               >
-                <span className="relative flex h-6 items-center justify-center">
-                  <Icon className="size-5" aria-hidden="true" />
+                <span className="relative flex items-center justify-center">
+                  <Icon className="size-6.5" aria-hidden="true" />
 
                   {/* A dot, not a number: the founder, "a small neon green
                       dot on the inbox icon so you know to check your
@@ -139,8 +142,10 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                   )}
                 </span>
 
-                {tab.label}
-                {dot && <span className="sr-only">, unread</span>}
+                <span className="sr-only">
+                  {tab.label}
+                  {dot && ", unread"}
+                </span>
               </Link>
             </li>
           );

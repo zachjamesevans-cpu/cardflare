@@ -143,8 +143,8 @@ describe("the words", () => {
 
 describe("the Nights tab", () => {
   it("is the QR icon with a two-row sheet: Scan QR to the scanner, Enter event code to the Room form", () => {
-    expect(nights).toContain('name="qr-code-outline"');
-    expect(nights).toContain("accessibilityLabel={SCAN_OR_CODE}");
+    expect(nights).toContain('icon="qr-code-outline"');
+    expect(nights).toContain("label={SCAN_OR_CODE}");
     expect(nights).toMatch(
       /label: SCAN_QR,[\s\S]*?onPress: \(\) => navigation\.navigate\("Scan"\)/,
     );

@@ -47,7 +47,7 @@ describe("the chat header", () => {
 
   it("has a small ⋯ at the right holding View profile, We traded, Report, Block", () => {
     expect(thread).toContain("headerRight: () => (");
-    expect(thread).toContain('name="ellipsis-horizontal"');
+    expect(thread).toMatch(/<HeaderButton\s+icon="ellipsis-horizontal"\s+label="More"/);
     expect(thread).toContain("<ActionSheet");
     const order = ["View profile", "We traded", "Report", "Block"].map((label) =>
       thread.indexOf(`label: "${label}"`),

@@ -56,5 +56,5 @@ export async function PlayerTabBar() {
  * for the same reason. Tuned to the pill, not to the old docked bar.
  */
 export function TabBarSpacer() {
-  return <div aria-hidden="true" className="h-24" />;
+  return <div aria-hidden="true" className="h-20" />;
 }

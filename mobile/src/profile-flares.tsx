@@ -3,7 +3,8 @@ import { Text, View, useWindowDimensions } from "react-native";
 
 import type { ProfileFlare } from "./api";
 import { QuantityBadge } from "./quantity-badge";
-import { colors, gutter, spacing } from "./theme";
+import { PROFILE_INSET } from "./profile-tabs";
+import { colors, spacing } from "./theme";
 import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
 
 /**
@@ -46,9 +47,10 @@ export function ProfileFlares({
 }) {
   const window = useWindowDimensions();
   /* The grid is as wide as the pane it sits in, measured; until the
-     measurement lands, the page's width inside its gutters. */
+     measurement lands, the screen's whole width, since the pane runs
+     edge to edge. */
   const [measured, setMeasured] = useState(0);
-  const across = measured > 0 ? measured : window.width - 2 * gutter;
+  const across = measured > 0 ? measured : window.width;
   const width = Math.floor((across - (ACROSS - 1) * GAP) / ACROSS);
 
   const shelf: ZoomCard[] = flares.map((flare) => ({
@@ -65,13 +67,21 @@ export function ProfileFlares({
       style={{ gap: spacing(3) }}
       onLayout={(event) => setMeasured(Math.floor(event.nativeEvent.layout.width))}
     >
-      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+      {/* The words keep their distance from the edge; only the grid
+          under them runs to it. */}
+      <Text
+        style={{
+          color: colors.textMuted,
+          fontSize: 12,
+          paddingHorizontal: PROFILE_INSET,
+        }}
+      >
         {flaresCountLine(flares.length)}
       </Text>
 
       {flares.length === 0 ? (
         yours ? (
-          <View style={{ gap: spacing(1) }}>
+          <View style={{ gap: spacing(1), paddingHorizontal: PROFILE_INSET }}>
             <Muted>No Flares up. Post one from the Flare tab.</Muted>
             {onPost ? (
               <Tap onPress={onPost} accessibilityLabel="Post a Flare">
@@ -82,7 +92,9 @@ export function ProfileFlares({
             ) : null}
           </View>
         ) : (
-          <Muted>No Flares up.</Muted>
+          <View style={{ paddingHorizontal: PROFILE_INSET }}>
+            <Muted>No Flares up.</Muted>
+          </View>
         )
       ) : (
         /* A grid the way a social profile draws one: three across, a

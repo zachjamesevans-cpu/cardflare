@@ -77,9 +77,8 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     expect(tabs).toContain('tabBarItemStyle: { display: "none" }');
     expect(app).not.toContain("function PostButton(");
     const header = read("mobile/src/collapsing-header.tsx");
-    expect(header).toContain('accessibilityLabel="Post a Flare"');
     expect(header).toContain(
-      '<Ionicons name="add" size={26} color={colors.textPrimary} />',
+      '<HeaderButton icon="add" label="Post a Flare" onPress={onPost} />',
     );
     expect(read("mobile/src/screens/home.tsx")).toContain(
       'onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}',
@@ -127,10 +126,9 @@ describe("the Feed's bell", () => {
     expect(header).not.toContain('accessibilityLabel="Search"');
     expect(home).not.toContain("onSearch");
     inOrder(header, [
-      'unread > 0 ? "Notifications, unread" : "Notifications"',
-      'name="notifications-outline"',
-      "{unread > 0 ? (",
-      "<UnreadDot ring={colors.canvas} style={{ bottom: 0, right: -1 }} />",
+      'icon="notifications-outline"',
+      'label={unread > 0 ? "Notifications, unread" : "Notifications"}',
+      "dot={unread > 0}",
     ]);
     expect(spoken(header)).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
@@ -138,20 +136,20 @@ describe("the Feed's bell", () => {
 
 describe("back is a plain chevron", () => {
   it("has no words, says Back to VoiceOver, and no screen sets a back title", () => {
-    const back = app.slice(
-      app.indexOf("function HeaderBack("),
-      app.indexOf("const theme: Theme"),
+    /* Drawn by our own header now (src/header.tsx), in the same box as
+       every other header button. */
+    const shared = read("mobile/src/header.tsx");
+    const back = shared.slice(
+      shared.indexOf("export function StackHeader("),
+      shared.indexOf("export function TabHeader("),
     );
-    expect(back).toContain('accessibilityLabel="Back"');
-    expect(back).toContain(
-      '<Ionicons name="chevron-back" size={26} color={colors.accent} />',
+    expect(back).toMatch(
+      /<HeaderButton\s+icon="chevron-back"\s+label="Back"\s+color=\{colors\.accent\}\s+onPress=\{\(\) => navigation\.goBack\(\)\}/,
     );
     expect(spoken(back)).not.toContain("<Text");
     expect(app).not.toContain("BACK_LABELS");
     expect(app).not.toContain("headerBackTitle");
-    expect(app).toContain(
-      "canGoBack ? <HeaderBack onPress={() => navigation.goBack()} /> : <View />",
-    );
+    expect(app).toContain("header: (props) => <StackHeader {...props} />");
   });
 
   it("calls the trade history History", () => {

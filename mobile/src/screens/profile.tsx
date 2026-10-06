@@ -57,6 +57,7 @@ import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header
 import { HuntsPanel } from "../hunts-panel";
 import {
   OWN_TABS,
+  PROFILE_INSET,
   ProfileTabs,
   type ProfilePane,
   type ProfileTab,
@@ -807,7 +808,9 @@ export function ProfileScreen() {
   return (
     <ScrollView
       contentContainerStyle={{
-        paddingHorizontal: gutter,
+        /* No gutter: the block runs to the screen's edges, the
+           founder's "extend all the way over to the edges of the
+           screen". Its rows keep their own inset. */
         paddingVertical: spacing(4),
         gap: spacing(4),
         /* Clear of the floating tab bar. */
@@ -820,17 +823,29 @@ export function ProfileScreen() {
           profile where they see Follow. The founder's rule: what you
           see is what they see. One block, no panels inside it: the
           founder, "fewer giant bordered boxes". */}
-      <Card
-        style={{ paddingTop: spacing(6), gap: spacing(4), overflow: "hidden" }}
+      <View
+        style={{
+          paddingTop: spacing(6),
+          paddingBottom: spacing(4),
+          gap: spacing(4),
+          overflow: "hidden",
+          backgroundColor: colors.surface,
+        }}
         onLayout={(event) => {
+          /* No border to step inside of: the block is the scene's box. */
           const { width, height } = event.nativeEvent.layout;
-          setBlockBox({ w: width - 2, h: height - 2 });
+          setBlockBox({ w: width, h: height });
         }}
       >
         {/* The cover carries down behind the picture, the name and the
-            badge, then fades into the card. No seam: the founder's
+            badge, then fades into the block. No seam: the founder's
             mockup, and the same shape the website draws. */}
-        <CoverBanner coverUrl={profile.coverUrl} height={COVER_HEIGHT} fade />
+        <CoverBanner
+          coverUrl={profile.coverUrl}
+          height={COVER_HEIGHT}
+          fade
+          corner={0}
+        />
 
         {/* The worn profile effect, over the whole block: above the
             cover, below everything that can be tapped, exactly where
@@ -840,7 +855,7 @@ export function ProfileScreen() {
           scene={profile.equips?.scene ?? null}
           width={blockBox.w}
           height={blockBox.h}
-          radius={radius.card - 1}
+          radius={0}
         />
 
         {/*
@@ -910,7 +925,7 @@ export function ProfileScreen() {
          * which is the founder's own rule for this screen: what you see
          * is what they see.
          */}
-        <View style={{ marginTop: HEADER_TOP }}>
+        <View style={{ marginTop: HEADER_TOP, paddingHorizontal: PROFILE_INSET }}>
           <ProfileHeader
             avatar={
               <PlayerAvatar
@@ -966,9 +981,13 @@ export function ProfileScreen() {
             this screen, then sat behind a row of doors, slides in place
             now; the header and the circles above stay put. */}
         <ProfileTabs panes={panes} onChange={onTab} />
-      </Card>
+      </View>
 
-      {message && <Muted>{message}</Muted>}
+      {message && (
+        <View style={{ paddingHorizontal: PROFILE_INSET }}>
+          <Muted>{message}</Muted>
+        </View>
+      )}
 
       {/* The list behind a tapped number, over the page - the founder:
           "a separate pop up", not a section at the bottom. */}

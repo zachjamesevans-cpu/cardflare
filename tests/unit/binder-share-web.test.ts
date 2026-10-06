@@ -44,9 +44,9 @@ describe("Share, at the top of the binder", () => {
       "const url = `${window.location.origin}/b/${shareCode ?? binderId}`;",
     );
     expect(view).toContain("shareCode={binder.shareCode}");
-    expect(share).toContain('<Share2 className="size-4" aria-hidden="true" />');
+    expect(share).toContain('<Share2 className={HEADER_ICON} aria-hidden="true" />');
     expect(share).toContain('aria-label="Share binder"');
-    expect(share).toContain("flex size-9 shrink-0");
+    expect(share).toContain("className={HEADER_BUTTON}");
     expect(share).toContain('{copied ? "Link copied" : ""}');
   });
 

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { KeyRound, QrCode } from "lucide-react";
 
+import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { Sheet } from "@/components/ui/sheet";
 import { SCAN_OR_CODE } from "@/lib/events/going-copy";
 import { ENTER_CODE } from "@/lib/events/night-copy";
@@ -33,9 +34,9 @@ export function CodeSheet() {
         aria-haspopup="dialog"
         aria-label={SCAN_OR_CODE}
         title={SCAN_OR_CODE}
-        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+        className={HEADER_BUTTON}
       >
-        <QrCode className="size-4" aria-hidden="true" />
+        <QrCode className={HEADER_ICON} aria-hidden="true" />
       </button>
 
       <Sheet open={open} onClose={() => setOpen(false)} title={SCAN_OR_CODE}>

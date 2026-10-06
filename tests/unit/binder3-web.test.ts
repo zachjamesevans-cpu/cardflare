@@ -233,9 +233,11 @@ describe("hold and move, in one gesture", () => {
 describe("Share, its own round button", () => {
   const share = fn(view, "ShareBinder");
 
-  it("is round, separate from the pencil, for owner and visitor", () => {
+  it("is its own button, separate from the pencil, for owner and visitor", () => {
     expect(share).toContain('aria-label="Share binder"');
-    expect(share).toContain("flex size-9 shrink-0");
+    /* The header's plain icon box, no circle: "remove all of these
+       weird 'bubbles' around icons". */
+    expect(share).toContain("className={HEADER_BUTTON}");
     expect(view).toContain('aria-label="Binder settings"');
     expect(view).toContain("{(binder.yours || settings.forTrade) && (");
   });

@@ -9,7 +9,7 @@ import { FollowButton } from "@/components/players/follow-button";
 import { MessageButton } from "@/components/players/message-button";
 import { PeopleList } from "@/components/players/people-list";
 import { HuntsPanel } from "@/components/players/hunts-panel";
-import { ProfileHeader } from "@/components/players/profile-header";
+import { PROFILE_BLOCK, ProfileHeader } from "@/components/players/profile-header";
 import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileTabs } from "@/components/players/profile-tabs";
 import { profileTabFrom } from "@/lib/players/profile-tabs";
@@ -18,7 +18,6 @@ import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { buttonStyles } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
@@ -154,7 +153,7 @@ export default async function PublicProfilePage({
   return (
     <TabPageShell title={profile.displayName}>
       <BlockProvider initial={block}>
-        <Card className="relative flex flex-col gap-5 overflow-hidden">
+        <div className={PROFILE_BLOCK}>
           <ProfileCover coverUrl={profile.coverUrl} short />
           <WornSceneLayer worn={dressed} rive={dressedArt} />
 
@@ -352,7 +351,7 @@ export default async function PublicProfilePage({
               ),
             }}
           />
-        </Card>
+        </div>
       </BlockProvider>
     </TabPageShell>
   );

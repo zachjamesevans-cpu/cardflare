@@ -248,10 +248,16 @@ export function CoverBanner({
   height,
   blur = 0,
   fade = false,
+  corner = 16,
 }: {
   coverUrl: string | null;
   height: number;
   blur?: number;
+  /**
+   * The top corners' rounding. A card's cover follows the card's
+   * corners; the profile's runs edge to edge and has none.
+   */
+  corner?: number;
   /**
    * Dissolve into the card instead of stopping at an edge.
    *
@@ -271,8 +277,8 @@ export function CoverBanner({
         left: 0,
         right: 0,
         height,
-        borderTopLeftRadius: 16,
-        borderTopRightRadius: 16,
+        borderTopLeftRadius: corner,
+        borderTopRightRadius: corner,
         overflow: "hidden",
         backgroundColor: colors.elevated,
       }}

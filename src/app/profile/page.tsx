@@ -9,7 +9,7 @@ import { ProfileCover } from "@/components/players/profile-cover";
 import { HuntsPanel } from "@/components/players/hunts-panel";
 import { PeopleList } from "@/components/players/people-list";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { ProfileHeader } from "@/components/players/profile-header";
+import { PROFILE_BLOCK, ProfileHeader } from "@/components/players/profile-header";
 import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileTabs } from "@/components/players/profile-tabs";
 import { profileTabFrom } from "@/lib/players/profile-tabs";
@@ -24,7 +24,6 @@ import {
   TradeHistoryWall,
 } from "@/components/trades/history";
 import { buttonStyles } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Rail } from "@/components/lists/rail";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
@@ -187,7 +186,7 @@ export default async function ProfilePage({
               read as duplicates: "it should all go live from the
               actual edit button... everything can be changed up top."
               One block owns the whole profile now. */}
-          <Card className="relative flex flex-col gap-5 overflow-hidden">
+          <div className={PROFILE_BLOCK}>
             <ProfileCover coverUrl={profile.coverUrl} short />
             <WornSceneLayer worn={dressed} rive={dressedArt} />
 
@@ -484,7 +483,7 @@ export default async function ProfilePage({
                 ),
               }}
             />
-          </Card>
+          </div>
 
           <TabBarSpacer />
         </div>

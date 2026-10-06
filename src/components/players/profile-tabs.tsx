@@ -80,6 +80,15 @@ const TABS: Record<ProfileTab, { label: string; icon: LucideIcon }> = {
   embers: { label: "Embers", icon: Store },
 };
 
+/*
+ * The panes that run to the screen's edges on a phone: a grid of
+ * cards, the way Instagram's grid meets the sides. Every other pane
+ * holds rows of words and keeps px-4 off the edge. From `sm` up the
+ * block is a card again and every pane sits inside its padding. The
+ * app's profile-tabs.tsx keeps the same list.
+ */
+const EDGE_TO_EDGE: readonly ProfileTab[] = ["flares"];
+
 /** How far a finger goes sideways before it is a swipe, not a tap. */
 const SWIPE_PX = 40;
 
@@ -229,7 +238,10 @@ export function ProfileTabs({
   };
 
   return (
-    <div className="flex w-full flex-col">
+    /* On a phone the block keeps its words 16px in; the strip and the
+       panes step back out over that padding to meet the screen's
+       edges, as the cover does. */
+    <div className="-mx-4 flex flex-col sm:mx-0">
       {/* The strip: icon tabs the full width of the block, evenly
           spaced, 44px tall, one line under the whole row, and one
           underline that slides to whichever tab is on. */}
@@ -306,7 +318,10 @@ export function ProfileTabs({
                 aria-hidden={!on}
                 inert={!on}
                 hidden={!on && !hydrated}
-                className="w-full shrink-0 pt-4"
+                className={cn(
+                  "w-full shrink-0 pt-4",
+                  !EDGE_TO_EDGE.includes(tab) && "px-4 sm:px-0",
+                )}
               >
                 {panes[tab] ?? null}
               </div>

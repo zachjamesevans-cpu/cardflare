@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
+import { cn } from "@/lib/cn";
 import type { ProfileFlare } from "@/lib/players/profile";
 
 /**
@@ -26,6 +27,14 @@ import type { ProfileFlare } from "@/lib/players/profile";
  * ("7 Flares"); on its own it draws its heading with the count beside
  * it.
  */
+/*
+ * Under the tab strip on a phone the grid runs to the screen's edges
+ * and the words keep 16px off them; from `sm` up the block's own
+ * padding does that. The app's profile-flares.tsx insets the same
+ * lines.
+ */
+const INSET = "px-4 sm:px-0";
+
 export function ProfileFlares({
   flares,
   yours,
@@ -66,11 +75,11 @@ export function ProfileFlares({
           </span>
         </h2>
       ) : flares.length > 0 ? (
-        <p className="text-xs text-text-muted tabular-nums">{count}</p>
+        <p className={cn("text-xs text-text-muted tabular-nums", INSET)}>{count}</p>
       ) : null}
 
       {flares.length === 0 ? (
-        <p className="text-sm text-text-muted">
+        <p className={cn("text-sm text-text-muted", !heading && INSET)}>
           {yours ? (
             <>
               No Flares up. Post one from the Flare tab.{" "}

@@ -1,3 +1,4 @@
+import { HeaderButton } from "../header";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -194,17 +195,11 @@ export function ThreadScreen() {
             />
           ),
           headerRight: () => (
-            <Tap
+            <HeaderButton
+              icon="ellipsis-horizontal"
+              label="More"
               onPress={() => setMenuOpen(true)}
-              hitSlop={10}
-              accessibilityLabel="More"
-            >
-              <Ionicons
-                name="ellipsis-horizontal"
-                size={22}
-                color={colors.textPrimary}
-              />
-            </Tap>
+            />
           ),
         });
       } catch {

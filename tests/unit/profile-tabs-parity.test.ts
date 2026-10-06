@@ -195,7 +195,7 @@ describe("the panes: side by side in a track that slides", () => {
     expect(web.tabs).toContain("transform: `translateX(-${index * 100}%)`");
     expect(web.tabs).toContain('transition: "transform 240ms var(--ease-out-soft)"');
     expect(web.tabs).toContain("overflow-hidden");
-    expect(web.tabs).toContain('className="w-full shrink-0 pt-4"');
+    expect(web.tabs).toContain('"w-full shrink-0 pt-4"');
   });
 
   it("is as tall as the open pane, measured, and follows it", () => {

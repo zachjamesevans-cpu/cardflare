@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { Plus, Search } from "lucide-react";
+import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { Item } from "@/components/feed/feed-items";
 import {
@@ -93,12 +94,8 @@ function Shell({
          guest posts from a room. */
       leading={
         playerId ? (
-          <Link
-            href="/flare"
-            aria-label="Post a Flare"
-            className="flex size-9 items-center justify-center rounded-full border border-border bg-surface text-text-primary transition-colors hover:border-border-strong"
-          >
-            <Plus className="size-5" aria-hidden="true" />
+          <Link href="/flare" aria-label="Post a Flare" className={HEADER_BUTTON}>
+            <Plus className={HEADER_ICON} aria-hidden="true" />
           </Link>
         ) : undefined
       }
@@ -106,12 +103,8 @@ function Shell({
         playerId ? (
           <NotificationBell unread={unread} />
         ) : (
-          <Link
-            href="/search"
-            aria-label="Search"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-          >
-            <Search className="size-4" aria-hidden="true" />
+          <Link href="/search" aria-label="Search" className={HEADER_BUTTON}>
+            <Search className={HEADER_ICON} aria-hidden="true" />
           </Link>
         )
       }
