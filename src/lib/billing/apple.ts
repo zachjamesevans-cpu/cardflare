@@ -171,6 +171,14 @@ export function sandboxMayEntitle(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
   if (env.VERCEL_ENV !== "production") return true;
+  /*
+   * ON by default in production. App Review buys Pro in the sandbox
+   * against the live server - Apple's own guidance is to accept a
+   * sandbox receipt there - so refusing it by default fails review with
+   * "the purchase did not unlock anything". Set APPLE_REJECT_SANDBOX=1
+   * once review is done to limit sandbox Pro to the allowlist below.
+   */
+  if (env.APPLE_REJECT_SANDBOX !== "1") return true;
   if (env.APPLE_ALLOW_SANDBOX === "1") return true;
   return (env.APPLE_SANDBOX_PLAYER_IDS ?? "")
     .split(",")

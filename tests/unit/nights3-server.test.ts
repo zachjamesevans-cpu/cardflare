@@ -77,10 +77,10 @@ describe("the reminder on the day", () => {
     expect(body).toContain('"night-reminder");');
   });
 
-  it("rides a half-hourly cron in the hours before doors, bounded by time, fail-closed", () => {
+  it("rides a daily cron (Hobby plan) with a day's horizon, bounded by time, fail-closed", () => {
     const route = read("src/app/api/cron/night-reminder/route.ts");
     expect(route).toContain("process.env.CRON_SECRET");
-    expect(route).toContain("const HORIZON_MS = 3 * 60 * 60 * 1000;");
+    expect(route).toContain("(Number(process.env.NIGHT_REMINDER_HORIZON_HOURS) || 24) * 60 * 60 * 1000");
     expect(route).toContain("const TIME_BUDGET_MS = 45 * 1000;");
     expect(route).not.toContain("NOTICE_CAP");
     /* The sent-marker: whoever already has the reminder is skipped. */
@@ -96,12 +96,12 @@ describe("the reminder on the day", () => {
     const cron = vercel.crons.find(
       (entry) => entry.path === "/api/cron/night-reminder",
     );
-    expect(cron?.schedule).toBe("*/30 * * * *");
+    expect(cron?.schedule).toBe("0 16 * * *");
   });
 });
 
 describe("nights that have ended", () => {
-  it("are closed by a fail-closed cron on a short clock", () => {
+  it("are closed by a fail-closed daily cron (reads already treat them as ended)", () => {
     const route = read("src/app/api/cron/close-nights/route.ts");
     expect(route).toContain("process.env.CRON_SECRET");
     expect(route).toContain("if (!secret ||");
@@ -111,7 +111,7 @@ describe("nights that have ended", () => {
     };
     expect(vercel.crons).toContainEqual({
       path: "/api/cron/close-nights",
-      schedule: "*/15 * * * *",
+      schedule: "0 11 * * *",
     });
   });
 

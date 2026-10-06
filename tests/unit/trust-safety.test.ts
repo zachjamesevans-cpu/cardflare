@@ -167,7 +167,9 @@ describe("player search", () => {
 
     await searchPlayersByName("kai", "me");
 
-    expect(calls.players.not).toEqual([["id", "in", "(a,b)"]]);
+    /* Each of the three ranked reads (exact, prefix, contains) is filtered. */
+    expect(calls.players.not.length).toBeGreaterThan(0);
+    for (const call of calls.players.not) expect(call).toEqual(["id", "in", "(a,b)"]);
   });
 
   it("filters nothing for a guest", async () => {

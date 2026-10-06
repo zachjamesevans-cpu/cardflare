@@ -72,13 +72,13 @@ describe("search", () => {
 });
 
 describe("push receipts", () => {
-  it("run every two hours and page through what is pending", () => {
+  it("run daily (the Hobby plan's limit) and page through what is pending", () => {
     const vercel = JSON.parse(read("vercel.json")) as {
       crons: { path: string; schedule: string }[];
     };
     expect(vercel.crons).toContainEqual({
       path: "/api/cron/push-receipts",
-      schedule: "0 */2 * * *",
+      schedule: "0 12 * * *",
     });
     const route = read("src/app/api/cron/push-receipts/route.ts");
     expect(route).toContain("while (batches < MAX_BATCHES");

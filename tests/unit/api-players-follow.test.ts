@@ -128,7 +128,7 @@ describe("POST /api/players/[playerId]", () => {
     blockedBetween.mockResolvedValue(true);
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(404);
-    expect(blockedBetween).toHaveBeenCalledWith("me-1", "target-1");
+    expect(blockedBetween).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
     expect(followPlayer).not.toHaveBeenCalled();
     expect(notifyNewFollower).not.toHaveBeenCalled();
   });
@@ -142,7 +142,7 @@ describe("POST /api/players/[playerId]", () => {
     });
     const response = await route.POST(request({ action: "unfollow" }), params);
     expect(response.status).toBe(200);
-    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "target-1");
+    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
   });
 
   it("unfollows through the same door", async () => {

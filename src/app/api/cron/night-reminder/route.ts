@@ -31,8 +31,17 @@ export const maxDuration = 60;
  * Guarded by CRON_SECRET, and fail-closed.
  */
 
-/** How far ahead a night may start and still be reminded about now. */
-const HORIZON_MS = 3 * 60 * 60 * 1000;
+/**
+ * How far ahead a night may start and still be reminded about now.
+ *
+ * Vercel's Hobby plan runs a cron at most once a day, so the schedule in
+ * vercel.json is daily and the horizon is a day: every night is reminded
+ * once, in the 24 hours before it. On a plan that allows it, run this
+ * every 30 minutes and set NIGHT_REMINDER_HORIZON_HOURS=3 for the
+ * "a couple of hours before doors" reminder described above.
+ */
+const HORIZON_MS =
+  (Number(process.env.NIGHT_REMINDER_HORIZON_HOURS) || 24) * 60 * 60 * 1000;
 /** Stop starting new players this far into the run; maxDuration is 60s. */
 const TIME_BUDGET_MS = 45 * 1000;
 /** Dedupe keys looked up per query. */

@@ -45,7 +45,7 @@ describe("the Feed's first run", () => {
     expect(home).toContain("const feedReady = hydrated && feedSettled && !feedFailed;");
     for (const tab of ["following", "mine", "nearby"]) {
       expect(home).toContain(
-        `{feedReady && shown.length === 0 && tab === "${tab}" && (`,
+        `{!guest && feedReady && shown.length === 0 && tab === "${tab}" && (`,
       );
     }
     expect(home).not.toContain("{hydrated && shown.length === 0 && tab");

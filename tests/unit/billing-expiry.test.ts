@@ -129,23 +129,20 @@ describe("sandbox purchases", () => {
     expect(sandboxMayEntitle("p1", {})).toBe(true);
   });
 
-  it("are refused on production unless switched on or allow-listed", () => {
-    expect(sandboxMayEntitle("p1", { VERCEL_ENV: "production" })).toBe(false);
-    expect(
-      sandboxMayEntitle("p1", { VERCEL_ENV: "production", APPLE_ALLOW_SANDBOX: "1" }),
-    ).toBe(true);
-    expect(
-      sandboxMayEntitle("p1", {
-        VERCEL_ENV: "production",
-        APPLE_SANDBOX_PLAYER_IDS: "p0, p1",
-      }),
-    ).toBe(true);
-    expect(
-      sandboxMayEntitle("p2", {
-        VERCEL_ENV: "production",
-        APPLE_SANDBOX_PLAYER_IDS: "p0, p1",
-      }),
-    ).toBe(false);
+  it("are accepted on production by default, so App Review's sandbox purchase unlocks Pro", () => {
+    expect(sandboxMayEntitle("p1", { VERCEL_ENV: "production" })).toBe(true);
+  });
+
+  it("are refused on production once APPLE_REJECT_SANDBOX is set, unless switched on or allow-listed", () => {
+    const strict = { VERCEL_ENV: "production", APPLE_REJECT_SANDBOX: "1" };
+    expect(sandboxMayEntitle("p1", strict)).toBe(false);
+    expect(sandboxMayEntitle("p1", { ...strict, APPLE_ALLOW_SANDBOX: "1" })).toBe(true);
+    expect(sandboxMayEntitle("p1", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" })).toBe(
+      true,
+    );
+    expect(sandboxMayEntitle("p2", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" })).toBe(
+      false,
+    );
   });
 
   it("are checked on both doors: the app's sync and Apple's webhook", () => {

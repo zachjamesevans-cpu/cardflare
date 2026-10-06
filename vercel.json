@@ -10,15 +10,15 @@
     },
     {
       "path": "/api/cron/push-receipts",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/night-reminder",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 16 * * *"
     },
     {
       "path": "/api/cron/close-nights",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 11 * * *"
     },
     {
       "path": "/api/cron/gifts",
