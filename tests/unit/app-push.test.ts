@@ -154,8 +154,8 @@ describe("the switches", () => {
 
   it("sit right after Rooms, under the shared heading and line", () => {
     const rooms = settings.indexOf("<Title>Rooms</Title>");
-    const pushCard = settings.indexOf("<PushPrefSwitches />");
-    const blocked = settings.indexOf("<BlockedPlayers />");
+    const pushCard = settings.indexOf("<PushPrefSwitches initial={prefs} />");
+    const blocked = settings.indexOf("<BlockedPlayers initial={blocked} />");
     expect(rooms).toBeGreaterThan(-1);
     expect(pushCard).toBeGreaterThan(rooms);
     expect(blocked).toBeGreaterThan(pushCard);

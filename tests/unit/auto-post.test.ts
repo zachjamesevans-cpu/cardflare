@@ -80,7 +80,7 @@ describe("the one switch", () => {
       );
     }
     expect(read("src/app/profile/settings/page.tsx")).toContain("<AutoPostToggle");
-    expect(app).toContain("setAutoPost(result.player.autoPostFlares ?? true)");
+    expect(app).toContain("setAutoPost(data.me.player.autoPostFlares ?? true)");
     expect(read("mobile/src/api.ts")).toContain('action: "set-auto-post"');
   });
 });

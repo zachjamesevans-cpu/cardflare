@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Image, ScrollView, Text, View } from "react-native";
@@ -36,10 +36,12 @@ import {
   Card,
   ErrorLine,
   Input,
+  Loading,
   Muted,
   Tap,
   Title,
 } from "../ui";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { parseDeckList } from "../deck-list";
 import { QuantityBadge } from "../quantity-badge";
 import {
@@ -164,6 +166,14 @@ function ConnectionTest() {
   );
 }
 
+/** Everything the screen reads on open, kept together on disk too. */
+interface SettingsData {
+  me: Me;
+  profile: Profile | null;
+  prefs: PushPrefs | null;
+  blocked: BlockedPlayer[];
+}
+
 export function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
@@ -189,30 +199,91 @@ export function SettingsScreen() {
      handle are edited on Edit profile, not here. */
   const [profile, setProfile] = useState<Profile | null>(null);
 
+  /* The switches and the blocked list, read in the same batch as the
+     account so the screen arrives whole. Null until that batch lands. */
+  const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(null);
+  /* True once the first batch has settled, or the last visit's copy
+     painted: until then one loading line, not a screen assembling. */
+  const [ready, setReady] = useState(false);
+  /* Set once a fresh read has painted, so a slow disk read never
+     paints last week's copy over it. */
+  const fresh = useRef(false);
+
+  /*
+   * ONE READ, ONE PAINT.
+   *
+   * The founder, backing out of Settings and coming back: "seems like
+   * they dont load everything at once and stuff pops in". It was four
+   * reads landing on their own schedules - the account and profile,
+   * the push switches and the blocked list each in their own component
+   * - and sections that only draw once their data arrives (your store,
+   * your collection, the switches, Delete account), so the page grew
+   * and shifted as each one came back.
+   *
+   * Now all four go out together and the screen paints once they have
+   * all settled. The last visit's copy is kept on disk, so a second
+   * open paints at once from it while the fresh read lands over the
+   * top in a single step.
+   */
+  const apply = useCallback((data: SettingsData) => {
+    setMe(data.me);
+    setProfile(data.profile);
+    setView(feedViewFrom(data.me.player.feedView));
+    setAutoPost(data.me.player.autoPostFlares ?? true);
+    setPrefs(data.prefs);
+    setBlocked(data.blocked);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const playerId = await cachedPlayerId();
+      if (!playerId) return;
+      const cached = await readCache<SettingsData>("settings", playerId);
+      /* Only if the fresh read has not beaten it here. */
+      if (live && cached && !fresh.current) apply(cached);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [apply]);
+
   useFocusEffect(
     useCallback(() => {
       let live = true;
       void (async () => {
-        try {
-          const [result, mine] = await Promise.all([
-            getMe(),
-            getProfile().catch(() => null),
-          ]);
-          if (live) {
-            setMe(result);
-            setProfile(mine?.profile ?? null);
-            setView(feedViewFrom(result.player.feedView));
-            setAutoPost(result.player.autoPostFlares ?? true);
-          }
-        } catch {
-          if (live) setMe(null);
+        const [account, mine, push, blocks] = await Promise.allSettled([
+          getMe(),
+          getProfile(),
+          getPushPrefs(),
+          listBlockedPlayers(),
+        ]);
+        if (!live) return;
+        if (account.status !== "fulfilled") {
+          /* Draw what can be drawn rather than spin forever. */
+          setReady(true);
+          return;
         }
+        const data: SettingsData = {
+          me: account.value,
+          profile: mine.status === "fulfilled" ? (mine.value?.profile ?? null) : null,
+          prefs: push.status === "fulfilled" ? push.value.prefs : null,
+          /* An older server has no list: an empty one, not a gap. */
+          blocked: blocks.status === "fulfilled" ? blocks.value.blocked : [],
+        };
+        fresh.current = true;
+        apply(data);
+        void writeCache("settings", data.me.player.id, data);
       })();
       return () => {
         live = false;
       };
-    }, []),
+    }, [apply]),
   );
+
+  if (!ready) return <Loading />;
 
   /* The stores this account owns that carry a bar; nobody else's. */
   const ownedGifts = (me?.staff ?? []).flatMap((row) =>
@@ -384,9 +455,9 @@ export function SettingsScreen() {
         {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
-      <PushPrefSwitches />
+      <PushPrefSwitches initial={prefs} />
 
-      <BlockedPlayers />
+      <BlockedPlayers initial={blocked} />
 
       {/* Tooling, for a development build only. A player's settings
           page is not the place for a design lab or a connection probe;
@@ -449,41 +520,23 @@ export function SettingsScreen() {
  * (src/components/players/push-pref-toggles.tsx); the Inbox keeps
  * every notice whatever these say.
  *
- * Null until the first read lands, so the switches never paint a
- * default somebody then "turns off" that was never on. Its own read,
- * so a settings screen on an older server still draws everything
- * else. Optimistic on a tap, the way the Rooms switch is: the switch
- * moves at once, the write follows, and a failure paints the truth
- * back and says so.
+ * Read with the rest of the screen, in its one batch, and handed in:
+ * null when that read failed, so the switches never paint a default
+ * somebody then "turns off" that was never on, and the line says why.
+ * Optimistic on a tap, the way the Rooms switch is: the switch moves
+ * at once, the write follows, and a failure paints the truth back and
+ * says so.
  */
-function PushPrefSwitches() {
-  const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+function PushPrefSwitches({ initial }: { initial: PushPrefs | null }) {
+  const [prefs, setPrefs] = useState<PushPrefs | null>(initial);
   const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      getPushPrefs()
-        .then((result) => {
-          if (!live) return;
-          setPrefs(result.prefs);
-          setError(null);
-        })
-        .catch(() => {
-          /* No switches to draw until the read lands; the line says why. */
-          if (!live) return;
-          setPrefs((current) => {
-            if (!current) {
-              setError("Could not load these right now. Try again in a moment.");
-            }
-            return current;
-          });
-        });
-      return () => {
-        live = false;
-      };
-    }, []),
-  );
+  /* A fresher batch landing (the next open) takes over. */
+  useEffect(() => {
+    if (initial) setPrefs(initial);
+  }, [initial]);
+
+  const unread = prefs === null ? "Could not load these right now. Try again in a moment." : null;
 
   const flip = (group: PushGroup) => {
     if (!prefs) return;
@@ -539,7 +592,7 @@ function PushPrefSwitches() {
           })}
         </View>
       ) : null}
-      <ErrorLine message={error} />
+      <ErrorLine message={error ?? unread} />
     </Card>
   );
 }
@@ -547,35 +600,30 @@ function PushPrefSwitches() {
 /**
  * The people you have blocked, with Unblock beside each: the website's
  * settings card. A block is made on somebody's profile and undone
- * either there or here. Re-read on focus, because a block made on a
- * profile a moment ago belongs on this list the moment it opens.
+ * either there or here. Read with the rest of the screen on every
+ * focus, because a block made on a profile a moment ago belongs on this
+ * list the moment it opens.
  */
-function BlockedPlayers() {
-  /* Null until the first read lands, so an empty list is the server's
-     word and not a loading gap. */
-  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(null);
+function BlockedPlayers({ initial }: { initial: BlockedPlayer[] | null }) {
+  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = useCallback(async (alive: () => boolean = () => true) => {
+  /* A fresher batch landing (the next open) takes over. */
+  useEffect(() => {
+    if (initial) setBlocked(initial);
+  }, [initial]);
+
+  /* After an unblock, the list as the server now has it. */
+  const load = async () => {
     try {
       const result = await listBlockedPlayers();
-      if (alive()) setBlocked(result.blocked);
+      setBlocked(result.blocked);
     } catch {
       /* An older server has no list; the card stays on its last word. */
-      if (alive()) setBlocked((current) => current ?? []);
+      setBlocked((current) => current ?? []);
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      void load(() => live);
-      return () => {
-        live = false;
-      };
-    }, [load]),
-  );
+  };
 
   const unblock = async (playerId: string) => {
     if (busy) return;

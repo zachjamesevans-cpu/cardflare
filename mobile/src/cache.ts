@@ -99,6 +99,11 @@ export const CACHE_TTL = {
      nothing posts on the strength of it. */
   composerMe: 30 * 24 * 60 * 60 * 1000,
   composerHunts: 30 * 24 * 60 * 60 * 1000,
+  /* Settings: the account, the switches and the blocked list, painted
+     at once from the last visit and re-read on every open - the
+     founder watched its sections "pop in" one by one. A week, the
+     ceiling for everything but the Flare tab's own reads. */
+  settings: 7 * 24 * 60 * 60 * 1000,
 } as const;
 
 export type CacheKind = keyof typeof CACHE_TTL;
