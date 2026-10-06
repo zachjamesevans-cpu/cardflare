@@ -1,11 +1,15 @@
 import "server-only";
 
-import { binderSessionFor, listHaves } from "@/lib/lists/haves";
-import { addToBinder, removeFromBinder } from "@/lib/lists/repository";
+import { adjustBinderCard, tradeBinderFor, tradeHoldings } from "@/lib/binder/binder";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { LoggedTradeRow } from "@/lib/supabase/types";
 import { tierAllows } from "@/lib/tiers";
-import type { LogTrade } from "./logged-schema";
+import {
+  type BinderChange,
+  type LogTrade,
+  planGave,
+  reverseChanges,
+} from "./logged-schema";
 
 /**
  * Trades the player logged by hand: written, read back, and removed.
@@ -74,67 +78,114 @@ export async function logTrade(
   }
 
   if (input.updateHaveList) {
-    await keepHaveListInStep(playerId, displayName, input).catch((caught) =>
-      console.error("Could not update the Have list after a logged trade", caught),
+    const changes = await keepHaveListInStep(playerId, displayName, input).catch(
+      (caught) => {
+        console.error("Could not update the Have list after a logged trade", caught);
+        return [] as BinderChange[];
+      },
     );
+    /* Remembered on the row, so deleting the trade undoes exactly this. */
+    if (changes.length > 0) {
+      const { error: noteError } = await admin
+        .from("logged_trades")
+        .update({ binder_changes: changes })
+        .eq("id", data.id)
+        .eq("player_id", playerId);
+      if (noteError) console.error("Could not note the trade's binder moves", noteError);
+    }
   }
 
   return { ok: true, id: data.id };
 }
 
 /**
- * The binder nudge, done rather than asked. A card given away comes
- * off the Have list (every entry for that card, or for that printing
- * when one was named); a card received goes on it. Best effort: the
- * trade is already written, and a binder that could not be touched is
- * a log line, not a failed log.
+ * The binder nudge, done rather than asked, by exactly the traded
+ * copies. A card given away comes off the binders up for trade by the
+ * quantity traded (the row leaves only when none are left); a card
+ * received is added to the count already there, in the first binder up
+ * for trade. Each move is one statement in the database, and the moves
+ * actually made are returned for the trade to remember. Best effort:
+ * the trade is already written, and a binder that could not be touched
+ * is a log line, not a failed log.
  */
 async function keepHaveListInStep(
   playerId: string,
   displayName: string,
   input: LogTrade,
-): Promise<void> {
+): Promise<BinderChange[]> {
   if (input.direction === "got") {
-    const session = await binderSessionFor(playerId, displayName, true);
-    if (!session) return;
-    await addToBinder(session.id, {
-      cardId: input.cardId,
-      printingId: input.printingId,
-      quantity: input.quantity,
-      note: null,
-      deckLabel: null,
-    });
-    return;
+    const binderId = await tradeBinderFor(playerId);
+    if (!binderId) return [];
+    return applyChanges(playerId, displayName, [
+      {
+        binder_id: binderId,
+        card_id: input.cardId,
+        printing_id: input.printingId,
+        delta: input.quantity,
+      },
+    ]);
   }
 
-  const session = await binderSessionFor(playerId, displayName, false);
-  if (!session) return;
-  const haves = await listHaves(playerId);
-  for (const entry of haves) {
-    if (entry.cardId !== input.cardId) continue;
-    if (input.printingId && entry.printingId && entry.printingId !== input.printingId) {
-      continue;
-    }
-    await removeFromBinder(entry.id, session.id);
-  }
+  const holdings = await tradeHoldings(playerId, input.cardId);
+  return applyChanges(
+    playerId,
+    displayName,
+    planGave(holdings, input.cardId, input.printingId, input.quantity),
+  );
 }
 
-/** Removes a logged trade. Only its author's, and a repeat is not an error. */
+/** Applies binder moves in turn; returns each with the change actually made. */
+async function applyChanges(
+  playerId: string,
+  displayName: string,
+  changes: BinderChange[],
+): Promise<BinderChange[]> {
+  const applied: BinderChange[] = [];
+  for (const change of changes) {
+    const delta = await adjustBinderCard(playerId, displayName, {
+      binderId: change.binder_id,
+      cardId: change.card_id,
+      printingId: change.printing_id,
+      delta: change.delta,
+    });
+    if (delta !== 0) applied.push({ ...change, delta });
+  }
+  return applied;
+}
+
+/**
+ * Removes a logged trade, and undoes what it did to the binders: the
+ * copies a "gave" took off go back, the copies a "got" added come off.
+ * Exactly those, never more. Only its author's, and a repeat is not an
+ * error.
+ */
 export async function deleteLoggedTrade(
   playerId: string,
   id: string,
+  displayName: string,
 ): Promise<boolean> {
   if (!isSupabaseConfigured()) return false;
+  const admin = getSupabaseAdmin();
 
-  const { error } = await getSupabaseAdmin()
+  /* Delete first and read what it did from the deleted row, so two
+     deletes at once cannot both put the copies back. */
+  const { data: removed, error } = await admin
     .from("logged_trades")
     .delete()
     .eq("id", id)
-    .eq("player_id", playerId);
+    .eq("player_id", playerId)
+    .select("binder_changes");
 
   if (error) {
     console.error("Could not remove the logged trade", error);
     return false;
+  }
+
+  for (const row of removed ?? []) {
+    const changes = Array.isArray(row.binder_changes) ? row.binder_changes : [];
+    await applyChanges(playerId, displayName, reverseChanges(changes)).catch(
+      (caught) => console.error("Could not undo a logged trade's binder moves", caught),
+    );
   }
   return true;
 }

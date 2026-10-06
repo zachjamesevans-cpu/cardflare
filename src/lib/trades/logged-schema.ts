@@ -115,3 +115,65 @@ export function newestFirst<T extends { confirmedAt: string }>(entries: T[]): T[
     (a, b) => new Date(b.confirmedAt).getTime() - new Date(a.confirmedAt).getTime(),
   );
 }
+
+/** One binder card moved by a logged trade, as the trade remembers it. */
+export interface BinderChange {
+  binder_id: string;
+  card_id: string;
+  printing_id: string | null;
+  delta: number;
+}
+
+/** A copy of the card sitting in one of the player's binders up for trade. */
+export interface TradeHolding {
+  binderId: string;
+  cardId: string;
+  printingId: string | null;
+  quantity: number;
+}
+
+/**
+ * Which binder copies a "gave" trade takes away, and how many from each.
+ *
+ * Exactly the traded copies leave, never every entry for the card: the
+ * named printing first, then "any printing" rows, binder by binder in
+ * the order given. With no printing named, any row of the card will do.
+ * A row runs to zero (and so out of the binder) only when the trade
+ * took every copy it held.
+ */
+export function planGave(
+  holdings: TradeHolding[],
+  cardId: string,
+  printingId: string | null,
+  copies: number,
+): BinderChange[] {
+  const ofCard = holdings.filter((row) => row.cardId === cardId && row.quantity > 0);
+  const eligible = printingId
+    ? [
+        ...ofCard.filter((row) => row.printingId === printingId),
+        ...ofCard.filter((row) => row.printingId === null),
+      ]
+    : ofCard;
+
+  let left = Math.max(0, Math.round(copies));
+  const changes: BinderChange[] = [];
+  for (const row of eligible) {
+    if (left <= 0) break;
+    const take = Math.min(left, row.quantity);
+    changes.push({
+      binder_id: row.binderId,
+      card_id: row.cardId,
+      printing_id: row.printingId,
+      delta: -take,
+    });
+    left -= take;
+  }
+  return changes;
+}
+
+/** What deleting a logged trade does: the opposite of each move it made. */
+export function reverseChanges(changes: BinderChange[]): BinderChange[] {
+  return changes
+    .filter((change) => change.delta !== 0)
+    .map((change) => ({ ...change, delta: -change.delta }));
+}

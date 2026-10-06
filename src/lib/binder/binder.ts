@@ -535,6 +535,83 @@ async function syncTradeCard(
   for (const entry of entries) await removeFromBinder(entry.id, session.id);
 }
 
+/**
+ * Every copy of one card in the owner's binders up for trade, binder by
+ * binder in the owner's order: what a logged "gave" takes copies from.
+ */
+export async function tradeHoldings(
+  playerId: string,
+  cardId: string,
+): Promise<{ binderId: string; cardId: string; printingId: string | null; quantity: number }[]> {
+  if (!isSupabaseConfigured()) return [];
+  const up = (await binderRows(playerId)).filter((row) => row.for_trade);
+  if (up.length === 0) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("binder_cards")
+    .select("binder_id, card_id, printing_id, quantity")
+    .in(
+      "binder_id",
+      up.map((row) => row.id),
+    )
+    .eq("card_id", cardId);
+  if (error) {
+    console.error("Could not read the card's binder copies", error);
+    return [];
+  }
+  const order = new Map(up.map((row, index) => [row.id, index]));
+  return (data ?? [])
+    .map((row) => ({
+      binderId: row.binder_id,
+      cardId: row.card_id,
+      printingId: row.printing_id,
+      quantity: row.quantity,
+    }))
+    .sort((a, b) => (order.get(a.binderId) ?? 0) - (order.get(b.binderId) ?? 0));
+}
+
+/**
+ * Moves one card in one of the owner's binders by a delta, in a single
+ * statement (`binder_card_adjust`): copies are added to the count that
+ * is there, or taken off it, and the card leaves the binder only at
+ * zero. Returns the change actually made, which the 99-copy and
+ * 200-card caps can make smaller than asked. The Have list follows.
+ */
+export async function adjustBinderCard(
+  playerId: string,
+  displayName: string,
+  change: { binderId: string; cardId: string; printingId: string | null; delta: number },
+): Promise<number> {
+  if (!isSupabaseConfigured() || change.delta === 0) return 0;
+  const row = await binderRow(playerId, change.binderId);
+  if (!row) return 0;
+  const { data, error } = await getSupabaseAdmin().rpc("binder_card_adjust", {
+    p_binder: change.binderId,
+    p_card: change.cardId,
+    p_printing: change.printingId,
+    p_delta: Math.round(change.delta),
+  });
+  if (error) {
+    console.error("Could not move the binder card", error);
+    return 0;
+  }
+  const applied = typeof data === "number" ? data : 0;
+  if (applied !== 0 && row.for_trade) {
+    await syncTradeCard(playerId, displayName, change.cardId, change.printingId);
+  }
+  return applied;
+}
+
+/**
+ * The binder a card that came in by trade goes into: the owner's first
+ * binder up for trade, or a new "Trade binder" when none is up.
+ */
+export async function tradeBinderFor(playerId: string): Promise<string | null> {
+  const existing = await firstTradeBinderId(playerId);
+  if (existing) return existing;
+  const made = await createBinder(playerId, { name: FIRST_BINDER_NAME, forTrade: true });
+  return made.ok ? made.id : null;
+}
+
 /** Every card of one binder, brought in step: after a toggle or a delete. */
 async function syncTradeBinderCards(
   playerId: string,

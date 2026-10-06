@@ -865,11 +865,17 @@ export type TradeRow = {
   disputed_at: string | null;
   disputed_by: string | null;
   dispute_note: string | null;
+  /** When this trade counted its copies as found. Null = it never did. */
+  found_applied_at: string | null;
+  /** The copies it added to the found count, which a reversal takes off. */
+  found_copies: number;
 };
 
 export type TradeInsert = Omit<
   TradeRow,
   | "id"
+  | "found_applied_at"
+  | "found_copies"
   | "event_id"
   | "thread_id"
   | "requester_player_id"
@@ -884,6 +890,8 @@ export type TradeInsert = Omit<
   | "dispute_note"
 > & {
   id?: string;
+  found_applied_at?: string | null;
+  found_copies?: number;
   event_id?: string | null;
   thread_id?: string | null;
   requester_player_id?: string | null;
@@ -1551,6 +1559,16 @@ export type LoggedTradeRow = {
   /** A calendar date, "YYYY-MM-DD". */
   traded_on: string;
   note: string | null;
+  /** What logging it did to the binders, so a delete undoes exactly that. */
+  binder_changes: LoggedTradeBinderChange[];
+};
+
+/** One binder card moved by a logged trade. */
+export type LoggedTradeBinderChange = {
+  binder_id: string;
+  card_id: string;
+  printing_id: string | null;
+  delta: number;
 };
 
 /**
@@ -1683,6 +1701,7 @@ export type LoggedTradeInsert = Omit<
   | "partner_name"
   | "place"
   | "note"
+  | "binder_changes"
 > & {
   id?: string;
   created_at?: string;
@@ -1691,6 +1710,7 @@ export type LoggedTradeInsert = Omit<
   partner_name?: string | null;
   place?: string | null;
   note?: string | null;
+  binder_changes?: LoggedTradeBinderChange[];
 };
 
 /**
@@ -2183,6 +2203,21 @@ export type Database = {
       binder_save_order: {
         Args: { p_binder: string; p_ids: string[] };
         Returns: undefined;
+      };
+      /* Moves one binder card by a delta; returns the change actually made. */
+      binder_card_adjust: {
+        Args: {
+          p_binder: string;
+          p_card: string;
+          p_printing: string | null;
+          p_delta: number;
+        };
+        Returns: number;
+      };
+      /* A want's plus/minus; the new quantity, or null when not theirs. */
+      player_want_adjust: {
+        Args: { p_want: string; p_player: string; p_delta: number };
+        Returns: number | null;
       };
       catalog_sets: {
         Args: Record<string, never>;

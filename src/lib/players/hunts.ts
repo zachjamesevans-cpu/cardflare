@@ -4,6 +4,7 @@ import { printingLabel } from "@/lib/cards/schema";
 import { cardFacts } from "@/lib/feed/repository";
 import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repository";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { splitFound } from "./found-split";
 import { tierAllows } from "@/lib/tiers";
 
 /**
@@ -541,6 +542,48 @@ export type ProgressWrite =
   | { ok: false; reason: "not-yours" | "unavailable" };
 
 /**
+ * Brings a request's open Flares in step with its found count: the
+ * copies traded Flares brought count first, and the rest are shared
+ * out over the open ones, oldest first (`splitFound`). Every door that
+ * moves a request's count ends here: a tick, a trade, a reversal.
+ */
+async function syncRequestFlares(
+  requestId: string,
+  found: number,
+  now: string,
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const { data: linked, error } = await admin
+    .from("flares")
+    .select("id, quantity, status, created_at")
+    .eq("hunt_request_id", requestId)
+    .in("status", ["open", "traded"]);
+  if (error) {
+    console.error("Could not read the request's Flares", error);
+    return;
+  }
+  const rows = linked ?? [];
+  const split = splitFound(found, rows);
+  await Promise.all(
+    rows.flatMap((flare) => {
+      const share = split.get(flare.id);
+      if (share === undefined) return [];
+      return [
+        admin
+          .from("flares")
+          .update({
+            found_quantity: share,
+            found_at: share >= flare.quantity ? now : null,
+            updated_at: now,
+          })
+          .eq("id", flare.id)
+          .eq("status", "open"),
+      ];
+    }),
+  );
+}
+
+/**
  * Sets the copies in hand for one request. The owner only, clamped to
  * the copies needed, and never below the copies a closed trade brought
  * - those belong to the trade, not to the box.
@@ -591,27 +634,11 @@ export async function setRequestFound(
   /*
    * The request's open Flares follow the tick, so the Feed and the post
    * greys the card with FOUND the way every other "I have it now" door
-   * already does (see found.ts). This wrote the request alone, so a card
-   * ticked off in a hunt still read as wanted everywhere else. Untick
-   * and they follow back down.
+   * already does (see found.ts). Untick and they follow back down. The
+   * count is shared out across them rather than copied onto each, so a
+   * request posted on two boards does not read as found twice over.
    */
-  const { data: linked } = await admin
-    .from("flares")
-    .select("id, quantity")
-    .eq("hunt_request_id", requestId)
-    .eq("status", "open");
-  await Promise.all(
-    (linked ?? []).map((flare) =>
-      admin
-        .from("flares")
-        .update({
-          found_quantity: Math.min(flare.quantity, next),
-          found_at: next >= flare.quantity ? now : null,
-          updated_at: now,
-        })
-        .eq("id", flare.id),
-    ),
-  );
+  await syncRequestFlares(requestId, next, now);
   await admin.from("hunts").update({ updated_at: now }).eq("id", hunt.id);
   return { ok: true, found: next, needed: request.quantity_needed };
 }
@@ -744,77 +771,122 @@ export async function markHuntCard(
 /**
  * A trade closed on a posted card: its copies are in hand.
  *
- * Called once per trade, and a trade happens once per Flare (the trades
- * table says so), so the same exchange cannot count twice. For a card
- * in a hunt the request moves; outside one the Flare's own count does.
+ * Counted once per trade, and the trade remembers that it did: the
+ * claim on `found_applied_at` lets exactly one caller through, and
+ * `found_copies` keeps how many copies it actually added (the count is
+ * clamped to the copies needed), so a reversal takes off that and no
+ * more. For a card in a hunt the request moves and its sibling open
+ * Flares follow; outside one the Flare's own count does.
  */
-export async function recordTradeFound(flareId: string, copies: number): Promise<void> {
+export async function recordTradeFound(tradeId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
+  const admin = getSupabaseAdmin();
+  const now = new Date().toISOString();
+
+  const { data: trade } = await admin
+    .from("trades")
+    .update({ found_applied_at: now })
+    .eq("id", tradeId)
+    .is("found_applied_at", null)
+    .is("disputed_at", null)
+    .select("id, flare_id, quantity")
+    .maybeSingle();
+  if (!trade?.flare_id) return;
+
+  const applied = await addFoundCopies(trade.flare_id, trade.quantity, now);
+  await admin.from("trades").update({ found_copies: applied }).eq("id", tradeId);
+}
+
+/** Adds copies to a Flare's found count; returns how many it really added. */
+async function addFoundCopies(
+  flareId: string,
+  copies: number,
+  now: string,
+): Promise<number> {
   const admin = getSupabaseAdmin();
   const { data: flare } = await admin
     .from("flares")
-    .select("id, quantity, hunt_request_id")
+    .select("id, quantity, found_quantity, hunt_request_id")
     .eq("id", flareId)
     .maybeSingle();
-  if (!flare) return;
+  if (!flare) return 0;
 
-  const now = new Date().toISOString();
   if (flare.hunt_request_id) {
     const { data: request } = await admin
       .from("hunt_requests")
       .select("id, hunt_id, quantity_needed, quantity_found")
       .eq("id", flare.hunt_request_id)
       .maybeSingle();
-    if (!request) return;
+    if (!request) return 0;
     const next = Math.min(request.quantity_needed, request.quantity_found + copies);
     await admin
       .from("hunt_requests")
       .update({ quantity_found: next, updated_at: now })
       .eq("id", request.id);
+    await syncRequestFlares(request.id, next, now);
     await admin.from("hunts").update({ updated_at: now }).eq("id", request.hunt_id);
-    return;
+    return Math.max(0, next - request.quantity_found);
   }
 
   await admin
     .from("flares")
     .update({ found_quantity: flare.quantity, updated_at: now })
     .eq("id", flareId);
+  return Math.max(0, flare.quantity - flare.found_quantity);
 }
 
-/** A trade reversed: its copies leave the count again. */
-export async function reverseTradeFound(
-  flareId: string,
-  copies: number,
-): Promise<void> {
+/**
+ * A trade reversed: the copies IT added leave the count again, and only
+ * if it added any. A conversation trade declined before its Flare ever
+ * closed never counted, so there is nothing to take back.
+ */
+export async function reverseTradeFound(tradeId: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   const admin = getSupabaseAdmin();
+
+  const { data: claimed } = await admin
+    .from("trades")
+    .update({ found_applied_at: null })
+    .eq("id", tradeId)
+    .not("found_applied_at", "is", null)
+    .select("id, flare_id, found_copies")
+    .maybeSingle();
+  if (!claimed?.flare_id) return;
+  const copies = claimed.found_copies;
+  await admin.from("trades").update({ found_copies: 0 }).eq("id", tradeId);
+  if (copies <= 0) return;
+
   const { data: flare } = await admin
     .from("flares")
-    .select("id, hunt_request_id")
-    .eq("id", flareId)
+    .select("id, hunt_request_id, found_quantity")
+    .eq("id", claimed.flare_id)
     .maybeSingle();
   if (!flare) return;
   const now = new Date().toISOString();
   if (flare.hunt_request_id) {
     const { data: request } = await admin
       .from("hunt_requests")
-      .select("id, quantity_found")
+      .select("id, hunt_id, quantity_found")
       .eq("id", flare.hunt_request_id)
       .maybeSingle();
     if (!request) return;
+    const next = Math.max(0, request.quantity_found - copies);
     await admin
       .from("hunt_requests")
-      .update({
-        quantity_found: Math.max(0, request.quantity_found - copies),
-        updated_at: now,
-      })
+      .update({ quantity_found: next, updated_at: now })
       .eq("id", request.id);
+    await syncRequestFlares(request.id, next, now);
+    await admin.from("hunts").update({ updated_at: now }).eq("id", request.hunt_id);
     return;
   }
   await admin
     .from("flares")
-    .update({ found_quantity: 0, updated_at: now })
-    .eq("id", flareId);
+    .update({
+      found_quantity: Math.max(0, flare.found_quantity - copies),
+      found_at: null,
+      updated_at: now,
+    })
+    .eq("id", flare.id);
 }
 
 export { remainingCopies as remainingFor } from "@/lib/flares/draft-rules";

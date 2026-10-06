@@ -44,15 +44,14 @@ describe("a trade confirmed in a conversation", () => {
 
   it("closes the Flare only once its own author has a hand on it", () => {
     expect(lib).toContain(
-      "if (flareId && authorSaid) await closeFlareAsTraded(flareId, quantity);",
+      "if (flareId && authorSaid) await closeFlareAsTraded(flareId, inserted.id);",
     );
     expect(lib).toContain(
       "if (trade.flare_id && trade.requester_player_id === viewerId) {",
     );
     /* One trade per Flare, whichever place it was confirmed in. */
-    expect(lib).toContain(
-      'if (error?.code === "23505") return { ok: false, reason: "already-traded" };',
-    );
+    expect(lib).toContain('if (error?.code === "23505") {');
+    expect(lib).toContain('return { ok: false, reason: "already-traded" };');
   });
 
   it("pays by the room's rules, with the pair counted by account too", () => {

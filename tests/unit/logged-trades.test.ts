@@ -7,6 +7,8 @@ import {
   loggedWhen,
   logTradeSchema,
   newestFirst,
+  planGave,
+  reverseChanges,
   todayISO,
 } from "@/lib/trades/logged-schema";
 
@@ -123,13 +125,78 @@ describe("the logged half of the history", () => {
 
   it("keeps the Have list in step unless told not to", () => {
     expect(lib).toContain("if (input.updateHaveList)");
-    expect(lib).toContain("removeFromBinder(entry.id, session.id)");
-    expect(lib).toContain("addToBinder(session.id, {");
+    expect(lib).toContain("planGave(holdings, input.cardId, input.printingId, input.quantity)");
+    expect(lib).toContain("delta: input.quantity");
+  });
+
+  it("undoes exactly what it did when the trade is deleted", () => {
+    expect(lib).toContain('.select("binder_changes")');
+    expect(lib).toContain("reverseChanges(changes)");
+    const counts = read("supabase/migrations/20261109090000_in_person_play_counts.sql");
+    expect(counts).toContain("create or replace function public.binder_card_adjust(");
+    expect(counts).toContain("security definer");
+    expect(counts).toMatch(/revoke all on function public\.binder_card_adjust[^;]+from anon/);
+    expect(counts).toMatch(
+      /revoke all on function public\.binder_card_adjust[^;]+from authenticated/,
+    );
   });
 
   it("is the player's alone, in the database too", () => {
     expect(migration).toContain("enable row level security");
     expect(migration).toContain("revoke all on public.logged_trades from anon");
     expect(migration).toContain("partner_player_id <> player_id");
+  });
+});
+
+describe("what a logged trade does to the binder", () => {
+  const OTHER = "11111111-2222-4333-8444-555555555555";
+  const holding = (
+    binderId: string,
+    quantity: number,
+    printingId: string | null = null,
+    cardId = CARD,
+  ) => ({ binderId, cardId, printingId, quantity });
+
+  it("gives away the traded copies, not every entry for the card", () => {
+    const changes = planGave([holding("b1", 4)], CARD, null, 1);
+    expect(changes).toEqual([
+      { binder_id: "b1", card_id: CARD, printing_id: null, delta: -1 },
+    ]);
+  });
+
+  it("takes the row to zero only when every copy went", () => {
+    expect(planGave([holding("b1", 2)], CARD, null, 2)).toEqual([
+      { binder_id: "b1", card_id: CARD, printing_id: null, delta: -2 },
+    ]);
+  });
+
+  it("runs across binders, the named printing first, and never takes more than it holds", () => {
+    const changes = planGave(
+      [holding("b1", 1, null), holding("b2", 1, "p1"), holding("b3", 5, "p2")],
+      CARD,
+      "p1",
+      3,
+    );
+    expect(changes).toEqual([
+      { binder_id: "b2", card_id: CARD, printing_id: "p1", delta: -1 },
+      { binder_id: "b1", card_id: CARD, printing_id: null, delta: -1 },
+    ]);
+  });
+
+  it("leaves other cards alone", () => {
+    expect(planGave([holding("b1", 3, null, OTHER)], CARD, null, 1)).toEqual([]);
+  });
+
+  it("reverses exactly the moves it made", () => {
+    expect(
+      reverseChanges([
+        { binder_id: "b1", card_id: CARD, printing_id: null, delta: -2 },
+        { binder_id: "b2", card_id: CARD, printing_id: "p1", delta: 3 },
+        { binder_id: "b3", card_id: CARD, printing_id: null, delta: 0 },
+      ]),
+    ).toEqual([
+      { binder_id: "b1", card_id: CARD, printing_id: null, delta: 2 },
+      { binder_id: "b2", card_id: CARD, printing_id: "p1", delta: -3 },
+    ]);
   });
 });
