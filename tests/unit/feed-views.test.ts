@@ -123,7 +123,9 @@ describe("feed views", () => {
     const appUi = await read("mobile/src/ui.tsx");
     /* The tile image, anchored on the frame it is drawn into rather
        than on a line number. */
-    const tile = appUi.slice(appUi.indexOf("if (!ownImageUrl) return"));
+    const anchor = appUi.indexOf("{!ownImageUrl ? (");
+    expect(anchor).toBeGreaterThan(-1);
+    const tile = appUi.slice(anchor);
     const first = tile.slice(tile.indexOf("<RemoteImage"));
     expect(first.slice(0, 900)).toContain('contentFit="contain"');
   });

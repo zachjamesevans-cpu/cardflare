@@ -149,10 +149,13 @@ export const TAB_BAR = {
    * The pill itself. Icons only since the founder's "Delete the text
    * below all of the tabs and tighten up the dock": 58 carried a label
    * under each icon, 50 carries the icon with even air above and below.
+   * Then the founder, on a phone: "that whole dock seems a bit too
+   * small now" - the pill 15% taller (50 to 58) and the icons 10%
+   * bigger (26 to 29), still icons only.
    */
-  height: 50,
+  height: 58,
   /** Every tab's glyph; a touch larger now it carries the tab alone. */
-  icon: 26,
+  icon: 29,
 } as const;
 
 /** Fully rounded: a pill, not a rounded rectangle. */

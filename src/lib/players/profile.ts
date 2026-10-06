@@ -3,12 +3,13 @@ import "server-only";
 import { huntsFor, type Hunt } from "@/lib/players/hunts";
 import { organizerStoresFor, type OrganizerStore } from "@/lib/stores/staff";
 
+import { cardArt, type CardPrinting } from "@/lib/cards/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { freeSlugFor, ownedCosmetics, ownsCosmetic, type Equipped } from "./cosmetics";
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
-import { listOfferings, listWants } from "./wants";
+import { doneWantKeys, listOfferings, listWants, wantKey } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import type { CosmeticArtFile } from "./art-files";
 import {
@@ -163,7 +164,7 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings] =
+  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings, done] =
     await Promise.all([
       huntsFor(playerId, viewerId),
       /*
@@ -179,9 +180,14 @@ async function loadProfile(
       listBinders(playerId, viewerId),
       listWants(playerId),
       listOfferings(playerId),
+      doneWantKeys(playerId),
     ]);
 
-  const flares: ProfileFlare[] = [...wants, ...offerings].map((row) => ({
+  /* What the player is still looking for, not what they already found -
+     ticked off in a hunt or on a Flare. See `doneWantKeys`. */
+  const open = wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId)));
+
+  const flares: ProfileFlare[] = [...open, ...offerings].map((row) => ({
     id: row.id,
     cardId: row.cardId,
     cardName: row.cardName,
@@ -421,19 +427,21 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
   const rows = data ?? [];
   if (rows.length === 0) return [];
 
+  /* Every printing of each card, not only the named ones: a shelf card on
+     a printing with no scan borrows a sibling's art instead of drawing as
+     a black tile (the founder found two on one profile). See `cardArt`. */
+  const cardIds = [...new Set(rows.map((row) => row.card_id))];
   const [cards, printings] = await Promise.all([
     admin
       .from("cards")
       .select("id, exact_name, canonical_card_number")
-      .in("id", [...new Set(rows.map((row) => row.card_id))]),
-    (() => {
-      const ids = rows
-        .map((row) => row.printing_id)
-        .filter((id): id is string => Boolean(id));
-      return ids.length > 0
-        ? admin.from("card_printings").select("id, image_url").in("id", ids)
-        : Promise.resolve({ data: [], error: null });
-    })(),
+      .in("id", cardIds),
+    admin
+      .from("card_printings")
+      .select(
+        "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url",
+      )
+      .in("card_id", cardIds),
   ]);
 
   if (cards.error || printings.error) {
@@ -442,9 +450,24 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
   }
 
   const cardsById = new Map((cards.data ?? []).map((row) => [row.id, row]));
-  const artById = new Map(
-    (printings.data ?? []).map((row) => [row.id, row.image_url as string | null]),
-  );
+  const artById = new Map<string, string | null>();
+  const byCard = new Map<string, CardPrinting[]>();
+  for (const row of printings.data ?? []) {
+    artById.set(row.id, row.image_url);
+    const list = byCard.get(row.card_id) ?? [];
+    list.push({
+      id: row.id,
+      setCode: row.set_code,
+      setName: row.set_name,
+      printingLabel: row.printing_label,
+      variantType: row.variant_type,
+      rarity: row.rarity,
+      printingName: row.printing_name,
+      isPromo: row.is_promo,
+      imageUrl: row.image_url,
+    });
+    byCard.set(row.card_id, list);
+  }
 
   return rows.map((row) => {
     const card = cardsById.get(row.card_id);
@@ -455,7 +478,11 @@ export async function listShowcase(playerId: string): Promise<ShowcaseCard[]> {
       name: card?.exact_name ?? "Unknown card",
       number: card?.canonical_card_number ?? "",
       /* Raw as stored; `isRenderableImageUrl` is the gate, at render. */
-      imageUrl: row.printing_id ? (artById.get(row.printing_id) ?? null) : null,
+      imageUrl: cardArt(
+        row.printing_id ? artById.get(row.printing_id) : null,
+        byCard.get(row.card_id) ?? [],
+        card?.exact_name ?? "",
+      ),
       position: row.position,
       frame: row.frame_slug,
       holo: row.holo_slug,

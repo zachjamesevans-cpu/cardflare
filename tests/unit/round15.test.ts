@@ -49,7 +49,10 @@ describe("one Flares number (audit B4, counts)", () => {
   it("the profile's number is wants plus offerings, the same as its grid", () => {
     const stats = read("src/lib/players/stats.ts");
     expect(stats).toContain("countOfferings(playerId)");
-    expect(stats).toContain("flares: (wants.count ?? 0) + offerings");
+    /* Open wants only - less what is found, as the grid leaves it off. */
+    expect(stats).toContain("doneWantKeys(playerId)");
+    expect(stats).toContain("!done.has(wantKey(row.card_id, row.printing_id))");
+    expect(stats).toContain("flares: open + offerings");
     const wants = read("src/lib/players/wants.ts");
     expect(wants).toContain("export async function countOfferings(");
     expect(wants).toContain("return describeRows(await offeringRows(playerId));");

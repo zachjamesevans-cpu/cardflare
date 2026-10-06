@@ -41,7 +41,8 @@ function appBlock(source: string): { scroll: string; block: string } {
   const measured = source.indexOf("setBlockBox({");
   expect(measured).toBeGreaterThan(-1);
   const open = source.lastIndexOf("<View", measured);
-  const scroll = source.lastIndexOf("<ScrollView", open);
+  /* Animated, so the cover can stretch on a pull past the top. */
+  const scroll = source.lastIndexOf("<Animated.ScrollView", open);
   const end = source.indexOf("<ProfileTabs", measured);
   expect(scroll).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(measured);

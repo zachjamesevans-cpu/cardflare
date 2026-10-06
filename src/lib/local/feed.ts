@@ -1,6 +1,6 @@
 import "server-only";
 
-import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
+import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { pointForPostalCode, zipsWithin, type Point } from "@/lib/geo/zip";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { milesBetween, storesNear, type NearbyStore } from "@/lib/stores/nearby";
@@ -256,15 +256,18 @@ export async function localFeed(
     const posterPlayerId = row.player_id ?? session?.player_id ?? null;
 
     const exact = row.printing_id ? printingById.get(row.printing_id) : null;
-    const shown =
-      exact ??
-      pickBasePrinting(printingsByCard.get(row.card_id) ?? [], card.exact_name);
 
     shaped.push({
       flareId: row.id,
       cardName: card.exact_name,
       cardNumber: card.canonical_card_number,
-      imageUrl: shown?.imageUrl ?? null,
+      /* The label stays the named printing's; only the picture falls back,
+         so a printing with no scan is not a black tile. See `cardArt`. */
+      imageUrl: cardArt(
+        exact?.imageUrl,
+        printingsByCard.get(row.card_id) ?? [],
+        card.exact_name,
+      ),
       printingLabel: exact ? printingLabel(exact, card.exact_name) : null,
       quantity: row.quantity,
       note: row.note,

@@ -503,7 +503,10 @@ describe("card animations and profile scenes, in the app", () => {
       const scene = source.indexOf("<WornScene");
       expect(scene).toBeGreaterThan(-1);
       const block = source.slice(source.lastIndexOf("<View", scene), scene);
-      expect(block).toContain('overflow: "hidden"');
+      /* No clip on the block: the cover stretches up out of it on a
+         pull past the top. The scene is a canvas sized to the block,
+         so it stays inside without one. */
+      expect(block).not.toContain('overflow: "hidden"');
       expect(block).toContain("onLayout=");
       expect(block).toContain("<CoverBanner");
       /* The share icon is the first thing in the block that can be

@@ -588,6 +588,30 @@ export async function setRequestFound(
     console.error("Could not update the hunt's progress", error);
     return { ok: false, reason: "unavailable" };
   }
+  /*
+   * The request's open Flares follow the tick, so the Feed and the post
+   * greys the card with FOUND the way every other "I have it now" door
+   * already does (see found.ts). This wrote the request alone, so a card
+   * ticked off in a hunt still read as wanted everywhere else. Untick
+   * and they follow back down.
+   */
+  const { data: linked } = await admin
+    .from("flares")
+    .select("id, quantity")
+    .eq("hunt_request_id", requestId)
+    .eq("status", "open");
+  await Promise.all(
+    (linked ?? []).map((flare) =>
+      admin
+        .from("flares")
+        .update({
+          found_quantity: Math.min(flare.quantity, next),
+          found_at: next >= flare.quantity ? now : null,
+          updated_at: now,
+        })
+        .eq("id", flare.id),
+    ),
+  );
   await admin.from("hunts").update({ updated_at: now }).eq("id", hunt.id);
   return { ok: true, found: next, needed: request.quantity_needed };
 }

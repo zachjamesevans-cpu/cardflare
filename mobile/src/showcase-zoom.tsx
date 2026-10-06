@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -249,6 +250,7 @@ export function CoverBanner({
   blur = 0,
   fade = false,
   corner = 16,
+  pull,
 }: {
   coverUrl: string | null;
   height: number;
@@ -268,9 +270,45 @@ export function CoverBanner({
    * Skia-free React Native, so the two platforms match.
    */
   fade?: boolean;
+  /**
+   * The scroll view's vertical offset, for a cover that stretches when
+   * the page is pulled down past its top.
+   *
+   * The founder, on the profile: "when you scroll all the way up (like
+   * you're pulling down from top of screen) you still see behind the
+   * profile". iOS bounces every scroll view, so the pull opened a blank
+   * strip above the cover. With this the cover grows into that strip
+   * instead, Twitter- and Spotify-style: its bottom edge stays put and
+   * its top stays pinned to the top of the scroll view, the photo
+   * zooming to fill. Scaling about the centre grows it half up and
+   * half down, so moving it up by half the pull lands the top exactly
+   * where the scroll view's top is. Nothing happens scrolling the
+   * other way. The holder must not clip, or the stretch is cut off.
+   */
+  pull?: Animated.Value;
 }) {
+  const stretch = pull
+    ? [
+        {
+          translateY: pull.interpolate({
+            inputRange: [-height, 0],
+            outputRange: [-height / 2, 0],
+            extrapolateLeft: "extend",
+            extrapolateRight: "clamp",
+          }),
+        },
+        {
+          scale: pull.interpolate({
+            inputRange: [-height, 0],
+            outputRange: [2, 1],
+            extrapolateLeft: "extend",
+            extrapolateRight: "clamp",
+          }),
+        },
+      ]
+    : [];
   return (
-    <View
+    <Animated.View
       style={{
         position: "absolute",
         top: 0,
@@ -281,6 +319,7 @@ export function CoverBanner({
         borderTopRightRadius: corner,
         overflow: "hidden",
         backgroundColor: colors.elevated,
+        transform: stretch,
       }}
       pointerEvents="none"
     >
@@ -323,6 +362,6 @@ export function CoverBanner({
           }}
         />
       ) : null}
-    </View>
+    </Animated.View>
   );
 }

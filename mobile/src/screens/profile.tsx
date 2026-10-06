@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -141,6 +142,8 @@ interface CachedProfile {
 
 export function ProfileScreen() {
   const tabInset = useTabBarInset();
+  /* The scroll offset, which stretches the cover on a pull past the top. */
+  const pull = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -806,12 +809,23 @@ export function ProfileScreen() {
   }));
 
   return (
-    <ScrollView
+    <Animated.ScrollView
+      onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: pull } } }], {
+        useNativeDriver: true,
+      })}
+      scrollEventThrottle={16}
+      /* One colour from the header to the dock. The page used to be
+         canvas black with the surface-coloured block floating in it,
+         so a black band showed above the cover and another under the
+         last row, behind the dock - the founder: "it doesn't feel
+         native, there's a color gap at top and bottom". The scroll
+         view is the block's colour now, overscroll included. */
+      style={{ backgroundColor: colors.surface }}
       contentContainerStyle={{
         /* No gutter: the block runs to the screen's edges, the
            founder's "extend all the way over to the edges of the
-           screen". Its rows keep their own inset. */
-        paddingVertical: spacing(4),
+           screen". Its rows keep their own inset. No top padding:
+           the cover starts right under the header. */
         gap: spacing(4),
         /* Clear of the floating tab bar. */
         paddingBottom: spacing(4) + tabInset,
@@ -828,7 +842,8 @@ export function ProfileScreen() {
           paddingTop: spacing(6),
           paddingBottom: spacing(4),
           gap: spacing(4),
-          overflow: "hidden",
+          /* No overflow clip: the cover stretches up out of the block
+             on a pull past the top. */
           backgroundColor: colors.surface,
         }}
         onLayout={(event) => {
@@ -845,6 +860,7 @@ export function ProfileScreen() {
           height={COVER_HEIGHT}
           fade
           corner={0}
+          pull={pull}
         />
 
         {/* The worn profile effect, over the whole block: above the
@@ -1035,7 +1051,7 @@ export function ProfileScreen() {
         }
         effect={profile.equipped.effect}
       />
-    </ScrollView>
+    </Animated.ScrollView>
   );
 }
 

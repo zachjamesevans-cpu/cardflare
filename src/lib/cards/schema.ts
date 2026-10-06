@@ -266,6 +266,28 @@ export function floatAskedVariants(
 }
 
 /**
+ * The one rule for which picture a card row shows: the named printing's own
+ * art, else the best sibling's (see `pickBasePrinting`), else null.
+ *
+ * Every API that sends a card image goes through this. They each used to
+ * work it out themselves, about fifteen of them, and several reached for a
+ * sibling only when the row named no printing - so a Flare on a specific
+ * printing that has no scan (a variant the provider never imaged) came back
+ * null and drew as a black tile on a profile, even though the same card's
+ * other printings had art. The founder found two on one profile.
+ *
+ * `siblings` is every printing of the card, the named one included or not.
+ */
+export function cardArt(
+  printingImageUrl: string | null | undefined,
+  siblings: readonly CardPrinting[],
+  cardName: string,
+): string | null {
+  if (printingImageUrl) return printingImageUrl;
+  return pickBasePrinting([...siblings], cardName)?.imageUrl ?? null;
+}
+
+/**
  * The printing to show when someone will take any version of a card.
  *
  * "Any printing" used to render no artwork at all, which is the one case where
