@@ -110,35 +110,90 @@ describe("the binder grid on the phone", () => {
   });
 });
 
-describe("hold to move on the phone", () => {
-  it("lifts only the held card, as an overlay on a long press", () => {
-    expect(page).toContain("onLongPress={yours ? onPickUp : undefined}");
-    expect(page).toContain("function HeldPocket(");
-    expect(page).toContain("const LIFT_SCALE = 0.05;");
-    expect(page).toContain("scale: 1 + LIFT_SCALE * lift.value");
-    expect(page).toContain("shadowOpacity: 0.5 * lift.value");
+describe("hold and drag on the phone, in one touch", () => {
+  /* Binder round 3. The founder: "Drag and drop isn't perfect - you
+     have to hold it down to go into edit mode, then press it again. I
+     should be able to hold it down, and without lifting finger start
+     moving the cards around." */
+  it("is one gesture-handler pan on the page frame, activating after a hold", () => {
+    expect(page).toContain(
+      'import { Gesture, GestureDetector } from "react-native-gesture-handler";',
+    );
+    expect(page).toContain("const HOLD_MS = 300;");
+    expect(page).toContain("Gesture.Pan()");
+    expect(page).toContain(".activateAfterLongPress(HOLD_MS)");
+    expect(page).toContain(".enabled(enabled)");
+    expect(page).toContain("enabled: yours,");
+    expect(page).toMatch(
+      /<GestureDetector gesture=\{drag\.gesture\}>\s*<View onLayout=\{onFrameLayout\}/,
+    );
+    /* No PanResponder, no long press handed to the picture, no second press. */
+    for (const gone of [
+      "PanResponder",
+      "onLongPress",
+      "handlersFor",
+      "grantedRef",
+      "onTouchEnd",
+      "useHoldToMove",
+    ]) {
+      expect(page, gone).not.toContain(gone);
+    }
   });
 
-  it("leaves a dashed outline behind and rings the pocket under the finger", () => {
+  it("lifts the card with a haptic, larger, with a shadow, under the finger", () => {
+    expect(page).toContain("Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)");
+    expect(page).toContain("function HeldPocket(");
+    expect(page).toContain("const LIFT_SCALE = 0.08;");
+    expect(page).toContain("scale: 1 + LIFT_SCALE * lift.value");
+    expect(page).toContain("shadowOpacity: 0.5 * lift.value");
+    /* The worklet moves the overlay; decisions go to JS. */
+    expect(page).toContain("dragX.value = event.translationX;");
+    expect(page).toContain("runOnJS(onMove)(event.x, event.y);");
+    expect(page).toContain("runOnJS(onPickUp)(event.x, event.y);");
+    expect(page).toContain("runOnJS(onRelease)();");
+    expect(page).toContain("scrollEnabled={!drag.held}");
+  });
+
+  it("slides the others as placeInPockets says while hovering", () => {
+    expect(page).toContain('from "../pocket-math";');
+    expect(page).toContain(
+      "? placeInPockets(allCards, drag.held.entryId, drag.target)",
+    );
+    expect(page).toContain("slots={pageOf(shown, index)}");
+    expect(page).toContain("const SLIDE = LinearTransition.duration(DROP.duration);");
+    expect(page).toContain("layout={SLIDE}");
+    /* The held card's place is the dashed outline, ringed where it lands. */
     expect(pockets).toContain('borderStyle: placeholder ? "dashed" : "solid"');
     expect(pockets).toContain("borderColor: targeted\n          ? colors.accent");
     expect(page).toContain("placeholder={placeholder}");
-    expect(page).toContain("targeted={targeted}");
-    expect(page).toContain("targeted={target === index}");
+    expect(page).toContain("targeted={placeholder && landing}");
   });
 
-  it("commits on release with a layout animation, then writes the order", () => {
-    expect(page).toContain("LayoutAnimation.configureNext(");
-    expect(page).toContain("LayoutAnimation.Types.easeInEaseOut");
-    expect(page).toContain("onMoveRef.current(from.index, toIndex)");
-    expect(page).toContain("reorderBinder(");
-    expect(page).toContain("void load();");
+  it("turns the page when the held card rests at an edge", () => {
+    expect(page).toContain("const EDGE_TURN_MS = 600;");
+    expect(page).toContain("const watchEdge = (fingerX: number, fingerY: number)");
+    expect(page).toContain("edgeTimer.current = setTimeout(turn, EDGE_TURN_MS);");
+    expect(page).toContain("live.current.onTurn(next);");
+  });
+
+  it("drops optimistically, PATCHes the pocket, and puts it back on a refusal", () => {
+    expect(page).toContain("const next = placeInPockets(before, entryId, pocket);");
+    expect(page).toContain(
+      "const result = await placeBinderCard(writeId, entryId, pocket);",
+    );
+    expect(page).toContain(
+      "setBinder((current) => (current ? { ...current, cards: before } : current));",
+    );
+    expect(page).toContain('"That card did not move."');
+    expect(page).toContain("live.current.onPlace(from.entryId, to);");
+    expect(page).not.toContain("reorderBinder");
+    expect(api).toContain("export const placeBinderCard = (");
+    expect(api).toContain(
+      'call<{ binder: Binder }>("PATCH", `${binderPath(binderId)}/cards`',
+    );
   });
 
   it("takes a card out by dropping it on Remove, and has no Edit mode", () => {
-    /* Round 3. The founder: "the add cards button and edit button are
-       completely redundant because you should be able to do both of
-       those on that screen already. Delete." */
     for (const gone of [
       "editing",
       "setEditing",
@@ -149,30 +204,23 @@ describe("hold to move on the phone", () => {
     ]) {
       expect(page, gone).not.toContain(gone);
     }
-    /* The zone: under the page frame, only while a card is in hand,
-       dashed in the danger colour, the word Remove in it. */
     expect(page).toContain("function RemoveZone(");
     expect(page).toMatch(/\{drag\.held \? \(\s*<RemoveZone/);
     expect(page).toContain('accessibilityLabel="Remove from binder"');
     expect(page).toContain("borderColor: colors.danger");
     expect(page).toMatch(/borderStyle: over \? "solid" : "dashed"/);
     expect(page).toMatch(/>\s*Remove\s*</);
-    /* Measured with onLayout against the frame's parent, and read in
-       the frame's coordinates, the same ones the finger is tracked in. */
     expect(page).toContain("onLayout={onLayout}");
     expect(page).toContain("onRemoveZoneLayout");
     expect(page).toContain("frameRef.current = event.nativeEvent.layout");
     expect(page).toContain("zoneRef.current = event.nativeEvent.layout");
     expect(page).toContain("const left = zone.x - frame.x;");
     expect(page).toContain("const top = zone.y - frame.y;");
-    /* On release over it: onRemove, not onMove, and the overlay fades
-       rather than gliding home. */
     expect(page).toContain("if (overRemoveRef.current) {");
-    expect(page).toContain("onRemoveRef.current(from.index)");
+    expect(page).toContain("live.current.onRemove(from.entryId);");
     expect(page).toContain("presence.value = withTiming(0, DROP");
     expect(page).toContain("opacity: presence.value");
-    expect(page).toContain("removeBinderCard(card.entryId, id)");
-    /* The hint, word for word with the website, only once there is a card. */
+    expect(page).toContain("removeBinderCard(entryId, writeId)");
     expect(page).toContain("Hold a card to move it, or drop it on Remove.");
     expect(page).toContain("Cards you would trade. Add the ones you carry.");
     expect(page).toMatch(
@@ -180,23 +228,7 @@ describe("hold to move on the phone", () => {
     );
   });
 
-  it("moves nothing else, and never turns the page in hand", () => {
-    for (const gone of [
-      "watchEdge",
-      "turnHeld",
-      "wobble",
-      "withRepeat",
-      "EDGE_HOLD_MS",
-      "DEAD_ZONE",
-      "slot.value",
-      "from.value",
-      "neutralFor",
-    ]) {
-      expect(page, gone).not.toContain(gone);
-    }
-    /* A pocket is a plain View: no animated transform on a neighbour.
-       The shared pocket is the view; the binder's wrapper puts the
-       card in it. Neither animates. */
+  it("keeps the pocket a plain view: the slide is the wrapper's layout", () => {
     const pocket = pockets.slice(
       pockets.indexOf("export function Pocket("),
       pockets.indexOf("export function EmptyPocket("),
@@ -204,16 +236,14 @@ describe("hold to move on the phone", () => {
     expect(pocket.length).toBeGreaterThan(0);
     expect(pocket).not.toContain("useAnimatedStyle");
     expect(pocket).not.toContain("transform");
-    expect(pocket).toContain("<View");
+    expect(pocket).not.toContain("handlers");
     const wrapper = page.slice(
       page.indexOf("function BinderPocket("),
       page.indexOf("function RemoveZone("),
     );
     expect(wrapper.length).toBeGreaterThan(0);
     expect(wrapper).not.toContain("useAnimatedStyle");
-    expect(wrapper).not.toContain("transform");
     expect(wrapper).toContain("<Pocket");
-    expect(page).toContain("scrollEnabled={!drag.held}");
   });
 });
 

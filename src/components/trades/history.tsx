@@ -17,6 +17,7 @@ import {
 
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { formatLocalDate, LocalDate, useMounted } from "@/components/ui/local-date";
 import { DotsMenu } from "@/components/ui/menu";
 import { cn } from "@/lib/cn";
@@ -127,13 +128,19 @@ export function TradeHistoryRow({
         pending && "opacity-55",
       )}
     >
-      <span className="block w-11 shrink-0 overflow-hidden rounded-[5px] border border-border bg-elevated">
+      <span className="relative block w-11 shrink-0 overflow-hidden rounded-[5px] border border-border bg-elevated">
         <span className="block aspect-[60/84] w-full">
           {trade.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={trade.imageUrl} alt="" className="size-full object-cover" />
           )}
         </span>
+        {/* How many changed hands: the binder's tag, on the card's
+            corner, rather than a "×2" in the middle of the sentence. */}
+        <QuantityBadge
+          quantity={trade.quantity}
+          className="pointer-events-none absolute top-0.5 left-0.5"
+        />
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <p className="flex items-start gap-1.5 text-sm text-text-primary">
@@ -149,9 +156,7 @@ export function TradeHistoryRow({
           <span className="line-clamp-2">
             {trade.got ? "Got " : "Gave "}
             <span className="font-semibold">{trade.cardName}</span>
-            {trade.quantity > 1 && (
-              <span className="text-text-muted tabular-nums"> ×{trade.quantity}</span>
-            )}
+            {trade.quantity > 1 && <span className="sr-only"> ×{trade.quantity}</span>}
             {partner ? (
               <>
                 {trade.got ? " from " : " to "}

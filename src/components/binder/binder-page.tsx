@@ -6,15 +6,20 @@ import {
   useRef,
   useState,
   useTransition,
-  type DragEvent,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Share2 } from "lucide-react";
 
 import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
+import {
+  usePocketDrag,
+  useSlide,
+  type DropSpot,
+} from "@/components/binder/pocket-drag";
 import {
   AddPocket,
   COLUMNS,
@@ -39,8 +44,8 @@ import { OfferReview } from "@/components/flares/offer-review";
 import { Sheet } from "@/components/ui/sheet";
 import {
   offerOnBinderAction,
+  placeBinderCardAction,
   removeBinderCardAction,
-  reorderBinderAction,
 } from "@/lib/binder/actions";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import type { BinderCoverId } from "@/lib/binder/covers";
@@ -49,6 +54,12 @@ import {
   BINDER_OFFER_MAX_CARDS,
   BINDER_OFFER_NOTE_MAX,
 } from "@/lib/binder/offer-copy";
+import {
+  LAST_POCKET,
+  pageOf,
+  pagesFor,
+  placeInPockets,
+} from "@/lib/binder/pocket-math";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 
@@ -72,8 +83,11 @@ import { cn } from "@/lib/cn";
  * trade, get the viewer as it was.
  *
  * And shareable: "Add a public link that can be shared for binders so
- * they can view it on web or app." Share, at the top, hands the system
- * share sheet cardflare.gg/b/<id>, or copies it. On the owner's private
+ * they can view it on web or app." Share is its own round button at the
+ * top, beside the pencil and never inside it (the founder: "Share
+ * button shouldn't be in same bubble as edit."), for the owner and a
+ * visitor alike. It hands the system share sheet the short link,
+ * cardflare.gg/b/<shareCode>, or copies it. On the owner's private
  * binder it stays, and says what would make it shareable.
  *
  * The owner's tools are the page itself. The founder (round 3): "the
@@ -86,19 +100,25 @@ import { cn } from "@/lib/cn";
  * "Maybe a small edit icon at the top or something." A visitor gets the "On your hunts" chip when any card is one they
  * are hunting, and the message door.
  *
- * The order of the pockets is the owner's. The founder: "I think we
- * should have a 'hold to move' thing, similar animations to how
- * people can adjust which order their flares are in when they post."
- * So every filled pocket drags, the way the composer's tray drags: a
- * pocket dropped on another pocket moves there and the rest shift to
- * make room, never a swap; dropped on an arrow it goes to the far end
- * of the page beyond. Alt and the arrow keys do the same from a
- * keyboard. The new order paints at once and the server keeps it.
+ * REAL POCKETS. Every card has a pocket (page 1 is 0 to 8), and a gap
+ * stays a gap, the way a binder keeps a slot open for a card still
+ * being chased. Every empty pocket on the owner's binder is a "+" that
+ * opens Add cards FOR THAT POCKET: "Adding a card in a specific slot
+ * should put that exact card there." Once the last page is full the
+ * owner sees one more page of them (`pagesFor`). A visitor's empty
+ * pockets stay empty.
  *
- * Every empty pocket on the owner's binder is a "+" that opens Add
- * cards, and once the last page is full the owner sees one more page
- * of them, so there is always somewhere to put the next card. A
- * visitor's empty pockets stay empty.
+ * HOLD AND MOVE, in one gesture (`usePocketDrag`). The founder: "I
+ * should be able to hold it down, and without lifting finger start
+ * moving the cards around." A finger held on a card lifts it, a mouse
+ * lifts it by moving; while it is up the pocket under it shows where
+ * it will land and the other cards slide aside exactly as the drop
+ * will put them (`placeInPockets`, the database's own rule: an empty
+ * pocket takes it, a full one slides the run along to the next gap).
+ * Held at the page's edge or over an arrow, the page turns. Let go,
+ * the move paints at once and `placeBinderCardAction` keeps it; a
+ * refusal puts the card back and says so. Alt and the arrow keys do
+ * the same from a keyboard, pocket by pocket.
  *
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the
@@ -118,9 +138,6 @@ const settingsOf = (binder: Binder): Settings => ({
   forTrade: binder.forTrade,
   name: binder.name,
 });
-
-/** Where a dragged pocket is hovering: a slot, an arrow, or Remove. */
-type DropSpot = number | "prev" | "next" | "remove";
 
 /**
  * The line under the title: what this binder's cards mean. Up for
@@ -178,32 +195,72 @@ export function BinderView({
 
   const [at, setAt] = useState(0);
   const [onHuntsOnly, setOnHuntsOnly] = useState(false);
-  const [adding, setAdding] = useState(false);
+  /** The Add cards sheet, open, and the pocket that opened it. */
+  const [adding, setAdding] = useState<{ pocket: number | null } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  /** The entry id in the air, while a pocket is being dragged. */
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [over, setOver] = useState<DropSpot | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /** What the last batch of adds said: "Added 3 cards." */
+  const [added, setAdded] = useState<string | null>(null);
   /** Share was pressed on the owner's private binder. */
   const [shareRefused, setShareRefused] = useState(false);
   const [pending, start] = useTransition();
 
-  const list =
-    !binder.yours && onHuntsOnly ? cards.filter((card) => card.onYourHunt) : cards;
+  /* A visitor's "On your hunts" packs the matches into pockets in a
+     row; everything else is drawn where it sits. */
+  const list = useMemo(
+    () =>
+      !binder.yours && onHuntsOnly
+        ? cards
+            .filter((card) => card.onYourHunt)
+            .map((card, index) => ({ ...card, pocket: index }))
+        : cards,
+    [binder.yours, onHuntsOnly, cards],
+  );
   const perPage = POCKETS_PER_PAGE;
-  /* The owner always has an empty pocket in reach: when the last page
-     is full (or there are no cards), one more page of "+" pockets. */
-  const pages = binder.yours
-    ? Math.floor(list.length / perPage) + 1
-    : Math.max(1, Math.ceil(list.length / perPage));
+  /* Enough pages to reach the last card; for the owner, one more of
+     "+" pockets once the last page is full. */
+  const pages = pagesFor(list, binder.yours);
   /* Never off the end: removing the last card on the last page folds
      back onto a page that exists. */
   const page = Math.min(at, pages - 1);
-  const shown = list.slice(page * perPage, page * perPage + perPage);
-  const pockets: (BinderCard | null)[] = [
-    ...shown,
-    ...Array.from({ length: perPage - shown.length }, () => null),
-  ];
+
+  /*
+   * THE GESTURE. Let go over a pocket, the card goes there; over
+   * Remove, it leaves; anywhere else, it goes back. Held over an edge,
+   * the page turns.
+   */
+  const {
+    lifted,
+    over: hovering,
+    grid,
+    ghost,
+    pocketProps,
+  } = usePocketDrag({
+    enabled: binder.yours && !pending,
+    columns: COLUMNS,
+    onDrop: (entryId, spot) => {
+      if (spot === "remove") remove(entryId);
+      else if (typeof spot === "number") move(entryId, page * perPage + spot);
+    },
+    onTurn: (side) => {
+      const next = side === "prev" ? page - 1 : page + 1;
+      if (next >= 0 && next < pages) setAt(next);
+    },
+    canTurn: (side) => (side === "prev" ? page > 0 : page < pages - 1),
+  });
+  const dragging = lifted?.entryId ?? null;
+  const over: DropSpot | null = dragging ? hovering : null;
+  const landing = typeof over === "number" ? page * perPage + over : null;
+  /* While a card is held over a pocket, the page is drawn as the drop
+     would leave it: the others already slid aside. */
+  const drawn =
+    dragging && landing !== null ? placeInPockets(list, dragging, landing) : list;
+  const pockets = pageOf(drawn, page);
+  const held = dragging ? cards.find((card) => card.entryId === dragging) : undefined;
+  const slide = useSlide(
+    grid,
+    `${page}:${pockets.map((card) => card?.entryId ?? "").join(",")}`,
+  );
 
   /*
    * THE OFFER, as the Feed post's. The picks live here, for the page's
@@ -296,27 +353,29 @@ export function BinderView({
     setSettings((current) => ({ ...current, ...patch }));
 
   /**
-   * Put the card into slot `to`, shifting the others: the composer's
-   * splice, over the whole binder rather than one page. A slot past
-   * the end (an empty pocket, the trailing page) means last. The page
-   * follows the card, so a move onto the next page is seen landing.
+   * Put the card in `pocket`, as the database will: an empty pocket
+   * takes it, a full one slides the run along to the next gap. Painted
+   * at once, and the page follows the card so it is seen landing; a
+   * refusal puts every card back where it was and says so.
    */
-  const move = (entryId: string, to: number) => {
+  const move = (entryId: string, pocket: number) => {
     if (pending) return;
-    const from = cards.findIndex((card) => card.entryId === entryId);
-    const slot = Math.max(0, Math.min(to, cards.length - 1));
-    if (from < 0 || from === slot) return;
-    const next = [...cards];
-    const [moved] = next.splice(from, 1);
-    if (moved) next.splice(slot, 0, moved);
-    setCards(next);
-    setAt(Math.floor(slot / perPage));
-    act(() =>
-      reorderBinderAction(
-        next.map((card) => card.entryId),
-        binder.id,
-      ),
-    );
+    const card = cards.find((entry) => entry.entryId === entryId);
+    if (!card || pocket < 0 || pocket > LAST_POCKET || card.pocket === pocket) return;
+    const before = cards;
+    setCards(placeInPockets(cards, entryId, pocket));
+    setAt(Math.floor(pocket / perPage));
+    setError(null);
+    setAdded(null);
+    start(async () => {
+      const result = await placeBinderCardAction(binder.id, { entryId, pocket });
+      if (!result.ok) {
+        setCards(before);
+        setError(`${result.message} It is back where it was.`);
+        return;
+      }
+      router.refresh();
+    });
   };
 
   /**
@@ -328,39 +387,10 @@ export function BinderView({
     if (pending) return;
     const card = cards.find((entry) => entry.entryId === entryId);
     if (!card) return;
+    setAdded(null);
     setCards((current) => current.filter((entry) => entry.entryId !== entryId));
     act(() => removeBinderCardAction(card.entryId, binder.id));
   };
-
-  const dropAt = (spot: DropSpot) => (event: DragEvent) => {
-    event.preventDefault();
-    if (!dragging) return;
-    if (spot === "remove") {
-      remove(dragging);
-    } else {
-      const to =
-        spot === "prev"
-          ? page * perPage - 1
-          : spot === "next"
-            ? (page + 1) * perPage
-            : spot;
-      move(dragging, to);
-    }
-    setDragging(null);
-    setOver(null);
-  };
-
-  /* Preventing the default is what marks a valid drop target; without
-     it the browser refuses the drop. */
-  const dragOver = (spot: DropSpot, own: boolean) => (event: DragEvent) => {
-    if (!dragging || own) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    if (over !== spot) setOver(spot);
-  };
-
-  const dragLeave = (spot: DropSpot) => () =>
-    setOver((current) => (current === spot ? null : current));
 
   const countLine = `${binder.count} ${binder.count === 1 ? "card" : "cards"}`;
   const line = binderLine(settings.forTrade, binder.yours, binder.ownerName);
@@ -370,8 +400,9 @@ export function BinderView({
 
   const view = (
     <div className="flex w-full flex-col gap-4">
-      {/* The title row: the words on the left; on the right, Share,
-          and for the owner the pencil that opens the settings sheet. */}
+      {/* The title row: the words on the left; on the right, Share in
+          its own round button, and for the owner the pencil that opens
+          the settings sheet beside it. */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           {title && (
@@ -388,6 +419,7 @@ export function BinderView({
           {(binder.yours || settings.forTrade) && (
             <ShareBinder
               binderId={binder.id}
+              shareCode={binder.shareCode}
               title={shareTitle}
               forTrade={settings.forTrade}
               onPrivate={() => setShareRefused(true)}
@@ -440,48 +472,22 @@ export function BinderView({
           over its middle. */}
       <div className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]">
         <ul
+          ref={grid}
           className="grid grid-cols-3 gap-2"
           aria-label={`Page ${page + 1} of ${pages}`}
         >
           {pockets.map((card, index) => {
             const slot = page * perPage + index;
-            const own = card?.entryId === dragging;
+            /* The held card's own pocket: where it will land, or where
+               it goes back to, drawn faint with the accent ring. */
+            const own = card !== undefined && card.entryId === dragging;
             return (
               <li
                 key={card ? card.entryId : `empty-${page}-${index}`}
-                /*
-                 * DRAGGED INTO PLACE, the website's half of the app's
-                 * hold to move. A mouse needs no long press to say it
-                 * means to drag, so a filled pocket is draggable
-                 * outright, and every pocket, filled or not, takes the
-                 * drop.
-                 */
-                draggable={binder.yours && card !== null}
-                onDragStart={
-                  binder.yours && card
-                    ? (event) => {
-                        setDragging(card.entryId);
-                        event.dataTransfer.effectAllowed = "move";
-                        /* Firefox will not start a drag without payload. */
-                        event.dataTransfer.setData("text/plain", card.entryId);
-                      }
-                    : undefined
-                }
-                onDragEnd={
-                  binder.yours
-                    ? () => {
-                        setDragging(null);
-                        setOver(null);
-                      }
-                    : undefined
-                }
-                onDragOver={binder.yours ? dragOver(slot, own) : undefined}
-                onDragLeave={binder.yours ? dragLeave(slot) : undefined}
-                onDrop={binder.yours ? dropAt(slot) : undefined}
+                ref={card ? slide(card.entryId) : undefined}
                 className={cn(
                   "relative rounded-[5px] transition-opacity",
-                  own && "opacity-40",
-                  over === slot && !own && "ring-2 ring-accent",
+                  own && "opacity-40 ring-2 ring-accent",
                 )}
               >
                 {card ? (
@@ -489,7 +495,7 @@ export function BinderView({
                     role="group"
                     aria-label={
                       binder.yours
-                        ? `${card.name}, pocket ${slot + 1} of ${cards.length}. Drag to move it, or hold Alt and use the arrow keys.`
+                        ? `${card.name}, page ${page + 1}, pocket ${index + 1}. Hold or drag to move it, or hold Alt and use the arrow keys.`
                         : undefined
                     }
                     /* A pocket whose card has no picture to open has
@@ -501,6 +507,7 @@ export function BinderView({
                         ? 0
                         : undefined
                     }
+                    {...(binder.yours ? pocketProps(card.entryId) : {})}
                     onKeyDown={
                       binder.yours
                         ? (event) => {
@@ -509,13 +516,14 @@ export function BinderView({
                             const step = ARROW_STEP(event.key);
                             if (step === null) return;
                             event.preventDefault();
-                            move(card.entryId, slot + step);
+                            move(card.entryId, card.pocket + step);
                           }
                         : undefined
                     }
                     className={cn(
                       "rounded-[5px]",
-                      binder.yours && "cursor-grab active:cursor-grabbing",
+                      binder.yours &&
+                        "cursor-grab touch-manipulation select-none [-webkit-touch-callout:none] active:cursor-grabbing",
                     )}
                   >
                     <CardImageZoom
@@ -527,14 +535,16 @@ export function BinderView({
                       direction="showcase"
                       enabled={imagesEnabled}
                       siblings={zoomCards}
-                      position={list.indexOf(card)}
+                      position={list.findIndex(
+                        (entry) => entry.entryId === card.entryId,
+                      )}
                       ask={askFor(card)}
                       thumbClassName="w-full"
                       thumb={<PocketTile card={card} imagesEnabled={imagesEnabled} />}
                     />
                   </div>
                 ) : binder.yours ? (
-                  <AddPocket onClick={() => setAdding(true)} />
+                  <AddPocket onClick={() => setAdding({ pocket: slot })} />
                 ) : (
                   <EmptyPocket />
                 )}
@@ -550,18 +560,12 @@ export function BinderView({
               disabled={page === 0}
               onClick={() => setAt(page - 1)}
               ring={over === "prev"}
-              onDragOver={binder.yours ? dragOver("prev", false) : undefined}
-              onDragLeave={binder.yours ? dragLeave("prev") : undefined}
-              onDrop={binder.yours ? dropAt("prev") : undefined}
             />
             <PageArrow
               side="next"
               disabled={page === pages - 1}
               onClick={() => setAt(page + 1)}
               ring={over === "next"}
-              onDragOver={binder.yours ? dragOver("next", false) : undefined}
-              onDragLeave={binder.yours ? dragLeave("next") : undefined}
-              onDrop={binder.yours ? dropAt("next") : undefined}
             />
           </>
         )}
@@ -577,9 +581,7 @@ export function BinderView({
         <div
           role="group"
           aria-label="Remove from binder"
-          onDragOver={dragOver("remove", false)}
-          onDragLeave={dragLeave("remove")}
-          onDrop={dropAt("remove")}
+          data-drop="remove"
           className={cn(
             "flex h-14 items-center justify-center rounded-[var(--radius-control)] border-2 border-dashed border-danger text-sm font-semibold text-danger transition-colors",
             over === "remove" ? "bg-danger/20" : "bg-danger/5",
@@ -588,6 +590,22 @@ export function BinderView({
           Remove
         </div>
       )}
+
+      {/* The card in the hand: over everything, under the finger, a
+          little bigger and casting a shadow, the way the app lifts it. */}
+      {held &&
+        lifted &&
+        createPortal(
+          <div
+            ref={ghost}
+            aria-hidden="true"
+            className="pointer-events-none fixed top-0 left-0 z-50 rounded-[5px] shadow-[var(--shadow-panel)]"
+            style={{ width: lifted.width, height: lifted.height }}
+          >
+            <PocketTile card={held} imagesEnabled={imagesEnabled} />
+          </div>,
+          document.body,
+        )}
 
       {pages > 1 && <PageDots pages={pages} page={page} onPick={setAt} />}
 
@@ -631,15 +649,32 @@ export function BinderView({
         </p>
       )}
 
+      {/* What the last batch of adds did, in the action's words. */}
+      {added && !error && (
+        <p role="status" className="text-center text-sm text-text-secondary">
+          {added}
+        </p>
+      )}
+
       {binder.yours ? (
         <>
-          {/* The Add cards sheet, opened from the "+" pockets alone. */}
+          {/* The Add cards sheet, opened from the "+" pockets alone,
+              each one opening it for its own pocket. */}
           <AddBinderCard
             binderId={binder.id}
             imagesEnabled={imagesEnabled}
             playerGames={playerGames}
-            open={adding}
-            onOpenChange={setAdding}
+            open={adding !== null}
+            onOpenChange={(open) => {
+              if (!open) setAdding(null);
+            }}
+            pocket={adding?.pocket ?? null}
+            inBinder={cards}
+            onAdded={(message, firstPocket) => {
+              setError(null);
+              setAdded(message);
+              if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
+            }}
           />
           <Sheet
             open={settingsOpen}
@@ -693,22 +728,28 @@ export function BinderView({
 const PRIVATE_SHARE_LINE = "Turn on Up for trade to share this binder.";
 
 /**
- * SHARE, at the top of the binder. The link is cardflare.gg/b/<id>,
- * which opens the binder on the web for anyone and in the app on a
- * phone that has it. A phone's own share sheet when there is one (a
- * dismissed sheet is not an error); anywhere else the link is copied
- * and the button says so for two seconds, because a button that copies
- * silently gets pressed four times. A private binder has no link to
- * give, so on the owner's the button stays and says, beside it, what
- * would make it shareable: never a dead press.
+ * SHARE, at the top of the binder, in its own round button: the
+ * founder, "Share button shouldn't be in same bubble as edit." The link
+ * is the short one, cardflare.gg/b/<shareCode> (the binder's id for a
+ * binder from before codes), which opens the binder on the web for
+ * anyone and in the app on a phone that has it. A phone's own share
+ * sheet when there is one (a dismissed sheet is not an error); anywhere
+ * else the link is copied and "Link copied" shows beside the button for
+ * two seconds, because a button that copies silently gets pressed four
+ * times. A private binder has no link to give, so on the owner's the
+ * button stays and says, under the title, what would make it
+ * shareable: never a dead press.
  */
 function ShareBinder({
   binderId,
+  shareCode,
   title,
   forTrade,
   onPrivate,
 }: {
   binderId: string;
+  /** The short link's code; null for a binder that has none yet. */
+  shareCode: string | null;
   title: string;
   /** The live Up for trade setting, not the one the page loaded with. */
   forTrade: boolean;
@@ -729,7 +770,7 @@ function ShareBinder({
       onPrivate();
       return;
     }
-    const url = `${window.location.origin}/b/${binderId}`;
+    const url = `${window.location.origin}/b/${shareCode ?? binderId}`;
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({ title, url });
@@ -751,19 +792,28 @@ function ShareBinder({
   };
 
   return (
-    <button
-      type="button"
-      onClick={() => void share()}
-      aria-live="polite"
-      className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-surface px-3 text-sm font-semibold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
-    >
-      {copied ? (
-        <Check className="size-4 text-accent" aria-hidden="true" />
-      ) : (
-        <Share2 className="size-4" aria-hidden="true" />
-      )}
-      {copied ? "Link copied" : "Share"}
-    </button>
+    <>
+      <span
+        role="status"
+        aria-live="polite"
+        className="text-xs font-semibold text-accent"
+      >
+        {copied ? "Link copied" : ""}
+      </span>
+      <button
+        type="button"
+        onClick={() => void share()}
+        aria-label="Share binder"
+        title="Share binder"
+        className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        {copied ? (
+          <Check className="size-4 text-accent" aria-hidden="true" />
+        ) : (
+          <Share2 className="size-4" aria-hidden="true" />
+        )}
+      </button>
+    </>
   );
 }
 

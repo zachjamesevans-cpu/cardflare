@@ -413,9 +413,7 @@ describe("the binder page, by id", () => {
 
   it("sends every write to the binder it is looking at", () => {
     expect(web.view).toContain("removeBinderCardAction(card.entryId, binder.id)");
-    expect(web.view).toMatch(
-      /reorderBinderAction\(\s*next\.map\(\(card\) => card\.entryId\),\s*binder\.id,?\s*\)/,
-    );
+    expect(web.view).toContain("placeBinderCardAction(binder.id, { entryId, pocket })");
     expect(web.view).toContain("binderId={binder.id}");
     expect(web.add).toContain("binderId,");
     expect(web.settings).toContain("saveBinderSettingsAction(patch, binderId)");
@@ -473,11 +471,13 @@ describe("the showcase, lighter", () => {
 });
 
 describe("the Flares grid", () => {
-  it("is every Flare, three across, with the direction in the two words the product uses", () => {
+  it("is every Flare, three across, with only an offer labelled", () => {
     for (const [name, source] of platforms) {
       expect(source.flares.length, `${name}: the grid exists`).toBeGreaterThan(0);
       expect(source.flares, name).toContain("Flares");
-      expect(source.flares, name).toContain("Looking for");
+      /* The founder: "Delete the 'looking for' part on all cards."
+         A want wears nothing; a showcase keeps its chip. */
+      expect(source.flares, name).not.toMatch(/>\s*Looking for|"Looking for"/);
       expect(source.flares, name).toContain("Offering");
       expect(source.flares, name).not.toContain("Letting go");
       expect(source.flares, name).toContain(

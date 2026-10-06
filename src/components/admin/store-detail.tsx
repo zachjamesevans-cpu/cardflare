@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { formatEventWindow } from "@/lib/events/format";
 import type { InventoryLine } from "@/lib/shows/repository";
 import { slabLabel } from "@/lib/shows/schema";
@@ -77,14 +78,15 @@ export function VendorInventoryReadonly({ inventory }: { inventory: InventoryLin
             className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border py-3 first:border-t-0 first:pt-0 last:pb-0"
           >
             <div className="flex min-w-0 flex-1 basis-48 flex-col">
-              <span className="truncate font-semibold text-text-primary">
-                {line.cardName}
-                {line.quantity > 1 && (
-                  <span className="font-normal text-text-muted tabular-nums">
-                    {" "}
-                    ×{line.quantity}
-                  </span>
-                )}
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-semibold text-text-primary">
+                  {line.cardName}
+                </span>
+                <QuantityBadge
+                  quantity={line.quantity}
+                  size="md"
+                  className="shrink-0"
+                />
               </span>
               <span className="font-mono text-xs text-text-muted">
                 {line.cardNumber}

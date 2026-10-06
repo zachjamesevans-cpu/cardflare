@@ -34,9 +34,12 @@ export const authConfigured = (): boolean => Boolean(SUPABASE_URL && SUPABASE_AN
 export const SITE_URL = "https://www.cardflare.gg";
 
 /**
- * A binder's share link: https://www.cardflare.gg/b/<binderId>. Opens the
- * binder on the website for anyone, and in the app on a phone that has
- * it (App.tsx routes `b/:binderId` to the Binder screen).
+ * A binder's share link: https://www.cardflare.gg/b/<code>, the code
+ * being the binder's short share code, or its id when it has none yet
+ * (`binder.shareCode ?? binder.id`). Both open the same binder on the
+ * website for anyone, and in the app on a phone that has it (App.tsx
+ * routes `b/:binderId` to the Binder screen, and the server answers
+ * either).
  */
-export const binderShareUrl = (binderId: string): string =>
-  `${SITE_URL}/b/${encodeURIComponent(binderId)}`;
+export const binderShareUrl = (code: string): string =>
+  `${SITE_URL}/b/${encodeURIComponent(code)}`;

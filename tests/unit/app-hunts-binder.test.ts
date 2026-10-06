@@ -426,11 +426,11 @@ describe("the binder draws from the shared pockets and behaves as before", () =>
     }
     /* The binder keeps what is its own. */
     for (const own of [
-      "function useHoldToMove(",
+      "function useDragToPocket(",
       "function HeldPocket(",
       "function RemoveZone(",
       "function BinderPocket(",
-      "onLongPress={yours ? onPickUp : undefined}",
+      "activateAfterLongPress(HOLD_MS)",
       "ON YOUR HUNT",
     ]) {
       expect(src.binder, own).toContain(own);

@@ -4,6 +4,7 @@ import { ArrowLeft, Check, X } from "lucide-react";
 
 import { CardSearch } from "@/components/cards/card-search";
 import { Button } from "@/components/ui/button";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import {
   chosenPrinting,
   keyOf,
@@ -26,10 +27,12 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * How many copies are in, and nothing else. The founder: "Should now
  * just have a 1, 2, 3, etc… when clicking these cards whether base
  * rarity or not." The order they went in is not a number anybody
- * needs while picking.
+ * needs while picking. Since binder round 3 it is drawn as the one
+ * quantity tag, "×1", "×2", the binder picker's mark too; on a picked
+ * result "×1" shows, because there it says the result is picked.
  */
-function markText(quantity: number): string {
-  return `${quantity}`;
+function markCount(quantity: number): number {
+  return quantity;
 }
 
 export function CardPicker({
@@ -91,7 +94,7 @@ export function CardPicker({
           aria-label="Picked cards"
           className="flex [scrollbar-width:none] gap-2 overflow-x-auto py-0.5 [&::-webkit-scrollbar]:hidden"
         >
-          {cards.map((item, index) => {
+          {cards.map((item) => {
             const printing = chosenPrinting(item);
             return (
               <li key={keyOf(item)} className="relative shrink-0">
@@ -105,10 +108,12 @@ export function CardPicker({
                     />
                   )}
                 </span>
-                <span className="absolute top-1 left-1 rounded-full bg-accent px-1.5 text-[10px] font-bold text-accent-contrast tabular-nums">
-                  {index + 1}
-                  {item.quantity > 1 && ` · ${item.quantity}`}
-                </span>
+                {/* The binder's quantity tag, the one every count of
+                    copies wears; nothing for a single copy. */}
+                <QuantityBadge
+                  quantity={item.quantity}
+                  className="absolute top-1 left-1"
+                />
                 <button
                   type="button"
                   onClick={() => onRemove(keyOf(item))}
@@ -145,7 +150,7 @@ export function CardPicker({
          */
         markFor={(card) => {
           const line = cards.find((item) => keyOf(item) === lineKey(card.id, null));
-          return line ? markText(line.quantity) : null;
+          return line ? markCount(line.quantity) : null;
         }}
         markForPrintingFor={(card) => {
           if (!cards.some((item) => item.card.id === card.id && item.printingId)) {
@@ -155,7 +160,7 @@ export function CardPicker({
             const line = cards.find(
               (item) => keyOf(item) === lineKey(card.id, printing.id),
             );
-            return line ? markText(line.quantity) : null;
+            return line ? markCount(line.quantity) : null;
           };
         }}
       />

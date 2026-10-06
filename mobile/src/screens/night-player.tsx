@@ -245,9 +245,10 @@ function FlareTiles({
           >
             {f.cardName}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 10 }}>
-            {f.intent === "showcase" ? "Offering" : "Hunting"}
-          </Text>
+          {/* Only an offer is labelled: a want is what a Flare is. */}
+          {f.intent === "showcase" ? (
+            <Text style={{ color: colors.textMuted, fontSize: 10 }}>Offering</Text>
+          ) : null}
         </View>
       ))}
     </ScrollView>

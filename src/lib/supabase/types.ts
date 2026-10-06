@@ -1584,6 +1584,8 @@ export type BinderRow = {
   for_trade: boolean;
   position: number;
   front_card_id: string | null;
+  /** The short link: cardflare.gg/b/<share_code>. */
+  share_code: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -2170,6 +2172,14 @@ export type Database = {
       card_sets_by_name: {
         Args: { p_game: string; p_names: string[] };
         Returns: { set_code: string; set_name: string }[];
+      };
+      binder_place_card: {
+        Args: { p_binder: string; p_entry: string; p_pocket: number };
+        Returns: undefined;
+      };
+      binder_save_order: {
+        Args: { p_binder: string; p_ids: string[] };
+        Returns: undefined;
       };
       catalog_sets: {
         Args: Record<string, never>;

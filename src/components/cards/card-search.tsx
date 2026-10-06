@@ -13,6 +13,7 @@ import {
 
 import { CardImageZoom } from "@/components/cards/card-image-zoom";
 import { Card } from "@/components/ui/card";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { searchCardsAction } from "@/lib/cards/actions";
 import {
   ALL_GAMES,
@@ -293,8 +294,8 @@ function PrintingList({
    * made to pick the card, open a dropdown, and find the art a second time.
    */
   onPick?: (printing: CardPrinting) => void;
-  /** The badge for one version, when the caller is counting picks. */
-  markFor?: (printing: CardPrinting) => string | null;
+  /** Copies picked of one version, when the caller is counting picks. */
+  markFor?: (printing: CardPrinting) => number | null;
   /** One fewer of that version; drawn as a minus beside its badge. */
   onUnpick?: (printing: CardPrinting) => void;
 }) {
@@ -358,12 +359,15 @@ function PrintingList({
                * the root of the card... you should't have to scroll up
                * to see that."
                */}
-              {markFor?.(printing) && (
+              {markFor?.(printing) != null && (
                 <>
                   {onUnpick && <UnpickButton onClick={() => onUnpick(printing)} />}
-                  <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
-                    {markFor(printing)}
-                  </span>
+                  <QuantityBadge
+                    quantity={markFor(printing) ?? 0}
+                    size="md"
+                    always
+                    className="shrink-0"
+                  />
                 </>
               )}
             </div>
@@ -389,6 +393,7 @@ function Row({
   mark = null,
   markForPrinting,
   onUnpick,
+  note = null,
 }: {
   card: CardResult;
   term: string;
@@ -402,12 +407,14 @@ function Row({
    */
   composerFor?: string | null;
   composer?: React.ReactNode;
-  /** A picker's mark on a result already taken: "1 · 2 copies". */
-  mark?: string | null;
+  /** Copies a picker has of this result, drawn as the quantity tag "×2". */
+  mark?: number | null;
   /** The same, per version, so a tapped alt art wears its own number. */
-  markForPrinting?: (printing: CardPrinting) => string | null;
+  markForPrinting?: (printing: CardPrinting) => number | null;
   /** One fewer of this card, or of one version of it, from the minus beside its badge. */
   onUnpick?: (card: CardResult, printing?: CardPrinting) => void;
+  /** A picker's line under the card's facts: the binder's "×2 in this binder". */
+  note?: React.ReactNode;
 }) {
   /*
    * The headline is the base printing, not whichever set code sorted first —
@@ -491,10 +498,8 @@ function Row({
             <span className="truncate font-semibold text-text-primary">
               <Highlighted text={card.exactName} term={term} />
             </span>
-            {mark && (
-              <span className="shrink-0 rounded-full border border-accent bg-accent px-2 py-0.5 text-[11px] font-bold text-accent-contrast tabular-nums">
-                {mark}
-              </span>
+            {mark !== null && (
+              <QuantityBadge quantity={mark} size="md" always className="shrink-0" />
             )}
           </p>
 
@@ -510,11 +515,13 @@ function Row({
           </p>
 
           <Stats card={card} />
+
+          {note}
         </button>
 
         {/* A sibling of the select button, not a child: a button cannot
             hold a button, and the two answer opposite questions. */}
-        {mark && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}
+        {mark !== null && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}
       </div>
 
       {/* Opened from the header, so it appears right below it. */}
@@ -616,7 +623,7 @@ export interface CardSearchProps {
    * A picker's mark on results it already holds, so a search that picks
    * several cards shows which are in and in what order. Null for none.
    */
-  markFor?: (card: CardResult) => string | null;
+  markFor?: (card: CardResult) => number | null;
   /**
    * The badge for one VERSION of a card, when the caller counts picks
    * per printing. Returns the per-printing marker for that card, so a
@@ -625,12 +632,18 @@ export interface CardSearchProps {
    */
   markForPrintingFor?: (
     card: CardResult,
-  ) => ((printing: CardPrinting) => string | null) | undefined;
+  ) => ((printing: CardPrinting) => number | null) | undefined;
   /**
    * One fewer copy of a picked card, from the minus beside its badge.
    * The founder: "a way to lessen your quantity of cards."
    */
   onUnpick?: (card: CardResult, printing?: CardPrinting) => void;
+  /**
+   * One more line on a result, under its facts, for what the caller
+   * knows about that card: the binder's picker says how many are
+   * already in the binder. Null for nothing.
+   */
+  noteFor?: (card: CardResult) => React.ReactNode;
 }
 
 /**
@@ -652,6 +665,7 @@ export function CardSearch({
   markFor,
   markForPrintingFor,
   onUnpick,
+  noteFor,
 }: CardSearchProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -931,6 +945,7 @@ export function CardSearch({
                   markForPrintingFor ? markForPrintingFor(card) : undefined
                 }
                 onUnpick={onUnpick}
+                note={noteFor ? noteFor(card) : null}
               />
             );
           })}

@@ -118,20 +118,23 @@ describe("the binder page", () => {
   });
 
   it("moves a held pocket, shifting the others, on both platforms", () => {
-    /* The web drags, the composer's way; the app long-presses, the
-       card tray's way. Both end in the one reorder call with the whole
-       binder's ids. */
-    expect(web.view).toContain("draggable={binder.yours && card !== null}");
-    expect(web.view).toContain("reorderBinderAction(");
-    expect(web.view).toContain("next.splice(from, 1)");
-    expect(web.view).toContain("next.splice(slot, 0, moved)");
-    expect(web.view).toContain('event.dataTransfer.effectAllowed = "move"');
+    /* Round 3: the web holds and moves in one gesture, with pointer
+       events, and a drop lands in a pocket by the database's rule
+       (binder3-web.test.ts pins the gesture). */
+    expect(web.view).toContain("...(binder.yours ? pocketProps(card.entryId) : {})");
+    expect(web.view).toContain("placeBinderCardAction(binder.id, { entryId, pocket })");
+    expect(web.view).toContain("setCards(placeInPockets(cards, entryId, pocket));");
+    expect(web.view).not.toContain("reorderBinderAction");
+    expect(web.view).not.toContain("draggable=");
     expect(web.view).toContain("hold Alt and use the arrow keys");
-    /* Both arrows take a drop, to the far end of the page beyond. */
-    expect(web.view).toContain('dropAt("prev")');
-    expect(web.view).toContain('dropAt("next")');
-    expect(app.page).toContain("onLongPress");
-    expect(app.page).toContain("reorderBinder(");
+    /* Both arrows turn the page while a card is held over them. */
+    expect(web.view).toContain('ring={over === "prev"}');
+    expect(web.view).toContain('ring={over === "next"}');
+    /* The app: one held-then-dragged pan, the drop by the same rule. */
+    expect(app.page).toContain(".activateAfterLongPress(HOLD_MS)");
+    expect(app.page).toContain("placeBinderCard(writeId, entryId, pocket)");
+    expect(app.page).toContain("placeInPockets(before, entryId, pocket)");
+    expect(app.page).not.toContain("reorderBinder");
   });
 
   it("gives the owner a + in every empty pocket, and a page of them when full", () => {
@@ -144,12 +147,15 @@ describe("the binder page", () => {
     }
     expect(web.pockets).toContain('aria-label="Add a card"');
     /* The owner's page count: one more page once the last is full,
-       including an empty binder. A visitor never sees the extra page. */
-    expect(web.view).toContain("Math.floor(list.length / perPage) + 1");
-    expect(web.view).toContain("Math.max(1, Math.ceil(list.length / perPage))");
-    /* The pocket opens the Add cards sheet, and is the one way in. */
-    expect(web.view).toMatch(/<AddPocket\s+onClick=\{\(\) => setAdding\(true\)\}/);
-    expect(web.page).toContain("onOpenChange={setAdding}");
+       including an empty binder. A visitor never sees the extra page.
+       Round 3: the shared pocket maths decides it. */
+    expect(web.view).toContain("const pages = pagesFor(list, binder.yours);");
+    expect(web.view).toContain("const pockets = pageOf(drawn, page);");
+    /* The pocket opens the Add cards sheet for itself, the one way in. */
+    expect(web.view).toMatch(
+      /<AddPocket\s+onClick=\{\(\) => setAdding\(\{ pocket: slot \}\)\}/,
+    );
+    expect(web.page).toContain("open={adding !== null}");
   });
 
   it("has the message door under a visitor's view", () => {
@@ -183,9 +189,9 @@ describe("the binder page", () => {
   it("saves every setting at once and refreshes behind it", () => {
     for (const action of [
       "saveBinderSettingsAction",
-      "addBinderCardAction",
+      "addBinderCardsAction",
       "removeBinderCardAction",
-      "reorderBinderAction",
+      "placeBinderCardAction",
     ]) {
       expect(web.page).toContain(action);
     }

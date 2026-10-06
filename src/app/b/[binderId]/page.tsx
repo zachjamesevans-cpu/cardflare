@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { z } from "zod";
 
 import { PublicBinder } from "@/components/binder/public-binder";
-import { binderOwner, readBinder } from "@/lib/binder/binder";
+import { binderIdFromLink, binderOwner, readBinder } from "@/lib/binder/binder";
 import { SITE } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +11,11 @@ type Params = { params: Promise<{ binderId: string }> };
 
 /** The binder a share link names, as anyone signed out would see it. */
 async function sharedBinder(raw: string) {
-  const id = z.guid().safeParse(raw);
-  if (!id.success) return null;
-  const owner = await binderOwner(id.data);
+  const id = await binderIdFromLink(raw);
+  if (!id) return null;
+  const owner = await binderOwner(id);
   if (!owner) return null;
-  const binder = await readBinder(owner, null, id.data);
+  const binder = await readBinder(owner, null, id);
   return binder ? { owner, binder } : null;
 }
 
@@ -43,17 +42,17 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /**
- * The share link: cardflare.gg/b/<id>, short enough for a text. Opens
+ * The share link: cardflare.gg/b/<code> (eight letters and digits), or
+ * the binder's id for the links shared before codes existed. Opens
  * the binder for anyone, signed in or not, and in the app on an iPhone
  * that has it (the apple-app-site-association file names /b/*). A
  * binder that is not up for trade is a 404 here, the same as at its
  * long address.
  */
 export default async function SharedBinderPage({ params }: Params) {
-  const raw = (await params).binderId;
-  const id = z.guid().safeParse(raw);
-  if (!id.success) notFound();
-  const owner = await binderOwner(id.data);
+  const id = await binderIdFromLink((await params).binderId);
+  if (!id) notFound();
+  const owner = await binderOwner(id);
   if (!owner) notFound();
-  return <PublicBinder playerId={owner} binderId={id.data} />;
+  return <PublicBinder playerId={owner} binderId={id} />;
 }

@@ -93,7 +93,9 @@ describe("which way a Flare points", () => {
 
   it("says the same on the older row", () => {
     const items = read("src/components/feed/feed-items.tsx");
-    expect(items).toContain('"Offering" : "Looking for"');
+    /* Only an offer names its direction; a want is what a Flare is. */
+    expect(items).toContain('item.direction === "showcase" ? "Offering" : null');
+    expect(items).not.toContain('"Looking for"');
     expect(items).not.toContain("Letting go");
     expect(items).not.toMatch(/\bhunting\b/i);
   });

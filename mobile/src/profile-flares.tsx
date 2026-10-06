@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 
 import type { ProfileFlare } from "./api";
+import { QuantityBadge } from "./quantity-badge";
 import { colors, gutter, spacing } from "./theme";
 import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
 
@@ -14,10 +15,13 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
  * heading. A small count line sits at the top, the same number the
  * header's Flares stat shows, and the grid under it is the whole
  * list, three across, newest first: a profile with sixty Flares
- * scrolls. Each tile is the one card viewer every shelf uses, with a
- * tiny chip at the foot saying which way the Flare points. Nothing
- * to offer on from here; the Feed and the room are where a Flare is
- * answered.
+ * scrolls. Each tile is the one card viewer every shelf uses. A want
+ * wears no label (the founder: "Delete the 'looking for' part on all
+ * cards. Seems kinda redundant when they know it's for flares."); a
+ * showcase keeps a small "Offering" chip at the foot, so a mixed grid
+ * still tells the two apart. More than one copy is the quantity tag in
+ * the top-left corner, the binder's. Nothing to offer on from here;
+ * the Feed and the room are where a Flare is answered.
  */
 
 /** The space between tiles, and how many sit across. */
@@ -82,8 +86,8 @@ export function ProfileFlares({
         )
       ) : (
         /* A grid the way a social profile draws one: three across, a
-           hairline between tiles, nothing under them. The direction
-           rides the foot of the art as a small chip. */
+           hairline between tiles, nothing under them. Only an offer
+           wears a chip at the foot. */
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
           {flares.map((flare, index) => (
             <View key={flare.id} style={{ width }}>
@@ -98,34 +102,35 @@ export function ProfileFlares({
                 siblings={shelf}
                 position={index}
               />
-              {/* Which way it points, in the two words the whole product
-                  uses for a Flare's direction. */}
-              <View
-                pointerEvents="none"
-                style={{
-                  position: "absolute",
-                  left: 4,
-                  bottom: 4,
-                  borderRadius: 4,
-                  backgroundColor:
-                    flare.direction === "want" ? colors.accent : "rgba(0,0,0,0.8)",
-                  paddingHorizontal: 4,
-                  paddingVertical: 1,
-                }}
-              >
-                <Text
+              <QuantityBadge
+                quantity={flare.quantity}
+                style={{ position: "absolute", top: 4, left: 4 }}
+              />
+              {/* Only an offer is labelled; a want is what a Flare is. */}
+              {flare.direction === "want" ? null : (
+                <View
+                  pointerEvents="none"
                   style={{
-                    color:
-                      flare.direction === "want"
-                        ? colors.accentContrast
-                        : colors.textSecondary,
-                    fontSize: 9,
-                    fontWeight: "700",
+                    position: "absolute",
+                    left: 4,
+                    bottom: 4,
+                    borderRadius: 4,
+                    backgroundColor: "rgba(0,0,0,0.8)",
+                    paddingHorizontal: 4,
+                    paddingVertical: 1,
                   }}
                 >
-                  {flare.direction === "want" ? "Looking for" : "Offering"}
-                </Text>
-              </View>
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 9,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Offering
+                  </Text>
+                </View>
+              )}
             </View>
           ))}
         </View>

@@ -1,6 +1,7 @@
 import { CheckCircle2, Clock, HelpCircle, Undo2 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { acknowledgeTradeAction } from "@/lib/trades/actions";
 import type { TradeRecord } from "@/lib/trades/schema";
@@ -141,11 +142,7 @@ export function TradedTonight({
                   <span className="font-semibold text-text-primary">
                     {trade.cardName}
                   </span>
-                  {trade.quantity > 1 && (
-                    <span className="text-sm text-text-muted tabular-nums">
-                      ×{trade.quantity}
-                    </span>
-                  )}
+                  <QuantityBadge quantity={trade.quantity} size="md" />
                   <span className="text-sm text-text-secondary">
                     {trade.youWere === "requester"
                       ? trade.partnerName

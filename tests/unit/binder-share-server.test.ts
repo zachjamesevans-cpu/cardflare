@@ -16,16 +16,18 @@ describe("the share link", () => {
   const image = flat(read("src/app/b/[binderId]/opengraph-image.tsx"));
 
   it("finds the owner from the id and draws the same page as the long address", () => {
-    expect(page).toContain("const owner = await binderOwner(id.data);");
-    expect(page).toContain("<PublicBinder playerId={owner} binderId={id.data} />");
+    expect(page).toContain(
+      "const id = await binderIdFromLink((await params).binderId);",
+    );
+    expect(page).toContain("<PublicBinder playerId={owner} binderId={id} />");
     expect(flat(read("src/app/p/[playerId]/binders/[binderId]/page.tsx"))).toContain(
       "<PublicBinder playerId={playerId} binderId={binderId} />",
     );
   });
 
   it("previews only what a signed-out visitor could open", () => {
-    expect(page).toContain("const binder = await readBinder(owner, null, id.data);");
-    expect(image).toContain("await readBinder(owner, null, id.data)");
+    expect(page).toContain("const binder = await readBinder(owner, null, id);");
+    expect(image).toContain("await readBinder(owner, null, id)");
   });
 
   it("is claimed by the app on iOS, and nothing else is", () => {
@@ -46,11 +48,16 @@ describe("the share link", () => {
 
   it("lets the app open any binder by id, still hiding a private one", () => {
     const route = flat(read("src/app/api/v1/binders/[binderId]/route.ts"));
+    /* The id or the share link's short code, then the binder as this
+       viewer may see it. */
     expect(route).toContain(
-      "const owner = (await binderOwner(id.data)) ?? player.playerId;",
+      "const id = await binderIdFromLink((await params).binderId);",
     );
     expect(route).toContain(
-      "const binder = await readBinder(owner, player.playerId, id.data);",
+      "const owner = (await binderOwner(id)) ?? player.playerId;",
+    );
+    expect(route).toContain(
+      "const binder = await readBinder(owner, player.playerId, id);",
     );
   });
 });

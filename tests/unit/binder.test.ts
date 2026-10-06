@@ -74,8 +74,11 @@ describe("the binder's order is the owner's", () => {
 
   it("never loses a card a stale screen left out of the order", () => {
     expect(lib).toContain("export async function saveBinderOrder(");
-    expect(lib).toContain("const order = [...placed, ...rest];");
-    expect(lib).toContain('.eq("binder_id", binderId)');
+    /* One statement (binder_save_order), the listed ids first and every
+       card the list left out after them, so nothing is lost. */
+    expect(lib).toContain('rpc("binder_save_order", {');
+    const migration = read("supabase/migrations/20261107090000_binder_pockets.sql");
+    expect(migration).toContain("and c.id not in (select id from given)");
   });
 
   it("is written from the website and the app alike", () => {

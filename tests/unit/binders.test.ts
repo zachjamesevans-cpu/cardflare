@@ -74,9 +74,10 @@ describe("the Have list is derived from the binders up for trade", () => {
 
   it("follows every write that could change it, card by card", () => {
     expect(lib).toContain("async function syncTradeCard(");
-    const add = lib.slice(lib.indexOf("export async function addBinderCard("));
+    /* Every card a batch touched, added or counted up. */
+    const add = lib.slice(lib.indexOf("export async function addBinderCards("));
     expect(add).toMatch(
-      /if \(row\.for_trade\)\s*await syncTradeCard\(\s*playerId,\s*displayName,\s*input\.cardId,\s*input\.printingId,?\s*\)/,
+      /if \(row\.for_trade\) \{\s*for \(const item of touched\) \{\s*await syncTradeCard\(playerId, displayName, item\.cardId, item\.printingId\);/,
     );
     const remove = lib.slice(lib.indexOf("export async function removeBinderCard("));
     expect(remove).toMatch(

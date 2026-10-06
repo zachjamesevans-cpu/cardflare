@@ -22,6 +22,7 @@ import { blockPlayerAction } from "@/lib/players/safety-actions";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/controls";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import {
   answerTradeAction,
@@ -489,11 +490,11 @@ function FlareRow({
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-semibold text-text-primary">
-            {flare.cardName}
-            {flare.quantity > 1 && (
-              <span className="text-accent"> ×{flare.quantity}</span>
-            )}
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate font-semibold text-text-primary">
+              {flare.cardName}
+            </span>
+            <QuantityBadge quantity={flare.quantity} size="md" className="shrink-0" />
           </p>
           <p className="truncate font-mono text-xs text-text-muted">
             {flare.cardNumber}
@@ -509,13 +510,14 @@ function FlareRow({
               {flare.note}
             </p>
           )}
+          {/* Only an offer names its direction: a want is what a Flare
+              is, and the founder found the want label on every card
+              redundant. The app's local.tsx says the same. */}
           <p className="mt-1 text-xs text-text-muted">
-            {flare.intent === "showcase" ? "Trading away" : "Hunting"} ·{" "}
-            {flare.acceptsTrade && flare.acceptsCash
-              ? "trade or cash"
-              : flare.acceptsCash
-                ? "cash"
-                : "trade"}
+            {flare.intent === "showcase" ? "Offering · " : ""}
+            {flare.intent === "showcase"
+              ? acceptsLabelFor(flare)
+              : capitalised(acceptsLabelFor(flare))}
           </p>
         </div>
 
@@ -1123,4 +1125,18 @@ function Thumb({ imageUrl }: { imageUrl: string | null }) {
       </span>
     </span>
   );
+}
+
+/** "trade or cash", "cash" or "trade": what this Flare takes. */
+function acceptsLabelFor(flare: LocalFlare): string {
+  return flare.acceptsTrade && flare.acceptsCash
+    ? "trade or cash"
+    : flare.acceptsCash
+      ? "cash"
+      : "trade";
+}
+
+/** A line's first word, capitalised: "Trade or cash". */
+function capitalised(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
 }

@@ -32,6 +32,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerPeek } from "@/components/players/player-peek";
 import type { CosmeticArtFileRef } from "@/components/players/cosmetic-art";
 import { Badge, Card } from "@/components/ui/card";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Rail } from "@/components/lists/rail";
 import { RemoveEntry } from "@/components/lists/remove-entry";
 import { BeyondFold, SectionFold } from "@/components/lists/section-fold";
@@ -134,11 +135,11 @@ function Entry({
            */}
           <div className="flex items-baseline gap-x-2">
             <p className="min-w-0 font-semibold text-text-primary">{entry.cardName}</p>
-            {entry.quantity > 1 && (
-              <span className="shrink-0 text-sm text-text-muted tabular-nums">
-                ×{entry.quantity}
-              </span>
-            )}
+            <QuantityBadge
+              quantity={entry.quantity}
+              size="md"
+              className="shrink-0 self-center"
+            />
             {found && (
               <span className="shrink-0 text-xs font-bold tracking-wider text-accent uppercase">
                 Found
@@ -408,7 +409,7 @@ function CarouselEntry({
    * card and everything anchored to it lands on the card's own edges. Three asked with one
    * pledged is a fan of two; fully pledged collapses to a single dimmed
    * card at the rail's end. Past four the layers stop being countable,
-   * so ×N text returns; screen readers always get a number. The fan's
+   * so the ×N tag carries it; screen readers always get a number. The fan's
    * bleed is reserved as margin so neighbours never collide.
    */
   const visible = Math.max(remaining ?? entry.quantity, 1);
@@ -519,14 +520,12 @@ function CarouselEntry({
         )}
         {/* The number, right on the card — the fan draws it, this chip
             says it, and both count down together as pledges land. */}
-        {visible > 1 && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0.5 bottom-0.5 z-10 rounded-[4px] border border-border bg-canvas/85 px-1 text-[10px] font-bold text-text-primary tabular-nums"
-          >
-            ×{visible}
-          </span>
-        )}
+        <span aria-hidden="true" className="contents">
+          <QuantityBadge
+            quantity={visible}
+            className="pointer-events-none absolute right-0.5 bottom-0.5 z-10"
+          />
+        </span>
       </div>
 
       <p className="min-h-[14px] truncate text-[11px] leading-[14px] font-semibold text-text-primary">
