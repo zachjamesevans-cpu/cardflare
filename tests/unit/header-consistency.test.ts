@@ -93,12 +93,12 @@ describe("the app's header", () => {
 });
 
 describe("the dock", () => {
-  it("is icons only and tighter in the app", () => {
+  it("is icons only in the app, sized up from the tight 50pt pill", () => {
     expect(app).toContain("tabBarShowLabel: false,");
     expect(app).toContain("size={TAB_BAR.icon}");
     const glass = read("mobile/src/glass.tsx");
-    expect(glass).toContain("height: 50,");
-    expect(glass).toContain("icon: 26,");
+    expect(glass).toContain("height: 58,");
+    expect(glass).toContain("icon: 29,");
   });
 
   it("is icons only on the website, with each name kept for a screen reader", () => {

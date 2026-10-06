@@ -374,12 +374,17 @@ export function PlayerProfileScreen() {
 
   return (
     <ScrollView
+      /* One colour from the header to the bottom edge, as on your own
+         profile: no canvas-black bands above the cover or under the
+         last row. */
+      style={{ backgroundColor: colors.surface }}
       contentContainerStyle={{
         /* No gutter: the block runs to the screen's edges, the
            founder's "extend all the way over to the edges of the
-           screen". Its rows keep their own inset. */
-        paddingVertical: spacing(4),
+           screen". Its rows keep their own inset. No top padding:
+           the cover starts right under the header. */
         gap: spacing(4),
+        paddingBottom: spacing(4),
       }}
     >
       {/* The profile block: cover, picture, name, badge, shelf. */}

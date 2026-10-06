@@ -807,11 +807,18 @@ export function ProfileScreen() {
 
   return (
     <ScrollView
+      /* One colour from the header to the dock. The page used to be
+         canvas black with the surface-coloured block floating in it,
+         so a black band showed above the cover and another under the
+         last row, behind the dock - the founder: "it doesn't feel
+         native, there's a color gap at top and bottom". The scroll
+         view is the block's colour now, overscroll included. */
+      style={{ backgroundColor: colors.surface }}
       contentContainerStyle={{
         /* No gutter: the block runs to the screen's edges, the
            founder's "extend all the way over to the edges of the
-           screen". Its rows keep their own inset. */
-        paddingVertical: spacing(4),
+           screen". Its rows keep their own inset. No top padding:
+           the cover starts right under the header. */
         gap: spacing(4),
         /* Clear of the floating tab bar. */
         paddingBottom: spacing(4) + tabInset,
