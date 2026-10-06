@@ -230,7 +230,7 @@ export async function playerTimeline(playerId: string): Promise<PlayerTimeline |
       .order("traded_on", { ascending: false })
       .limit(PER_SOURCE),
     /* The profile's own number: open wants plus offerings. */
-    profileStats(playerId),
+    profileStats(playerId, null),
     /* "Last in a room" is a seat's clock, not a session's: a session's
        last_seen_at moves on every page, so it read 19h ago right after
        the player posted into a night. */

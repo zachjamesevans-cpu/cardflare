@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
+  ApiError,
   answerThreadTrade,
   blockPlayer,
   proposeThreadTrade,
@@ -110,6 +111,10 @@ export function ThreadScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   /* Set once a block from this screen has landed. */
   const [blocked, setBlocked] = useState(false);
+  /* The server's word that a block stands between the two, either way
+     round, or a send refused for one: the composer gives way to a
+     plain line instead of a generic "Could not send that." */
+  const [closed, setClosed] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [draft, setDraft] = useState("");
@@ -216,6 +221,7 @@ export function ThreadScreen() {
            with a card name is read as a thread about that card. */
         setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
         setTrade(thread.trade ?? null);
+        setClosed(thread.blocked ?? false);
         /* Instagram's header: their face, their name with the @handle
            under it, all of it opening their profile; the conversation
            is the person. The "⋯" at the right holds the rest. */
@@ -271,7 +277,12 @@ export function ThreadScreen() {
       setDraft("");
       await load();
       list.current?.scrollToEnd({ animated: true });
-    } catch {
+    } catch (caught) {
+      /* A 409 "closed" is a block, either way round: say so plainly. */
+      if (caught instanceof ApiError && caught.code === "closed") {
+        setClosed(true);
+        return;
+      }
       setError("Could not send that.");
     }
   };
@@ -370,7 +381,7 @@ export function ThreadScreen() {
           },
         ]
       : []),
-    ...(!blocked && !tradePending && !tradeOpen
+    ...(!blocked && !closed && !tradePending && !tradeOpen
       ? [
           {
             key: "traded",
@@ -563,6 +574,8 @@ export function ThreadScreen() {
       >
         {blocked ? (
           <Muted>Blocked. Neither of you can message the other.</Muted>
+        ) : closed ? (
+          <Muted>You can't message this person.</Muted>
         ) : (
           <>
             {/* The trade, when one is open: what you said, waiting on

@@ -624,6 +624,9 @@ function ThreadView({
   /* Block's inline question, and whether it has landed. */
   const [asking, setAsking] = useState(false);
   const [blocked, setBlocked] = useState(false);
+  /* The server's word that a block stands between the two, either
+     way round: the composer gives way to one plain line. */
+  const [closed, setClosed] = useState(false);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [reporting, setReporting] = useState(false);
@@ -651,6 +654,7 @@ function ThreadView({
       setWithPlayerId(thread.withPlayerId ?? null);
       setWithAvatarUrl(thread.withAvatarUrl ?? null);
       setWithHandle(thread.withHandle ?? null);
+      setClosed(thread.blocked ?? false);
     });
     /* onBack is stable enough for a mount effect; re-running on its
        identity would reload the thread on every parent render. */
@@ -726,6 +730,7 @@ function ThreadView({
   const canSayTraded =
     messages !== null &&
     !blocked &&
+    !closed &&
     !composingTrade &&
     (trade === null || trade.status !== "pending");
 
@@ -909,6 +914,10 @@ function ThreadView({
         <p className="flex items-center gap-2 text-sm text-text-secondary">
           <Check className="size-4" aria-hidden="true" />
           Blocked. Neither of you can message the other.
+        </p>
+      ) : closed ? (
+        <p className="text-sm text-text-secondary">
+          You can&rsquo;t message this person.
         </p>
       ) : (
         <div className="flex flex-col gap-2">

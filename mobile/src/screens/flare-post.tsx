@@ -1,14 +1,22 @@
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
-import { ActionSheet, DotsButton } from "../action-menu";
+import { ActionSheet, DotsButton, type ActionItem } from "../action-menu";
 import {
   commentOnPost,
+  deletePostComment,
   describeError,
   getPost,
   likePost,
@@ -17,8 +25,10 @@ import {
   rememberRoom,
   restorePost,
   takeDownPost,
+  type PostComment,
   type PostDetail,
 } from "../api";
+import { cachedPlayerId } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
@@ -76,6 +86,20 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const [menu, setMenu] = useState(false);
   /* "Report", on somebody else's post: the same sheet the Feed opens. */
   const [report, setReport] = useState<ReportTarget | null>(null);
+  /* One comment's "⋯": Report on somebody else's line, Delete on your
+     own or on any line under your own post. The server decides who
+     may delete; this only decides what to offer. */
+  const [commentMenu, setCommentMenu] = useState<PostComment | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void cachedPlayerId().then((id) => {
+      if (live) setMe(id);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   /* Your own post, taken down: the body gives way to one line and the
      toast offers the minute's undo. The Feed behind is told either way. */
   const [takenDown, setTakenDown] = useState(false);
@@ -113,6 +137,62 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     } catch (caught) {
       setError(`That did not post (${describeError(caught)}). Try again in a moment.`);
     }
+  };
+
+  const removeComment = (comment: PostComment) => {
+    if (!post) return;
+    Alert.alert("Delete this comment?", "It is gone for everyone.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          setError(null);
+          void deletePostComment(post.postId, comment.id)
+            .then(() =>
+              setPost((current) =>
+                current
+                  ? {
+                      ...current,
+                      thread: current.thread.filter((row) => row.id !== comment.id),
+                      comments: Math.max(0, current.comments - 1),
+                    }
+                  : current,
+              ),
+            )
+            .catch(() => setError("Could not delete that. Try again in a moment."));
+        },
+      },
+    ]);
+  };
+
+  /** What a comment's "⋯" offers, or null when there is nothing. */
+  const commentActions = (comment: PostComment): ActionItem[] | null => {
+    if (!post) return null;
+    const mine = me !== null && comment.playerId === me;
+    const items: ActionItem[] = [
+      ...(mine
+        ? []
+        : [
+            {
+              key: "report",
+              label: "Report",
+              icon: "flag-outline" as const,
+              onPress: () => setReport({ kind: "comment", targetId: comment.id }),
+            },
+          ]),
+      ...(mine || post.yours
+        ? [
+            {
+              key: "delete",
+              label: "Delete",
+              icon: "trash-outline" as const,
+              onPress: () => removeComment(comment),
+            },
+          ]
+        : []),
+    ];
+    return items.length > 0 ? items : null;
   };
 
   const takeDown = async () => {
@@ -316,7 +396,6 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               ) : null}
             </View>
             <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
-            <ReportSheet target={report} onClose={() => setReport(null)} />
 
             {/* The cards, the way the Feed draws them: one row, or the
                 same row swiped. Tap one to open it big and offer it. */}
@@ -476,6 +555,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                     {comment.body}
                   </Text>
                 </View>
+                <DotsButton
+                  onPress={commentActions(comment) ? () => setCommentMenu(comment) : null}
+                  label="More about this comment"
+                />
               </View>
             ))
           )}
@@ -516,6 +599,12 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         </View>
         <ErrorLine message={error} />
       </View>
+
+      <ActionSheet
+        items={commentMenu ? commentActions(commentMenu) : null}
+        onClose={() => setCommentMenu(null)}
+      />
+      <ReportSheet target={report} onClose={() => setReport(null)} />
 
       <FlareCardsSheet
         open={cardsSheet}

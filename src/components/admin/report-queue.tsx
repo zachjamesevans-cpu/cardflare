@@ -21,6 +21,7 @@ const KIND_WORD: Record<ReportKind, string> = {
   post: "a post",
   player: "a player",
   thread: "a conversation",
+  comment: "a comment",
 };
 
 export function ReportQueue({ reports }: { reports: OpenReport[] }) {
@@ -78,6 +79,47 @@ export function ReportQueue({ reports }: { reports: OpenReport[] }) {
                     <p className="text-sm break-words whitespace-pre-line text-text-secondary">
                       {report.note}
                     </p>
+                  )}
+                  {/* The comment as it read when reported: kept on the
+                      report, because the comment itself can be deleted. */}
+                  {report.excerpt && (
+                    <blockquote className="border-l-2 border-border pl-3 text-sm break-words whitespace-pre-line text-text-primary">
+                      {report.excerpt}
+                    </blockquote>
+                  )}
+                  {/* A reported conversation, read here so the admin can
+                      judge it without anyone's login. Newest fifty. */}
+                  {report.kind === "thread" && (
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-text-secondary">
+                        Conversation ({report.messages.length} messages)
+                      </summary>
+                      {report.messages.length === 0 ? (
+                        <p className="mt-2 text-text-muted">No messages.</p>
+                      ) : (
+                        <ol className="mt-2 flex max-h-96 flex-col gap-1.5 overflow-y-auto rounded-[var(--radius-control)] border border-border bg-elevated p-3">
+                          {report.messages.map((message) => (
+                            <li key={message.id} className="break-words">
+                              <span
+                                className={
+                                  message.fromReporter
+                                    ? "font-semibold text-text-secondary"
+                                    : "font-semibold text-text-primary"
+                                }
+                              >
+                                {message.senderName}
+                              </span>{" "}
+                              <span className="text-xs text-text-muted">
+                                {ago(message.sentAt)}
+                              </span>
+                              <p className="whitespace-pre-line text-text-primary">
+                                {message.body}
+                              </p>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                    </details>
                   )}
                 </div>
 

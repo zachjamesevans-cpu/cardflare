@@ -1960,7 +1960,7 @@ export const getPlayerPeople = (playerId: string) =>
 /* Report and block                                                    */
 /* ------------------------------------------------------------------ */
 
-export type ReportKind = "post" | "player" | "thread";
+export type ReportKind = "post" | "player" | "thread" | "comment";
 export type ReportReason = "spam" | "scam" | "harassment" | "other";
 
 /**
@@ -2880,6 +2880,16 @@ export const commentOnPost = (postId: string, body: string) =>
     { action: "comment", body },
   );
 
+/**
+ * Takes a comment down: yours, or anybody's under your own post. The
+ * server checks which; a refusal is a 403.
+ */
+export const deletePostComment = (postId: string, commentId: string) =>
+  call<{ ok: true }>(
+    "DELETE",
+    `/api/v1/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+  );
+
 /** "I have this" on one card of a post, with a note for the thread. */
 export const offerFromPost = (postId: string, flareId: string, note: string) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
@@ -3794,6 +3804,12 @@ export const readLocalThread = (threadId: string) =>
   call<{
     ok: boolean;
     closed: boolean;
+    /**
+     * A block stands between the two, either way round: nothing can be
+     * sent, and the screen says so in place of the composer. Absent
+     * from an older server.
+     */
+    blocked?: boolean;
     /**
      * What it is about: a posted Flare, a saved want, or the two
      * people. Optional: an older server does not say, and a thread

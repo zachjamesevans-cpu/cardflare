@@ -9,7 +9,7 @@ import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
-import { blockState } from "@/lib/players/safety";
+import { blockState, blockedBetween, profileHiddenBy } from "@/lib/players/safety";
 import { profileStats } from "@/lib/players/stats";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
@@ -71,12 +71,24 @@ export async function GET(
     viewerPlayerId(request),
     dressedEquipsFor(playerId),
   ]);
-  /* After the viewer, because the binder's panel depends on who asks:
-     a private binder is absent for everyone but its owner. */
-  const profile = await publicProfile(playerId, me);
   if (!allowed) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
+
+  /* A block hides the profile, both ways. Somebody who blocked you gets
+     exactly the answer a missing player gets, so the block cannot be
+     read off the response. The blocker gets the same 404 with a code
+     of their own, so the app can offer Unblock and nothing else. */
+  const block =
+    me && me !== playerId
+      ? await blockState(me, playerId)
+      : { blocked: false, blockedBy: false };
+  const hidden = profileHiddenBy(block);
+  if (hidden) return hidden;
+
+  /* After the viewer, because the binder's panel depends on who asks:
+     a private binder is absent for everyone but its owner. */
+  const profile = await publicProfile(playerId, me);
   if (!profile) {
     return Response.json({ error: "No such player." }, { status: 404 });
   }
@@ -88,16 +100,14 @@ export async function GET(
     resolveEquipped(profile.equipped),
     wornArtFor(dressed),
     me ? followState(me, playerId) : null,
-    profileStats(playerId),
+    profileStats(playerId, me),
   ]);
 
   return Response.json({
     follow: me && me !== playerId ? follow : null,
     /* Both directions, so a blocked profile offers neither Follow nor
        Message, and a profile that blocked you says nothing about it. */
-    ...(me && me !== playerId
-      ? await blockState(me, playerId)
-      : { blocked: false, blockedBy: false }),
+    ...block,
     stats,
     playerId: profile.playerId,
     displayName: profile.displayName,
@@ -182,6 +192,13 @@ export async function POST(
   const action = body?.action;
   if (action !== "follow" && action !== "unfollow") {
     return Response.json({ error: "Unrecognised follow action" }, { status: 400 });
+  }
+
+  /* No following across a block, either way. Unfollowing is always
+     allowed (a block already cut the edges, so it is a no-op). The
+     refusal reads as a missing player, the same as the profile. */
+  if (action === "follow" && (await blockedBetween(me, playerId))) {
+    return Response.json({ error: "No such player." }, { status: 404 });
   }
 
   const done =

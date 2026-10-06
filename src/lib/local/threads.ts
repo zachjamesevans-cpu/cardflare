@@ -3,11 +3,12 @@ import "server-only";
 import { listLocals } from "@/lib/players/locals";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
-import { blockedBetween, blockedSet } from "@/lib/players/safety";
+import { blockedBetween, blockedSet, blockState } from "@/lib/players/safety";
 import { latestThreadTrade, type ThreadTrade } from "@/lib/trades/thread-trades";
 import { conversationIdFor, pairThreadId } from "./pairs";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 import { avatarSrc } from "@/lib/players/profile-image";
+import type { FlareMessageRow } from "@/lib/supabase/types";
 
 /**
  * Conversations between two accounts.
@@ -711,6 +712,12 @@ async function meetSuggestion(
 export interface ThreadRead {
   ok: boolean;
   closed: boolean;
+  /**
+   * Either has blocked the other: nothing can be sent, and the screen
+   * says so in place of the composer. Which side blocked is not said.
+   * The blocker keeps the history; the person blocked does not.
+   */
+  blocked: boolean;
   /** What it is about: a posted Flare, a saved want, or the two people. */
   kind: "flare" | "want" | "direct";
   /**
@@ -735,6 +742,18 @@ export interface ThreadRead {
   trade: ThreadTrade | null;
 }
 
+/** The columns of a message `readThread` draws from. */
+type ThreadMessageRow = Pick<
+  FlareMessageRow,
+  | "id"
+  | "sender_player_id"
+  | "body"
+  | "created_at"
+  | "card_id"
+  | "card_ids"
+  | "printing_ids"
+>;
+
 export async function readThread(
   threadId: string,
   viewerId: string,
@@ -742,6 +761,7 @@ export async function readThread(
   const empty: ThreadRead = {
     ok: false,
     closed: false,
+    blocked: false,
     kind: "direct",
     threadId: null,
     cardName: null,
@@ -764,20 +784,30 @@ export async function readThread(
   const admin = getSupabaseAdmin();
   const otherId = asked.authorId === viewerId ? asked.responderId : asked.authorId;
 
+  const block = await blockState(viewerId, otherId);
+  const blocked = block.blocked || block.blockedBy;
+  /* Blocked BY them: the conversation is closed to you, history and
+     all. The blocker still reads what was said. */
+  const hideHistory = block.blockedBy && !block.blocked;
+
   const [{ data: messages }, { data: other }, meet, trade] = await Promise.all([
-    admin
-      .from("flare_messages")
-      .select("id, sender_player_id, body, created_at, card_id, card_ids, printing_ids")
-      .eq("thread_id", conversationId)
-      .order("created_at", { ascending: false })
-      .limit(200),
+    hideHistory
+      ? Promise.resolve({ data: [] as ThreadMessageRow[] })
+      : admin
+          .from("flare_messages")
+          .select(
+            "id, sender_player_id, body, created_at, card_id, card_ids, printing_ids",
+          )
+          .eq("thread_id", conversationId)
+          .order("created_at", { ascending: false })
+          .limit(200),
     admin
       .from("players")
       .select("display_name, avatar_url, handle")
       .eq("id", otherId)
       .maybeSingle(),
-    meetSuggestion(viewerId, otherId).catch(() => null),
-    latestThreadTrade(conversationId, viewerId).catch(() => null),
+    blocked ? null : meetSuggestion(viewerId, otherId).catch(() => null),
+    hideHistory ? null : latestThreadTrade(conversationId, viewerId).catch(() => null),
   ]);
 
   /* The newest 200, drawn oldest first. */
@@ -874,6 +904,7 @@ export async function readThread(
   return {
     ok: true,
     closed: false,
+    blocked,
     kind: "direct",
     threadId: conversationId,
     cardName: null,
@@ -911,12 +942,22 @@ export async function unreadMessages(playerId: string): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
   const admin = getSupabaseAdmin();
-  const { data: threads } = await admin
-    .from("flare_threads")
-    .select("id")
-    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`);
+  const [{ data: threads }, blocked] = await Promise.all([
+    admin
+      .from("flare_threads")
+      .select("id, author_player_id, responder_player_id")
+      .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`),
+    blockedSet(playerId),
+  ]);
 
-  const ids = (threads ?? []).map((row) => row.id);
+  /* Not a conversation with somebody blocked either way: Messages does
+     not list it, so its unread would be a dot nothing could clear. */
+  const ids = (threads ?? [])
+    .filter(
+      (row) =>
+        !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
+    )
+    .map((row) => row.id);
   if (ids.length === 0) return 0;
 
   const { count } = await admin

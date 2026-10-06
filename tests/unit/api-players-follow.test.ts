@@ -12,6 +12,8 @@ const playerForUser = vi.fn();
 const followPlayer = vi.fn();
 const unfollowPlayer = vi.fn();
 const followStateFn = vi.fn();
+const blockedBetween = vi.fn();
+const notifyNewFollower = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
@@ -28,6 +30,16 @@ vi.mock("@/lib/players/follows", () => ({
   followPlayer: (a: string, b: string) => followPlayer(a, b),
   unfollowPlayer: (a: string, b: string) => unfollowPlayer(a, b),
   followState: (a: string, b: string) => followStateFn(a, b),
+}));
+
+vi.mock("@/lib/players/safety", () => ({
+  blockedBetween: (a: string, b: string) => blockedBetween(a, b),
+  blockState: async () => ({ blocked: false, blockedBy: false }),
+  profileHiddenBy: () => null,
+}));
+
+vi.mock("@/lib/notifications/notify", () => ({
+  notifyNewFollower: (a: string, b: string) => notifyNewFollower(a, b),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -70,9 +82,13 @@ beforeEach(() => {
     followPlayer,
     unfollowPlayer,
     followStateFn,
+    blockedBetween,
+    notifyNewFollower,
   ]) {
     fn.mockReset();
   }
+  blockedBetween.mockResolvedValue(false);
+  notifyNewFollower.mockResolvedValue(undefined);
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   playerForUser.mockResolvedValue({ id: "me-1", display_name: "Kaito" });
   followPlayer.mockResolvedValue(true);
@@ -104,6 +120,27 @@ describe("POST /api/players/[playerId]", () => {
     expect(followPlayer).toHaveBeenCalledWith("me-1", "target-1");
     const body = (await response.json()) as { follow: { following: boolean } };
     expect(body.follow.following).toBe(true);
+  });
+
+  it("refuses a follow across a block, either way, and rings nobody", async () => {
+    blockedBetween.mockResolvedValue(true);
+    const response = await route.POST(request({ action: "follow" }), params);
+    expect(response.status).toBe(404);
+    expect(blockedBetween).toHaveBeenCalledWith("me-1", "target-1");
+    expect(followPlayer).not.toHaveBeenCalled();
+    expect(notifyNewFollower).not.toHaveBeenCalled();
+  });
+
+  it("still lets an unfollow through a block", async () => {
+    blockedBetween.mockResolvedValue(true);
+    followStateFn.mockResolvedValue({
+      following: false,
+      followsYou: false,
+      partners: false,
+    });
+    const response = await route.POST(request({ action: "unfollow" }), params);
+    expect(response.status).toBe(200);
+    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "target-1");
   });
 
   it("unfollows through the same door", async () => {

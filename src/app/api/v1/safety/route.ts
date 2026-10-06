@@ -22,7 +22,7 @@ const actionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("unblock"), playerId: z.guid() }),
   z.object({
     action: z.literal("report"),
-    kind: z.enum(["post", "player", "thread"]),
+    kind: z.enum(["post", "player", "thread", "comment"]),
     targetId: z.guid(),
     reason: z.enum(["spam", "scam", "harassment", "other"]),
     note: z.string().max(500).optional(),

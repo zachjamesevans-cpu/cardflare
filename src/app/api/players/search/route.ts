@@ -1,5 +1,6 @@
 import { apiPlayer } from "@/lib/api/auth";
 import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
 import { searchPlayersByName } from "@/lib/players/search";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
@@ -17,11 +18,8 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request): Promise<Response> {
   const viewer = await getViewer();
-  if (
-    viewer.kind === "anonymous" &&
-    !(await getPlayerSession()) &&
-    !(await apiPlayer(request))
-  ) {
+  const api = await apiPlayer(request);
+  if (viewer.kind === "anonymous" && !(await getPlayerSession()) && !api) {
     return Response.json({ error: "Sign in first." }, { status: 401 });
   }
 
@@ -33,7 +31,15 @@ export async function GET(request: Request): Promise<Response> {
   if (limited) return limited;
 
   const query = new URL(request.url).searchParams.get("q") ?? "";
-  const players = await searchPlayersByName(query);
+  /* The signed-in player searching, so a block hides each from the
+     other here too. A guest in a room has blocked nobody. */
+  const me =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind !== "anonymous"
+        ? ((await playerForUser(viewer.user.id))?.id ?? null)
+        : (api?.playerId ?? null);
+  const players = await searchPlayersByName(query, me);
 
   return Response.json({
     players: players.map((player) => ({

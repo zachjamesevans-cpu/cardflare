@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarWearFor } from "./equips";
+import { blockedSet } from "./safety";
 import { avatarPathFor, avatarSrc } from "./profile-image";
 
 /**
@@ -41,7 +42,11 @@ export interface FoundPlayer {
   aura: string | null;
 }
 
-export async function searchPlayersByName(query: string): Promise<FoundPlayer[]> {
+export async function searchPlayersByName(
+  query: string,
+  /** The signed-in player searching: nobody blocked either way is found. */
+  viewerId: string | null = null,
+): Promise<FoundPlayer[]> {
   const trimmed = query.trim();
   if (!isSupabaseConfigured() || trimmed.length < 2) return [];
 
@@ -57,14 +62,17 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
    */
   const byHandle = quoteFilterValue(`%${escaped.replace(/^@/, "").toLowerCase()}%`);
 
-  const { data, error } = await getSupabaseAdmin()
+  const hidden = viewerId ? [...(await blockedSet(viewerId))] : [];
+
+  let search = getSupabaseAdmin()
     .from("players")
     .select(
       "id, display_name, handle, avatar_url, avatar_animated, tier, equipped_avatar_frame",
     )
-    .or(`display_name.ilike.${like},handle.ilike.${byHandle}`)
-    .order("display_name")
-    .limit(12);
+    .or(`display_name.ilike.${like},handle.ilike.${byHandle}`);
+  /* Ids from our own table, never from the query string. */
+  if (hidden.length > 0) search = search.not("id", "in", `(${hidden.join(",")})`);
+  const { data, error } = await search.order("display_name").limit(12);
 
   if (error) {
     console.error("Could not search players", error);
