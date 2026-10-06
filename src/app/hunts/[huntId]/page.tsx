@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { HuntBinder } from "@/components/players/hunt-binder";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
@@ -64,13 +64,9 @@ export default async function HuntPage({
         </Link>
 
         <div className="flex w-full max-w-2xl flex-col gap-4">
-          <Link
+          <BackLink
             href={yours ? "/profile?tab=hunts" : `/p/${hunt.playerId}?tab=hunts`}
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            {yours ? "Back to your hunts" : `Back to ${hunt.ownerName}'s hunts`}
-          </Link>
+          />
 
           <Card className="flex flex-col gap-4 p-4 sm:p-6">
             <HuntBinder

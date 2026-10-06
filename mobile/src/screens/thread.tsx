@@ -24,30 +24,35 @@ import {
   THREAD_TRADE_QUANTITY_MAX,
   threadTradeFailureMessage,
   type LocalThreadMessage,
-  type MeetSuggestion,
   type ThreadTrade,
 } from "../api";
+import { ActionSheet, type ActionItem } from "../action-menu";
 import {
   CardPicker,
   DirectionToggle,
   PickedCardRow,
   type PickedCard,
 } from "../card-picker";
-import { MESSAGE_MAX_LENGTH, agoLabel } from "../local-shared";
-import { meetLine, suggestText } from "../meet";
+import { chatTimeLine } from "../chat-time";
+import { MESSAGE_MAX_LENGTH } from "../local-shared";
+import { COMPOSER_MAX_LINES, messageRuns, tidyMessage } from "../message-runs";
 import { PlayerAvatar } from "../player-avatar";
 import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, spacing } from "../theme";
-import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
+import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
 
 /**
  * One conversation: about a Flare, a saved want, or, since a profile
  * grew a Message button, about nothing in particular. The header is
- * the person's name; the "About <card>" strip is drawn only when the
- * thread has a card, and a direct message never does.
+ * Instagram's: the back chevron, their face, their name with the
+ * @handle under it (both opening their profile), and a small "⋯" at
+ * the right holding View profile, We traded, Report and Block. The
+ * founder did not want Block and Report as massive buttons in the
+ * chat. The "About <card>" strip is drawn only when the thread has a
+ * card, and a direct message never does.
  *
  * Loaded fresh on focus — reading is the receipt that marks the other
  * side's messages read and clears the inbox notice — and reloaded after
@@ -55,11 +60,16 @@ import { AsyncButton, Button, ErrorLine, Input, Loading, Muted, Tap } from "../u
  * store moves at minutes, not milliseconds, and pull-to-refresh is the
  * honest version of realtime until there is one.
  *
- * "We traded" lives here too, since round 8. Either side says it, the
- * other side is asked, and the second tap pays both Embers under the
- * room's rules. The website's ThreadView draws the same three states
- * in the same words: the button and its form, "You said you traded",
- * and "<name> says you traded" with Yes and No.
+ * "We traded" lives here too, since round 8, opened from the "⋯" menu
+ * since round 16. Either side says it, the other side is asked, and the
+ * second tap pays both Embers under the room's rules. The website's
+ * ThreadView draws the same three states in the same words: the form,
+ * "You said you traded", and "<name> says you traded" with Yes and No.
+ *
+ * Messages are drawn the way messageRuns says (src/message-runs.ts,
+ * the website's twin): their face once per run, beside its last
+ * message, never your own; a run drawn close together; a time line
+ * only at the start and after a pause.
  */
 type ThreadKind = "flare" | "want" | "direct";
 
@@ -87,8 +97,12 @@ export function ThreadScreen() {
   const [messages, setMessages] = useState<LocalThreadMessage[] | null>(null);
   const [withName, setWithName] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
-  const [meet, setMeet] = useState<MeetSuggestion | null>(null);
   const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
+  /* Their face, kept for the messages: drawn beside the last of each
+     of their runs. */
+  const [withAvatarUrl, setWithAvatarUrl] = useState<string | null>(null);
+  /* The header's "⋯", open or not. */
+  const [menuOpen, setMenuOpen] = useState(false);
   /* Set once a block from this screen has landed. */
   const [blocked, setBlocked] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("direct");
@@ -104,7 +118,7 @@ export function ThreadScreen() {
   const [tradeDirection, setTradeDirection] = useState<"got" | "gave">("got");
   const [tradeQuantity, setTradeQuantity] = useState(1);
   const [tradeError, setTradeError] = useState<string | null>(null);
-  /* "Report", beside Block: the conversation itself, so the
+  /* "Report", in the "⋯" menu: the conversation itself, so the
      admins can read it. The same sheet a post and a profile open. */
   const [report, setReport] = useState<ReportTarget | null>(null);
   const list = useRef<FlatList<LocalThreadMessage>>(null);
@@ -152,14 +166,15 @@ export function ThreadScreen() {
         setMessages(thread.messages);
         setWithName(thread.withName);
         setCardName(thread.cardName);
-        setMeet(thread.meet ?? null);
         setWithPlayerId(thread.withPlayerId ?? null);
+        setWithAvatarUrl(thread.withAvatarUrl ?? null);
         /* An older server does not say what the thread is about; one
            with a card name is read as a thread about that card. */
         setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
         setTrade(thread.trade ?? null);
-        /* Their face beside their name, and both open their profile:
-           the conversation is the person. The website's header link. */
+        /* Instagram's header: their face, their name with the @handle
+           under it, all of it opening their profile; the conversation
+           is the person. The "⋯" at the right holds the rest. */
         const title = thread.withName ?? "Conversation";
         const otherId = thread.withPlayerId ?? null;
         const face = thread.withAvatarUrl ?? null;
@@ -168,6 +183,7 @@ export function ThreadScreen() {
           headerTitle: () => (
             <ThreadHeader
               name={title}
+              handle={thread.withHandle ?? null}
               playerId={otherId}
               avatarUrl={face}
               onOpen={
@@ -176,6 +192,19 @@ export function ThreadScreen() {
                   : undefined
               }
             />
+          ),
+          headerRight: () => (
+            <Tap
+              onPress={() => setMenuOpen(true)}
+              hitSlop={10}
+              accessibilityLabel="More"
+            >
+              <Ionicons
+                name="ellipsis-horizontal"
+                size={22}
+                color={colors.textPrimary}
+              />
+            </Tap>
           ),
         });
       } catch {
@@ -196,7 +225,8 @@ export function ThreadScreen() {
   );
 
   const send = async () => {
-    const body = draft.trim();
+    /* Blank lines piled at either end go; nothing left, nothing sent. */
+    const body = tidyMessage(draft);
     if (!body) return;
     setError(null);
     try {
@@ -214,9 +244,9 @@ export function ThreadScreen() {
   };
 
   /*
-   * Block, where "End conversation" used to be. Conversations do not
-   * end now, the way a DM does not; the block is how somebody is
-   * stopped, with the profile's own words and the profile's confirm.
+   * Block, in the "⋯" menu. Conversations do not end, the way a DM
+   * does not; the block is how somebody is stopped, with the profile's
+   * own words and the profile's confirm.
    */
   const block = () => {
     if (!withPlayerId) return;
@@ -292,6 +322,58 @@ export function ThreadScreen() {
   const settledLine =
     trade && !tradePending ? settledTradeLine(trade, otherName) : null;
 
+  /* The header's "⋯": View profile, We traded, Report, Block. We traded
+     goes while a trade waits on an answer or the form is already open;
+     Block goes once it has landed, and with it the chance to trade. */
+  const menuItems: ActionItem[] = [
+    ...(withPlayerId
+      ? [
+          {
+            key: "profile",
+            label: "View profile",
+            icon: "person-circle-outline" as const,
+            onPress: () =>
+              navigation.navigate("PlayerProfile", { playerId: withPlayerId }),
+          },
+        ]
+      : []),
+    ...(!blocked && !tradePending && !tradeOpen
+      ? [
+          {
+            key: "traded",
+            label: "We traded",
+            icon: "swap-horizontal" as const,
+            onPress: () => {
+              setTradeError(null);
+              setTradeOpen(true);
+            },
+          },
+        ]
+      : []),
+    {
+      key: "report",
+      label: "Report",
+      icon: "flag-outline" as const,
+      onPress: () => setReport({ kind: "thread", targetId: threadId }),
+    },
+    ...(withPlayerId && !blocked
+      ? [
+          {
+            key: "block",
+            label: "Block",
+            icon: "ban-outline" as const,
+            onPress: block,
+          },
+        ]
+      : []),
+  ];
+
+  const runs = messageRuns(messages ?? []);
+  /* Line height of the composer's text, and the box's cap: five lines,
+     then it scrolls inside rather than climbing up the screen. */
+  const composerLine = 20;
+  const composerMax = COMPOSER_MAX_LINES * composerLine + spacing(3) * 2 + 2;
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.canvas }}
@@ -319,7 +401,6 @@ export function ThreadScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
-          gap: spacing(2),
         }}
         data={messages ?? []}
         keyExtractor={(message) => message.id}
@@ -342,62 +423,100 @@ export function ThreadScreen() {
             </Text>
           )
         }
-        renderItem={({ item }) => (
-          <View
-            style={{
-              maxWidth: "85%",
-              alignSelf: item.yours ? "flex-end" : "flex-start",
-              alignItems: item.yours ? "flex-end" : "flex-start",
-              gap: spacing(1),
-            }}
-          >
-            {/* The cards a message is about ("I have this", a nearby
-                match, an offer on a binder), on the sender's side just
-                above the words, so "I have this one" reads as being
-                about that card. An offer on a binder carries several:
-                each its own bubble, stacked. An older server sends
-                only `card`. */}
-            {(item.cards && item.cards.length > 0
+        renderItem={({ item, index }) => {
+          const flags = runs[index] ?? {
+            showTime: true,
+            showFace: !item.yours,
+            joinsNext: false,
+          };
+          const itemCards =
+            item.cards && item.cards.length > 0
               ? item.cards
               : item.card
                 ? [item.card]
-                : []
-            ).map((card, index) => (
-              <CardBubble
-                key={`${card.cardId}-${index}`}
-                card={card}
-                onOpen={(cardId) => navigation.navigate("Card", { cardId })}
-              />
-            ))}
-            <View
-              style={{
-                backgroundColor: item.yours ? colors.accent : colors.elevated,
-                borderRadius: 12,
-                paddingHorizontal: spacing(3),
-                paddingVertical: spacing(2),
-              }}
-            >
-              <Text
+                : [];
+          return (
+            <View style={{ marginBottom: flags.joinsNext ? 2 : spacing(3) }}>
+              {/* A time line where the talk started or picked up again
+                  after a pause, centred, the way Instagram stamps it. */}
+              {flags.showTime ? (
+                <Text
+                  style={{
+                    color: colors.textMuted,
+                    fontSize: 11,
+                    fontWeight: "600",
+                    textAlign: "center",
+                    marginBottom: spacing(2),
+                  }}
+                >
+                  {chatTimeLine(item.sentAt)}
+                </Text>
+              ) : null}
+              <View
                 style={{
-                  color: item.yours ? colors.accentContrast : colors.textPrimary,
-                  fontSize: 15,
+                  flexDirection: "row",
+                  alignItems: "flex-end",
+                  justifyContent: item.yours ? "flex-end" : "flex-start",
+                  gap: spacing(2),
                 }}
               >
-                {item.body}
-              </Text>
-              <Text
-                style={{
-                  color: item.yours ? colors.accentContrast : colors.textMuted,
-                  opacity: item.yours ? 0.7 : 1,
-                  fontSize: 10,
-                  marginTop: 2,
-                }}
-              >
-                {agoLabel(item.sentAt)}
-              </Text>
+                {/* Their face, once per run, beside its last message.
+                    The slot is kept on the others so a run's bubbles
+                    line up; your own face is never drawn. */}
+                {!item.yours ? (
+                  <View style={{ width: 24, height: 24 }}>
+                    {flags.showFace ? (
+                      <PlayerAvatar
+                        displayName={withName ?? "Player"}
+                        seed={withPlayerId ?? threadId}
+                        avatarUrl={withAvatarUrl}
+                        size={24}
+                      />
+                    ) : null}
+                  </View>
+                ) : null}
+                <View
+                  style={{
+                    maxWidth: "80%",
+                    alignItems: item.yours ? "flex-end" : "flex-start",
+                    gap: spacing(1),
+                  }}
+                >
+                  {/* The cards a message is about ("I have this", a nearby
+                      match, an offer on a binder), on the sender's side just
+                      above the words, so "I have this one" reads as being
+                      about that card. An offer on a binder carries several:
+                      each its own bubble, stacked. An older server sends
+                      only `card`. */}
+                  {itemCards.map((card, cardIndex) => (
+                    <CardBubble
+                      key={`${card.cardId}-${cardIndex}`}
+                      card={card}
+                      onOpen={(cardId) => navigation.navigate("Card", { cardId })}
+                    />
+                  ))}
+                  <View
+                    style={{
+                      backgroundColor: item.yours ? colors.accent : colors.elevated,
+                      borderRadius: 18,
+                      paddingHorizontal: spacing(3),
+                      paddingVertical: spacing(2),
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: item.yours ? colors.accentContrast : colors.textPrimary,
+                        fontSize: 15,
+                      }}
+                    >
+                      {item.body}
+                    </Text>
+                  </View>
+                </View>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
 
       <View
@@ -413,49 +532,6 @@ export function ThreadScreen() {
           <Muted>Blocked. Neither of you can message the other.</Muted>
         ) : (
           <>
-            {/* Somewhere public to meet, suggested rather than asked for:
-                a store, never an address. The website's chip. */}
-            {meet ? (
-              <View
-                style={{
-                  gap: spacing(2),
-                  borderRadius: 10,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.elevated,
-                  padding: spacing(3),
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                  }}
-                >
-                  <Ionicons name="storefront-outline" size={16} color={colors.accent} />
-                  <Text
-                    style={{
-                      color: colors.textPrimary,
-                      fontWeight: "600",
-                      fontSize: 13,
-                    }}
-                  >
-                    Meet somewhere public
-                  </Text>
-                </View>
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                  {meetLine(meet)}
-                </Text>
-                <View style={{ alignSelf: "flex-start" }}>
-                  <Button
-                    label={`Suggest ${meet.storeName}`}
-                    variant="secondary"
-                    onPress={() => setDraft((current) => suggestText(current, meet))}
-                  />
-                </View>
-              </View>
-            ) : null}
             {/* The trade, when one is open: what you said, waiting on
                 them, or what they said, waiting on you. The website's
                 Handshake card. */}
@@ -525,12 +601,16 @@ export function ThreadScreen() {
               style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing(2) }}
             >
               <View style={{ flex: 1 }}>
+                {/* Grows with what is typed up to five lines, then scrolls
+                    inside: it used to climb the screen with every Return. */}
                 <Input
                   value={draft}
                   onChangeText={setDraft}
                   multiline
+                  scrollEnabled
                   maxLength={MESSAGE_MAX_LENGTH}
                   placeholder="Message"
+                  style={{ lineHeight: composerLine, maxHeight: composerMax }}
                 />
               </View>
               <AsyncButton label="Send" pendingLabel="Sending…" onPress={send} />
@@ -538,9 +618,9 @@ export function ThreadScreen() {
             <ErrorLine message={error} />
             {/* The last trade this conversation settled, in one line. */}
             {settledLine ? <Muted>{settledLine}</Muted> : null}
-            {/* "We traded", opened: the form sits where the button was.
-                A Flare or a want names its card; a direct message asks
-                for one, and which way it went. */}
+            {/* "We traded", opened from the "⋯" menu: the form sits
+                under the composer. A Flare or a want names its card; a
+                direct message asks for one, and which way it went. */}
             {tradeOpen ? (
               <View
                 style={{
@@ -629,44 +709,31 @@ export function ThreadScreen() {
                 <ErrorLine message={tradeError} />
               </View>
             ) : null}
-            <View style={{ flexDirection: "row", gap: spacing(2) }}>
-              {/* "We traded" leads the row, unless a trade is already
-                  waiting on an answer or the form is open above. */}
-              {!tradePending && !tradeOpen ? (
-                <Button
-                  label="We traded"
-                  variant="secondary"
-                  onPress={() => {
-                    setTradeError(null);
-                    setTradeOpen(true);
-                  }}
-                />
-              ) : null}
-              {withPlayerId ? (
-                <Button label="Block" variant="secondary" onPress={block} />
-              ) : null}
-              <Button
-                label="Report"
-                variant="secondary"
-                onPress={() => setReport({ kind: "thread", targetId: threadId })}
-              />
-            </View>
           </>
         )}
       </View>
+      <ActionSheet
+        items={menuOpen ? menuItems : null}
+        onClose={() => setMenuOpen(false)}
+      />
       <ReportSheet target={report} onClose={() => setReport(null)} />
     </KeyboardAvoidingView>
   );
 }
 
-/** The header: their face beside their name, opening their profile. */
+/**
+ * The header, Instagram's: their face, their name with the @handle
+ * under it, and a tap on any of it opens their profile.
+ */
 function ThreadHeader({
   name,
+  handle,
   playerId,
   avatarUrl,
   onOpen,
 }: {
   name: string;
+  handle: string | null;
   playerId: string | null;
   avatarUrl: string | null;
   onOpen?: () => void;
@@ -681,17 +748,23 @@ function ThreadHeader({
           size={32}
         />
       ) : null}
-      <Text
-        numberOfLines={1}
-        style={{
-          flexShrink: 1,
-          color: colors.textPrimary,
-          fontSize: 17,
-          fontWeight: "600",
-        }}
-      >
-        {name}
-      </Text>
+      <View style={{ flexShrink: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            color: colors.textPrimary,
+            fontSize: 16,
+            fontWeight: "600",
+          }}
+        >
+          {name}
+        </Text>
+        {handle ? (
+          <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+            @{handle}
+          </Text>
+        ) : null}
+      </View>
     </View>
   );
   if (!onOpen) return row;

@@ -371,7 +371,8 @@ describe("the binder page, by id", () => {
   it("lives at /binders/<id> on both profiles, with the old address redirecting", () => {
     expect(web.ownBinder).toContain("readBinder(playerId, playerId, binderId)");
     expect(web.ownBinder).toContain("title={binder.name}");
-    expect(web.ownBinder).toContain("Back to your binders");
+    /* Round 16: the way back is a plain chevron, no words. */
+    expect(web.ownBinder).toContain('<BackLink href="/profile?tab=binders" />');
     expect(web.playerBinder).toContain("readBinder(playerId, me, binderId)");
     expect(web.playerBinder).toContain("if (!binder) notFound();");
     expect(web.playerBinder).toContain("`${binder.ownerName}'s ${binder.name}`");

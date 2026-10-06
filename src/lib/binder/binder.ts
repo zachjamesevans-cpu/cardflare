@@ -51,6 +51,8 @@ export const FIRST_BINDER_NAME = "Trade binder";
 
 export interface BinderCard {
   entryId: string;
+  /** The printing the owner put in, or null for any printing. */
+  printingId: string | null;
   /**
    * The pocket it sits in: page 1 is 0 to 8, page 2 is 9 to 17. Gaps are
    * real and kept, the way a binder keeps a slot open for a card you are
@@ -331,6 +333,7 @@ async function assemble(
     const fact = facts.get(card.id);
     return {
       entryId: card.id,
+      printingId: card.printing_id,
       pocket: pocketOf.get(card.id) ?? 0,
       cardId: card.card_id,
       name: fact?.name ?? "Unknown card",

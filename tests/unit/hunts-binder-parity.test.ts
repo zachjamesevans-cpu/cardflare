@@ -248,8 +248,9 @@ describe("the hunt page: the open binder", () => {
   it("links back to the Hunts tab the row came from, on the web", () => {
     expect(web.page).toContain('"/profile?tab=hunts"');
     expect(web.page).toContain("`/p/${hunt.playerId}?tab=hunts`");
-    expect(web.page).toContain('"Back to your hunts"');
-    expect(web.page).toContain("`Back to ${hunt.ownerName}'s hunts`");
+    /* Round 16: a plain chevron, no words (components/ui/back-link.tsx). */
+    expect(web.page).toContain("<BackLink");
+    expect(web.page).not.toContain("Back to your hunts");
   });
 
   it("draws 3x3 pockets on the binder-page background with arrows and dots", () => {

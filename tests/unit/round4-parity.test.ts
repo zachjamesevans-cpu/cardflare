@@ -184,12 +184,17 @@ describe("logging a trade", () => {
     expect(app.history).toContain("partnerPlayerId");
   });
 
-  it("filters by direction with the same three chips", () => {
-    for (const source of [web.history, app.historyScreen]) {
-      for (const label of ['"All"', '"Got"', '"Gave"']) {
+  /* Round 16: History's chips are All · Trades · Flares on both, and
+     replace the old All · Got · Gave. The app keeps its chips beside
+     the merge rule in src/history-items.ts. */
+  it("filters with the same three chips: All, Trades, Flares", () => {
+    const appChips = read("mobile/src/history-items.ts");
+    for (const source of [web.history, appChips]) {
+      for (const label of ['"All"', '"Trades"', '"Flares"']) {
         expect(source).toContain(label);
       }
     }
+    expect(app.historyScreen).toContain("HISTORY_FILTERS.map(");
   });
 
   it("reaches the server the same way from both", () => {

@@ -251,36 +251,36 @@ describe("the main tabs paint at once", () => {
   });
 });
 
-describe("the Inbox dot", () => {
-  const dot = app.slice(
-    app.indexOf("function InboxDot()"),
-    app.indexOf("function Tabs()"),
-  );
+describe("the unread dot (round 16: on the Feed's bell, not an Inbox tab)", () => {
+  const dot = read("mobile/src/unread-dot.tsx");
+  const header = read("mobile/src/collapsing-header.tsx");
+  const home = read("mobile/src/screens/home.tsx");
 
-  it("is a small accent dot with a ring in the bar's fill, and no number", () => {
-    expect(app).toContain("const INBOX_DOT = 9;");
+  it("is a small accent dot with a ring, and no number", () => {
+    expect(dot).toContain("export const UNREAD_DOT = 9;");
     expect(dot).toContain("backgroundColor: colors.accent,");
-    expect(dot).toContain("borderColor: colors.elevated,");
+    expect(dot).toContain("borderColor: ring,");
     expect(dot).not.toContain("<Text");
     expect(dot).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
-  it("shows on the Inbox icon only while something is unread, and says so", () => {
-    expect(app).toContain("const unread = useUnread();");
-    expect(app).toContain('if (route.name === "Inbox" && unread > 0) {');
-    expect(app).toContain("<InboxDot />");
-    expect(app).toContain(
-      'tabBarAccessibilityLabel: unread > 0 ? "Inbox, unread" : "Inbox",',
-    );
+  it("shows on the bell only while something is unread, and says so", () => {
+    expect(home).toContain("const unread = useUnread();");
+    expect(home).toContain("unread={unread}");
+    expect(header).toContain("{unread > 0 ? (");
+    expect(header).toContain("<UnreadDot ring={colors.canvas}");
+    expect(header).toContain('unread > 0 ? "Notifications, unread" : "Notifications"');
   });
 
   it("refreshes on launch, foreground, tab change and an arriving notice", () => {
     const effect = app.slice(
-      app.indexOf("The Inbox dot's count"),
-      app.indexOf("}, [gate]);", app.indexOf("The Inbox dot's count")),
+      app.indexOf("The two dots' counts"),
+      app.indexOf("}, [gate]);", app.indexOf("The two dots' counts")),
     );
     expect(effect).toContain('if (gate !== "open") return;\n    void refreshUnread();');
-    expect(effect).toContain('if (next === "active") void refreshUnread();');
+    expect(effect).toMatch(
+      /if \(next !== "active"\) return;\s*void refreshUnread\(\);/,
+    );
     expect(effect).toContain("Notifications.addNotificationReceivedListener(");
     expect(app).toMatch(/focus: \(\) => \{\s*void refreshUnread\(\);/);
   });

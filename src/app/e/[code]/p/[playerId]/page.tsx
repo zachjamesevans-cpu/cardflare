@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { NightShell } from "@/components/events/night-header";
 import { NightPlayer } from "@/components/events/night-player";
+import { BackLink } from "@/components/ui/back-link";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
@@ -63,13 +62,7 @@ export default async function NightPlayerPage({
 
   return (
     <NightShell wide>
-      <Link
-        href={`/e/${normalized}`}
-        className="inline-flex items-center gap-1.5 text-sm text-text-secondary underline-offset-4 hover:underline"
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-        {event.name}
-      </Link>
+      <BackLink href={`/e/${normalized}`} />
 
       <NightPlayer
         view={view}

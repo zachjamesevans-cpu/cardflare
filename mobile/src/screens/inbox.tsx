@@ -132,11 +132,11 @@ export function InboxScreen() {
     navigation.navigate("PlayerProfile", { playerId });
 
   /* Where conversations live: the Local tab while it is on, the
-     Messages screen otherwise. One door, the same one the notices use. */
+     Messages tab otherwise. One door, the same one the notices use. */
   const openMessages = () =>
     LOCAL_ENABLED
       ? navigation.navigate("Tabs", { screen: "Local" })
-      : navigation.navigate("Messages");
+      : navigation.navigate("Tabs", { screen: "Messages" });
 
   /*
    * A notice with a path is a door. The same router a push tap and the

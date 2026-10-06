@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
+import { UnreadDot } from "./unread-dot";
 
 /**
  * The name is the founder's ARTWORK, not text in a font. He supplied
@@ -147,10 +148,19 @@ export function settleHeader(state: HeaderScroll): void {
 
 export function CollapsingHeader({
   state,
+  onPost,
   onSearch,
+  onInbox,
+  unread,
 }: {
   state: HeaderScroll;
+  /** The + at the top left: Post a Flare, the way Instagram posts. */
+  onPost: () => void;
   onSearch: () => void;
+  /** The bell: the notices, which used to be the Inbox tab. */
+  onInbox: () => void;
+  /** Unread notices; above zero, the bell wears the accent dot. */
+  unread: number;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -232,6 +242,38 @@ export function CollapsingHeader({
         />
 
         {/*
+         * THE +, top left: Post a Flare. The founder: "Let's just make a +
+         * icon in top left of feed so it's like instagram and you're making
+         * a post there." The middle of the tab bar is Messages, which gets
+         * opened far more often than a Flare gets posted. Same weight as
+         * the search and the bell, the way Instagram's + sits.
+         */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              top: insets.top,
+              bottom: 0,
+              justifyContent: "center",
+            },
+            contents,
+          ]}
+        >
+          <Tap
+            accessibilityLabel="Post a Flare"
+            onPress={onPost}
+            style={{
+              paddingLeft: spacing(4),
+              paddingRight: spacing(2),
+              paddingVertical: spacing(2),
+            }}
+          >
+            <Ionicons name="add" size={26} color={colors.textPrimary} />
+          </Tap>
+        </Animated.View>
+
+        {/*
          * The positioning lives on this wrapper, NOT on the Tap.
          *
          * Tap puts its `style` on an inner Animated.View rather than on
@@ -255,17 +297,48 @@ export function CollapsingHeader({
             contents,
           ]}
         >
-          <Tap
-            accessibilityLabel="Search"
-            onPress={onSearch}
-            style={{
-              paddingLeft: spacing(4),
-              paddingRight: spacing(4),
-              paddingVertical: spacing(2),
-            }}
-          >
-            <Ionicons name="search" size={20} color={colors.textSecondary} />
-          </Tap>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Tap
+              accessibilityLabel="Search"
+              onPress={onSearch}
+              style={{
+                paddingLeft: spacing(4),
+                paddingRight: spacing(2),
+                paddingVertical: spacing(2),
+              }}
+            >
+              <Ionicons name="search" size={20} color={colors.textSecondary} />
+            </Tap>
+            {/*
+             * THE BELL. The notices were a tab; the founder gave the slot
+             * to Messages and put them here, top right of the Feed, the
+             * way Instagram keeps its heart. The accent dot at the bell's
+             * bottom right says something is unread, and the label says
+             * it for VoiceOver.
+             */}
+            <Tap
+              accessibilityLabel={
+                unread > 0 ? "Notifications, unread" : "Notifications"
+              }
+              onPress={onInbox}
+              style={{
+                paddingLeft: spacing(2),
+                paddingRight: spacing(4),
+                paddingVertical: spacing(2),
+              }}
+            >
+              <View>
+                <Ionicons
+                  name="notifications-outline"
+                  size={21}
+                  color={colors.textSecondary}
+                />
+                {unread > 0 ? (
+                  <UnreadDot ring={colors.canvas} style={{ bottom: 0, right: -1 }} />
+                ) : null}
+              </View>
+            </Tap>
+          </View>
         </Animated.View>
       </HeaderSurface>
     </Animated.View>

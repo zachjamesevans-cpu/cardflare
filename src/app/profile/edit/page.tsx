@@ -1,7 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AvatarForm } from "@/components/players/avatar-form";
@@ -10,6 +8,7 @@ import { EditProfileRows } from "@/components/players/edit-profile-rows";
 import { PictureDoor } from "@/components/players/picture-door";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { BackLink } from "@/components/ui/back-link";
 import { Card } from "@/components/ui/card";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
@@ -72,13 +71,7 @@ export default async function EditProfilePage() {
         }
       >
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-          <Link
-            href="/profile"
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            Back to your profile
-          </Link>
+          <BackLink href="/profile" />
 
           {/* The picture, dressed as the profile draws it, beside the
               door to the avatar effects. "Edit picture or avatar" under

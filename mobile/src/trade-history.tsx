@@ -3,11 +3,13 @@ import type { ComponentProps } from "react";
 import { Text, View } from "react-native";
 
 import { DotsButton } from "./action-menu";
-import type { TradeHistoryEntry, TradeHistoryTotals } from "./api";
+import type { FlareHistoryEntry, TradeHistoryEntry, TradeHistoryTotals } from "./api";
+import { FLARE_OUTCOME_LABELS } from "./history-items";
+import { PlayerAvatar } from "./player-avatar";
 import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
 import { colors, radius, spacing } from "./theme";
-import { Button } from "./ui";
+import { Button, Tap } from "./ui";
 
 /**
  * The pieces of the trade history, shared by the card on the profile
@@ -23,6 +25,17 @@ export function dayOf(iso: string): string {
     weekday: "short",
     month: "short",
     day: "numeric",
+  }).format(new Date(iso));
+}
+
+/** "Fri, Sep 12, 3:04 PM": an answer's moment, in the reader's clock. */
+export function momentOf(iso: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   }).format(new Date(iso));
 }
 
@@ -379,6 +392,164 @@ export function TradeHistoryTotalsRow({ totals }: { totals: TradeHistoryTotals }
           <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{label}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+/**
+ * A past Flare, in History.
+ *
+ * The founder, looking at greyed-out FOUND rows on the Flare tab: "past
+ * flares should live somewhere, or a flare history of sorts... it could
+ * be cool to see a log of who answered the flare, date and time etc."
+ * So the row is the card (its art, its name, how many), how it ended,
+ * when it went up and when it stopped, and everyone who answered it:
+ * their face, their name, when, and how many they could bring. Each
+ * answer opens your conversation with them when there is one. The
+ * website's src/components/trades/flare-history-row.tsx draws the same
+ * row with the same words.
+ */
+export function FlareHistoryRow({
+  flare,
+  last = false,
+  onOpenCard,
+  onOpenThread,
+}: {
+  flare: FlareHistoryEntry;
+  last?: boolean;
+  onOpenCard: (cardId: string) => void;
+  onOpenThread: (threadId: string) => void;
+}) {
+  const takenDown = flare.outcome === "taken-down";
+  const dates = [
+    flare.direction === "showcase" ? "Offering" : null,
+    `Posted ${dayOf(flare.postedAt)}`,
+    `Ended ${dayOf(flare.endedAt)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "flex-start",
+        gap: spacing(3),
+        paddingVertical: spacing(3),
+        borderBottomWidth: last ? 0 : 1,
+        borderBottomColor: colors.border,
+      }}
+    >
+      <View
+        style={{
+          width: THUMB,
+          height: Math.round((THUMB * 84) / 60),
+          borderRadius: 5,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          overflow: "hidden",
+        }}
+      >
+        {flare.imageUrl ? (
+          <RemoteImage uri={flare.imageUrl} style={{ width: "100%", height: "100%" }} />
+        ) : null}
+        <QuantityBadge
+          quantity={flare.quantity}
+          style={{ position: "absolute", top: 2, left: 2 }}
+        />
+      </View>
+
+      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+          <Tap
+            onPress={() => onOpenCard(flare.cardId)}
+            accessibilityLabel={`Open ${flare.cardName}`}
+            style={{ flexShrink: 1, minWidth: 0 }}
+          >
+            <Text
+              numberOfLines={1}
+              style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "700" }}
+            >
+              {flare.cardName}
+            </Text>
+          </Tap>
+          <View
+            style={{
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: takenDown ? colors.border : colors.accentMuted,
+              paddingHorizontal: spacing(2),
+              paddingVertical: 2,
+            }}
+          >
+            <Text
+              style={{
+                color: takenDown ? colors.textMuted : colors.accent,
+                fontSize: 11,
+                fontWeight: "700",
+              }}
+            >
+              {FLARE_OUTCOME_LABELS[flare.outcome]}
+            </Text>
+          </View>
+        </View>
+        <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+          {dates}
+        </Text>
+
+        {/* Who answered: face, name, when, and how many they could
+            bring. A tap opens your conversation with them. */}
+        {flare.responders.length > 0 ? (
+          <View
+            style={{ marginTop: spacing(1.5), gap: spacing(1) }}
+            accessibilityLabel="Who answered"
+          >
+            {flare.responders.map((responder, index) => {
+              const inner = (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: spacing(2),
+                    minWidth: 0,
+                  }}
+                >
+                  <PlayerAvatar
+                    displayName={responder.name}
+                    seed={responder.playerId ?? `${flare.flareId}-${index}`}
+                    avatarUrl={responder.avatarUrl}
+                    size={24}
+                  />
+                  <Text
+                    numberOfLines={1}
+                    style={{ flexShrink: 1, color: colors.textSecondary, fontSize: 12 }}
+                  >
+                    <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                      {responder.name}
+                    </Text>
+                    {` · ${momentOf(responder.at)}`}
+                  </Text>
+                  <QuantityBadge quantity={responder.quantity} />
+                </View>
+              );
+              const key = `${responder.playerId ?? "guest"}-${index}`;
+              const threadId = responder.threadId;
+              return threadId ? (
+                <Tap
+                  key={key}
+                  onPress={() => onOpenThread(threadId)}
+                  accessibilityLabel={`Open your conversation with ${responder.name}`}
+                >
+                  {inner}
+                </Tap>
+              ) : (
+                <View key={key}>{inner}</View>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -72,7 +72,9 @@ import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
 import { registerForPush } from "./src/push";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
-import { refreshUnread, useUnread } from "./src/unread";
+import { UnreadDot } from "./src/unread-dot";
+import { refreshUnread } from "./src/unread";
+import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages";
 
 /**
  * CardFlare for the pocket. The same backend, the same account, the same
@@ -80,7 +82,9 @@ import { refreshUnread, useUnread } from "./src/unread";
  * you about an offer while your phone is locked.
  *
  * Five tabs: Feed, Nights (the nights near you and the ones you are
- * going to), Flare, Inbox, Profile. The Room (where you are right now;
+ * going to), the raised + that posts a Flare, Messages, Profile. The
+ * notices are the bell at the Feed's top right (the Inbox, a stack
+ * screen now). The Room (where you are right now;
  * remembers the last room), scanning, posting, signing in and settings
  * ride on top as stack screens; the QR icon on Nights' header is the
  * door to the scanner and the Room's code form, and a night's matches
@@ -135,7 +139,8 @@ export type TabParams = {
         };
       }
     | undefined;
-  Inbox: undefined;
+  /** The conversations, with a dot while any message is unread. */
+  Messages: undefined;
   Profile: undefined;
 };
 
@@ -147,8 +152,8 @@ export type StackParams = {
   Room: undefined;
   /** One conversation about one Flare, from Local, Messages or the Inbox. */
   LocalThread: { threadId: string };
-  /** The conversations people already had, while Local is off. */
-  Messages: undefined;
+  /** The notices, from the bell at the Feed's top right. It was a tab. */
+  Inbox: undefined;
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
@@ -240,55 +245,29 @@ export type StackParams = {
 const Tab = createBottomTabNavigator<TabParams>();
 const Stack = createNativeStackNavigator<StackParams>();
 
-/* What each screen's back button says - the headerBackTitle map, kept
-   because the button itself is ours now (see HeaderBack). */
-const BACK_LABELS: Partial<Record<keyof StackParams, string>> = {
-  SignIn: "Back",
-  CreateAccount: "Back",
-  Scan: "Back",
-  Settings: "Profile",
-  EditProfile: "Profile",
-  Hunts: "Profile",
-  Binders: "Profile",
-  /* Opened from a profile's highlights row or from the Binders list,
-     so the label names neither. */
-  Binder: "Back",
-  Store: "Profile",
-  Customize: "Profile",
-  Pro: "Back",
-  PlayerProfile: "Back",
-  NightMatches: "Night",
-  NightPlayer: "Night",
-  LogTrade: "History",
-  Remote: "Room",
-  Search: "Feed",
-  Card: "Back",
-  PostFlare: "Room",
-  Room: LOCAL_ENABLED ? "Back" : "Nights",
-  LocalThread: LOCAL_ENABLED ? "Local" : "Messages",
-  Messages: "Inbox",
-};
-
 /**
- * Our own back button, replacing the native header's.
+ * Our own back button, replacing the native header's: a chevron and
+ * nothing else.
  *
  * The native one stopped answering taps on this screens/new-architecture
  * combination while the back GESTURE kept working - the tap lands in
  * native code this app cannot see. Drawing the button ourselves puts
- * the tap in JavaScript where it demonstrably works, with the same
- * chevron-and-label look iOS renders.
+ * the tap in JavaScript where it demonstrably works.
+ *
+ * No words beside it. The founder: back buttons are a plain chevron,
+ * the way Instagram draws them, so the per-screen labels ("Profile",
+ * "Night", "Room") went with the map that held them.
  */
-function HeaderBack({ label, onPress }: { label: string; onPress: () => void }) {
+function HeaderBack({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
       onPress={onPress}
       hitSlop={12}
       accessibilityRole="button"
-      accessibilityLabel={`Back to ${label}`}
+      accessibilityLabel="Back"
       style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}
     >
       <Ionicons name="chevron-back" size={26} color={colors.accent} />
-      <Text style={{ color: colors.accent, fontSize: 16 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -319,18 +298,10 @@ const TAB_ICONS: Partial<
   /* The website's dock draws lucide CalendarDays for Nights; the
        calendar fills in when it is the open tab, like the flame. */
   Nights: { idle: "calendar-outline", focused: "calendar" },
-  Inbox: { idle: "notifications-outline" },
+  /* The website's dock draws lucide MessageCircle for Messages. */
+  Messages: { idle: "chatbubble-outline", focused: "chatbubble" },
   Profile: { idle: "person-circle-outline" },
 };
-
-/*
- * The centre tab is the flame, the same glyph the website's dock draws
- * (lucide Flame in src/components/players/player-tabs.tsx). It used to
- * wear the old mark image; the founder: "use the same 'flare' logo from
- * the website to the app... it shows old logo." Filled when it is the
- * open tab, outlined otherwise, in the tint every other tab gets.
- */
-const FLARE_TAB_ICON = { focused: "flame", idle: "flame-outline" } as const;
 
 /*
  * The tab bar draws its own buttons, so the app-wide Tap primitive never
@@ -391,37 +362,23 @@ function TabButton({
 }
 
 /*
- * THE INBOX DOT. The founder (2026-10-05): "If you have an unread
+ * THE UNREAD DOT. The founder (2026-10-05): "If you have an unread
  * notification in app, there should be a small neon green dot on the
  * inbox icon so you know to check your inbox." The accent, no number
  * (the home screen's icon badge already carries the count), sat on the
- * icon's top right with a thin ring in the bar's own fill so it reads
- * as a dot on the glass rather than a smudge on the bell.
+ * icon's corner with a thin ring in the bar's own fill so it reads as a
+ * dot on the glass rather than a smudge on the glyph. The Messages tab
+ * wears it for unread messages; the Feed's bell wears the same dot for
+ * unread notices (src/unread-dot.tsx).
  */
-const INBOX_DOT = 9;
-
-function InboxDot() {
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        top: -1,
-        right: -3,
-        width: INBOX_DOT,
-        height: INBOX_DOT,
-        borderRadius: INBOX_DOT / 2,
-        backgroundColor: colors.accent,
-        borderWidth: 1.5,
-        borderColor: colors.elevated,
-      }}
-    />
-  );
+function MessagesDot() {
+  return <UnreadDot ring={colors.elevated} style={{ top: -1, right: -3 }} />;
 }
 
 function Tabs() {
-  /* Unread notices, for the dot. src/unread.ts holds the one value. */
-  const unread = useUnread();
+  /* Unread messages, for the dot on Messages. src/unread-messages.ts
+     holds the one value; the notices' count is the Feed bell's. */
+  const unreadMessages = useUnreadMessages();
 
   return (
     <Tab.Navigator
@@ -435,6 +392,7 @@ function Tabs() {
            anybody looks down at the bar. */
         focus: () => {
           void refreshUnread();
+          void refreshUnreadMessages();
         },
       }}
       screenOptions={({ route }) => ({
@@ -449,7 +407,11 @@ function Tabs() {
         headerStyle: { backgroundColor: colors.canvas },
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { fontWeight: "700" },
-        tabBarButton: (props) => <TabButton {...props} />,
+        /* Post a Flare keeps its route (every "Post a Flare" door in the
+           app navigates to it) but has no slot in the bar: it opens from
+           the + at the top left of the Feed. */
+        tabBarButton: (props) =>
+          route.name === "Flare" ? null : <TabButton {...props} />,
         /*
          * LIQUID GLASS, which means the bar stops being a floor and
          * starts being a surface the list runs under.
@@ -511,13 +473,15 @@ function Tabs() {
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
         tabBarIcon: ({ color, size, focused }) => {
-          const pair = TAB_ICONS[route.name as keyof TabParams] ?? FLARE_TAB_ICON;
+          const pair = TAB_ICONS[route.name as keyof TabParams] ?? {
+            idle: "add" as const,
+          };
           const icon = focused ? (pair.focused ?? pair.idle) : pair.idle;
-          if (route.name === "Inbox" && unread > 0) {
+          if (route.name === "Messages" && unreadMessages > 0) {
             return (
               <View>
                 <Ionicons name={icon} color={color} size={size} />
-                <InboxDot />
+                <MessagesDot />
               </View>
             );
           }
@@ -548,7 +512,7 @@ function Tabs() {
            * its own list and moves it with the scroll. See
            * src/collapsing-header.tsx.
            *
-           * Only this tab. Room, Flare, Inbox and Profile are screens
+           * Only this tab. Room, Flare, Messages and Profile are screens
            * you arrive at to do one thing rather than lists you fall
            * down, and a header that hides on a short screen is a
            * header that flickers.
@@ -577,25 +541,34 @@ function Tabs() {
           }}
         />
       )}
-      {/* The tab keeps the product's name; the header says what the
-          tab is for, the same words as the website's page heading. */}
+      {/* The conversations, the screen the Inbox's Messages row used to
+          open, now a tab of its own with a dot while anything is
+          unread. Local, while it is on, keeps its own list too. */}
+      <Tab.Screen
+        name="Messages"
+        options={{
+          title: "Messages",
+          tabBarLabel: "Messages",
+          /* The dot has no words of its own, so the label says it. */
+          tabBarAccessibilityLabel:
+            unreadMessages > 0 ? "Messages, unread" : "Messages",
+        }}
+      >
+        {() => <LocalScreen threadsOnly />}
+      </Tab.Screen>
+      <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* Post a Flare: no slot in the bar (see tabBarButton above); the +
+          at the Feed's top left opens it. Last, so it never shifts the
+          visible tabs. */}
       <Tab.Screen
         name="Flare"
         component={HubScreen}
-        options={{ title: "Post a Flare", tabBarLabel: "Flare" }}
-      />
-      {/* The tab and its page agree: Inbox, on both platforms. */}
-      <Tab.Screen
-        name="Inbox"
-        component={InboxScreen}
         options={{
-          title: "Inbox",
-          tabBarLabel: "Inbox",
-          /* The dot has no words of its own, so the label says it. */
-          tabBarAccessibilityLabel: unread > 0 ? "Inbox, unread" : "Inbox",
+          title: "Post a Flare",
+          tabBarLabel: "Post a Flare",
+          tabBarAccessibilityLabel: "Post a Flare",
         }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -790,20 +763,25 @@ function AppGates() {
   }, [gate]);
 
   /*
-   * The Inbox dot's count (src/unread.ts), asked for once the tabs are
+   * The two dots' counts: the Feed bell's (src/unread.ts) and the
+   * Messages tab's (src/unread-messages.ts), asked for once the tabs are
    * open (signed out reads as no dot), again whenever the app comes
    * back to the front, and again when a notice lands while it is open.
    * The fourth trigger, every tab change, is the navigator's `focus`
-   * listener in Tabs; the fifth, clearing it, is the Inbox's read.
+   * listener in Tabs; the fifth, clearing the bell's, is the Inbox's read.
    */
   useEffect(() => {
     if (gate !== "open") return;
     void refreshUnread();
+    void refreshUnreadMessages();
     const foreground = AppState.addEventListener("change", (next) => {
-      if (next === "active") void refreshUnread();
+      if (next !== "active") return;
+      void refreshUnread();
+      void refreshUnreadMessages();
     });
     const arrived = Notifications.addNotificationReceivedListener(() => {
       void refreshUnread();
+      void refreshUnreadMessages();
     });
     return () => {
       foreground.remove();
@@ -838,7 +816,7 @@ function AppGates() {
       >
         <StatusBar style="light" />
         <Stack.Navigator
-          screenOptions={({ navigation, route }) => ({
+          screenOptions={({ navigation }) => ({
             headerStyle: { backgroundColor: colors.surface },
             headerTintColor: colors.textPrimary,
             headerTitleStyle: { fontWeight: "700" },
@@ -869,58 +847,32 @@ function AppGates() {
             gestureEnabled: true,
             fullScreenGestureEnabled: false,
             headerLeft: ({ canGoBack }) =>
-              canGoBack ? (
-                <HeaderBack
-                  label={BACK_LABELS[route.name as keyof StackParams] ?? "Back"}
-                  onPress={() => navigation.goBack()}
-                />
-              ) : (
-                <View />
-              ),
+              canGoBack ? <HeaderBack onPress={() => navigation.goBack()} /> : <View />,
           })}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />
           {/* The Room, pushed over the tabs from Nights' "Scan or enter
               a code" and from every night's row. It was the second tab
               until Nights took the slot; it is the same screen. */}
+          <Stack.Screen name="Room" component={RoomTab} options={{ title: "Room" }} />
+          {/* The notices, pushed from the bell at the Feed's top right.
+              It was a tab until the bar made room for Messages. */}
           <Stack.Screen
-            name="Room"
-            component={RoomTab}
-            options={{
-              title: "Room",
-              headerBackTitle: LOCAL_ENABLED ? "Back" : "Nights",
-            }}
+            name="Inbox"
+            component={InboxScreen}
+            options={{ title: "Inbox" }}
           />
-          {LOCAL_ENABLED ? null : (
-            /* Local off: the conversations people already had, one
-               screen, reached from the Inbox. */
-            <Stack.Screen
-              name="Messages"
-              options={{ title: "Messages", headerBackTitle: "Inbox" }}
-            >
-              {() => <LocalScreen threadsOnly />}
-            </Stack.Screen>
-          )}
           <Stack.Screen
             name="LocalThread"
             component={ThreadScreen}
-            options={{
-              title: "Conversation",
-              headerBackTitle: LOCAL_ENABLED ? "Local" : "Messages",
-            }}
+            options={{ title: "Conversation" }}
           />
-          <Stack.Screen
-            name="SignIn"
-            options={{ title: "Sign in", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="SignIn" options={{ title: "Sign in" }}>
             {({ navigation }) => (
               <SignInScreen onSignedIn={() => navigation.goBack()} />
             )}
           </Stack.Screen>
-          <Stack.Screen
-            name="CreateAccount"
-            options={{ title: "Create account", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="CreateAccount" options={{ title: "Create account" }}>
             {({ navigation }) => (
               <WelcomeScreen
                 initialStep="account"
@@ -929,43 +881,31 @@ function AppGates() {
               />
             )}
           </Stack.Screen>
-          <Stack.Screen
-            name="Scan"
-            options={{ title: "Scan", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="Scan" options={{ title: "Scan" }}>
             {({ navigation }) => <ScanScreen onCode={() => openRoom(navigation)} />}
           </Stack.Screen>
           <Stack.Screen
             name="Lab"
             component={LabScreen}
-            options={{ title: "Design lab", headerBackTitle: "Settings" }}
+            options={{ title: "Design lab" }}
           />
           <Stack.Screen
             name="Settings"
             component={SettingsScreen}
-            options={{ title: "Settings", headerBackTitle: "Profile" }}
+            options={{ title: "Settings" }}
           />
           <Stack.Screen
             name="EditProfile"
             component={EditProfileScreen}
-            options={{ title: "Edit profile", headerBackTitle: "Profile" }}
+            options={{ title: "Edit profile" }}
           />
-          <Stack.Screen
-            name="Hunts"
-            options={{ title: "Hunts", headerBackTitle: "Profile" }}
-          >
+          <Stack.Screen name="Hunts" options={{ title: "Hunts" }}>
             {({ route }) => <HuntsScreen playerId={route.params?.playerId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Binders"
-            options={{ title: "Binders", headerBackTitle: "Profile" }}
-          >
+          <Stack.Screen name="Binders" options={{ title: "Binders" }}>
             {({ route }) => <BindersScreen playerId={route.params?.playerId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Binder"
-            options={{ title: "Binder", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="Binder" options={{ title: "Binder" }}>
             {({ route }) => (
               <BinderScreen
                 playerId={route.params?.playerId}
@@ -976,34 +916,25 @@ function AppGates() {
           <Stack.Screen
             name="Store"
             component={StoreScreen}
-            options={{ title: "Embers store", headerBackTitle: "Profile" }}
+            options={{ title: "Embers store" }}
           />
-          <Stack.Screen
-            name="Customize"
-            options={{ title: "Customize", headerBackTitle: "Profile" }}
-          >
+          <Stack.Screen name="Customize" options={{ title: "Customize" }}>
             {({ route }) => <CustomizeScreen area={route.params?.area ?? "profile"} />}
           </Stack.Screen>
           <Stack.Screen
             name="Pro"
             component={ProScreen}
-            options={{ title: "cardflare Pro", headerBackTitle: "Back" }}
+            options={{ title: "cardflare Pro" }}
           />
           <Stack.Screen
             name="PlayerProfile"
             component={PlayerProfileScreen}
-            options={{ title: "Player", headerBackTitle: "Back" }}
+            options={{ title: "Player" }}
           />
-          <Stack.Screen
-            name="NightMatches"
-            options={{ title: "Matches", headerBackTitle: "Night" }}
-          >
+          <Stack.Screen name="NightMatches" options={{ title: "Matches" }}>
             {({ route }) => <NightMatchesScreen code={route.params.code} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="NightPlayer"
-            options={{ title: "Player", headerBackTitle: "Night" }}
-          >
+          <Stack.Screen name="NightPlayer" options={{ title: "Player" }}>
             {({ route }) => (
               <NightPlayerScreen
                 code={route.params.code}
@@ -1014,54 +945,34 @@ function AppGates() {
           <Stack.Screen
             name="TradeHistory"
             component={TradeHistoryScreen}
-            options={{ title: "Trade history", headerBackTitle: "Profile" }}
+            options={{ title: "History" }}
           />
           <Stack.Screen
             name="LogTrade"
             component={LogTradeScreen}
-            options={{ title: "Log a trade", headerBackTitle: "History" }}
+            options={{ title: "Log a trade" }}
           />
-          <Stack.Screen
-            name="FlarePost"
-            options={{ title: "Flare", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="FlarePost" options={{ title: "Flare" }}>
             {({ route }) => <FlarePostScreen postId={route.params.postId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Hunt"
-            options={{ title: "Hunt", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="Hunt" options={{ title: "Hunt" }}>
             {({ route }) => <HuntScreen huntId={route.params.huntId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="StoreProfile"
-            options={{ title: "Store", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="StoreProfile" options={{ title: "Store" }}>
             {({ route }) => <StoreProfileScreen storeId={route.params.storeId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Remote"
-            options={{ title: "Timer remote", headerBackTitle: "Room" }}
-          >
+          <Stack.Screen name="Remote" options={{ title: "Timer remote" }}>
             {({ route }) => <RemoteScreen storeId={route.params?.storeId} />}
           </Stack.Screen>
           <Stack.Screen
             name="Search"
             component={SearchScreen}
-            options={{ title: "Search", headerBackTitle: "Feed" }}
+            options={{ title: "Search" }}
           />
-          <Stack.Screen
-            name="Card"
-            options={{ title: "Card", headerBackTitle: "Back" }}
-          >
+          <Stack.Screen name="Card" options={{ title: "Card" }}>
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="PostFlare"
-            // The back button names where it goes, not the screen's internal
-            // name — "Tabs" meant nothing to anyone at a counter.
-            options={{ title: "Post a Flare", headerBackTitle: "Room" }}
-          >
+          <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
             {({ route }) => (
               <FlareComposer
                 target={{ kind: "room", code: route.params.code }}

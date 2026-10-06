@@ -1121,17 +1121,20 @@ export type FlareMessageRow = {
   card_id: string | null;
   /** Every card it carries, in order; card_id is the first. */
   card_ids: string[];
+  /** The printing of each card in card_ids, same order; null = any printing. */
+  printing_ids: (string | null)[];
 };
 
 export type FlareMessageInsert = Omit<
   FlareMessageRow,
-  "id" | "created_at" | "read_at" | "card_id" | "card_ids"
+  "id" | "created_at" | "read_at" | "card_id" | "card_ids" | "printing_ids"
 > & {
   id?: string;
   created_at?: string;
   read_at?: string | null;
   card_id?: string | null;
   card_ids?: string[];
+  printing_ids?: (string | null)[];
 };
 
 export type PlayerInsert = Omit<

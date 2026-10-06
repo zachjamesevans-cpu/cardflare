@@ -90,16 +90,19 @@ describe("We traded, in a conversation", () => {
     expect(web.thread).toContain("<ThreadTradeBlock");
     expect(web.thread).toContain("proposeTradeAction(threadId, input)");
     expect(web.thread).toContain("answerTradeAction(tradeId, yes)");
-    /* The trigger leads the row with Block and Report. */
-    expect(web.thread.indexOf("<TradeTrigger")).toBeLessThan(
-      web.thread.indexOf("onClick={() => setAsking(true)}"),
+    /* Round 16: "We traded" sits in the chat header's ⋯, ahead of
+       Report and Block, and opens the same form. */
+    expect(web.thread.indexOf('label: "We traded"')).toBeGreaterThan(-1);
+    expect(web.thread.indexOf('label: "We traded"')).toBeLessThan(
+      web.thread.indexOf("onSelect: () => setAsking(true)"),
     );
+    expect(web.thread).toContain("setComposingTrade(true)");
     /* And the block sits above the composer, hidden once blocked. */
     expect(web.thread.indexOf("<ThreadTradeBlock")).toBeGreaterThan(
       web.thread.indexOf("{blocked ? ("),
     );
     expect(web.thread.indexOf("<ThreadTradeBlock")).toBeLessThan(
-      web.thread.indexOf('aria-label="Message"'),
+      web.thread.indexOf("<MessageComposer"),
     );
   });
 

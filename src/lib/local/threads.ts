@@ -131,7 +131,7 @@ export async function openFlareThread(
 
   const { data: flare } = await admin
     .from("flares")
-    .select("id, player_session_id, player_id, card_id")
+    .select("id, player_session_id, player_id, card_id, printing_id")
     .eq("id", flareId)
     .maybeSingle();
 
@@ -204,6 +204,7 @@ export async function openFlareThread(
     body,
     {
       flareCardId: flare.card_id,
+      flarePrintingId: flare.printing_id,
     },
   );
 
@@ -236,7 +237,7 @@ export async function openWantThread(
 
   const { data: want } = await admin
     .from("player_wants")
-    .select("id, player_id, card_id")
+    .select("id, player_id, card_id, printing_id")
     .eq("id", wantId)
     .maybeSingle();
 
@@ -291,6 +292,7 @@ export async function openWantThread(
     body,
     {
       flareCardId: want.card_id,
+      flarePrintingId: want.printing_id,
     },
   );
 
@@ -427,7 +429,14 @@ async function appendMessage(
   senderId: string,
   recipientId: string,
   body: string,
-  context?: { flareCardId?: string; cardIds?: string[] },
+  context?: {
+    flareCardId?: string;
+    /** The Flare's or want's printing; null when any printing will do. */
+    flarePrintingId?: string | null;
+    cardIds?: string[];
+    /** One per card in cardIds, same order; null = any printing. */
+    printingIds?: (string | null)[];
+  },
 ): Promise<boolean> {
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
@@ -440,6 +449,14 @@ async function appendMessage(
       : context?.flareCardId
         ? [context.flareCardId]
         : [];
+  /* The art each card was offered in, so the chat draws the alt art the
+     binder or the Flare showed rather than the plainest printing. */
+  const printingIds =
+    context?.cardIds && context.cardIds.length > 0
+      ? cardIds.map((_, index) => context.printingIds?.[index] ?? null)
+      : context?.flareCardId
+        ? [context?.flarePrintingId ?? null]
+        : [];
 
   const { error } = await admin.from("flare_messages").insert({
     thread_id: threadId,
@@ -447,6 +464,7 @@ async function appendMessage(
     body,
     card_id: cardIds[0] ?? null,
     card_ids: cardIds,
+    printing_ids: printingIds,
   });
 
   if (error) {
@@ -473,12 +491,14 @@ export async function sendCardsMessage(
   recipientId: string,
   body: string,
   cardIds: string[],
+  printingIds: (string | null)[] = [],
 ): Promise<string | null> {
   if (!isSupabaseConfigured()) return null;
   const conversation = await pairThreadId(recipientId, senderId);
   if (!conversation) return null;
   const sent = await appendMessage(conversation, senderId, recipientId, body, {
     cardIds,
+    printingIds,
   });
   return sent ? conversation : null;
 }
@@ -703,6 +723,8 @@ export interface ThreadRead {
   withPlayerId: string | null;
   /** Their face for the header, or null for the initials face. */
   withAvatarUrl: string | null;
+  /** Their @handle, under the name in the header, Instagram-style. */
+  withHandle: string | null;
   messages: ThreadMessage[];
   /** A public place to suggest meeting, or null when neither side has a local. */
   meet: MeetSuggestion | null;
@@ -726,6 +748,7 @@ export async function readThread(
     withName: null,
     withPlayerId: null,
     withAvatarUrl: null,
+    withHandle: null,
     messages: [],
     meet: null,
     trade: null,
@@ -744,13 +767,13 @@ export async function readThread(
   const [{ data: messages }, { data: other }, meet, trade] = await Promise.all([
     admin
       .from("flare_messages")
-      .select("id, sender_player_id, body, created_at, card_id, card_ids")
+      .select("id, sender_player_id, body, created_at, card_id, card_ids, printing_ids")
       .eq("thread_id", conversationId)
       .order("created_at", { ascending: false })
       .limit(200),
     admin
       .from("players")
-      .select("display_name, avatar_url")
+      .select("display_name, avatar_url, handle")
       .eq("id", otherId)
       .maybeSingle(),
     meetSuggestion(viewerId, otherId).catch(() => null),
@@ -768,6 +791,34 @@ export async function readThread(
         ? [message.card_id]
         : [];
   const cardIds = [...new Set(ordered.flatMap(carried))];
+  const printingOf = (
+    message: { card_ids: string[] | null; printing_ids: (string | null)[] | null },
+    index: number,
+  ): string | null =>
+    message.card_ids && message.card_ids.length > 0
+      ? (message.printing_ids?.[index] ?? null)
+      : (message.printing_ids?.[0] ?? null);
+  const printingIds = [
+    ...new Set(
+      ordered.flatMap((message) =>
+        carried(message).flatMap((_, index) => {
+          const printing = printingOf(message, index);
+          return printing ? [printing] : [];
+        }),
+      ),
+    ),
+  ];
+  const artByPrinting = new Map<string, string>();
+  if (printingIds.length > 0) {
+    const { data: printings } = await admin
+      .from("card_printings")
+      .select("id, image_url")
+      .in("id", printingIds)
+      .not("image_url", "is", null);
+    for (const row of printings ?? []) {
+      if (row.image_url) artByPrinting.set(row.id, row.image_url);
+    }
+  }
   const cardById = new Map<
     string,
     { name: string; number: string; imageUrl: string | null }
@@ -829,10 +880,14 @@ export async function readThread(
     withName: other?.display_name ?? null,
     withPlayerId: otherId,
     withAvatarUrl: avatarSrc(other?.avatar_url),
+    withHandle: other?.handle ?? null,
     messages: ordered.map((message) => {
-      const cards = carried(message).flatMap((cardId) => {
+      const cards = carried(message).flatMap((cardId, index) => {
         const card = cardById.get(cardId);
-        return card ? [{ cardId, ...card }] : [];
+        if (!card) return [];
+        const printing = printingOf(message, index);
+        const imageUrl = (printing && artByPrinting.get(printing)) || card.imageUrl;
+        return [{ cardId, ...card, imageUrl }];
       });
       return {
         id: message.id,

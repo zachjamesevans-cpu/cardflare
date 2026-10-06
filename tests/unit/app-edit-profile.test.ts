@@ -75,11 +75,13 @@ describe("Edit profile, the app's screen", () => {
     expect(screen).toContain("handleWhileTyping(next)");
   });
 
-  it("is a stack screen titled Edit profile, with Back to the profile", () => {
+  it("is a stack screen titled Edit profile, with the plain back chevron", () => {
     expect(app).toContain("EditProfile: undefined;");
     expect(app).toContain('name="EditProfile"');
     expect(app).toContain('title: "Edit profile"');
-    expect(app).toContain('EditProfile: "Profile"');
+    /* Round 16: back is a chevron with no words, on every screen. */
+    expect(app).not.toContain("BACK_LABELS");
+    expect(app).not.toContain("headerBackTitle");
     expect(profile).toContain('navigation.navigate("EditProfile")');
     expect(profile).toContain('label="Edit profile"');
   });
@@ -117,12 +119,14 @@ describe("the picker", () => {
   });
 });
 
-describe("the flame on the centre tab", () => {
+describe("the centre tab", () => {
   const app = read("mobile/App.tsx");
 
-  it("is the website's glyph, filled when open and outlined when not", () => {
-    expect(app).toContain('focused: "flame"');
-    expect(app).toContain('idle: "flame-outline"');
+  it("is gone: posting is the + at the Feed's top left, never the old mark image", () => {
+    /* The flame gave way to a raised +, and the founder took that out
+       too ("Not a fan of the big plus"); tests/unit/r16-app-nav.test.ts
+       pins the + in the Feed header. */
+    expect(app).not.toContain("function PostButton(");
     expect(app).not.toContain("MarkIcon");
     expect(app).not.toContain("cardflare-mark.png");
     /* The mark still has a home: the pack shop. */

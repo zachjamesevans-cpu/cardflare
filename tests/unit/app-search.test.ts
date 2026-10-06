@@ -107,8 +107,8 @@ describe("the Search screen, from the Feed", () => {
     expect(src.app).toContain('import { SearchScreen } from "./src/screens/search";');
     expect(src.app).toContain("  Search: undefined;");
     expect(src.app).toContain('name="Search"');
-    expect(src.app).toContain('options={{ title: "Search", headerBackTitle: "Feed" }}');
-    expect(src.app).toContain('Search: "Feed",');
+    /* Round 16: back is the plain chevron, so no back title. */
+    expect(src.app).toContain('options={{ title: "Search" }}');
     expect(src.app).not.toContain("FindPlayer");
     expect(src.home).toContain('onSearch={() => navigation.navigate("Search")}');
     expect(src.home).not.toContain("FindPlayer");
@@ -132,15 +132,17 @@ describe("the Search screen, from the Feed", () => {
   });
 
   it("draws Cards, Players, Stores in that order, each only when it has rows", () => {
-    const cards = src.search.indexOf('<Section heading="Cards">');
-    const players = src.search.indexOf('<Section heading="Players">');
-    const stores = src.search.indexOf('<Section heading="Stores">');
+    /* Round 16: the order on screen is Top's (topOrder) or the tab's;
+       in the source the three are still written Cards, Players, Stores. */
+    const cards = src.search.indexOf('<Section key={kind} heading="Cards"');
+    const players = src.search.indexOf('<Section key={kind} heading="Players"');
+    const stores = src.search.indexOf('<Section key={kind} heading="Stores"');
     expect(cards).toBeGreaterThan(-1);
     expect(players).toBeGreaterThan(cards);
     expect(stores).toBeGreaterThan(players);
-    expect(src.search).toContain("{found && found.cards.length > 0 ? (");
-    expect(src.search).toContain("{found && found.players.length > 0 ? (");
-    expect(src.search).toContain("{found && found.stores.length > 0 ? (");
+    expect(src.search).toContain("return found && found.cards.length > 0 ? (");
+    expect(src.search).toContain("return found && found.players.length > 0 ? (");
+    expect(src.search).toContain("return found && found.stores.length > 0 ? (");
     /* A card row: art, name, number, the game's short name; tap opens the card. */
     expect(src.search).toContain("uri={leadArt(card)}");
     expect(src.search).toContain("{card.name}");
@@ -180,7 +182,6 @@ describe("the card page", () => {
     expect(src.app).toContain("  Card: { cardId: string };");
     expect(src.app).toContain('name="Card"');
     expect(src.app).toContain("<CardScreen cardId={route.params.cardId} />");
-    expect(src.app).toContain('Card: "Back",');
     expect(src.href).toContain('if (href.startsWith("/cards/")) {');
     expect(src.href).toContain('navigation.navigate("Card", { cardId });');
     expect(src.card).toContain("await getCardPage(cardId)");

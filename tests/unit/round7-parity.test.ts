@@ -153,8 +153,10 @@ describe("one report sheet, shared by profile, post and conversation", () => {
     );
   });
 
-  it("sits beside End conversation in a thread, on both", () => {
-    expect(web.thread).toContain("End this conversation");
+  /* Round 16: in the chat header's ⋯ on the web, with View profile,
+     We traded and Block (tests/unit/r16-web-msg.test.ts). */
+  it("sits in a thread's menu, on both", () => {
+    expect(web.thread).toContain('label: "Report"');
     expect(web.thread).toContain('kind="thread"');
     expect(web.thread).toContain("targetId={threadId}");
     expect(web.thread.indexOf("Report")).toBeGreaterThan(-1);
