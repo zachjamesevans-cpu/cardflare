@@ -135,7 +135,9 @@ describe("painting it", () => {
      * feed appears.
      */
     const home = await readFile("mobile/src/screens/home.tsx", "utf8");
-    expect(home).toContain("{hydrated && feed.length < 3 && (");
+    expect(home).toContain("{feedReady && feed.length < 3 && (");
+    /* Ready means the cache has answered AND the first fetch has. */
+    expect(home).toContain("const feedReady = hydrated && feedSettled && !feedFailed;");
   });
 
   it("keeps what is on screen when a refresh fails", async () => {

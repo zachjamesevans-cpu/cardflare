@@ -64,6 +64,9 @@ export function PostSocial({
   const [loading, startLoading] = useTransition();
   const [draft, setDraft] = useState("");
   const [sending, startSending] = useTransition();
+  /* A comment that did not post, or a thread that did not load, says
+     so: a draft that silently stays put reads as a frozen button. */
+  const [error, setError] = useState<string | null>(null);
 
   const toggleLike = () => {
     const next = !liked;
@@ -82,8 +85,17 @@ export function PostSocial({
     const next = !open;
     setOpen(next);
     if (next && thread === null) {
+      setError(null);
       startLoading(async () => {
-        setThread(await loadPostThreadAction(postId));
+        try {
+          setThread(await loadPostThreadAction(postId));
+        } catch {
+          /* Stop the spinner: an empty thread with the reason under it,
+             and closing and reopening tries again. */
+          setThread(null);
+          setOpen(false);
+          setError("Couldn't load comments. Try again.");
+        }
       });
     }
   };
@@ -91,9 +103,20 @@ export function PostSocial({
   const send = () => {
     const body = draft.trim();
     if (!body || sending) return;
+    setError(null);
     startSending(async () => {
-      const comment = await addPostCommentAction(postId, body);
-      if (!comment) return;
+      let comment: PostComment | null = null;
+      try {
+        comment = await addPostCommentAction(postId, body);
+      } catch {
+        comment = null;
+      }
+      if (!comment) {
+        /* Refused (too many in an hour) or failed: the draft stays so
+           nothing typed is lost, and the reason is on screen. */
+        setError("Couldn't post that comment. Wait a moment and try again.");
+        return;
+      }
       setDraft("");
       setThread((current) => [...(current ?? []), comment]);
       setCount((current) => current + 1);
@@ -131,6 +154,12 @@ export function PostSocial({
         </button>
         {message && <FlareMessage target={message} count={offers} />}
       </div>
+
+      {error && !open && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       {open && (
         <div className="flex flex-col gap-3 border-t border-border pt-3">
@@ -209,6 +238,11 @@ export function PostSocial({
               {sending ? "Posting…" : "Post"}
             </button>
           </form>
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>

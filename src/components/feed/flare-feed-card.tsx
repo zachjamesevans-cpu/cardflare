@@ -15,7 +15,7 @@ import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
-import { cardCountLabel } from "@/lib/feed/card-copy";
+import { cardCountLabel, postSubject } from "@/lib/feed/card-copy";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { HuntItem } from "@/lib/feed/repository";
 
@@ -48,8 +48,11 @@ import type { HuntItem } from "@/lib/feed/repository";
  * that claimed a minute's age was the audit's first finding. The app's
  * `agoFrom` says the same (mobile/src/flare-feed-card.tsx).
  */
-export function agoFrom(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
+export function agoFrom(iso: string | null | undefined): string {
+  /* A time that does not parse says nothing rather than "NaNd ago". */
+  const at = iso ? Date.parse(iso) : Number.NaN;
+  if (!Number.isFinite(at)) return "";
+  const seconds = Math.max(0, (Date.now() - at) / 1000);
   if (seconds < 60) return "now";
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
@@ -361,7 +364,8 @@ export function FlareFeedCard({
               ? null
               : {
                   flareId: lead.flareId,
-                  cardName: lead.cardName,
+                  /* The post's name for several cards, not the lead's. */
+                  cardName: postSubject(item),
                   posterName: item.displayName,
                 }
           }

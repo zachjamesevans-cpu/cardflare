@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SheetBackdrop } from "./action-menu";
 import { SwipeToClose } from "./sheet-swipe";
-import type { FeedCard } from "./api";
+import { getPost, type FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
 import { availableLabel, cardsLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { reviewLabel, selectionSummary, wantsLine } from "./offer-copy";
@@ -35,6 +35,8 @@ export interface FlareSheetPost {
   yours: boolean;
   completed: boolean;
   cards: FeedCard[];
+  /** Cards on the whole post, when the Feed's rail carried fewer. */
+  total?: number;
 }
 
 /**
@@ -85,6 +87,30 @@ export function FlareCardsSheet({
   const insets = useSafeAreaInsets();
   const [selecting, setSelecting] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  /*
+   * EVERY CARD, NOT THE RAIL'S. The Feed ships a post's first twenty
+   * cards; "View all 30" over a list of twenty was the count lying.
+   * When the post has more than it carried, the whole post is read once
+   * on opening and the list is the post's own. The website's sheet does
+   * the same.
+   */
+  const [fullCards, setFullCards] = useState<{ postId: string; cards: FeedCard[] } | null>(
+    null,
+  );
+  const partial = open ? (open.total ?? 0) > open.cards.length : false;
+  const openPostId = open?.postId ?? null;
+  useEffect(() => {
+    if (!openPostId || !partial || fullCards?.postId === openPostId) return;
+    let live = true;
+    getPost(openPostId)
+      .then(({ post }) => {
+        if (live) setFullCards({ postId: openPostId, cards: post.cards });
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [openPostId, partial, fullCards]);
 
   /* The picks as they stand, for the moment of opening only: a tick
      afterwards must not flip the mode under the person's thumb. */
@@ -102,6 +128,9 @@ export function FlareCardsSheet({
 
   if (!open) return null;
 
+  const cards =
+    fullCards && fullCards.postId === open.postId ? fullCards.cards : open.cards;
+
   const canOffer = !open.yours && open.direction === "want" && !open.completed;
   const offerable = (card: FeedCard) =>
     canOffer &&
@@ -115,7 +144,7 @@ export function FlareCardsSheet({
     else next[key] = quantity;
     onPicks(next);
   };
-  const chosen = open.cards.filter((card) => card.flareId && picked[card.flareId]);
+  const chosen = cards.filter((card) => card.flareId && picked[card.flareId]);
   const copies = chosen.reduce(
     (sum, card) => sum + (picked[card.flareId ?? ""] ?? 0),
     0,
@@ -184,7 +213,9 @@ export function FlareCardsSheet({
               }}
             >
               <Title>
-                {selecting ? "What do you have?" : `${cardsLabel(open.cards.length)}`}
+                {selecting
+                  ? "What do you have?"
+                  : `${cardsLabel(Math.max(cards.length, open.total ?? 0))}`}
               </Title>
               <Tap onPress={onClose} hitSlop={8} accessibilityLabel="Close">
                 <Ionicons name="close" size={22} color={colors.textSecondary} />
@@ -197,7 +228,7 @@ export function FlareCardsSheet({
                 keyboardDismissMode="on-drag"
                 contentContainerStyle={{ gap: spacing(2) }}
               >
-                {open.cards.map((card) => {
+                {cards.map((card) => {
                   const key = card.flareId ?? card.cardId;
                   const count = picked[key] ?? 0;
                   const remaining = remainingOf(card);

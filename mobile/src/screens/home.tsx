@@ -74,7 +74,10 @@ import {
 } from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson } from "../feed-person";
-import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { agoFrom } from "../ago";
+import { cachedPlayerId, readCache, rememberAccount, writeCache } from "../cache";
+import { feedKeys } from "../feed-keys";
+import { postSubject } from "../flare-copy";
 import { markFeedStale, onFeedStale } from "../feed-refresh";
 import { UndoToast, type UndoOffer } from "../undo-toast";
 import { refreshTick } from "../refresh-tick";
@@ -328,7 +331,9 @@ function WantedRow({
             {entry.card.cardName}
           </Text>
           <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
-            {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
+            {[entry.displayName ?? "A player", entry.storeName, agoFrom(entry.when)]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
         </View>
         <Tap
@@ -359,16 +364,6 @@ function WantedRow({
       <ErrorLine message={error} />
     </View>
   );
-}
-
-function agoFrom(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
-
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.round(hours / 24)}d ago`;
 }
 
 /**
@@ -412,6 +407,8 @@ export function HomeScreen() {
       belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
   );
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
+  /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
+  const shownKeys = feedKeys(shown);
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
   /* The post whose cards are open in the sheet, to read or to offer on. */
@@ -447,6 +444,22 @@ export function HomeScreen() {
   /* False until the cached read has resolved, so nothing that means
      "you have nothing" is drawn before we know that is true. */
   const [hydrated, setHydrated] = useState(false);
+  /*
+   * False until the first real feed fetch has answered, either way. A
+   * first run has no cache, so `hydrated` alone let "Nothing from people
+   * yet" flash at somebody whose feed was still on its way.
+   */
+  const [feedSettled, setFeedSettled] = useState(false);
+  /* The fetch failed and there was nothing to keep on screen: an error
+     with a way to try again, never the empty state's "you have nothing". */
+  const [feedFailed, setFeedFailed] = useState(false);
+  /*
+   * Which load is the newest. Focus, a pull, a post elsewhere and a sheet
+   * closing each start one, and their answers land in any order; only
+   * the newest may write, so an older response cannot paint over it.
+   */
+  const loadSeq = useRef(0);
+  const feedReady = hydrated && feedSettled && !feedFailed;
 
   /*
    * The header follows the thumb, on the UI thread.
@@ -575,7 +588,7 @@ export function HomeScreen() {
    * tab has been left does not set state on a gone screen - and so the
    * two entry points cannot drift into two slightly different loads.
    */
-  const load = useCallback(async (alive: () => boolean) => {
+  const loadOnce = useCallback(async (alive: () => boolean) => {
     if (!(await storedAccessToken())) {
       if (alive()) {
         setMe(null);
@@ -602,6 +615,9 @@ export function HomeScreen() {
       const fresh = await getMe();
       if (alive()) setMe(fresh);
       cachedFor = fresh.player.id;
+      /* The signed-in account's own id: the one place the cache's
+         pointer is set (cache.ts). */
+      void rememberAccount(fresh.player.id);
     } catch {
       /* Offline or mid-refresh. The cache still knows who it belongs
          to, so a feed can be painted from it even when `me` failed —
@@ -623,7 +639,10 @@ export function HomeScreen() {
        */
       const coords = await silentCoords();
       const fresh = await getFeed(coords);
-      if (alive()) setFeed(fresh.items);
+      if (alive()) {
+        setFeed(fresh.items);
+        setFeedFailed(false);
+      }
 
       /* Written after a load that worked, so the cache can only ever
          hold a feed that was real. */
@@ -640,8 +659,24 @@ export function HomeScreen() {
        * worst form — it removes content rather than adding it late.
        */
       if (alive() && feedRef.current.length === 0) setFeed([]);
+      if (alive()) setFeedFailed(feedRef.current.length === 0);
     }
   }, []);
+
+  /* Every load goes through here: newest wins, and the first answer,
+     whichever way it went, lets the empty states speak. */
+  const load = useCallback(
+    async (alive: () => boolean) => {
+      const seq = ++loadSeq.current;
+      const newest = () => alive() && seq === loadSeq.current;
+      try {
+        await loadOnce(newest);
+      } finally {
+        if (newest()) setFeedSettled(true);
+      }
+    },
+    [loadOnce],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -745,6 +780,7 @@ export function HomeScreen() {
     yours: item.yours,
     completed: item.completed ?? false,
     cards: item.cards,
+    total: item.total,
   });
 
   const enter = async (raw: string) => {
@@ -1021,7 +1057,22 @@ export function HomeScreen() {
          * everywhere needs to be updated." Nothing that means "you have
          * nothing" is drawn before we know that is true.
          */}
-        {!hydrated && shown.length === 0 && <Loading />}
+        {(!hydrated || !feedSettled) && !feedFailed && shown.length === 0 && (
+          <Loading />
+        )}
+
+        {/* The first load failed and nothing was cached to keep. */}
+        {feedFailed && shown.length === 0 && (
+          <Card>
+            <Title>Couldn&rsquo;t load the Feed</Title>
+            <Body>Check your connection and try again.</Body>
+            <Button
+              label="Try again"
+              variant="secondary"
+              onPress={() => void refresh()}
+            />
+          </Card>
+        )}
 
         {shown.map((item, index) => {
           const body =
@@ -1312,7 +1363,7 @@ export function HomeScreen() {
                       : () =>
                           setMessaging({
                             flareId: item.cards[0]?.flareId ?? "",
-                            cardName: item.cards[0]?.cardName ?? "your card",
+                            cardName: postSubject(item),
                             posterName: item.displayName,
                           })
                   }
@@ -1352,7 +1403,7 @@ export function HomeScreen() {
                       : () =>
                           setMessaging({
                             flareId: item.cards[0]?.flareId ?? "",
-                            cardName: item.cards[0]?.cardName ?? "your card",
+                            cardName: postSubject(item),
                             posterName: item.displayName,
                           })
                   }
@@ -1691,7 +1742,7 @@ export function HomeScreen() {
             (index === 0 || shown[index - 1].section !== item.section);
 
           return (
-            <View key={`entry-${index}`} style={{ gap: spacing(2) }}>
+            <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
               {opensSection ? (
                 <Text
                   style={{
@@ -1734,7 +1785,7 @@ export function HomeScreen() {
          * nothing, briefly, is its own kind of disorienting — which is
          * the complaint this whole change exists to answer.
          */}
-        {hydrated && shown.length === 0 && tab === "following" && (
+        {feedReady && shown.length === 0 && tab === "following" && (
           <Card>
             <Title>Nothing from people yet</Title>
             <Body>
@@ -1750,7 +1801,7 @@ export function HomeScreen() {
         )}
         {/* The restored filter needs its own words. Without them it
             fell through to Nearby's, which talks about store rooms. */}
-        {hydrated && shown.length === 0 && tab === "mine" && (
+        {feedReady && shown.length === 0 && tab === "mine" && (
           <Card>
             <Title>You have not posted yet</Title>
             <Body>
@@ -1765,7 +1816,7 @@ export function HomeScreen() {
           </Card>
         )}
 
-        {hydrated && shown.length === 0 && tab === "nearby" && (
+        {feedReady && shown.length === 0 && tab === "nearby" && (
           <Card>
             <Title>Nothing on right now</Title>
             <Body>
@@ -1805,7 +1856,7 @@ export function HomeScreen() {
         />
         <ReportSheet target={report} onClose={() => setReport(null)} />
 
-        {hydrated && feed.length < 3 && (
+        {feedReady && feed.length < 3 && (
           <Card>
             <Title>How it works</Title>
             <Body>

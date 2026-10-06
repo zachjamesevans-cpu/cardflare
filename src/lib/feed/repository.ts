@@ -1604,6 +1604,9 @@ async function ownRoomFlares(viewerId: string) {
   return (data ?? []).map((flare) => ({ ...flare, player_id: viewerId }));
 }
 
+const AREA_FLARE_COLUMNS =
+  "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent";
+
 async function areaHuntsFor(
   authors: Map<string, FollowedPlayer>,
   viewerId: string,
@@ -1613,11 +1616,9 @@ async function areaHuntsFor(
 ): Promise<HuntItem[]> {
   if (authors.size === 0) return [];
 
-  const { data: flares } = await getSupabaseAdmin()
+  let { data: flares } = await getSupabaseAdmin()
     .from("flares")
-    .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
-    )
+    .select(AREA_FLARE_COLUMNS)
     /* One query for everybody rather than one per person followed. */
     .in("player_id", [...authors.keys()])
     .eq("status", "open")
@@ -1629,6 +1630,37 @@ async function areaHuntsFor(
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
+
+  /*
+   * A READ THAT HIT ITS LIMIT CAN CUT A POST IN HALF.
+   *
+   * The limit counts Flares, and a pasted deck is thirty of them, so the
+   * oldest batch in a full read may have only some of its rows - and a
+   * post that says "View all 12" while holding 7 is the count lying.
+   * When the read came back full, every batch it touched is read again
+   * by id, whole, and the missing rows merged in. One extra query, only
+   * on a busy feed.
+   */
+  if (flares && flares.length >= RECENT_READ) {
+    const batches = [
+      ...new Set(
+        flares.map((flare) => flare.posted_batch).filter((id): id is string => !!id),
+      ),
+    ];
+    if (batches.length > 0) {
+      const { data: rest } = await getSupabaseAdmin()
+        .from("flares")
+        .select(AREA_FLARE_COLUMNS)
+        .in("posted_batch", batches)
+        .in("player_id", [...authors.keys()])
+        .eq("status", "open")
+        .in("intent", ["want", "showcase"])
+        .is("event_id", null)
+        .order("created_at", { ascending: false });
+      const have = new Set(flares.map((flare) => flare.id));
+      flares = [...flares, ...(rest ?? []).filter((row) => !have.has(row.id))];
+    }
+  }
 
   /*
    * YOUR OWN FLARES COUNT WHEREVER YOU POSTED THEM.

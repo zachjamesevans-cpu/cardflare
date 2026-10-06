@@ -22,3 +22,25 @@ export const GONE_LABEL = "Gone";
 /** The printing somebody asked for, or the honest default. */
 export const printingLabel = (label: string | null | undefined): string =>
   label ?? "Any printing";
+
+/**
+ * What a message about a post is about, for "About your <this>: ".
+ *
+ * The card's name for a one-card post. For several it names the post,
+ * not whichever card happens to lead the rail: a message about a
+ * twenty-card hunt that opened "About your Nami:" read as a question
+ * about one card. The website's `postSubject` (src/lib/feed/card-copy.ts)
+ * says the same.
+ */
+export function postSubject(post: {
+  total: number;
+  cards: readonly { cardName: string }[];
+  hunt?: { name: string } | null;
+  deckLabel?: string | null;
+}): string {
+  const lead = post.cards[0]?.cardName;
+  if (post.total <= 1 && lead) return lead;
+  const named = post.hunt?.name?.trim() || post.deckLabel?.trim();
+  if (named) return `${named} Flare`;
+  return `Flare of ${cardsLabel(Math.max(post.total, post.cards.length))}`;
+}
