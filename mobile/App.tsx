@@ -65,13 +65,14 @@ import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, forgetWelcome, hasSeenWelcome } from "./src/screens/welcome";
 import { onSignedOut, storedAccessToken } from "./src/api";
 import { firstBootError } from "./src/boot-errors";
-import { colors, spacing } from "./src/theme";
+import { colors } from "./src/theme";
 import { Tap } from "./src/ui";
 import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
 import { registerForPush } from "./src/push";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
+import { StackHeader, TabHeader } from "./src/header";
 import { UnreadDot } from "./src/unread-dot";
 import { refreshUnread } from "./src/unread";
 import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages";
@@ -245,33 +246,6 @@ export type StackParams = {
 const Tab = createBottomTabNavigator<TabParams>();
 const Stack = createNativeStackNavigator<StackParams>();
 
-/**
- * Our own back button, replacing the native header's: a chevron and
- * nothing else.
- *
- * The native one stopped answering taps on this screens/new-architecture
- * combination while the back GESTURE kept working - the tap lands in
- * native code this app cannot see. Drawing the button ourselves puts
- * the tap in JavaScript where it demonstrably works.
- *
- * No words beside it. The founder: back buttons are a plain chevron,
- * the way Instagram draws them, so the per-screen labels ("Profile",
- * "Night", "Room") went with the map that held them.
- */
-function HeaderBack({ onPress }: { onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={12}
-      accessibilityRole="button"
-      accessibilityLabel="Back"
-      style={{ flexDirection: "row", alignItems: "center", paddingRight: 12 }}
-    >
-      <Ionicons name="chevron-back" size={26} color={colors.accent} />
-    </Pressable>
-  );
-}
-
 const theme: Theme = {
   ...DarkTheme,
   colors: {
@@ -406,9 +380,13 @@ function Tabs() {
          * tab bar grey would just move the seam to the other end. The
          * hairline borders still separate them.
          */
-        headerStyle: { backgroundColor: colors.canvas },
-        headerTintColor: colors.textPrimary,
-        headerTitleStyle: { fontWeight: "700" },
+        /* Our header, not the navigator's: the same bar every pushed
+           screen draws (src/header.tsx). */
+        header: (props) => <TabHeader {...props} />,
+        /* No words under the icons. The founder: "Delete the text below
+           all of the tabs and tighten up the dock. The icons explain
+           themselves." VoiceOver still reads each tab's name. */
+        tabBarShowLabel: false,
         /* Post a Flare keeps its route (every "Post a Flare" door in the
            app navigates to it) but has no slot in the bar: it opens from
            the + at the top left of the Feed. */
@@ -474,7 +452,7 @@ function Tabs() {
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarIcon: ({ color, size, focused }) => {
+        tabBarIcon: ({ color, focused }) => {
           const pair = TAB_ICONS[route.name as keyof TabParams] ?? {
             idle: "add" as const,
           };
@@ -482,12 +460,12 @@ function Tabs() {
           if (route.name === "Messages" && unreadMessages > 0) {
             return (
               <View>
-                <Ionicons name={icon} color={color} size={size} />
+                <Ionicons name={icon} color={color} size={TAB_BAR.icon} />
                 <MessagesDot />
               </View>
             );
           }
-          return <Ionicons name={icon} color={color} size={size} />;
+          return <Ionicons name={icon} color={color} size={TAB_BAR.icon} />;
         },
       })}
     >
@@ -834,10 +812,18 @@ function AppGates() {
       >
         <StatusBar style="light" />
         <Stack.Navigator
-          screenOptions={({ navigation }) => ({
-            headerStyle: { backgroundColor: colors.surface },
-            headerTintColor: colors.textPrimary,
-            headerTitleStyle: { fontWeight: "700" },
+          screenOptions={() => ({
+            /*
+             * OUR HEADER on every pushed screen (src/header.tsx), not the
+             * native one. iOS 26 draws a glass circle behind every native
+             * header button, and the founder: "remove all of these weird
+             * 'bubbles' around icons - they all seem kinda off center."
+             * The back chevron is ours too, as it was before: the native
+             * one stopped answering taps on this screens/new-architecture
+             * combination, while the swipe back, which belongs to the
+             * screen and not to the bar, keeps working either way.
+             */
+            header: (props) => <StackHeader {...props} />,
             /*
              * Back is a LEFT-EDGE swipe, not a whole-screen one.
              *
@@ -864,8 +850,6 @@ function AppGates() {
              */
             gestureEnabled: true,
             fullScreenGestureEnabled: false,
-            headerLeft: ({ canGoBack }) =>
-              canGoBack ? <HeaderBack onPress={() => navigation.goBack()} /> : <View />,
           })}
         >
           <Stack.Screen name="Tabs" component={Tabs} options={{ headerShown: false }} />

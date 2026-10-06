@@ -42,9 +42,12 @@ export function BinderHighlights({
 }) {
   if (binders.length === 0 && !yours) return null;
 
+  /* On a phone the row scrolls from edge to edge of the screen, the
+     way the profile block runs, and rests with its first binder in
+     line with the name above it. */
   return (
     <ul
-      className="-mx-1 flex items-start gap-1 overflow-x-auto px-1 py-1"
+      className="-mx-4 flex items-start gap-1 overflow-x-auto px-4 py-1 sm:-mx-1 sm:px-1"
       aria-label="Binders"
     >
       {binders.map((binder) => (

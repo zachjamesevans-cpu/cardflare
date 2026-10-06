@@ -1,3 +1,4 @@
+import { HeaderButton } from "../header";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -271,13 +272,11 @@ export function BinderScreen({
       title: binderTitle(binder),
       headerRight: binder.yours
         ? () => (
-            <Tap
+            <HeaderButton
+              icon="pencil-outline"
+              label="Binder settings"
               onPress={() => setSettingsOpen(true)}
-              hitSlop={8}
-              accessibilityLabel="Binder settings"
-            >
-              <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
-            </Tap>
+            />
           )
         : undefined,
     });

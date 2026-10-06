@@ -32,6 +32,22 @@ import type { ProfileStats } from "@/lib/players/stats";
  * was. The app's ProfileHeader draws the same.
  */
 
+/**
+ * The profile block's own box: cover, picture, numbers, name, buttons,
+ * binders and the tab strip, on your profile and on anybody else's.
+ *
+ * On a phone it runs edge to edge. The founder: "I'd like the profile
+ * to extend all the way over to the edges of the screen... In the
+ * profile it's currently in its own block in a way." So below `sm` it
+ * has no border and no corners, steps out over the page's px-2 with
+ * -mx-2, and keeps its words 16px off the edge with px-4; the app's
+ * profile does the same. From `sm` up it is the card it always was,
+ * because a cover across a 1400px window reads as broken rather than
+ * roomy.
+ */
+export const PROFILE_BLOCK =
+  "relative -mx-2 flex flex-col gap-5 overflow-hidden bg-surface px-4 py-6 sm:mx-0 sm:rounded-[var(--radius-card)] sm:border sm:border-border sm:p-6 sm:shadow-[var(--shadow-card)]";
+
 const STACK =
   "flex flex-col items-center justify-center gap-0.5 rounded-[var(--radius-control)] px-1 py-2";
 

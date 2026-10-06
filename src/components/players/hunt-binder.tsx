@@ -19,6 +19,7 @@ import {
   type OfferBuild,
   type ZoomCard,
 } from "@/components/cards/card-image-zoom";
+import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { OfferReview } from "@/components/flares/offer-review";
 import {
   HuntEditForm,
@@ -221,9 +222,9 @@ export function HuntBinder({
               type="button"
               aria-label="Edit hunt"
               onClick={() => setEditing(true)}
-              className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+              className={HEADER_BUTTON}
             >
-              <Pencil className="size-4" aria-hidden="true" />
+              <Pencil className={HEADER_ICON} aria-hidden="true" />
             </button>
           ) : (
             <Link

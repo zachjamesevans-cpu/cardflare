@@ -72,7 +72,9 @@ describe("the tab bar", () => {
   it("posts a Flare from the + at the Feed's top left, a player's", () => {
     expect(web.feedPage).toContain('href="/flare"');
     expect(web.feedPage).toContain('aria-label="Post a Flare"');
-    expect(web.feedPage).toContain('<Plus className="size-5" aria-hidden="true" />');
+    expect(web.feedPage).toContain(
+      '<Plus className={HEADER_ICON} aria-hidden="true" />',
+    );
     expect(web.shell).toContain("{leading}");
   });
 
@@ -82,7 +84,7 @@ describe("the tab bar", () => {
     );
     expect(web.tabs).toContain('const dot = tab.label === "Messages" && unread > 0;');
     expect(web.tabs).toContain("size-2.5 rounded-full bg-accent ring-2 ring-surface");
-    expect(web.tabs).toContain('{dot && <span className="sr-only">, unread</span>}');
+    expect(web.tabs).toContain('{dot && ", unread"}');
     expect(web.tabBar).toContain("unreadMessages(playerId)");
     expect(web.tabBar).not.toContain("unreadCount(");
   });
@@ -100,7 +102,8 @@ describe("the Feed's bell", () => {
     expect(web.bell).toContain(
       'unread > 0 ? "Notifications, unread" : "Notifications"',
     );
-    expect(web.bell).toContain("rounded-full bg-accent ring-2 ring-surface");
+    expect(web.bell).toContain("rounded-full bg-accent ring-2 ring-canvas");
+    expect(web.bell).toContain("className={HEADER_BUTTON}");
     /* Alone: search is a tab now, not an icon beside it. */
     expect(web.feedPage).not.toContain("FeedSearch");
   });
@@ -113,7 +116,7 @@ describe("the Feed's bell", () => {
     expect(web.feedPage).toContain("<Shell playerId={playerId} unread={unread}>");
     /* One button each side, so the mark stays centred. */
     expect(web.feedPage).not.toContain("trailingCount=");
-    expect(web.shell).toContain('trailingCount === 2 ? "h-9 w-20" : "size-9"');
+    expect(web.shell).toContain('trailingCount === 2 ? "h-11 w-[5.75rem]" : "size-11"');
   });
 
   it("leaves the notifications page a way back to the Feed, and Messages none to the Inbox", () => {

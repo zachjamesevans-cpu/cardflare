@@ -293,10 +293,10 @@ describe("the binder's model in the app", () => {
     expect(page).toMatch(
       /navigation\.setOptions\(\{\s*title: binderTitle\(binder\),\s*headerRight:/,
     );
-    expect(page).toContain('accessibilityLabel="Binder settings"');
-    expect(page).toContain('name="pencil-outline"');
+    /* The header's own button (src/header.tsx): one box and one glyph
+       size for every header icon in the app. */
     expect(page).toMatch(
-      /<Ionicons\s+name="pencil-outline"\s+size=\{22\}\s+color=\{colors\.textPrimary\}/,
+      /<HeaderButton\s+icon="pencil-outline"\s+label="Binder settings"/,
     );
     expect(page).toContain("function BinderSettingsSheet(");
     expect(page).toContain("<SheetBackdrop />");

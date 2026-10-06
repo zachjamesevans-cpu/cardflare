@@ -52,7 +52,7 @@ export function TabPageShell({
             aria-hidden={leading ? undefined : true}
             className={cn(
               "flex shrink-0 items-center",
-              trailingCount === 2 ? "h-9 w-20" : "size-9",
+              trailingCount === 2 ? "h-11 w-[5.75rem]" : "size-11",
             )}
           >
             {leading}
@@ -62,7 +62,7 @@ export function TabPageShell({
               <Logo size={30} priority />
             </Link>
           </span>
-          {trailing ?? <span aria-hidden="true" className="size-9 shrink-0" />}
+          {trailing ?? <span aria-hidden="true" className="size-11 shrink-0" />}
         </div>
 
         <div className="flex w-full max-w-2xl flex-col gap-3">{children}</div>

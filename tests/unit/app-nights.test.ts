@@ -127,8 +127,12 @@ describe("the Nights screen", () => {
 
   it("keeps the code door behind the QR icon, named the old way for a screen reader", () => {
     expect(nights).toContain("export function NightsCodeButton()");
-    expect(nights).toContain("accessibilityLabel={SCAN_OR_CODE}");
-    expect(nights).not.toContain("label={SCAN_OR_CODE}");
+    /* The header's own button: the label is what VoiceOver reads, the
+       QR glyph is all that is drawn. No worded button in the page. */
+    expect(nights).toContain(
+      '<HeaderButton icon="qr-code-outline" label={SCAN_OR_CODE} onPress={open} />',
+    );
+    expect(nights).not.toMatch(/<Button\s+label=\{SCAN_OR_CODE\}/);
   });
 
   it("refreshes on a pull, the Feed's way", () => {

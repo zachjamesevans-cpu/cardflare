@@ -3,6 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { BinderSummary } from "./api";
 import { BinderCover } from "./binder-cover";
+import { PROFILE_INSET } from "./profile-tabs";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
 
@@ -59,7 +60,14 @@ export function BinderHighlights({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: spacing(2), paddingVertical: spacing(1) }}
+      /* The row scrolls from edge to edge of the screen, the way the
+         profile runs now, and rests with its first binder in line
+         with the name above it. */
+      contentContainerStyle={{
+        gap: spacing(2),
+        paddingVertical: spacing(1),
+        paddingHorizontal: PROFILE_INSET,
+      }}
     >
       {binders.map((binder) => (
         <Highlight key={binder.id} binder={binder} onPress={() => onOpen(binder.id)} />

@@ -189,7 +189,7 @@ describe("the settings sit behind a pencil at the top", () => {
   it("opens a Binder settings sheet from the header pencil in the app", () => {
     expect(app.binder).toContain("headerRight");
     expect(app.binder).toContain('"pencil-outline"');
-    expect(app.binder).toContain('accessibilityLabel="Binder settings"');
+    expect(app.binder).toContain('label="Binder settings"');
     expect(app.binder).toContain("colors.textPrimary");
     expect(appPage).toContain("SheetBackdrop");
     expect(appPage).toContain("DeleteBinderConfirm");

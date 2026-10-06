@@ -1,3 +1,4 @@
+import { HeaderButton } from "../header";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -133,14 +134,7 @@ export function NightsCodeButton() {
 
   return (
     <>
-      <Tap
-        onPress={open}
-        hitSlop={8}
-        accessibilityLabel={SCAN_OR_CODE}
-        style={{ paddingHorizontal: spacing(2), paddingVertical: spacing(1) }}
-      >
-        <Ionicons name="qr-code-outline" size={22} color={colors.textPrimary} />
-      </Tap>
+      <HeaderButton icon="qr-code-outline" label={SCAN_OR_CODE} onPress={open} />
       <ActionSheet items={items} onClose={() => setItems(null)} />
     </>
   );

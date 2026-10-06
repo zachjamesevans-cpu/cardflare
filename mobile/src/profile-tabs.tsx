@@ -14,7 +14,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
-import { colors } from "./theme";
+import { colors, spacing } from "./theme";
 
 /**
  * The strip of icon tabs under a profile's highlights, and the panes
@@ -79,6 +79,21 @@ export interface ProfilePane {
   content: ReactNode;
 }
 
+/**
+ * How far the profile's words sit from the screen's edge. The block
+ * runs edge to edge now (the founder: "I'd like the profile to extend
+ * all the way over to the edges of the screen"), so the inset that the
+ * card's padding used to give lives here, on the rows that hold text.
+ */
+export const PROFILE_INSET = spacing(4);
+
+/**
+ * The panes that run to the screen's edges with no inset: a grid of
+ * cards, the way Instagram's grid meets the sides. Its own count line
+ * keeps the inset. Every other pane holds rows of words and sits in.
+ */
+export const EDGE_TO_EDGE: readonly ProfileTab[] = ["flares"];
+
 /** The strip's height, and the icon in it. */
 const STRIP_HEIGHT = 44;
 const ICON = 20;
@@ -94,7 +109,7 @@ export function ProfileTabs({
   onChange?: (tab: ProfileTab) => void;
 }) {
   const count = panes.length;
-  /* The block's inner width: one page of the pager, measured. */
+  /* The screen's width, edge to edge: one page of the pager, measured. */
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState(() =>
     Math.max(
@@ -266,7 +281,12 @@ export function ProfileTabs({
             {panes.map((pane, index) => (
               <View
                 key={pane.key}
-                style={{ width }}
+                style={{
+                  width,
+                  paddingHorizontal: EDGE_TO_EDGE.includes(pane.key)
+                    ? 0
+                    : PROFILE_INSET,
+                }}
                 accessibilityElementsHidden={index !== active}
                 importantForAccessibility={
                   index !== active ? "no-hide-descendants" : "auto"

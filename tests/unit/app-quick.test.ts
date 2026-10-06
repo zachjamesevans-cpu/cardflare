@@ -267,8 +267,10 @@ describe("the unread dot (round 16: on the Feed's bell, not an Inbox tab)", () =
   it("shows on the bell only while something is unread, and says so", () => {
     expect(home).toContain("const unread = useUnread();");
     expect(home).toContain("unread={unread}");
-    expect(header).toContain("{unread > 0 ? (");
-    expect(header).toContain("<UnreadDot ring={colors.canvas}");
+    expect(header).toContain("dot={unread > 0}");
+    expect(read("mobile/src/header.tsx")).toContain(
+      "<UnreadDot ring={colors.canvas} style={{ bottom: 0, right: -1 }} />",
+    );
     expect(header).toContain('unread > 0 ? "Notifications, unread" : "Notifications"');
   });
 
