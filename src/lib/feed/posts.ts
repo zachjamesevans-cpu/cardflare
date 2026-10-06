@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { printingLabel } from "@/lib/cards/schema";
+import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { foundLast } from "@/lib/feed/card-copy";
 import { binderSessionFor } from "@/lib/lists/haves";
 import {
@@ -540,7 +540,7 @@ export async function postDetail(
         .from("cards")
         .select("id, exact_name, canonical_card_number")
         .in("id", cardIds),
-      admin.from("card_printings").select("card_id, image_url").in("card_id", cardIds),
+      admin.from("card_printings").select(PRINTING_COLUMNS).in("card_id", cardIds),
       answersFor(
         shown.map((flare) => flare.id),
         viewerSessionIds,
@@ -571,9 +571,11 @@ export async function postDetail(
     : null;
 
   const cardById = new Map((cards.data ?? []).map((row) => [row.id, row]));
-  const artByCard = new Map<string, string | null>();
-  for (const row of printings.data ?? []) {
-    if (!artByCard.has(row.card_id)) artByCard.set(row.card_id, row.image_url);
+  /* Every printing per card, so the art is the best imaged one rather than
+     whichever row came first, which could have no scan and draw black. */
+  const byCard = new Map<string, CardPrinting[]>();
+  for (const row of (printings.data ?? []) as PrintingRow[]) {
+    byCard.set(row.card_id, [...(byCard.get(row.card_id) ?? []), toPrinting(row)]);
   }
   const held = heldByCard(binder);
   const remaining = await remainingByFlare(context);
@@ -606,7 +608,7 @@ export async function postDetail(
       cardId: flare.cardId,
       cardName: name,
       cardNumber: card?.canonical_card_number ?? "",
-      imageUrl: printing?.imageUrl ?? artByCard.get(flare.cardId) ?? null,
+      imageUrl: cardArt(printing?.imageUrl, byCard.get(flare.cardId) ?? [], name),
       flareId: flare.id,
       state:
         flare.status === "traded" || (remaining.get(flare.id) ?? 1) === 0

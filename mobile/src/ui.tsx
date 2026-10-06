@@ -640,6 +640,63 @@ function ZoomHaveForm({
   );
 }
 
+/**
+ * A card with no art anywhere: its name and number on the card's shape.
+ *
+ * This used to be an empty canvas-black box, which on a profile's grid
+ * read as a broken black tile - the founder found two on one profile.
+ * The server now falls back to a sibling printing's art (`cardArt`), so
+ * this is only for a card none of whose printings has a scan yet. Same
+ * shape as the website's binder pocket: name centred, number under it.
+ */
+export function NoArt({
+  name,
+  cardNumber,
+  style,
+  large = false,
+}: {
+  name: string;
+  cardNumber: string;
+  style: StyleProp<ViewStyle>;
+  /** The zoom viewer's size, not a grid tile's. */
+  large?: boolean;
+}) {
+  return (
+    <View
+      accessibilityLabel={`${name}, no card image`}
+      style={[
+        {
+          alignItems: "center",
+          justifyContent: "center",
+          padding: spacing(large ? 4 : 1.5),
+          gap: spacing(large ? 1.5 : 0.5),
+          backgroundColor: colors.elevated,
+          borderColor: colors.border,
+          borderWidth: 1,
+        },
+        style,
+      ]}
+    >
+      <Text
+        numberOfLines={large ? 4 : 3}
+        style={{
+          color: colors.textSecondary,
+          fontSize: large ? 18 : 11,
+          fontWeight: "600",
+          textAlign: "center",
+        }}
+      >
+        {name}
+      </Text>
+      {cardNumber ? (
+        <Text style={{ color: colors.textMuted, fontSize: large ? 14 : 9 }}>
+          {cardNumber}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 export function CardImage({
   imageUrl: ownImageUrl,
   width,
@@ -860,8 +917,7 @@ export function CardImage({
     borderWidth: 1,
   };
 
-  if (!ownImageUrl) return <View style={frame} />;
-  const greyKit = state === "found" ? getFoilKit() : null;
+  const greyKit = ownImageUrl && state === "found" ? getFoilKit() : null;
 
   const widthLarge = Math.min(window.width - spacing(14), 380);
 
@@ -928,7 +984,13 @@ export function CardImage({
           {/* Found: full black and white, drawn by Skia when it is in
               this binary, dimmed colour when it is not. The band under
               it says the word either way. */}
-          {greyKit ? (
+          {!ownImageUrl ? (
+            <NoArt
+              name={ownName}
+              cardNumber={ownCardNumber}
+              style={{ ...frame, backgroundColor: colors.elevated }}
+            />
+          ) : greyKit ? (
             <View style={frame}>
               <greyKit.Greyed
                 imageUrl={ownImageUrl}
@@ -1262,32 +1324,58 @@ export function CardImage({
                             close();
                           }}
                         >
-                          <RemoteImage
-                            uri={card.imageUrl}
-                            contentFit="contain"
-                            style={{
-                              width: hero,
-                              height: Math.round((hero * 88) / 63),
-                              borderRadius: radius.control,
-                              backgroundColor: colors.canvas,
-                            }}
-                          />
+                          {card.imageUrl ? (
+                            <RemoteImage
+                              uri={card.imageUrl}
+                              contentFit="contain"
+                              style={{
+                                width: hero,
+                                height: Math.round((hero * 88) / 63),
+                                borderRadius: radius.control,
+                                backgroundColor: colors.canvas,
+                              }}
+                            />
+                          ) : (
+                            <NoArt
+                              name={card.name}
+                              cardNumber={card.cardNumber}
+                              large
+                              style={{
+                                width: hero,
+                                height: Math.round((hero * 88) / 63),
+                                borderRadius: radius.control,
+                              }}
+                            />
+                          )}
                         </Pressable>
                       ))}
                     </ScrollView>
                   </View>
                 ) : (
                   <Pressable onPress={close}>
-                    <RemoteImage
-                      uri={imageUrl}
-                      contentFit="contain"
-                      style={{
-                        width: hero,
-                        height: Math.round((hero * 88) / 63),
-                        borderRadius: radius.control,
-                        backgroundColor: colors.canvas,
-                      }}
-                    />
+                    {imageUrl ? (
+                      <RemoteImage
+                        uri={imageUrl}
+                        contentFit="contain"
+                        style={{
+                          width: hero,
+                          height: Math.round((hero * 88) / 63),
+                          borderRadius: radius.control,
+                          backgroundColor: colors.canvas,
+                        }}
+                      />
+                    ) : (
+                      <NoArt
+                        name={name}
+                        cardNumber={cardNumber}
+                        large
+                        style={{
+                          width: hero,
+                          height: Math.round((hero * 88) / 63),
+                          borderRadius: radius.control,
+                        }}
+                      />
+                    )}
                   </Pressable>
                 )}
                 {/* Last, under the picture, where the thumb is. Keyed on

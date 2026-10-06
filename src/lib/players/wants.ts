@@ -1,6 +1,6 @@
 import "server-only";
 
-import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
+import { cardArt, type CardPrinting } from "@/lib/cards/schema";
 import { markCardFound } from "@/lib/players/found";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { afterWantSaved } from "@/lib/nearby/matching";
@@ -305,11 +305,11 @@ async function describeRows(rows: ListRow[]): Promise<SavedWant[]> {
    * A want that takes any printing still needs a picture — the same call
    * the Flare board makes, and for the same reason: someone who will take
    * any version is picturing the ordinary one, and a nameless row is
-   * harder to recognise than a piece of art.
+   * harder to recognise than a piece of art. So does one on a specific
+   * printing that has no scan, so siblings load for every row, not only
+   * the any-printing ones: see `cardArt`.
    */
-  const openCardIds = [
-    ...new Set(rows.filter((row) => !row.printing_id).map((row) => row.card_id)),
-  ];
+  const openCardIds = cardIds;
 
   const columns =
     "id, card_id, set_code, set_name, printing_label, variant_type, rarity, printing_name, is_promo, image_url";
@@ -351,9 +351,6 @@ async function describeRows(rows: ListRow[]): Promise<SavedWant[]> {
   return rows.map((row) => {
     const card = cardById.get(row.card_id);
     const printing = row.printing_id ? printingById.get(row.printing_id) : null;
-    const base = row.printing_id
-      ? null
-      : pickBasePrinting(byCard.get(row.card_id) ?? [], card?.exact_name ?? "");
 
     return {
       id: row.id,
@@ -370,7 +367,11 @@ async function describeRows(rows: ListRow[]): Promise<SavedWant[]> {
       quantity: row.quantity,
       note: row.note,
       deckLabel: row.deck_label ?? null,
-      imageUrl: printing?.image_url ?? base?.imageUrl ?? null,
+      imageUrl: cardArt(
+        printing?.image_url,
+        byCard.get(row.card_id) ?? [],
+        card?.exact_name ?? "",
+      ),
       direction: row.direction ?? "want",
     };
   });

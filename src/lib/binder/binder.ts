@@ -10,7 +10,7 @@ import {
 } from "@/lib/lists/repository";
 import type { AddEntryInput } from "@/lib/lists/schema";
 import { afterHolderChanged } from "@/lib/nearby/matching";
-import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
+import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import type { BinderCardRow, BinderRow } from "@/lib/supabase/types";
 import { LAST_POCKET, nextFreePocket } from "./pocket-math";
 import {
@@ -255,13 +255,13 @@ async function factsFor(rows: BinderCardRow[]): Promise<Map<string, Facts>> {
   for (const row of rows) {
     const card = cardRows.get(row.card_id);
     if (!card) continue;
-    const printing = row.printing_id
-      ? (named.get(row.printing_id) ?? null)
-      : pickBasePrinting(byCard.get(row.card_id) ?? [], card.name);
+    const printing = row.printing_id ? (named.get(row.printing_id) ?? null) : null;
     facts.set(row.id, {
       name: card.name,
       number: card.number,
-      imageUrl: printing?.imageUrl ?? null,
+      /* A named printing with no scan borrows a sibling's art rather than
+         drawing a black tile: see `cardArt`. */
+      imageUrl: cardArt(printing?.imageUrl, byCard.get(row.card_id) ?? [], card.name),
       printingLabel:
         row.printing_id && printing ? printingLabel(printing, card.name) : null,
     });

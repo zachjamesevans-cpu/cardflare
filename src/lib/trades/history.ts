@@ -1,5 +1,7 @@
 import "server-only";
 
+import { cardArt, type CardPrinting } from "@/lib/cards/schema";
+import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repository";
 import { tradeAwardRef, tradeReversalRef } from "@/lib/players/ember-rules";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -8,6 +10,21 @@ import { cardCameToYou, tradeIdFromRef } from "./history-rules";
 import { listLoggedTrades } from "./logged";
 import { loggedWhen, newestFirst } from "./logged-schema";
 import type { TradeRecord } from "./schema";
+
+/**
+ * Every printing of each card, grouped, so a trade's picture is the best
+ * imaged one rather than whichever row came back first - which could be a
+ * printing with no scan and draw as a black tile. See `cardArt`.
+ */
+function printingsByCard(
+  rows: readonly PrintingRow[] | null | undefined,
+): Map<string, CardPrinting[]> {
+  const byCard = new Map<string, CardPrinting[]>();
+  for (const row of rows ?? []) {
+    byCard.set(row.card_id, [...(byCard.get(row.card_id) ?? []), toPrinting(row)]);
+  }
+  return byCard;
+}
 
 /**
  * Everything a player ever traded, both sides, newest first.
@@ -87,7 +104,7 @@ async function loggedEntries(playerId: string): Promise<TradeHistoryEntry[]> {
       .in("id", cardIds),
     admin
       .from("card_printings")
-      .select("id, card_id, image_url")
+      .select(PRINTING_COLUMNS)
       .in("card_id", cardIds),
     partnerIds.length > 0
       ? admin.from("players").select("id, display_name").in("id", partnerIds)
@@ -98,10 +115,7 @@ async function loggedEntries(playerId: string): Promise<TradeHistoryEntry[]> {
   const artByPrinting = new Map(
     (printings.data ?? []).map((row) => [row.id, row.image_url as string | null]),
   );
-  const artByCard = new Map<string, string | null>();
-  for (const row of printings.data ?? []) {
-    if (!artByCard.has(row.card_id)) artByCard.set(row.card_id, row.image_url);
-  }
+  const byCard = printingsByCard(printings.data);
   const names = new Map((partners.data ?? []).map((row) => [row.id, row.display_name]));
 
   return rows.map((row) => {
@@ -112,10 +126,11 @@ async function loggedEntries(playerId: string): Promise<TradeHistoryEntry[]> {
       cardId: row.card_id,
       cardName: card?.exact_name ?? "Unknown card",
       cardNumber: card?.canonical_card_number ?? "",
-      imageUrl:
-        (row.printing_id ? artByPrinting.get(row.printing_id) : null) ??
-        artByCard.get(row.card_id) ??
-        null,
+      imageUrl: cardArt(
+        row.printing_id ? artByPrinting.get(row.printing_id) : null,
+        byCard.get(row.card_id) ?? [],
+        card?.exact_name ?? "",
+      ),
       quantity: row.quantity,
       got: row.direction === "got",
       partnerName:
@@ -282,7 +297,7 @@ export async function listTradeHistory(
       .in("id", cardIds),
     admin
       .from("card_printings")
-      .select("id, card_id, image_url")
+      .select(PRINTING_COLUMNS)
       .in("card_id", cardIds),
     partnerIds.length > 0
       ? admin
@@ -313,10 +328,7 @@ export async function listTradeHistory(
   const artByPrinting = new Map(
     (printings.data ?? []).map((row) => [row.id, row.image_url as string | null]),
   );
-  const artByCard = new Map<string, string | null>();
-  for (const row of printings.data ?? []) {
-    if (!artByCard.has(row.card_id)) artByCard.set(row.card_id, row.image_url);
-  }
+  const byCard = printingsByCard(printings.data);
   const names = new Map((partners.data ?? []).map((row) => [row.id, row.display_name]));
   const accountOf = new Map(
     (partners.data ?? []).map((row) => [row.id, row.player_id]),
@@ -339,10 +351,11 @@ export async function listTradeHistory(
         cardId: row.card_id,
         cardName: card?.exact_name ?? "Unknown card",
         cardNumber: card?.canonical_card_number ?? "",
-        imageUrl:
-          (row.printing_id ? artByPrinting.get(row.printing_id) : null) ??
-          artByCard.get(row.card_id) ??
-          null,
+        imageUrl: cardArt(
+          row.printing_id ? artByPrinting.get(row.printing_id) : null,
+          byCard.get(row.card_id) ?? [],
+          card?.exact_name ?? "",
+        ),
         quantity: row.quantity,
         got,
         partnerName: partnerPlayerId

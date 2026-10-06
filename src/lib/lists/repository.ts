@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { markCardFound } from "@/lib/players/found";
-import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
+import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { capFor, type Accepts, type AddEntryInput, type ListKind } from "./schema";
 import type { FlareIntent } from "@/lib/supabase/types";
 
@@ -110,15 +110,15 @@ interface EntryRow {
 interface Lookups {
   cards: Map<string, { number: string; name: string }>;
   printings: Map<string, CardPrinting>;
-  /** Per card, the printing to show when the entry names no specific one. */
-  basePrintings: Map<string, CardPrinting>;
+  /** Per card, every printing: the art to borrow when the entry's has none. */
+  siblings: Map<string, CardPrinting[]>;
   names: Map<string, string>;
 }
 
 const EMPTY_LOOKUPS: Lookups = {
   cards: new Map(),
   printings: new Map(),
-  basePrintings: new Map(),
+  siblings: new Map(),
   names: new Map(),
 };
 
@@ -167,11 +167,11 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
    * Entries that name no printing still need a picture. "Any printing" used to
    * show none at all, which is the one case where artwork helps most — someone
    * who will take any version is usually picturing the ordinary one, and a
-   * nameless row is harder to spot in a binder.
+   * nameless row is harder to spot in a binder. So does an entry on a
+   * specific printing that has no scan, so siblings load for every row:
+   * see `cardArt`.
    */
-  const openCardIds = [
-    ...new Set(rows.filter((row) => !row.printing_id).map((row) => row.card_id)),
-  ];
+  const openCardIds = cardIds;
 
   const [cardRows, printingRows, openPrintingRows, sessionRows] = await Promise.all([
     admin
@@ -213,12 +213,6 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
     byCard.set(row.card_id, list);
   }
 
-  const basePrintings = new Map<string, CardPrinting>();
-  for (const [cardId, printings] of byCard) {
-    const base = pickBasePrinting(printings, cards.get(cardId)?.name ?? "");
-    if (base) basePrintings.set(cardId, base);
-  }
-
   return {
     cards,
     printings: new Map(
@@ -227,7 +221,7 @@ async function lookupsFor(rows: EntryRow[], withNames: boolean): Promise<Lookups
         toPrinting(row),
       ]),
     ),
-    basePrintings,
+    siblings: byCard,
     names: new Map((sessionRows.data ?? []).map((row) => [row.id, row.display_name])),
   };
 }
@@ -241,7 +235,6 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
    * The image can come from a stand-in, but the label never does: the entry
    * still says "Any printing", because that is what was asked for.
    */
-  const forImage = printing ?? lookups.basePrintings.get(row.card_id) ?? null;
 
   return {
     id: row.id,
@@ -254,7 +247,11 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     cardName,
     printingId: row.printing_id,
     printingLabel: printing ? printingLabel(printing, cardName) : null,
-    imageUrl: forImage?.imageUrl ?? null,
+    imageUrl: cardArt(
+      printing?.imageUrl,
+      lookups.siblings.get(row.card_id) ?? [],
+      card?.name ?? "",
+    ),
     playerSessionId: row.player_session_id,
     displayName: lookups.names.get(row.player_session_id) ?? null,
     confirmedAt: row.confirmed_at ?? null,
