@@ -71,11 +71,29 @@ export async function areaFlareSchemaReady(): Promise<boolean> {
 }
 
 export type PostAreaFlaresResult =
-  | { ok: true; batchId: string; posted: number }
+  | {
+      ok: true;
+      batchId: string;
+      posted: number;
+      /** Cards already open from this account: skipped, not failed. */
+      alreadyUp: number;
+      /** Cards whose own insert failed while the rest went up. */
+      failed: number;
+    }
   | {
       ok: false;
       reason: "already-posted" | "not-migrated" | "unavailable";
     };
+
+/** What became of one card in a batch, in the order it was given. */
+export type AreaRowOutcome =
+  | { status: "posted"; flareId: string }
+  | { status: "already-up" }
+  | { status: "failed" };
+
+/** The migration's shapes: a missing column, a not-null event_id, the
+    two-shapes check. All one cause, and not the player's. */
+const NOT_MIGRATED_CODES = ["42703", "23502", "23514"];
 
 export interface AreaFlareInput {
   cardId: string;
@@ -87,6 +105,8 @@ export interface AreaFlareInput {
   intent?: "want" | "showcase";
   acceptsTrade?: boolean;
   acceptsCash?: boolean;
+  /** The hunt request this card answers, written with the row. */
+  huntRequestId?: string | null;
 }
 
 export async function postAreaFlare(
@@ -112,42 +132,11 @@ export async function postAreaFlare(
   if (!(await areaFlareSchemaReady())) return { ok: false, reason: "not-migrated" };
 
   const admin = getSupabaseAdmin();
-
-  const { data: player } = await admin
-    .from("players")
-    .select("postal_code")
-    .eq("id", playerId)
-    .maybeSingle();
-
-  /*
-   * The ZIP when there is one, from the profile first and a granted
-   * position second, snapped to a centroid. None is not a refusal any
-   * more: the Flare goes to friends either way, and only Local's radius
-   * would have wanted the anchor.
-   */
-  const postalCode =
-    normalisePostalCode(player?.postal_code) ?? nearestPostalCode(at ?? null);
+  const postalCode = await postalCodeFor(playerId, at);
 
   const { data, error } = await admin
     .from("flares")
-    .insert({
-      event_id: null,
-      player_session_id: null,
-      player_id: playerId,
-      posted_postal_code: postalCode ?? null,
-      /* The batch is what makes several cards read as one post, exactly
-         as it does on a room's board. Null when a card goes up alone. */
-      /* A lone post is a batch of one: the column is NOT NULL. */
-      posted_batch: group?.batchId ?? randomUUID(),
-      deck_label: group?.deckLabel ?? null,
-      card_id: input.cardId,
-      printing_id: input.printingId ?? null,
-      quantity: input.quantity ?? 1,
-      note: input.note ?? null,
-      intent: input.intent ?? "want",
-      accepts_trade: input.acceptsTrade ?? true,
-      accepts_cash: input.acceptsCash ?? false,
-    })
+    .insert(areaRow(playerId, input, postalCode, group))
     .select("id")
     .single();
 
@@ -159,9 +148,8 @@ export async function postAreaFlare(
 
     /* The shapes a missing migration takes: the column is not there, or
        `event_id` is still not-null, or the two-shapes check still
-       demands a ZIP this row does not carry. All one cause, and not the
-       player's. */
-    if (["42703", "23502", "23514"].includes(error.code ?? "")) {
+       demands a ZIP this row does not carry. */
+    if (NOT_MIGRATED_CODES.includes(error.code ?? "")) {
       console.error("The area-Flare migration has not been applied", error);
       return { ok: false, reason: "not-migrated" };
     }
@@ -170,6 +158,60 @@ export async function postAreaFlare(
     return { ok: false, reason: "unavailable" };
   }
 
+  afterAreaPost(playerId, input);
+  return { ok: true, flareId: data.id };
+}
+
+/*
+ * The ZIP when there is one, from the profile first and a granted
+ * position second, snapped to a centroid. None is not a refusal any
+ * more: the Flare goes to friends either way, and only Local's radius
+ * would have wanted the anchor. Read once per post, never per card.
+ */
+async function postalCodeFor(
+  playerId: string,
+  at?: Point | null,
+): Promise<string | null> {
+  const { data: player } = await getSupabaseAdmin()
+    .from("players")
+    .select("postal_code")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  return (
+    normalisePostalCode(player?.postal_code) ?? nearestPostalCode(at ?? null) ?? null
+  );
+}
+
+function areaRow(
+  playerId: string,
+  input: AreaFlareInput,
+  postalCode: string | null,
+  group?: { batchId: string; deckLabel: string | null },
+) {
+  return {
+    event_id: null,
+    player_session_id: null,
+    player_id: playerId,
+    posted_postal_code: postalCode,
+    /* The batch is what makes several cards read as one post, exactly
+       as it does on a room's board. A lone post is a batch of one: the
+       column is NOT NULL. */
+    posted_batch: group?.batchId ?? randomUUID(),
+    deck_label: group?.deckLabel ?? null,
+    card_id: input.cardId,
+    printing_id: input.printingId ?? null,
+    quantity: input.quantity ?? 1,
+    note: input.note ?? null,
+    intent: input.intent ?? "want",
+    accepts_trade: input.acceptsTrade ?? true,
+    accepts_cash: input.acceptsCash ?? false,
+    /* Only when there is one, so a plain post's row keeps its shape. */
+    ...(input.huntRequestId ? { hunt_request_id: input.huntRequestId } : {}),
+  };
+}
+
+function afterAreaPost(playerId: string, input: AreaFlareInput): void {
   if (input.intent === "showcase") {
     /* "I have this", posted from the couch: onto the Have list, marked
        for nearby matching. See nearby/showcase.ts. */
@@ -186,8 +228,125 @@ export async function postAreaFlare(
     /* A Flare posted with no room is an ask nearby matching can answer. */
     void afterWantSaved(playerId, input.cardId);
   }
+}
 
-  return { ok: true, flareId: data.id };
+const rowKey = (
+  cardId: string,
+  printingId: string | null | undefined,
+  intent: string,
+) => `${cardId}::${printingId ?? "any"}::${intent}`;
+
+type InsertedRow = {
+  id: string;
+  card_id: string;
+  printing_id: string | null;
+  intent: string;
+};
+
+/**
+ * Several cards into one batch, in as few round trips as it takes.
+ *
+ * The first cut posted a deck one card at a time, and every card paid
+ * for the schema probe, the player's ZIP and its own insert: a thirty
+ * card paste was ninety sequential queries and could outlive the
+ * serverless function. Now the probe and the ZIP are read once, the
+ * cards already up are found in one read, and the rest go in ONE
+ * insert. Only if that insert is refused (a race with the unique index,
+ * the same card posted from another tab a moment ago) does it fall back
+ * to one insert per card, so every card that can go up still does.
+ *
+ * Answers per card, in the order given, so a caller can say exactly
+ * what happened: "Posted 18 of 20 · 2 were already up".
+ */
+export async function insertAreaFlares(
+  playerId: string,
+  inputs: AreaFlareInput[],
+  at: Point | null | undefined,
+  group: { batchId: string; deckLabel: string | null },
+): Promise<
+  | { ok: true; outcomes: AreaRowOutcome[] }
+  | { ok: false; reason: "not-migrated" | "unavailable" }
+> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  if (!(await areaFlareSchemaReady())) return { ok: false, reason: "not-migrated" };
+
+  const admin = getSupabaseAdmin();
+  const postalCode = await postalCodeFor(playerId, at);
+
+  /* What is already open from this account, in one read. */
+  const cardIds = [...new Set(inputs.map((input) => input.cardId))];
+  const { data: open } = await admin
+    .from("flares")
+    .select("card_id, printing_id, intent")
+    .eq("player_id", playerId)
+    .is("event_id", null)
+    .eq("status", "open")
+    .in("card_id", cardIds);
+  const taken = new Set(
+    ((open ?? []) as Omit<InsertedRow, "id">[]).map((row) =>
+      rowKey(row.card_id, row.printing_id, row.intent),
+    ),
+  );
+
+  const outcomes: (AreaRowOutcome | null)[] = inputs.map((input) => {
+    const key = rowKey(input.cardId, input.printingId, input.intent ?? "want");
+    if (taken.has(key)) return { status: "already-up" };
+    /* The same card twice in one paste: the first one goes up. */
+    taken.add(key);
+    return null;
+  });
+  const fresh = inputs
+    .map((input, index) => ({ input, index }))
+    .filter(({ index }) => outcomes[index] === null);
+
+  if (fresh.length > 0) {
+    const { data, error } = await admin
+      .from("flares")
+      .insert(fresh.map(({ input }) => areaRow(playerId, input, postalCode, group)))
+      .select("id, card_id, printing_id, intent");
+
+    if (error && NOT_MIGRATED_CODES.includes(error.code ?? "")) {
+      console.error("The area-Flare migration has not been applied", error);
+      return { ok: false, reason: "not-migrated" };
+    }
+
+    if (!error) {
+      const byKey = new Map(
+        ((data ?? []) as InsertedRow[]).map((row) => [
+          rowKey(row.card_id, row.printing_id, row.intent),
+          row.id,
+        ]),
+      );
+      for (const { input, index } of fresh) {
+        const flareId = byKey.get(
+          rowKey(input.cardId, input.printingId, input.intent ?? "want"),
+        );
+        outcomes[index] = flareId ? { status: "posted", flareId } : { status: "failed" };
+      }
+    } else {
+      if (error.code !== "23505") console.error("Could not post the batch", error);
+      for (const { input, index } of fresh) {
+        const { data: one, error: oneError } = await admin
+          .from("flares")
+          .insert(areaRow(playerId, input, postalCode, group))
+          .select("id")
+          .single();
+        outcomes[index] = !oneError
+          ? { status: "posted", flareId: one.id }
+          : oneError.code === "23505"
+            ? { status: "already-up" }
+            : { status: "failed" };
+      }
+    }
+  }
+
+  const settled = outcomes.map(
+    (outcome): AreaRowOutcome => outcome ?? { status: "failed" },
+  );
+  for (const [index, outcome] of settled.entries()) {
+    if (outcome.status === "posted") afterAreaPost(playerId, inputs[index]);
+  }
+  return { ok: true, outcomes: settled };
 }
 
 /**
@@ -217,30 +376,26 @@ export async function postAreaFlares(
   if (inputs.length === 0) return { ok: false, reason: "unavailable" };
 
   const batchId = randomUUID();
-  let posted = 0;
-  let lastRefusal: PostAreaFlareResult | null = null;
+  const result = await insertAreaFlares(playerId, inputs, at, {
+    batchId,
+    deckLabel: deckLabel ?? null,
+  });
+  /* A missing migration is the same wall for every card: one answer. */
+  if (!result.ok) return result;
 
-  for (const input of inputs) {
-    const result = await postAreaFlare(playerId, input, at, {
-      batchId,
-      deckLabel: deckLabel ?? null,
-    });
+  const count = (status: AreaRowOutcome["status"]) =>
+    result.outcomes.filter((outcome) => outcome.status === status).length;
+  const posted = count("posted");
+  const alreadyUp = count("already-up");
+  const failed = count("failed");
 
-    if (result.ok) {
-      posted += 1;
-      continue;
-    }
-
-    /* A duplicate is somebody re-posting a list they have grown; skip it
-       and keep going. Anything else is the same wall for every remaining
-       card — a missing migration — so stop rather than write it out
-       thirty times. */
-    lastRefusal = result;
-    if (result.reason !== "already-posted") break;
-  }
-
-  if (posted > 0) return { ok: true, batchId, posted };
-  return lastRefusal ?? { ok: false, reason: "unavailable" };
+  /* A duplicate is somebody re-posting a list they have grown: counted
+     and skipped, never a reason to refuse the cards that are new. */
+  if (posted > 0) return { ok: true, batchId, posted, alreadyUp, failed };
+  return {
+    ok: false,
+    reason: alreadyUp > 0 && failed === 0 ? "already-posted" : "unavailable",
+  };
 }
 
 /**

@@ -144,6 +144,12 @@ export type DeckImportState =
       /** Lines with no card number in them at all. */
       unreadable: string[];
       atCap: boolean;
+      /** Cards in the paste the catalogue matched, before posting. */
+      total?: number;
+      /** Already open from this account: skipped, not failed. */
+      alreadyUp?: number;
+      /** Cards whose own write failed while the rest went up. */
+      failed?: number;
     };
 
 export const DECK_IMPORT_IDLE: DeckImportState = { status: "idle" };
