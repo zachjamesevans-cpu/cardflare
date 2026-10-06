@@ -55,13 +55,6 @@ export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const limited = tooMany(
-    `thread-open:${player.playerId}`,
-    LIMITS.threadOpen.limit,
-    LIMITS.threadOpen.windowMs,
-  );
-  if (limited) return limited;
-
   const parsed = openSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) {
     return badRequest(
@@ -70,11 +63,47 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { flareId, wantId, playerId, body } = parsed.data;
+
+  /* A Flare's or a want's open sends a message, so it counts as one. */
+  if (!playerId) {
+    const limited = tooMany(
+      `message:${player.playerId}`,
+      LIMITS.message.limit,
+      LIMITS.message.windowMs,
+    );
+    if (limited) return limited;
+  }
+
+  /*
+   * The new-conversations ceiling, charged only when a conversation is
+   * actually started. Tapping Message on somebody you already talk to,
+   * or answering a Flare twice, finds the thread and costs nothing.
+   */
+  let refused: Response | null = null;
+  const mayCreate = () => {
+    refused = tooMany(
+      `thread-open:${player.playerId}`,
+      LIMITS.threadOpen.limit,
+      LIMITS.threadOpen.windowMs,
+    );
+    return refused === null;
+  };
+
   const outcome = playerId
-    ? await openDirectThread(player.playerId, playerId)
+    ? await openDirectThread(player.playerId, playerId, { mayCreate })
     : flareId
-      ? await openFlareThread(flareId, player.playerId, body ?? "")
-      : await openWantThread(wantId!, player.playerId, body ?? "");
+      ? await openFlareThread(flareId, player.playerId, body ?? "", { mayCreate })
+      : await openWantThread(wantId!, player.playerId, body ?? "", { mayCreate });
+
+  if (!outcome.ok && outcome.reason === "rate-limited") {
+    return (
+      refused ??
+      Response.json(
+        { error: "rate-limited", message: "That is a lot at once. Try again in a moment." },
+        { status: 429 },
+      )
+    );
+  }
 
   if (!outcome.ok) {
     /* The reasons a client can do something about, in words it can show. */

@@ -77,7 +77,7 @@ describe("the chat header", () => {
 
 describe("the messages, Instagram's way", () => {
   it("are laid out by messageRuns", () => {
-    expect(thread).toContain("const runs = messageRuns(messages ?? []);");
+    expect(thread).toContain("const runs = messageRuns(shown ?? []);");
     expect(thread).toContain("flags.showTime ? (");
     expect(thread).toContain("chatTimeLine(item.sentAt)");
     expect(thread).toContain("flags.showFace ? (");
