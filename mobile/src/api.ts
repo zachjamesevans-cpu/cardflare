@@ -1976,7 +1976,7 @@ export const getPlayerPeople = (playerId: string) =>
 /* Report and block                                                    */
 /* ------------------------------------------------------------------ */
 
-export type ReportKind = "post" | "player" | "thread";
+export type ReportKind = "post" | "player" | "thread" | "comment";
 export type ReportReason = "spam" | "scam" | "harassment" | "other";
 
 /**
@@ -2888,6 +2888,16 @@ export const commentOnPost = (postId: string, body: string) =>
     "POST",
     `/api/v1/posts/${encodeURIComponent(postId)}`,
     { action: "comment", body },
+  );
+
+/**
+ * Takes a comment down: yours, or anybody's under your own post. The
+ * server checks which; a refusal is a 403.
+ */
+export const deletePostComment = (postId: string, commentId: string) =>
+  call<{ ok: true }>(
+    "DELETE",
+    `/api/v1/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
   );
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
@@ -3813,6 +3823,12 @@ export const readLocalThread = (threadId: string, before?: string) =>
      * older server does not say, and then there is no "Load older".
      */
     hasOlder?: boolean;
+    /**
+     * A block stands between the two, either way round: nothing can be
+     * sent, and the screen says so in place of the composer. Absent
+     * from an older server.
+     */
+    blocked?: boolean;
     /**
      * What it is about: a posted Flare, a saved want, or the two
      * people. Optional: an older server does not say, and a thread

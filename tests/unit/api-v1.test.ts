@@ -22,6 +22,7 @@ function chain(response: Response_, calls: Record<string, unknown[][]>) {
     "eq",
     "in",
     "is",
+    "or",
     "order",
     "limit",
     "insert",

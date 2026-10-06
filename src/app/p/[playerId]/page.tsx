@@ -110,8 +110,29 @@ export default async function PublicProfilePage({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
+  /* A block hides the page both ways. Blocked BY them reads exactly as
+     a missing player; the blocker sees the name, the Blocked chip and
+     Unblock, and nothing else of theirs. The app does the same. */
+  const block = await blockState(me, playerId);
+  if (block.blockedBy && !block.blocked) notFound();
+
   const profile = await publicProfile(playerId, me);
   if (!profile) notFound();
+
+  if (block.blocked) {
+    return (
+      <TabPageShell title={profile.displayName}>
+        <BlockProvider initial={block}>
+          <div className={PROFILE_BLOCK}>
+            <p className="text-sm text-text-muted">You blocked this player.</p>
+            <div className="flex gap-2">
+              <BlockControls playerId={playerId}>{null}</BlockControls>
+            </div>
+          </div>
+        </BlockProvider>
+      </TabPageShell>
+    );
+  }
 
   const [worn, dressed] = await Promise.all([
     resolveEquipped(profile.equipped),
@@ -137,14 +158,11 @@ export default async function PublicProfilePage({
      Follow, a Message, a Report and a Block. */
   const other = Boolean(me && me !== playerId);
   const yours = me === playerId;
-  const [follow, stats, followers, following, block] = await Promise.all([
+  const [follow, stats, followers, following] = await Promise.all([
     other ? followState(me as string, playerId) : null,
-    profileStats(playerId),
-    listFollowers(playerId),
-    listFollowing(playerId),
-    /* A read in a Server Component, seeding the two islands that show
-       it: the menu in the corner and the row under the name. */
-    blockState(me, playerId),
+    profileStats(playerId, me),
+    listFollowers(playerId, me),
+    listFollowing(playerId, me),
   ]);
 
   /* The Feed's chrome, not the console's: the wordmark with the Feed

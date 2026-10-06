@@ -21,3 +21,13 @@ export interface PostComment {
   body: string;
   cardName: string | null;
 }
+
+/**
+ * A comment as the website's thread draws it for one viewer: whether
+ * the line is theirs (no Report on your own words) and whether they
+ * may take it down (theirs, or any line under their own post).
+ */
+export interface ViewerComment extends PostComment {
+  mine: boolean;
+  deletable: boolean;
+}

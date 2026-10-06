@@ -20,6 +20,7 @@ import {
 } from "@/lib/notifications/notify";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { roomIdentitiesFor } from "@/lib/players/profile";
+import { blockState } from "@/lib/players/safety";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { instantToLocal } from "@/lib/time/zone";
 
@@ -1093,8 +1094,12 @@ export interface NightPlayerView {
   matches: number;
   theyHave: MatchCard[];
   theyWant: MatchCard[];
-  /** Their Flares at this night, from listRoomFlares filtered by their session(s). */
-  flares: ListEntry[];
+  /**
+   * Their Flares at this night, from listRoomFlares filtered by their
+   * session(s). Without the session id: a room session is a credential
+   * of sorts, and nobody but its owner needs it.
+   */
+  flares: Omit<ListEntry, "playerSessionId">[];
   /** for_trade only (listBinders with the viewer). */
   binders: BinderSummary[];
   flaresCount: number;
@@ -1162,6 +1167,13 @@ export async function nightPlayer(
   if (!isSupabaseConfigured()) return null;
 
   try {
+    /* A block hides them here as on their profile, either way round:
+       the same answer as a player who is not on the roster. */
+    if (viewerId && viewerId !== playerId) {
+      const block = await blockState(viewerId, playerId);
+      if (block.blocked || block.blockedBy) return null;
+    }
+
     const participants = await listParticipants(eventId);
     const seat = participants.find((row) => row.playerId === playerId);
     if (!seat) return null;
@@ -1177,9 +1189,16 @@ export async function nightPlayer(
     ]);
 
     const theirSessions = new Set(sessions.keys());
-    const flares = roomFlares.filter((entry) =>
-      theirSessions.has(entry.playerSessionId),
-    );
+    const flares = roomFlares
+      .filter((entry) => theirSessions.has(entry.playerSessionId))
+      .map((entry) => {
+        const shown: Omit<ListEntry, "playerSessionId"> & { playerSessionId?: string } =
+          {
+            ...entry,
+          };
+        delete shown.playerSessionId;
+        return shown;
+      });
 
     const night = lists.get(eventId);
     const matched = night
@@ -1201,7 +1220,8 @@ export async function nightPlayer(
     return {
       player: {
         playerId,
-        playerSessionId: seat.playerSessionId,
+        /* Theirs alone: anybody else looking gets null. */
+        playerSessionId: viewerId === playerId ? seat.playerSessionId : null,
         displayName: seat.displayName,
         avatarUrl: seat.avatarUrl,
         frame: seat.frame,

@@ -10,6 +10,7 @@ import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarSrc } from "@/lib/players/profile-image";
+import { blockedBetween } from "@/lib/players/safety";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { siteUrl } from "@/lib/site";
 import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
@@ -793,6 +794,8 @@ export async function notifyNewFollower(
   followedId: string,
 ): Promise<void> {
   if (!isSupabaseConfigured() || followerId === followedId) return;
+  /* Never across a block, whichever side made it. */
+  if (await blockedBetween(followerId, followedId)) return;
 
   try {
     const { data: follower } = await getSupabaseAdmin()
@@ -1110,6 +1113,9 @@ export async function notifyPostComment(
   body: string,
 ): Promise<void> {
   if (!isSupabaseConfigured() || authorId === commenterId) return;
+  /* Never across a block: the comment was refused anyway, and a notice
+     from somebody you blocked is exactly what a block is for. */
+  if (await blockedBetween(authorId, commenterId)) return;
 
   try {
     const title = `${commenterName} commented on your Flare`;

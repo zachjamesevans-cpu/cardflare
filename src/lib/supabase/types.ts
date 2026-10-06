@@ -1627,11 +1627,13 @@ export type PlayerReportRow = {
   id: string;
   created_at: string;
   reporter_id: string;
-  target_kind: "post" | "player" | "thread";
+  target_kind: "post" | "player" | "thread" | "comment";
   target_id: string;
   target_player_id: string | null;
   reason: "spam" | "scam" | "harassment" | "other";
   note: string | null;
+  /** A reported comment's words, kept after the comment is deleted. */
+  target_excerpt: string | null;
   status: "open" | "resolved";
   resolved_at: string | null;
   resolved_by: string | null;
@@ -1646,6 +1648,7 @@ export type PlayerReportInsert = Omit<
   | "resolved_by"
   | "note"
   | "target_player_id"
+  | "target_excerpt"
 > & {
   id?: string;
   created_at?: string;
@@ -1653,6 +1656,7 @@ export type PlayerReportInsert = Omit<
   resolved_at?: string | null;
   resolved_by?: string | null;
   note?: string | null;
+  target_excerpt?: string | null;
   target_player_id?: string | null;
 };
 

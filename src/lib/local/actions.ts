@@ -176,6 +176,7 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
     return {
       ok: false,
       closed: false,
+      blocked: false,
       kind: "direct",
       threadId: null,
       cardName: null,

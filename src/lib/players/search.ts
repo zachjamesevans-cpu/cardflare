@@ -3,6 +3,7 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { matchScore, rankBy } from "@/lib/search/rank";
 import { avatarWearFor } from "./equips";
+import { blockedSet } from "./safety";
 import { avatarPathFor, avatarSrc } from "./profile-image";
 
 /**
@@ -58,7 +59,11 @@ export function mergeBestFirst<T>(lists: readonly (readonly T[])[], id: (item: T
   return merged;
 }
 
-export async function searchPlayersByName(query: string): Promise<FoundPlayer[]> {
+export async function searchPlayersByName(
+  query: string,
+  /** The signed-in player searching: nobody blocked either way is found. */
+  viewerId: string | null = null,
+): Promise<FoundPlayer[]> {
   const trimmed = query.trim();
   if (!isSupabaseConfigured() || trimmed.length < 2) return [];
 
@@ -84,18 +89,21 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
     `display_name.ilike.${quoteFilterValue(`${escaped}%`)},handle.ilike.${quoteFilterValue(`${handleText}%`)}`,
     `display_name.ilike.${quoteFilterValue(`%${escaped}%`)},handle.ilike.${quoteFilterValue(`%${handleText}%`)}`,
   ];
+  /* Nobody blocked either way is found. Ids from our own table, never
+     from the query string. */
+  const hidden = viewerId ? [...(await blockedSet(viewerId))] : [];
 
   const results = await Promise.all(
-    filters.map((filter) =>
-      getSupabaseAdmin()
+    filters.map((filter) => {
+      let search = getSupabaseAdmin()
         .from("players")
         .select(
           "id, display_name, handle, avatar_url, avatar_animated, tier, equipped_avatar_frame",
         )
-        .or(filter)
-        .order("display_name")
-        .limit(SEARCH_LIMIT),
-    ),
+        .or(filter);
+      if (hidden.length > 0) search = search.not("id", "in", `(${hidden.join(",")})`);
+      return search.order("display_name").limit(SEARCH_LIMIT);
+    }),
   );
 
   const failed = results.find((result) => result.error);
