@@ -1,6 +1,7 @@
 import "server-only";
 
 import { unreadCount } from "@/lib/notifications/inbox";
+import { postHref, truncatePreview } from "@/lib/notifications/preview";
 import { groupForKind } from "@/lib/notifications/push-prefs";
 import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
 import type { NotificationRow } from "@/lib/supabase/types";
@@ -1065,7 +1066,7 @@ export async function notifyMessageReceived(
     const title = card?.exact_name
       ? `${name} messaged about ${card.exact_name}`
       : `${name} sent a message`;
-    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
+    const preview = truncatePreview(body);
     /* The thread itself, not the list: a tap lands in the conversation. */
     const path = `/local?thread=${encodeURIComponent(threadId)}`;
 
@@ -1112,8 +1113,9 @@ export async function notifyPostComment(
 
   try {
     const title = `${commenterName} commented on your Flare`;
-    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
-    const path = "/feed";
+    const preview = truncatePreview(body);
+    /* The post itself, not the Feed: a tap lands on what was said. */
+    const path = postHref(postId);
 
     const id = await record({
       playerId: authorId,
@@ -1512,7 +1514,7 @@ export async function notifyStorePost(
     if (followers.size === 0) return;
 
     const title = `${store.name} posted an update`;
-    const body = postTitle.length > 120 ? `${postTitle.slice(0, 119)}…` : postTitle;
+    const body = truncatePreview(postTitle);
     const path = `/s/${storeId}`;
 
     const everyone = [...followers];

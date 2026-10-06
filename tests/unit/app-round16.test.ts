@@ -378,7 +378,7 @@ describe("take down leaves the list at once", () => {
  * it, in a fixed order, and nothing stacked on the right.
  */
 describe("the offer rows are one shape: art left, one column right", () => {
-  const sheetRow = between(src.sheet, "{open.cards.map((card) => {", "</ScrollView>");
+  const sheetRow = between(src.sheet, "{cards.map((card) => {", "</ScrollView>");
   const reviewLine = between(src.review, "{lines.map((line) => (", "</ScrollView>");
   /* The owner's row is the pocket sheet now, "Update progress" for the
      one card under the tap: the same art-left shape. */

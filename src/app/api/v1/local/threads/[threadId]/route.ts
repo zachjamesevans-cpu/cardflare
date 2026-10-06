@@ -22,7 +22,11 @@ export async function GET(
   if (!player) return unauthorized();
 
   const { threadId } = await params;
-  const thread = await readThread(threadId, player.playerId);
+  /* "Load older": only messages before this time. Anything that is not
+     a date is ignored, and the newest page comes back. */
+  const before = new URL(request.url).searchParams.get("before");
+  const cursor = before && !Number.isNaN(Date.parse(before)) ? before : null;
+  const thread = await readThread(threadId, player.playerId, cursor);
   if (!thread.ok) return Response.json({ ok: false }, { status: 404 });
 
   return Response.json(absoluteImageUrls(thread));

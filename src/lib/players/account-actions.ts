@@ -19,6 +19,7 @@ import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
 import { previewDeckList, type DeckPreviewEntry } from "./deck-list-preview";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
+import { afterResponse } from "@/lib/after-response";
 import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { accountRoomIdentity } from "@/lib/players/room-identity";
 import { getPlayerSession, setPlayerCookie } from "@/lib/players/session";
@@ -185,7 +186,7 @@ export async function rsvpAction(formData: FormData): Promise<void> {
   // An RSVP's Flares wake the store's regulars the same way any early
   // post does; the dedupe makes this free when the digest already went.
   if (phase === "early" && wants.length > 0) {
-    void notifyEarlyBoardFlares(event.id);
+    afterResponse(() => notifyEarlyBoardFlares(event.id));
   }
 
   redirect(`/e/${code}`);
@@ -551,6 +552,9 @@ export async function importDeckListAction(
   return {
     status: "saved",
     saved: outcome.posted,
+    total: cards.length,
+    alreadyUp: outcome.alreadyUp,
+    failed: outcome.failed,
     unknown,
     unreadable,
     atCap: false,

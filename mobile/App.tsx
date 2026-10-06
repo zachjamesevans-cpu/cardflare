@@ -76,6 +76,7 @@ import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 import { StackHeader, TabHeader } from "./src/header";
 import { UnreadDot } from "./src/unread-dot";
 import { refreshUnread } from "./src/unread";
+import { isActiveThreadPush } from "./src/active-thread";
 import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages";
 
 /**
@@ -107,15 +108,22 @@ import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages"
 
    The badge is on: every push carries the unread count, and the icon
    wears it. The Inbox clears it (src/push.ts, syncBadge) once the
-   notices are read, so the number never outlives the list. */
+   notices are read, so the number never outlives the list.
+
+   A message from the conversation already on screen shows no banner
+   and plays no sound: the thread screen refreshes itself the moment it
+   lands (src/active-thread.ts says which conversation is open). */
 try {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification) => {
+      const here = isActiveThreadPush(notification.request.content.data);
+      return {
+        shouldShowBanner: !here,
+        shouldShowList: !here,
+        shouldPlaySound: !here,
+        shouldSetBadge: true,
+      };
+    },
   });
 } catch (error) {
   console.warn("Notification handler not installed", error);
@@ -364,17 +372,20 @@ function Tabs() {
     <Tab.Navigator
       // The same light tick every other control gives — switching tabs
       // is a tap too, and the bottom bar was the one mute surface left.
-      screenListeners={{
+      screenListeners={({ route }) => ({
         tabPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
         },
         /* Every tab change asks again, so the dot is right by the time
-           anybody looks down at the bar. */
+           anybody looks down at the bar. Messages is the exception for
+           its own dot: the tab loads the very list the dot is counted
+           from and sets it (screens/local.tsx), so asking here as well
+           read the conversations twice on every visit. */
         focus: () => {
           void refreshUnread();
-          void refreshUnreadMessages();
+          if (route.name !== "Messages") void refreshUnreadMessages();
         },
-      }}
+      })}
       screenOptions={({ route }) => ({
         /*
          * Both bars on the canvas, not on `surface`. With a true-black

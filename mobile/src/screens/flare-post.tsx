@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StackParams } from "../../App";
 import { ActionSheet, DotsButton } from "../action-menu";
 import {
+  ApiError,
   commentOnPost,
   friendlyError,
   getPost,
@@ -60,7 +61,15 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const insets = useSafeAreaInsets();
 
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  /* The server said this post does not exist: taken down, or never was. */
+  const [gone, setGone] = useState(false);
+  /*
+   * A read that failed for any OTHER reason - offline, a timeout, a 500.
+   * It says so with a Retry and keeps whatever post is already loaded,
+   * rather than calling a perfectly good post "taken down" because the
+   * network blinked.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   /* The cards in a sheet, to read or to offer on; and your own
@@ -86,9 +95,14 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     try {
       const { post: fresh } = await getPost(postId);
       setPost(fresh);
-      setFailed(false);
-    } catch {
-      setFailed(true);
+      setGone(false);
+      setLoadError(null);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setGone(true);
+        return;
+      }
+      setLoadError(`Couldn't refresh this Flare. ${friendlyError(caught)}`);
     }
   }, [postId]);
 
@@ -143,7 +157,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     }
   };
 
-  if (failed) {
+  if (gone) {
     return (
       <View
         style={{
@@ -153,7 +167,26 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           paddingVertical: spacing(4),
         }}
       >
-        <Muted>This Flare could not be opened. It may have been taken down.</Muted>
+        <Muted>This Flare has been taken down.</Muted>
+      </View>
+    );
+  }
+
+  /* Nothing loaded yet and the read failed: the reason and a way to
+     try again, in place of a spinner that would never stop. */
+  if (!post && loadError) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(3),
+        }}
+      >
+        <ErrorLine message={loadError} />
+        <AsyncButton label="Retry" pendingLabel="Retrying…" variant="secondary" onPress={load} />
       </View>
     );
   }
@@ -263,6 +296,18 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* A refresh that failed over a post already on screen: the post
+            stays, and this line offers the read again. */}
+        {loadError ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ErrorLine message={loadError} />
+            </View>
+            <Tap onPress={() => void load()} hitSlop={8} accessibilityLabel="Retry">
+              <Text style={{ color: colors.accent, fontWeight: "700" }}>Retry</Text>
+            </Tap>
+          </View>
+        ) : null}
         {post.store ? (
           /* A STORE's post: the shop's header and what it said, then the
              same heart and thread every post has. No cards, no offers -

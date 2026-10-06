@@ -39,6 +39,7 @@ import { printingLabel, type CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
 import { draftSummary, MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
 import { publishPostAction } from "@/lib/flares/publish-actions";
+import { postSummary } from "@/lib/flares/post-summary";
 
 /**
  * One composer: select cards, compose one Flare, preview, post.
@@ -153,6 +154,8 @@ function ComposerBody({
   const [posted, setPosted] = useState<{
     posted: number;
     huntId: string | null;
+    /** "Posted 18 of 20 · 2 were already up", or null when all went up. */
+    summary: string | null;
   } | null>(null);
   const [pending, start] = useTransition();
 
@@ -203,9 +206,17 @@ function ComposerBody({
         : choice.kind === "new"
           ? choice.name.trim() || null
           : null;
+  /* A new hunt with no name: Preview and Post wait for one, rather than
+     posting without the hunt the player thought they had started. */
+  const huntUnnamed =
+    draft.intent === "want" && choice.kind === "new" && !choice.name.trim();
 
   const post = () => {
     if (pending || draft.cards.length === 0) return;
+    if (huntUnnamed) {
+      setError("Name your hunt.");
+      return;
+    }
     setError(null);
     start(async () => {
       const hunt =
@@ -238,7 +249,11 @@ function ComposerBody({
       clearDraft();
       setDraft(EMPTY_DRAFT);
       setEditing(null);
-      setPosted({ posted: result.posted, huntId: result.huntId });
+      setPosted({
+        posted: result.posted,
+        huntId: result.huntId,
+        summary: postSummary(result),
+      });
       setStep("posted");
     });
   };
@@ -255,6 +270,11 @@ function ComposerBody({
           {room ? ` to ${room.name}` : " to your area"}
           {posted.huntId ? ", and on your hunt." : "."}
         </p>
+        {posted.summary && (
+          <p role="status" className="text-sm text-text-secondary">
+            {posted.summary}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Link href="/feed?tab=mine" className={buttonStyles("primary", "sm")}>
             See it in the Feed
@@ -636,10 +656,10 @@ function ComposerBody({
             setError(null);
             setStep("preview");
           }}
-          disabled={draft.cards.length === 0}
+          disabled={draft.cards.length === 0 || huntUnnamed}
           className="flex-1"
         >
-          Preview
+          {huntUnnamed ? "Name your hunt" : "Preview"}
         </Button>
         {!isEmptyDraft(draft) && (
           <Button

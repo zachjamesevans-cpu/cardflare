@@ -2604,7 +2604,13 @@ export const publishFlare = (input: {
   call<{
     ok: boolean;
     postId?: string;
+    /** Per card: what was asked, what went up, and why the rest did not. */
+    total?: number;
     posted?: number;
+    alreadyUp?: number;
+    failed?: number;
+    /** The cards that went up; older servers leave it out. */
+    postedCardIds?: string[];
     huntId?: string | null;
     atCap?: boolean;
     error?: string;
@@ -3452,6 +3458,10 @@ export const saveDeckList = (list: string, deckLabel?: string | null) =>
   call<{
     ok: true;
     saved: number;
+    /** Matched cards in the paste; older servers leave these out. */
+    total?: number;
+    alreadyUp?: number;
+    failed?: number;
     unknown: string[];
     unreadable: string[];
     atCap: boolean;
@@ -3785,11 +3795,24 @@ export interface ThreadTrade {
 /** The limit the form and the server share. */
 export const THREAD_TRADE_QUANTITY_MAX = 99;
 
-/** Reading a thread is what marks it read. */
-export const readLocalThread = (threadId: string) =>
+/**
+ * Reading a thread is what marks it read. `before` (a message's
+ * `sentAt`) reads the page of messages before it, for "Load older".
+ */
+export const readLocalThread = (threadId: string, before?: string) =>
   call<{
     ok: boolean;
     closed: boolean;
+    /**
+     * The conversation actually read, which may differ from the id
+     * asked for when an old link held an anchor's id.
+     */
+    threadId?: string | null;
+    /**
+     * More messages wait before the oldest one returned. Optional: an
+     * older server does not say, and then there is no "Load older".
+     */
+    hasOlder?: boolean;
     /**
      * What it is about: a posted Flare, a saved want, or the two
      * people. Optional: an older server does not say, and a thread
@@ -3812,7 +3835,12 @@ export const readLocalThread = (threadId: string) =>
     meet?: MeetSuggestion | null;
     /** The newest "We traded" in this conversation. Optional, as above. */
     trade?: ThreadTrade | null;
-  }>("GET", `/api/v1/local/threads/${encodeURIComponent(threadId)}`);
+  }>(
+    "GET",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}${
+      before ? `?before=${encodeURIComponent(before)}` : ""
+    }`,
+  );
 
 /**
  * "We traded": one side's word, written as a trade that waits for the

@@ -5,7 +5,7 @@ import { randomUUID } from "node:crypto";
 import type { Point } from "@/lib/geo/zip";
 import { mergeItems } from "./draft-rules";
 import { addFlare } from "@/lib/lists/repository";
-import { postAreaFlare } from "@/lib/local/area";
+import { insertAreaFlares } from "@/lib/local/area";
 import { addHuntRequests, createHunt } from "@/lib/players/hunts";
 import { saveWant } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -26,6 +26,12 @@ import type { FlareIntent } from "@/lib/supabase/types";
  * found by card and printing and reused, its copies-needed left alone
  * ("keep"). A card new to the hunt is added with the copies this post
  * asks for. An OFFERING post never touches a hunt at all.
+ *
+ * A hunt never outlives a post that did not happen. The hunt is resolved
+ * first, so a refused one costs nothing; but if no card then goes up, a
+ * hunt this post started is deleted (its requests go with it). A hunt
+ * that already existed keeps what was added: a card on a hunt stays
+ * there whatever becomes of its Flare.
  */
 
 export const CAPTION_MAX = 280;
@@ -53,13 +59,33 @@ export interface PublishInput {
 }
 
 export type PublishResult =
-  | { ok: true; postId: string; posted: number; huntId: string | null; atCap: boolean }
+  | {
+      ok: true;
+      postId: string;
+      /** Cards asked for, after repeats were merged. */
+      total: number;
+      posted: number;
+      /** Already open from this account: skipped, not failed. */
+      alreadyUp: number;
+      /** Cards whose own write failed while the rest went up. */
+      failed: number;
+      /** The room's cap stopped it; the cards past it were not tried. */
+      atCap: boolean;
+      /** Which cards went up, so a client draws only those. */
+      postedCardIds: string[];
+      huntId: string | null;
+    }
   | {
       ok: false;
       reason: "empty" | "hunt-limit" | "hunt-name" | "unavailable" | "already-posted";
       kept?: number;
       limit?: number;
     };
+
+/** A new hunt's name as it will be stored; empty means none was given. */
+export const cleanHuntName = (name: string) => name.replace(/\s+/g, " ").trim();
+
+type Outcome = "posted" | "already-up" | "failed" | "untried";
 
 export async function publishPost(input: PublishInput): Promise<PublishResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
@@ -72,6 +98,12 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
   );
   if (items.length === 0) return { ok: false, reason: "empty" };
 
+  /* "Name your hunt": a nameless hunt is refused before anything is
+     written, never quietly dropped. */
+  if (input.intent === "want" && input.hunt && "name" in input.hunt) {
+    if (!cleanHuntName(input.hunt.name)) return { ok: false, reason: "hunt-name" };
+  }
+
   const admin = getSupabaseAdmin();
   const caption =
     input.caption?.replace(/\s+/g, " ").trim().slice(0, CAPTION_MAX) || null;
@@ -79,6 +111,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
   /* The hunt, before anything is posted, so a refused hunt costs nothing. */
   let huntId: string | null = null;
   let huntName: string | null = null;
+  let huntIsNew = false;
   let requestIds: string[] = [];
   if (input.intent === "want" && input.hunt) {
     if ("id" in input.hunt) {
@@ -108,12 +141,24 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
         };
       }
       huntId = started.huntId;
-      huntName = input.hunt.name.replace(/\s+/g, " ").trim();
+      huntIsNew = started.created === true;
+      huntName = cleanHuntName(input.hunt.name);
     }
     const linked = await addHuntRequests(input.playerId, huntId, items, "keep");
-    if (!linked.ok) return { ok: false, reason: "unavailable" };
+    if (!linked.ok) {
+      if (huntIsNew) await admin.from("hunts").delete().eq("id", huntId);
+      return { ok: false, reason: "unavailable" };
+    }
     requestIds = linked.requestIds;
   }
+
+  /* A hunt this post started, when nothing went up: deleted, and its
+     requests with it (the cascade). A hunt that already existed is left
+     alone — a card added to a hunt stays there, Flare or no Flare
+     (tests/unit/hunt-persistence.test.ts). */
+  const dropNewHunt = async () => {
+    if (huntId && huntIsNew) await admin.from("hunts").delete().eq("id", huntId);
+  };
 
   const postId = randomUUID();
   const { error: postError } = await admin.from("flare_posts").insert({
@@ -127,6 +172,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
   });
   if (postError) {
     console.error("Could not write the post", postError);
+    await dropNewHunt();
     return { ok: false, reason: "unavailable" };
   }
 
@@ -138,15 +184,14 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     acceptsTrade: input.acceptsTrade || !input.acceptsCash,
     acceptsCash: input.acceptsCash,
   };
-  let posted = 0;
+  const outcomes: Outcome[] = items.map(() => "untried");
   let atCap = false;
-  let refused: PublishResult | null = null;
+  let notMigrated = false;
 
-  for (const [index, item] of items.entries()) {
-    const requestId = requestIds[index] ?? null;
-    let flareId: string | null = null;
-
-    if (input.eventId && input.session) {
+  if (input.eventId && input.session) {
+    /* A board: card by card, because the room's cap is checked per Flare
+       and a post that runs into it should post what fits and say so. */
+    for (const [index, item] of items.entries()) {
       const result = await addFlare(
         input.eventId,
         input.session.id,
@@ -166,80 +211,123 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
           atCap = true;
           break;
         }
-        refused = { ok: false, reason: "unavailable" };
+        outcomes[index] = "failed";
         continue;
       }
-      /* addFlare upserts and says nothing about the row: read it back by
-         the same key the unique index uses. */
-      const { data } = await admin
-        .from("flares")
-        .select("id")
-        .eq("event_id", input.eventId)
-        .eq("player_session_id", input.session.id)
-        .eq("card_id", item.cardId)
-        .eq("intent", input.intent)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      flareId = data?.id ?? null;
-    } else {
-      const result = await postAreaFlare(
-        input.playerId,
-        {
-          cardId: item.cardId,
-          printingId: item.printingId,
-          quantity: item.quantity,
-          note: null,
-          intent: input.intent,
-          acceptsTrade: accepts.acceptsTrade,
-          acceptsCash: accepts.acceptsCash,
-        },
-        input.at,
-        { batchId: postId, deckLabel: huntName },
-      );
-      if (!result.ok) {
-        refused = {
-          ok: false,
-          reason: result.reason === "already-posted" ? "already-posted" : "unavailable",
-        };
-        /* A missing migration is the same wall for every card. */
-        if (result.reason === "not-migrated") break;
-        continue;
-      }
-      flareId = result.flareId;
+      outcomes[index] = "posted";
     }
 
-    posted += 1;
-    if (flareId && (requestId || caption)) {
-      await admin
+    /* addFlare upserts and says nothing about the row: read the posted
+       ones back in ONE query, by the same key the unique index uses, and
+       point each at its hunt request (and the first at the caption). */
+    const postedIds = items
+      .filter((_, index) => outcomes[index] === "posted")
+      .map((item) => item.cardId);
+    if (postedIds.length > 0 && (requestIds.length > 0 || caption)) {
+      const { data } = await admin
         .from("flares")
-        .update({
-          hunt_request_id: requestId,
-          /* The caption rides the first card too, for readers that still
-             take a post's words off its first flare. */
-          note: index === 0 ? caption : null,
-        })
-        .eq("id", flareId);
+        .select("id, card_id, printing_id")
+        .eq("event_id", input.eventId)
+        .eq("player_session_id", input.session.id)
+        .eq("intent", input.intent)
+        .in("card_id", postedIds);
+      const rows = (data ?? []) as {
+        id: string;
+        card_id: string;
+        printing_id: string | null;
+      }[];
+      await Promise.all(
+        items.map((item, index) => {
+          if (outcomes[index] !== "posted") return null;
+          const requestId = requestIds[index] ?? null;
+          const note = index === 0 ? caption : null;
+          if (!requestId && !note) return null;
+          const row = rows.find(
+            (candidate) =>
+              candidate.card_id === item.cardId &&
+              (candidate.printing_id ?? null) === item.printingId,
+          );
+          if (!row) return null;
+          return admin
+            .from("flares")
+            .update({ hunt_request_id: requestId, note })
+            .eq("id", row.id);
+        }),
+      );
     }
-    /* A want follows the player to the next store as a Flare on their
-       list, whether it went up on a board or into the Feed. The founder,
-       on Feed posts missing from the list: "This section needs to
-       update the second a flare gets posted." */
-    if (input.intent === "want") {
-      await saveWant(input.playerId, {
+  } else {
+    /* The area: one schema probe, one ZIP read, one insert for the lot. */
+    const result = await insertAreaFlares(
+      input.playerId,
+      items.map((item, index) => ({
         cardId: item.cardId,
         printingId: item.printingId,
         quantity: item.quantity,
-        note: null,
-        deckLabel: huntName,
+        /* The caption rides the first card too, for readers that still
+           take a post's words off its first flare. */
+        note: index === 0 ? caption : null,
+        intent: input.intent,
+        acceptsTrade: accepts.acceptsTrade,
+        acceptsCash: accepts.acceptsCash,
+        huntRequestId: requestIds[index] ?? null,
+      })),
+      input.at,
+      { batchId: postId, deckLabel: huntName },
+    );
+    if (!result.ok) {
+      notMigrated = result.reason === "not-migrated";
+      items.forEach((_, index) => (outcomes[index] = "failed"));
+    } else {
+      result.outcomes.forEach((outcome, index) => {
+        outcomes[index] = outcome.status;
       });
     }
   }
 
+  const count = (kind: Outcome) => outcomes.filter((outcome) => outcome === kind).length;
+  const posted = count("posted");
+  const alreadyUp = count("already-up");
+
   if (posted === 0) {
     await admin.from("flare_posts").delete().eq("id", postId);
-    return refused ?? { ok: false, reason: "unavailable" };
+    await dropNewHunt();
+    if (alreadyUp > 0 && count("failed") === 0 && !atCap) {
+      return { ok: false, reason: "already-posted" };
+    }
+    if (notMigrated) console.error("Publishing needs the area-Flare migration");
+    return { ok: false, reason: "unavailable" };
   }
 
-  return { ok: true, postId, posted, huntId, atCap };
+  const postedItems = items.filter((_, index) => outcomes[index] === "posted");
+
+  /* A want follows the player to the next store as a Flare on their
+     list, whether it went up on a board or into the Feed. The founder,
+     on Feed posts missing from the list: "This section needs to
+     update the second a flare gets posted." Side by side, not one
+     after another: each is its own small upsert. */
+  if (input.intent === "want") {
+    await Promise.all(
+      postedItems.map((item) =>
+        saveWant(input.playerId, {
+          cardId: item.cardId,
+          printingId: item.printingId,
+          quantity: item.quantity,
+          note: null,
+          deckLabel: huntName,
+        }),
+      ),
+    );
+  }
+
+  return {
+    ok: true,
+    postId,
+    total: items.length,
+    posted,
+    alreadyUp,
+    failed: count("failed"),
+    atCap,
+    postedCardIds: postedItems.map((item) => item.cardId),
+    huntId,
+  };
 }

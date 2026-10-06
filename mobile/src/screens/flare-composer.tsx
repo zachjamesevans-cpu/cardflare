@@ -32,6 +32,7 @@ import { haveLocationPermission, requestCoords, type Coords } from "../location"
 import { LOCAL_ENABLED } from "../local-enabled";
 import { NearbyCard } from "../nearby";
 import type { PostRef } from "../post-social";
+import { postSummary } from "../post-summary";
 import { RemoteImage } from "../remote-image";
 import { Stepper } from "../stepper";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -190,7 +191,11 @@ export function FlareComposer({
   const [editing, setEditing] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [posted, setPosted] = useState<{ postId: string | null } | null>(null);
+  const [posted, setPosted] = useState<{
+    postId: string | null;
+    /** "Posted 18 of 20 · 2 were already up", or null when all went up. */
+    summary: string | null;
+  } | null>(null);
 
   /*
    * "I'm open to trades" lives at the composer's foot now, not beside
@@ -414,9 +419,17 @@ export function FlareComposer({
       : chosenHunt?.kind === "existing"
         ? (hunts.find((hunt) => hunt.id === chosenHunt.id)?.name ?? null)
         : null;
+  /* A new hunt with no name: Preview and Post wait for one, rather than
+     posting without the hunt the player thought they had started. */
+  const huntUnnamed =
+    draft.intent === "want" && chosenHunt?.kind === "new" && !chosenHunt.name.trim();
 
   const post = async () => {
     setError(null);
+    if (huntUnnamed) {
+      setError("Name your hunt.");
+      return;
+    }
     try {
       /* The decided target, never a painted one. */
       const where = resolveTarget ? await resolveTarget() : target;
@@ -454,8 +467,14 @@ export function FlareComposer({
       }
       /* The Feed starts catching up now, not when it is next looked at. */
       markFeedStale();
+      /* Only the cards that went up are drawn as posted. An older server
+         that does not name them posted all or nothing. */
+      const wentUp = result.postedCardIds ? new Set(result.postedCardIds) : null;
+      const postedItems = wentUp
+        ? draft.items.filter((item) => wentUp.has(item.cardId))
+        : draft.items;
       onPosted?.(
-        draft.items.map((item) => ({
+        postedItems.map((item) => ({
           id: `just-posted:${keyOf(item)}`,
           cardId: item.cardId,
           direction: draft.intent === "want" ? "want" : "offering",
@@ -477,7 +496,19 @@ export function FlareComposer({
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
-      setPosted({ postId: result.postId ?? null });
+      setPosted({
+        postId: result.postId ?? null,
+        summary:
+          result.total !== undefined && result.posted !== undefined
+            ? postSummary({
+                total: result.total,
+                posted: result.posted,
+                alreadyUp: result.alreadyUp,
+                failed: result.failed,
+                atCap: result.atCap,
+              })
+            : null,
+      });
       setDraft(EMPTY);
       setPreviewing(false);
       setEditing(null);
@@ -491,9 +522,11 @@ export function FlareComposer({
             : "You have too many Flares up. Take one down first."
           : code === "already-posted"
             ? "One of these cards is already up."
-            : code === "not-migrated"
-              ? "Posting isn't switched on yet. The server needs its latest update."
-              : `Could not post the Flare. ${friendlyError(caught)}`,
+            : code === "hunt-name"
+              ? "Name your hunt."
+              : code === "not-migrated"
+                ? "Posting isn't switched on yet. The server needs its latest update."
+                : `Could not post the Flare. ${friendlyError(caught)}`,
       );
     }
   };
@@ -521,6 +554,7 @@ export function FlareComposer({
                 ? "People near you see it, and so do your friends."
                 : "Your friends see it in the Feed."}
           </Body>
+          {posted.summary ? <Muted>{posted.summary}</Muted> : null}
           <Button
             label="See it in the Feed"
             onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
@@ -710,8 +744,8 @@ export function FlareComposer({
 
               <ErrorLine message={error} />
               <Button
-                label="Preview"
-                disabled={draft.items.length === 0}
+                label={huntUnnamed ? "Name your hunt" : "Preview"}
+                disabled={draft.items.length === 0 || huntUnnamed}
                 onPress={() => {
                   setEditing(null);
                   setPreviewing(true);

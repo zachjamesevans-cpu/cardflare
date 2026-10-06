@@ -28,6 +28,9 @@ const deckPreviewSchema = z.object({
 });
 
 export const dynamic = "force-dynamic";
+/* A pasted deck is one batched insert now, but a race with the unique
+   index falls back to card by card; give that room to finish. */
+export const maxDuration = 60;
 
 /**
  * Saving a hunt straight to the account, no room involved.
@@ -45,22 +48,27 @@ export async function POST(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
 
-  const limited = tooMany(
-    `deck-list:${player.playerId}`,
-    LIMITS.deckList.limit,
-    LIMITS.deckList.windowMs,
-  );
-  if (limited) return limited;
-
   const body = await readJsonPayload(request);
 
   /*
    * "Are these the cards I meant?" — the pasted list looked up with
    * names and art, nothing written. The phone shows the faces and only
    * then offers the save below.
+   *
+   * Its own, looser limit: the paste screen previews as the player
+   * types (debounced), so a single deck can ask a dozen times. Counting
+   * those against the post's twenty locked people out of posting the
+   * list they had just checked.
    */
   const asPreview = deckPreviewSchema.safeParse(body);
   if (asPreview.success) {
+    const previewLimited = tooMany(
+      `deck-preview:${player.playerId}`,
+      LIMITS.deckPreview.limit,
+      LIMITS.deckPreview.windowMs,
+    );
+    if (previewLimited) return previewLimited;
+
     const { lines, unreadable } = parseDeckList(asPreview.data.list);
     const entries = await previewDeckList(lines);
     return Response.json(absoluteImageUrls({ ok: true, entries, unreadable }));
@@ -73,6 +81,14 @@ export async function POST(request: Request): Promise<Response> {
    * transport makes every extra route another thing to get wrong in the
    * proxy.
    */
+  /* Everything past a preview writes, and shares the strict limit. */
+  const limited = tooMany(
+    `deck-list:${player.playerId}`,
+    LIMITS.deckList.limit,
+    LIMITS.deckList.windowMs,
+  );
+  if (limited) return limited;
+
   const asDeck = deckListSchema.safeParse(body);
   if (asDeck.success) {
     const { lines, unreadable } = parseDeckList(asDeck.data.list);
@@ -124,7 +140,18 @@ export async function POST(request: Request): Promise<Response> {
     /* Kept for older builds that read it; nothing caps a paste now. */
     const atCap = false;
 
-    return Response.json({ ok: true, saved, unknown, unreadable, atCap });
+    return Response.json({
+      ok: true,
+      saved,
+      /* Per card, so the phone can say "Posted 18 of 20 · 2 were
+         already up" rather than a bare count. */
+      total: cards.length,
+      alreadyUp: outcome.ok ? outcome.alreadyUp : 0,
+      failed: outcome.ok ? outcome.failed : 0,
+      unknown,
+      unreadable,
+      atCap,
+    });
   }
 
   const parsed = addEntrySchema.safeParse(body);

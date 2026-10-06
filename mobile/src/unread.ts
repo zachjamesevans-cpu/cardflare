@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 import { ApiError, getUnreadCount, onSignedOut, storedAccessToken } from "./api";
+import { syncBadge } from "./push";
 
 /**
  * How many notices are unread, shared by the tab bar and the Inbox.
@@ -59,7 +60,15 @@ export async function refreshUnread(): Promise<void> {
     }
     const { unread } = await getUnreadCount();
     if (generation !== started) return;
-    if (typeof unread === "number") setUnread(unread);
+    if (typeof unread === "number") {
+      setUnread(unread);
+      /* The icon's badge is the same server count (every push carries
+         it), so it is set from here too: on launch, on every return to
+         the front, and after a conversation is read, which clears its
+         message notice. Otherwise the icon kept the number the last
+         push wore until somebody opened the Inbox. */
+      void syncBadge(unread);
+    }
   } catch (caught) {
     /* A 401 is "signed out", which has no dot. Anything else is the
        network, and the last value stands. */

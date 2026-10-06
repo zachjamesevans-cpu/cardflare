@@ -36,6 +36,7 @@ import {
   type ZoomCard,
 } from "../ui";
 import { refreshTick } from "../refresh-tick";
+import { setUnreadMessages, totalUnread } from "../unread-messages";
 
 /**
  * Local — the tab that took Room's place in the bar.
@@ -148,6 +149,10 @@ export function LocalScreen({
         setThreads(nextThreads.threads);
         setThreadsKnown(true);
         setFailure(null);
+        /* The Messages tab's dot is counted from this same list, so it
+           is set from here rather than read again (App.tsx skips its own
+           refresh when Messages comes into focus). */
+        setUnreadMessages(totalUnread(nextThreads.threads));
         const playerId = await cachedPlayerId();
         if (playerId) void writeCache("threads", playerId, nextThreads.threads);
       } catch {

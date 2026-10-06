@@ -1,6 +1,7 @@
 import "server-only";
 
 import { addFlareBatch } from "@/lib/lists/repository";
+import { afterResponse } from "@/lib/after-response";
 import { notifyRoomFlare } from "@/lib/notifications/notify";
 import { listOfferings, listWants } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -110,12 +111,15 @@ export async function postFlaresOnJoin(
       const batch = await addFlareBatch(roomId, session.id, toInputs(wants), "want");
       posted.push(...batch.posted);
       if (batch.posted.length > 0) {
-        void notifyRoomFlare(
-          roomId,
-          session.id,
-          session.display_name ?? "A player",
-          batch.posted,
-          "want",
+        const posted = batch.posted;
+        afterResponse(() =>
+          notifyRoomFlare(
+            roomId,
+            session.id,
+            session.display_name ?? "A player",
+            posted,
+            "want",
+          ),
         );
       }
     }

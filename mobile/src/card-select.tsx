@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState, type ReactNode } from "react";
-import { Modal, ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -118,6 +118,16 @@ export function useCardSearch(target: PostTarget) {
     setHits([]);
   };
 
+  /*
+   * Read through a ref inside the search, not as a dependency of it. The
+   * search itself remembers the game it ran in, and with `remembered` in
+   * the dependency list that write re-ran the effect: the first answer
+   * was thrown away as stale and the same query went out a second time,
+   * 300ms later, on every first search in a game.
+   */
+  const rememberedRef = useRef(remembered);
+  rememberedRef.current = remembered;
+
   useEffect(() => {
     if (query.trim().length < 2) {
       setHits([]);
@@ -127,7 +137,7 @@ export function useCardSearch(target: PostTarget) {
     setSearching(true);
     let stale = false;
     const timer = setTimeout(() => {
-      if (scopedGame && !scope.locked && remembered !== scopedGame) {
+      if (scopedGame && !scope.locked && rememberedRef.current !== scopedGame) {
         setRemembered(scopedGame);
         void rememberSearchGame(scopedGame);
       }
@@ -146,7 +156,7 @@ export function useCardSearch(target: PostTarget) {
       stale = true;
       clearTimeout(timer);
     };
-  }, [query, scopedGame, scope.locked, remembered]);
+  }, [query, scopedGame, scope.locked]);
 
   return { query, setQuery, hits, searching, scope, scopedGame, playerGames, pickGame };
 }

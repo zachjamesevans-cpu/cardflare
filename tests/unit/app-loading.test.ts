@@ -61,7 +61,7 @@ describe("Loading, the app's one loading state", () => {
   it("is what the Room, the Feed and the Inbox draw while they wait", () => {
     expect(read("screens/room.tsx")).toContain('<Loading label="Opening the room" />');
     expect(read("screens/home.tsx")).toContain(
-      "{!hydrated && shown.length === 0 && <Loading />}",
+      "{(!hydrated || !feedSettled) && !feedFailed && shown.length === 0 && (",
     );
     expect(read("screens/inbox.tsx")).toContain(
       "{items === null && loadError === null && <Loading />}",

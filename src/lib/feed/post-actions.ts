@@ -14,7 +14,9 @@ import {
   listComments,
   offerFromFeed,
   offerItems,
+  postDetail,
   unlikePost,
+  type PostCard,
   type PostComment,
 } from "./posts";
 
@@ -59,11 +61,25 @@ export async function togglePostLikeAction(
     return false;
   }
 
-  const done = liked
-    ? await likePost(postId, player.id)
-    : await unlikePost(postId, player.id);
-  if (done) revalidatePath("/feed");
-  return done;
+  /*
+   * No revalidatePath here. The heart is already flipped on screen and
+   * the count follows it; rebuilding the whole Feed for every tap of a
+   * heart was the most expensive way to say nothing new. The next load
+   * reads the real count.
+   */
+  return liked ? likePost(postId, player.id) : unlikePost(postId, player.id);
+}
+
+/**
+ * Every card on a post, for the "View all N" sheet when the Feed's rail
+ * carried only the first twenty. Null when it cannot be read; the sheet
+ * then keeps the cards it has.
+ */
+export async function loadPostCardsAction(postId: string): Promise<PostCard[] | null> {
+  const player = await viewerPlayer(await getViewer());
+  if (!player || !postId) return null;
+  const post = await postDetail(postId, player.id);
+  return post?.cards ?? null;
 }
 
 /** The thread, opened on demand rather than shipped with every post. */

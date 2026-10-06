@@ -1,10 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
-import type { FeedCard, OfferItem, OfferOutcome, PostCard } from "./api";
+import {
+  ApiError,
+  type FeedCard,
+  type OfferItem,
+  type OfferOutcome,
+  type PostCard,
+} from "./api";
 import { colors, spacing } from "./theme";
-import { Tap, type ZoomHave } from "./ui";
+import { ErrorLine, Tap, type ZoomHave } from "./ui";
 
 /**
  * The social row under a Flare post, and the one rule about which card
@@ -109,17 +115,48 @@ export function PostSocialRow({
     setLikes(initialLikes);
   }
 
+  /*
+   * One heart request per post at a time. A thumb that taps twice fast
+   * used to send like, unlike, like in a race the server settled in
+   * whatever order they landed, and a rollback could undo the wrong
+   * flip. A tap while one is in flight is ignored; the heart already
+   * shows the answer it is waiting on.
+   */
+  const inFlight = useRef(false);
+  /* Said aloud when the server refuses, rather than a heart that
+     quietly flips back. Clears itself after a few seconds. */
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   const toggle = () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     const next = !liked;
     setLiked(next);
     setLikes((current) => Math.max(0, current + (next ? 1 : -1)));
-    onLike(next).catch(() => {
-      setLiked(!next);
-      setLikes((current) => Math.max(0, current + (next ? -1 : 1)));
-    });
+    setError(null);
+    onLike(next)
+      .catch((caught: unknown) => {
+        setLiked(!next);
+        setLikes((current) => Math.max(0, current + (next ? -1 : 1)));
+        setError(
+          caught instanceof ApiError && caught.status === 429
+            ? "That is a lot of likes. Try again in a little while."
+            : "Couldn't save that like. Try again.",
+        );
+      })
+      .finally(() => {
+        inFlight.current = false;
+      });
   };
 
   return (
+    <View style={{ gap: spacing(1) }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
       <Tap
         onPress={toggle}
@@ -181,6 +218,8 @@ export function PostSocialRow({
           ) : null}
         </Tap>
       ) : null}
+    </View>
+    <ErrorLine message={error} />
     </View>
   );
 }

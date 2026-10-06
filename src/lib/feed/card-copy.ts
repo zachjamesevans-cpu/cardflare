@@ -34,3 +34,23 @@ export function cardCountLabel(card: FeedCard, direction: "want" | "showcase"): 
      for every surface that prints it, on both platforms. */
   return wantsLine(quantity, remaining);
 }
+
+/**
+ * What a message about a post is about, for "About your <this>: ".
+ * The card's name for a one-card post; the post itself for several, not
+ * whichever card leads the rail. The app's `postSubject`
+ * (mobile/src/flare-copy.ts) says the same.
+ */
+export function postSubject(post: {
+  total: number;
+  cards: readonly { cardName: string }[];
+  hunt?: { name: string } | null;
+  deckLabel?: string | null;
+}): string {
+  const lead = post.cards[0]?.cardName;
+  if (post.total <= 1 && lead) return lead;
+  const named = post.hunt?.name?.trim() || post.deckLabel?.trim();
+  if (named) return `${named} Flare`;
+  const count = Math.max(post.total, post.cards.length);
+  return `Flare of ${count} ${count === 1 ? "card" : "cards"}`;
+}

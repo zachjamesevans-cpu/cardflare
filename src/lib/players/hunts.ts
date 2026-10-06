@@ -351,7 +351,7 @@ export async function canStartHunt(
 }
 
 export type HuntWrite =
-  | { ok: true; huntId: string }
+  | { ok: true; huntId: string; created?: boolean }
   | {
       ok: false;
       reason: "limit" | "name" | "not-yours" | "unavailable";
@@ -392,7 +392,7 @@ export async function createHunt(
     console.error("Could not start the hunt", error);
     return { ok: false, reason: "unavailable" };
   }
-  return { ok: true, huntId: data.id };
+  return { ok: true, huntId: data.id, created: true };
 }
 
 /** Renames, describes or hides a hunt. The owner only. */

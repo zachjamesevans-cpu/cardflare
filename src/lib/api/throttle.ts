@@ -41,6 +41,8 @@ export const LIMITS = {
   areaFlare: { limit: 30, windowMs: 10 * MINUTE },
   /** Deck lists saved, per account. */
   deckList: { limit: 20, windowMs: 10 * MINUTE },
+  /** Deck previews, per account: the paste screen asks as you type. */
+  deckPreview: { limit: 120, windowMs: 10 * MINUTE },
   /** Follows and unfollows, per account. */
   follow: { limit: 30, windowMs: 10 * MINUTE },
   /** Store claims, per network. */
