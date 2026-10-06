@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Home, MapPin, MessageCircle, UserCircle2 } from "lucide-react";
+import {
+  CalendarDays,
+  Home,
+  MapPin,
+  MessageCircle,
+  Search,
+  UserCircle2,
+} from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -11,16 +18,18 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
  * The app's bottom bar, on the website.
  *
  * The founder's parity call: somebody who uses the app on Wednesday and
- * the site on Thursday should not have to learn two products. Same four
- * places, same order: Feed, Nights, Messages, Profile, so a thumb that
- * knows one knows the other.
+ * the site on Thursday should not have to learn two products. Same five
+ * places, same order: Feed, Nights, Messages, Search, Profile, so a
+ * thumb that knows one knows the other.
  *
  * Round 16 reshaped it the way Instagram's is. Messages took the
  * Inbox's slot, because conversations are where people come back to;
  * notifications moved to a bell in the Feed's top right
  * (feed/notification-bell.tsx), and posting a Flare is the + at the
  * Feed's top left. A raised + in the middle of the bar was tried and
- * the founder took it out: "Not a fan of the big plus."
+ * the founder took it out: "Not a fan of the big plus." Five tabs with
+ * Messages dead centre was the call after that, and the founder gave
+ * the fifth slot to Search, which had been an icon by the bell.
  *
  * Fixed to the bottom on every width. On a laptop that is unusual for a
  * website and deliberate here: this is the signed-in player surface, the
@@ -44,8 +53,10 @@ const TABS = [
     ? [{ href: "/local", label: "Local", icon: MapPin } as const]
     : [{ href: "/nights", label: "Nights", icon: CalendarDays } as const]),
   /* The conversations list. With Local off, /local is the Messages
-     page; with it on, the same page leads with them. */
+     page; with it on, the same page leads with them. In the middle. */
   { href: "/local", label: "Messages", icon: MessageCircle },
+  /* Cards, players and stores, one search: /search. */
+  { href: "/search", label: "Search", icon: Search },
   { href: "/profile", label: "Profile", icon: UserCircle2 },
 ] as const;
 

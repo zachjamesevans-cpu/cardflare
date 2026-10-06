@@ -35,9 +35,13 @@ describe("the Local switch", () => {
     expect(app).toContain('name="Messages"');
 
     /* The Inbox's message notices still open somewhere on both: the
-       Messages tab, since round 16. */
+       Messages tab, since round 16, through the one door every notice
+       uses. */
     const inbox = read("mobile/src/screens/inbox.tsx");
-    expect(inbox).toContain('navigate("Tabs", { screen: "Messages" })');
+    expect(inbox).toContain("followHref(navigation, url)");
+    expect(read("mobile/src/follow-href.ts")).toContain(
+      'navigation.navigate("Tabs", { screen: "Messages" });',
+    );
     const page = read("src/app/local/page.tsx");
     expect(page).toContain('LOCAL_ENABLED ? "Local" : "Messages"');
   });

@@ -121,6 +121,8 @@ try {
 
 export type TabParams = {
   Feed: undefined;
+  /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
+  Search: undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
   Nights: undefined;
@@ -222,8 +224,6 @@ export type StackParams = {
   TradeHistory: { logged?: boolean } | undefined;
   /** Writing down a trade made off CardFlare, the website's sheet. */
   LogTrade: undefined;
-  /** One search for cards, players and stores, from the Feed's own header. */
-  Search: undefined;
   /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
   Card: { cardId: string };
   /**
@@ -294,6 +294,8 @@ const TAB_ICONS: Partial<
   /* Home-shaped, the founder's call: this is the screen you open by
        habit, and scanning moved to a button on it. */
   Feed: { idle: "home-outline" },
+  /* The website's dock draws lucide Search. */
+  Search: { idle: "search-outline", focused: "search" },
   Local: { idle: "location-outline" },
   /* The website's dock draws lucide CalendarDays for Nights; the
        calendar fills in when it is the open tab, like the flame. */
@@ -521,7 +523,7 @@ function Tabs() {
           tabBarLabel: "Feed",
         }}
       />
-      {/* The second slot: Local while it is on, Nights otherwise. Nights
+      {/* Second: Local while it is on, Nights otherwise. Nights
           took the Room's slot on 2026-10-03: rooms open the moment a
           store posts a night, and the tab is the list of them. The
           website's dock does the same (/nights, CalendarDays). See
@@ -556,6 +558,14 @@ function Tabs() {
       >
         {() => <LocalScreen threadsOnly />}
       </Tab.Screen>
+      {/* Search, fourth: the founder's order is Feed, Nights, Messages,
+          Search, Profile, Messages dead centre. Same screen the Feed's
+          search icon used to open. */}
+      <Tab.Screen
+        name="Search"
+        component={SearchScreen}
+        options={{ title: "Search", tabBarLabel: "Search" }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
       {/* Post a Flare: no slot in the bar (see tabBarButton above); the +
           at the Feed's top left opens it. Last, so it never shifts the
@@ -567,6 +577,14 @@ function Tabs() {
           title: "Post a Flare",
           tabBarLabel: "Post a Flare",
           tabBarAccessibilityLabel: "Post a Flare",
+          /*
+           * The item's box goes too, not only its button. The bar wraps
+           * every route in a View that takes an equal share of the
+           * width, so a null button alone left an empty fifth slot and
+           * the four tabs bunched to the left - the founder: "Missing a
+           * whole tab at the bottom."
+           */
+          tabBarItemStyle: { display: "none" },
         }}
       />
     </Tab.Navigator>
@@ -964,11 +982,6 @@ function AppGates() {
           <Stack.Screen name="Remote" options={{ title: "Timer remote" }}>
             {({ route }) => <RemoteScreen storeId={route.params?.storeId} />}
           </Stack.Screen>
-          <Stack.Screen
-            name="Search"
-            component={SearchScreen}
-            options={{ title: "Search" }}
-          />
           <Stack.Screen name="Card" options={{ title: "Card" }}>
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>

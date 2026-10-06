@@ -3,8 +3,7 @@ import Link from "next/link";
 
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
-import { Plus } from "lucide-react";
-import { FeedSearch } from "@/components/feed/feed-search";
+import { Plus, Search } from "lucide-react";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { Item } from "@/components/feed/feed-items";
 import {
@@ -71,9 +70,11 @@ export const dynamic = "force-dynamic";
  */
 
 /* The chrome is TabPageShell, shared with a player's page: the wordmark
-   centred with the Feed behind it, the search and the notifications
-   bell on the right, the tab bar below. The bell is a player's: a
-   guest has no inbox, so a guest's header is the search alone. */
+   centred with the Feed behind it, the notifications bell on the right,
+   the tab bar below. Search is a tab of its own now (Feed, Nights,
+   Messages, Search, Profile). The bell is a player's: somebody with no
+   inbox, who may have no tab bar either, gets the door to Search in
+   its place. */
 function Shell({
   playerId = null,
   unread = 0,
@@ -101,12 +102,18 @@ function Shell({
           </Link>
         ) : undefined
       }
-      trailingCount={playerId ? 2 : 1}
       trailing={
-        <FeedSearch
-          account={playerId}
-          bell={playerId ? <NotificationBell unread={unread} /> : undefined}
-        />
+        playerId ? (
+          <NotificationBell unread={unread} />
+        ) : (
+          <Link
+            href="/search"
+            aria-label="Search"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-surface text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+          >
+            <Search className="size-4" aria-hidden="true" />
+          </Link>
+        )
       }
     >
       {children}
@@ -246,8 +253,7 @@ export default async function FeedPage({
         <Card className="flex flex-col gap-3">
           <h2 className="font-semibold text-text-primary">Nothing from people yet</h2>
           <p className="text-sm text-text-secondary">
-            Follow a friend and their Flares show up here. Find them by name from the
-            search up top.
+            Follow a friend and their Flares show up here. Find them by name in Search.
           </p>
         </Card>
       ) : shown.length === 0 && tab === "mine" ? (

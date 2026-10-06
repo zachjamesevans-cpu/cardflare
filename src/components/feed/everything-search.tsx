@@ -121,8 +121,9 @@ export function EverythingSearch({ account = null }: { account?: string | null }
   const [found, setFound] = useState<Found | null>(null);
   const [tab, setTab] = useState<SearchTab>("top");
 
-  /* This component only mounts on a tap (FeedSearch opens it), so the
-     device's list is read on the client, never during a server render. */
+  /* This component only ever draws in the browser (SearchPanel skips
+     the server render), so the device's list is read on the client,
+     never during a server render. */
   const storageKey = recentKey(account);
   const [recent, setRecent] = useState<string[]>(() => readRecent(storageKey));
 

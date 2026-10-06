@@ -100,17 +100,20 @@ describe("the API carries the server's contracts", () => {
   });
 });
 
-describe("the Search screen, from the Feed", () => {
+describe("the Search tab", () => {
   it("replaced Find a player: the route is Search and nothing navigates to the old name", () => {
     expect(src.oldSearch).toBe("");
     expect(src.search).toContain("export function SearchScreen()");
     expect(src.app).toContain('import { SearchScreen } from "./src/screens/search";');
-    expect(src.app).toContain("  Search: undefined;");
-    expect(src.app).toContain('name="Search"');
-    /* Round 16: back is the plain chevron, so no back title. */
-    expect(src.app).toContain('options={{ title: "Search" }}');
+    /* A tab since the founder's five (Feed, Nights, Messages, Search,
+       Profile), and only a tab: no second Search route on the stack. */
+    expect(src.app.match(/  Search: undefined;/g)).toHaveLength(1);
+    expect(src.app).toContain('options={{ title: "Search", tabBarLabel: "Search" }}');
+    expect(src.app).not.toMatch(/<Stack\.Screen\s+name="Search"/);
     expect(src.app).not.toContain("FindPlayer");
-    expect(src.home).toContain('onSearch={() => navigation.navigate("Search")}');
+    expect(src.home).toContain('navigation.navigate("Tabs", { screen: "Search" })');
+    /* The list runs under the floating bar, so it pads for it. */
+    expect(src.search).toContain("paddingBottom: spacing(4) + tabInset,");
     expect(src.home).not.toContain("FindPlayer");
   });
 
