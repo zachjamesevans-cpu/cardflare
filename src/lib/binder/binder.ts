@@ -362,19 +362,6 @@ async function assemble(
   };
 }
 
-function summarize(binder: Binder): BinderSummary {
-  return {
-    id: binder.id,
-    name: binder.name,
-    forTrade: binder.forTrade,
-    isPublic: binder.isPublic,
-    count: binder.count,
-    layout: binder.layout,
-    cover: binder.cover,
-    onYourHunts: binder.onYourHunts,
-  };
-}
-
 /**
  * A binder, for whoever is looking. Null when the owner has no
  * account, the binder does not exist, or it is private and the viewer
@@ -451,8 +438,69 @@ export async function listBinders(
 ): Promise<BinderSummary[]> {
   const [name, rows] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
   if (!name) return [];
-  const binders = await Promise.all(rows.map((row) => assemble(row, name, viewerId)));
-  return binders.flatMap((binder) => (binder ? [summarize(binder)] : []));
+  const yours = viewerId === ownerId;
+  const visible = rows.filter((row) => yours || row.for_trade);
+  if (visible.length === 0) return [];
+
+  /*
+   * A summary is a count and a hunt tally, so it is read as one: the
+   * card ids of every visible binder in a single (paged) query and the
+   * viewer's wants once, rather than building every binder in full —
+   * names, printings and art for cards nobody is about to see.
+   */
+  const [cards, wanted] = await Promise.all([
+    binderCardIds(visible.map((row) => row.id)),
+    yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
+  ]);
+  return summarizeBinders(visible, cards, wanted);
+}
+
+/** Every card id in these binders, by binder. Paged past the row limit. */
+async function binderCardIds(
+  binderIds: string[],
+): Promise<{ binder_id: string; card_id: string }[]> {
+  const admin = getSupabaseAdmin();
+  const PAGE = 1000;
+  const all: { binder_id: string; card_id: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from("binder_cards")
+      .select("binder_id, card_id")
+      .in("binder_id", binderIds)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error("Could not count the binders' cards", error);
+      return all;
+    }
+    all.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) return all;
+  }
+}
+
+/** The summaries, in the binders' own order, from their card ids. */
+export function summarizeBinders(
+  rows: Pick<BinderRow, "id" | "name" | "for_trade" | "cover">[],
+  cards: { binder_id: string; card_id: string }[],
+  wanted: Set<string>,
+): BinderSummary[] {
+  const counts = new Map<string, { count: number; onYourHunts: number }>();
+  for (const card of cards) {
+    const tally = counts.get(card.binder_id) ?? { count: 0, onYourHunts: 0 };
+    tally.count += 1;
+    if (wanted.has(card.card_id)) tally.onYourHunts += 1;
+    counts.set(card.binder_id, tally);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    forTrade: row.for_trade,
+    isPublic: row.for_trade,
+    count: counts.get(row.id)?.count ?? 0,
+    layout: DEFAULT_BINDER_LAYOUT,
+    cover: isBinderCover(row.cover) ? row.cover : DEFAULT_BINDER_COVER,
+    onYourHunts: counts.get(row.id)?.onYourHunts ?? 0,
+  }));
 }
 
 /**

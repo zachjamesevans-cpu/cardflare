@@ -162,3 +162,36 @@ describe("every door names its binder by id", () => {
     expect(profile).not.toContain("binder: BinderSummary | null");
   });
 });
+
+describe("a profile's binder list, read as summaries", () => {
+  it("counts cards and hunts per binder from one batch of card ids", async () => {
+    const { summarizeBinders } = await import("@/lib/binder/binder");
+    const summaries = summarizeBinders(
+      [
+        { id: "b1", name: "Trade", for_trade: true, cover: "lime" },
+        { id: "b2", name: "Playables", for_trade: true, cover: "not-a-cover" },
+      ],
+      [
+        { binder_id: "b1", card_id: "c1" },
+        { binder_id: "b1", card_id: "c2" },
+        { binder_id: "b2", card_id: "c2" },
+      ],
+      new Set(["c2"]),
+    );
+    expect(summaries.map((row) => [row.id, row.count, row.onYourHunts])).toEqual([
+      ["b1", 2, 1],
+      ["b2", 1, 1],
+    ]);
+    expect(summaries[0]!.cover).toBe("lime");
+    expect(summaries[1]!.cover).not.toBe("not-a-cover");
+  });
+
+  it("never builds every binder in full to list them", () => {
+    const list = lib.slice(
+      lib.indexOf("export async function listBinders"),
+      lib.indexOf("async function binderCardIds"),
+    );
+    expect(list).not.toContain("assemble(");
+    expect(list).toContain("binderCardIds(visible.map((row) => row.id))");
+  });
+});
