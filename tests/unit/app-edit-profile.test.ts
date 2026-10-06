@@ -65,7 +65,7 @@ describe("Edit profile, the app's screen", () => {
     expect(screen).toContain("setHandle(");
     expect(screen).toContain("setAbout(");
     /* And says what the server said when it refuses. */
-    expect(screen).toContain("describeError(caught)");
+    expect(screen).toContain("friendlyError(caught)");
   });
 
   it("keeps the bio and pronouns to the server's limits", () => {

@@ -23,6 +23,10 @@ let playerRow: Response = { data: { postal_code: "97477" }, error: null };
 let insertResult: Response = { data: { id: "flare-1" }, error: null };
 /* The probe that asks whether the migration has been applied. */
 let schemaError: Response | null = null;
+/* The cards this account already has open, for the batch's one read. */
+let openRows: Record<string, unknown>[] = [];
+/* Every table asked for, reads included. */
+const froms: string[] = [];
 
 function chain(table: string) {
   const c: Record<string, unknown> = {};
@@ -45,22 +49,53 @@ function chain(table: string) {
 
   c.single = () => Promise.resolve(insertResult);
   c.maybeSingle = () => Promise.resolve(playerRow);
-  c.then = (resolve: (v: Response) => unknown, reject: (e: unknown) => unknown) =>
-    Promise.resolve(
-      op === "update"
-        ? { error: null }
-        : table === "flares" && schemaError
-          ? schemaError
-          : { data: null, error: null },
+  c.then = (resolve: (v: Response) => unknown, reject: (e: unknown) => unknown) => {
+    const last = calls[calls.length - 1];
+    /* A batch insert: every row back with an id, unless the single
+       insert's error is set, which the batch then hits too. */
+    const batch =
+      op === "insert" && last?.filters === filters && Array.isArray(last.payload)
+        ? insertResult.error
+          ? { data: null, error: insertResult.error }
+          : {
+              data: (last.payload as Record<string, unknown>[]).map((row, index) => ({
+                id: `flare-${index + 1}`,
+                card_id: row.card_id,
+                printing_id: row.printing_id,
+                intent: row.intent,
+              })),
+              error: null,
+            }
+        : null;
+    return Promise.resolve(
+      batch ??
+        (op === "update"
+          ? { error: null }
+          : table === "flares" && schemaError
+            ? schemaError
+            : table === "flares" && op === "select"
+              ? { data: openRows, error: null }
+              : { data: null, error: null }),
     ).then(resolve, reject);
+  };
 
   return c;
 }
 
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
-  getSupabaseAdmin: () => ({ from: (table: string) => chain(table) }),
+  getSupabaseAdmin: () => ({
+    from: (table: string) => {
+      froms.push(table);
+      return chain(table);
+    },
+  }),
 }));
+
+/* The fire-and-forget follow-ups do their own reads; they are not the
+   post, and counting their queries would hide the post's own. */
+vi.mock("@/lib/nearby/matching", () => ({ afterWantSaved: vi.fn() }));
+vi.mock("@/lib/nearby/showcase", () => ({ keepShowcaseAsHave: vi.fn() }));
 
 const { postAreaFlare, postAreaFlares, withdrawAreaFlare } =
   await import("@/lib/local/area");
@@ -70,6 +105,8 @@ beforeEach(() => {
   playerRow = { data: { postal_code: "97477" }, error: null };
   insertResult = { data: { id: "flare-1" }, error: null };
   schemaError = null;
+  openRows = [];
+  froms.length = 0;
 });
 
 const inserted = () =>
@@ -337,6 +374,14 @@ describe("posting several cards as one thing", () => {
    * nearby.
    */
   const inserts = () => calls.filter((c) => c.op === "insert");
+  /* Every row written, whether one insert carried them or several. */
+  const rows = () =>
+    inserts().flatMap((c) =>
+      Array.isArray(c.payload)
+        ? (c.payload as Record<string, unknown>[])
+        : [c.payload as Record<string, unknown>],
+    );
+  const lookups = (table: string) => froms.filter((name) => name === table);
 
   it("gives every card the same batch, which is the whole mechanism", async () => {
     await postAreaFlares("player-1", [
@@ -345,9 +390,7 @@ describe("posting several cards as one thing", () => {
       { cardId: "card-3" },
     ]);
 
-    const batches = inserts().map(
-      (c) => (c.payload as Record<string, unknown>).posted_batch,
-    );
+    const batches = rows().map((row) => row.posted_batch);
 
     expect(batches).toHaveLength(3);
     expect(new Set(batches).size).toBe(1);
@@ -362,8 +405,8 @@ describe("posting several cards as one thing", () => {
       "Red Zoro",
     );
 
-    for (const call of inserts()) {
-      expect(call.payload).toMatchObject({ deck_label: "Red Zoro" });
+    for (const row of rows()) {
+      expect(row).toMatchObject({ deck_label: "Red Zoro" });
     }
   });
 
@@ -373,7 +416,58 @@ describe("posting several cards as one thing", () => {
       { cardId: "card-2" },
     ]);
 
-    expect(result).toMatchObject({ ok: true, posted: 2 });
+    expect(result).toMatchObject({ ok: true, posted: 2, alreadyUp: 0, failed: 0 });
+  });
+
+  /*
+   * The audit: a thirty-card paste was ninety sequential queries (the
+   * schema probe, the ZIP and an insert, per card) and could outlive the
+   * function. One insert carries the lot now.
+   */
+  it("writes the whole deck in ONE insert, not one per card", async () => {
+    await postAreaFlares(
+      "player-1",
+      Array.from({ length: 30 }, (_, index) => ({ cardId: `card-${index}` })),
+    );
+
+    expect(inserts()).toHaveLength(1);
+    expect(rows()).toHaveLength(30);
+  });
+
+  it("reads the player's ZIP once per post, not once per card", async () => {
+    await postAreaFlares(
+      "player-1",
+      Array.from({ length: 12 }, (_, index) => ({ cardId: `card-${index}` })),
+    );
+
+    expect(lookups("players")).toHaveLength(1);
+    /* And the schema probe once, not per card: probe, open read, insert. */
+    expect(lookups("flares")).toHaveLength(3);
+  });
+
+  it("counts a card already up as skipped, and posts the rest", async () => {
+    openRows = [{ card_id: "card-2", printing_id: null, intent: "want" }];
+
+    const result = await postAreaFlares("player-1", [
+      { cardId: "card-1" },
+      { cardId: "card-2" },
+      { cardId: "card-3" },
+    ]);
+
+    expect(result).toMatchObject({ ok: true, posted: 2, alreadyUp: 1, failed: 0 });
+    expect(rows().map((row) => row.card_id)).toEqual(["card-1", "card-3"]);
+  });
+
+  it("says already up, not unavailable, when every card was", async () => {
+    openRows = [
+      { card_id: "card-1", printing_id: null, intent: "want" },
+      { card_id: "card-2", printing_id: null, intent: "want" },
+    ];
+
+    expect(
+      await postAreaFlares("player-1", [{ cardId: "card-1" }, { cardId: "card-2" }]),
+    ).toEqual({ ok: false, reason: "already-posted" });
+    expect(inserts()).toHaveLength(0);
   });
 
   it("stops on a wall every remaining card would hit too", async () => {

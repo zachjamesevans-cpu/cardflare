@@ -9,8 +9,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  * offline ... it takes a full 7 seconds to load the full profile."
  *
  * So this is the general version: any screen's answer, keyed by name,
- * scoped to the account, expiring on its own clock. `useCached` is how
- * screens use it — this file is only the shelf.
+ * scoped to the account, expiring on its own clock. Each screen reads it
+ * and writes it itself — this file is only the shelf.
  *
  * THE RULES, WHICH ARE WHY THIS IS NOT A `setItem`:
  *
@@ -131,6 +131,11 @@ export async function cachedPlayerId(): Promise<string | null> {
   }
 }
 
+/**
+ * Point the cache at the signed-in account. Called with the id from the
+ * player's own /me and nowhere else: `writeCache` deliberately leaves
+ * the pointer alone, because it also writes under other players' ids.
+ */
 export async function rememberAccount(playerId: string): Promise<void> {
   try {
     await AsyncStorage.setItem(LAST_ACCOUNT_KEY, playerId);
@@ -172,13 +177,17 @@ export async function writeCache<T>(
   suffix?: string,
 ): Promise<void> {
   try {
-    await AsyncStorage.multiSet([
-      [
-        keyFor(kind, playerId, suffix),
-        JSON.stringify({ value, at: Date.now() } satisfies Envelope<T>),
-      ],
-      [LAST_ACCOUNT_KEY, playerId],
-    ]);
+    /*
+     * Only the entry. The account pointer is NOT moved here: callers
+     * write under other players' ids too (a peeked profile is cached
+     * under the profile's owner), and a pointer that followed them would
+     * make the next open paint, and write, under a stranger's id. The
+     * pointer is set by `rememberAccount`, from the signed-in /me only.
+     */
+    await AsyncStorage.setItem(
+      keyFor(kind, playerId, suffix),
+      JSON.stringify({ value, at: Date.now() } satisfies Envelope<T>),
+    );
   } catch {
     /* Out of space, or a value that will not serialise. What is on
        screen is already right; failing to remember it is not worth

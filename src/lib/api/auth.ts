@@ -55,12 +55,16 @@ function bearerToken(request: Request): string | null {
  * screens asked for both on every request, some of them twice in one
  * response (a profile peek verified the same token at the top and
  * again for the follow state). A warm function serves many requests
- * from the same phone in a row, so the answer is kept for two minutes
- * per token. A token that expires or is signed out of stays good here
- * for at most that long, which is well inside the hour the token
- * itself is valid for. Capped, so a burst of tokens cannot grow it.
+ * from the same phone in a row, so the answer is kept for thirty
+ * seconds per token. A token that expires or is signed out of stays
+ * good here for at most that long. It was two minutes, but a DELETED
+ * account's token stayed good just as long on every warm instance the
+ * deletion did not run on - and a deleted person still being let in
+ * is worse than one extra auth round trip a minute. The instance that
+ * does the deletion forgets at once (`forgetApiPlayerById`). Capped,
+ * so a burst of tokens cannot grow it.
  */
-const AUTH_TTL_MS = 2 * 60 * 1000;
+const AUTH_TTL_MS = 30 * 1000;
 const AUTH_CAP = 500;
 const remembered = new Map<string, { player: ApiPlayer; at: number }>();
 
@@ -86,6 +90,14 @@ function rememberPlayer(token: string, player: ApiPlayer): void {
 export function forgetApiPlayer(request: Request): void {
   const token = bearerToken(request);
   if (token) remembered.delete(token);
+}
+
+/** Forget every token held for one player: their account was deleted,
+    and on this instance not even thirty seconds of grace is owed. */
+export function forgetApiPlayerById(playerId: string): void {
+  for (const [token, hit] of remembered) {
+    if (hit.player.playerId === playerId) remembered.delete(token);
+  }
 }
 
 /** Forget every token: for tests, which fake a different player per case. */

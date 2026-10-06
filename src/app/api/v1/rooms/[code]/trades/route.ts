@@ -5,6 +5,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
+import { roomPhase } from "@/lib/events/schema";
 import {
   notifyTradeAcknowledged,
   notifyTradeConfirmed,
@@ -25,6 +26,7 @@ const confirmSchema = z.object({
 const acknowledgeSchema = z.object({
   action: z.literal("acknowledge"),
   tradeId: z.guid(),
+  /* Accepted from older builds and ignored: the stored trade says. */
   flareId: z.guid().optional(),
   requesterSessionId: z.guid().optional(),
 });
@@ -85,16 +87,22 @@ export async function POST(
 
   const payload = await readJsonPayload(request);
 
+  /* A night that has ended takes no more trades, either hand. */
+  if (roomPhase(resolved.room) === "finished") {
+    return Response.json({ error: "room-ended" }, { status: 409 });
+  }
+
   const ack = acknowledgeSchema.safeParse(payload);
   if (ack.success) {
     const outcome = await acknowledgeTrade(ack.data.tradeId, session.id);
     if (!outcome.ok) {
       return Response.json({ error: outcome.reason }, { status: 409 });
     }
-    if (ack.data.flareId && ack.data.requesterSessionId) {
+    /* Who to tell comes from the stored trade, never from the body. */
+    if (outcome.flareId && outcome.requesterSessionId) {
       await notifyTradeAcknowledged(
-        ack.data.flareId,
-        ack.data.requesterSessionId,
+        outcome.flareId,
+        outcome.requesterSessionId,
         session.display_name,
         session.id,
       );

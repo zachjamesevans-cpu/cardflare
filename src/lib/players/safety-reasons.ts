@@ -2,7 +2,10 @@
  * Why a player reports something, free of server imports so the report
  * sheet in the browser and the server that validates it read one list.
  */
-export type ReportKind = "post" | "player" | "thread";
+export type ReportKind = "post" | "player" | "thread" | "comment";
+
+/** Every kind, for the server's validation. */
+export const REPORT_KINDS: ReportKind[] = ["post", "player", "thread", "comment"];
 export type ReportReason = "spam" | "scam" | "harassment" | "other";
 
 export const REPORT_REASONS: { value: ReportReason; label: string }[] = [

@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { peekPlayer, type PeekProfile } from "./api";
+import { ApiError, peekPlayer, type PeekProfile } from "./api";
 import { readCache, writeCache } from "./cache";
 import { CosmeticCard } from "./cosmetic-card";
 import { WornBadge, WornName } from "./worn-name";
@@ -48,6 +48,7 @@ export function PlayerPeekModal({
 
   const [profile, setProfile] = useState<PeekProfile | null>(null);
   const [failed, setFailed] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [zoomed, setZoomed] = useState<ZoomedCard | null>(null);
   /* True once the shelf's images are warm in the cache. Showing cards
      before that means art and foil popping in one by one, which reads
@@ -57,14 +58,16 @@ export function PlayerPeekModal({
   useEffect(() => {
     setProfile(null);
     setFailed(false);
+    setUnavailable(false);
     setShelfReady(false);
     if (!playerId) return;
 
     let live = true;
+    let gone = false;
     /* The last look first, then the fresh one over it: see the profile
        screen for why. */
     void readCache<PeekProfile>("peek", playerId).then((cached) => {
-      if (live && cached) {
+      if (live && cached && !gone) {
         setProfile((current) => current ?? cached);
         setShelfReady(true);
       }
@@ -87,8 +90,17 @@ export function PlayerPeekModal({
         await Promise.race([warm, new Promise((done) => setTimeout(done, 700))]);
         if (live) setShelfReady(true);
       })
-      .catch(() => {
-        if (live) setFailed(true);
+      .catch((caught) => {
+        if (!live) return;
+        /* A 404 is a missing player or a block either way: nothing of
+           theirs stays on screen, not even the last cached look. */
+        if (caught instanceof ApiError && caught.status === 404) {
+          gone = true;
+          setProfile(null);
+          setUnavailable(true);
+          return;
+        }
+        setFailed(true);
       });
 
     return () => {
@@ -116,7 +128,7 @@ export function PlayerPeekModal({
         onPress={onClose}
         style={{
           flex: 1,
-          backgroundColor: "rgba(0,0,0,0.75)",
+          backgroundColor: colors.scrim,
           alignItems: "center",
           justifyContent: "center",
           padding: spacing(4),
@@ -141,7 +153,9 @@ export function PlayerPeekModal({
           {profile?.coverUrl ? (
             <CoverBanner coverUrl={profile.coverUrl} height={86} />
           ) : null}
-          {failed ? (
+          {unavailable ? (
+            <Text style={{ color: colors.textMuted }}>This profile is unavailable.</Text>
+          ) : failed ? (
             <Text style={{ color: colors.textMuted }}>
               Could not load their profile right now. Try again in a moment.
             </Text>

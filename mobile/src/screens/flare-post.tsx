@@ -1,15 +1,24 @@
 import { useHeaderHeight } from "@react-navigation/elements";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
-import { ActionSheet, DotsButton } from "../action-menu";
+import { ActionSheet, DotsButton, type ActionItem } from "../action-menu";
 import {
+  ApiError,
   commentOnPost,
-  describeError,
+  deletePostComment,
+  friendlyError,
   getPost,
   likePost,
   offerItemsOnPost,
@@ -17,8 +26,10 @@ import {
   rememberRoom,
   restorePost,
   takeDownPost,
+  type PostComment,
   type PostDetail,
 } from "../api";
+import { cachedPlayerId } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
@@ -60,7 +71,15 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const insets = useSafeAreaInsets();
 
   const [post, setPost] = useState<PostDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  /* The server said this post does not exist: taken down, or never was. */
+  const [gone, setGone] = useState(false);
+  /*
+   * A read that failed for any OTHER reason - offline, a timeout, a 500.
+   * It says so with a Retry and keeps whatever post is already loaded,
+   * rather than calling a perfectly good post "taken down" because the
+   * network blinked.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   /* The cards in a sheet, to read or to offer on; and your own
@@ -76,6 +95,20 @@ export function FlarePostScreen({ postId }: { postId: string }) {
   const [menu, setMenu] = useState(false);
   /* "Report", on somebody else's post: the same sheet the Feed opens. */
   const [report, setReport] = useState<ReportTarget | null>(null);
+  /* One comment's "⋯": Report on somebody else's line, Delete on your
+     own or on any line under your own post. The server decides who
+     may delete; this only decides what to offer. */
+  const [commentMenu, setCommentMenu] = useState<PostComment | null>(null);
+  const [me, setMe] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void cachedPlayerId().then((id) => {
+      if (live) setMe(id);
+    });
+    return () => {
+      live = false;
+    };
+  }, []);
   /* Your own post, taken down: the body gives way to one line and the
      toast offers the minute's undo. The Feed behind is told either way. */
   const [takenDown, setTakenDown] = useState(false);
@@ -86,9 +119,14 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     try {
       const { post: fresh } = await getPost(postId);
       setPost(fresh);
-      setFailed(false);
-    } catch {
-      setFailed(true);
+      setGone(false);
+      setLoadError(null);
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 404) {
+        setGone(true);
+        return;
+      }
+      setLoadError(`Couldn't refresh this Flare. ${friendlyError(caught)}`);
     }
   }, [postId]);
 
@@ -111,8 +149,64 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         comments: post.comments + 1,
       });
     } catch (caught) {
-      setError(`That did not post (${describeError(caught)}). Try again in a moment.`);
+      setError(`That did not post. ${friendlyError(caught)}`);
     }
+  };
+
+  const removeComment = (comment: PostComment) => {
+    if (!post) return;
+    Alert.alert("Delete this comment?", "It is gone for everyone.", [
+      { text: "Keep", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          setError(null);
+          void deletePostComment(post.postId, comment.id)
+            .then(() =>
+              setPost((current) =>
+                current
+                  ? {
+                      ...current,
+                      thread: current.thread.filter((row) => row.id !== comment.id),
+                      comments: Math.max(0, current.comments - 1),
+                    }
+                  : current,
+              ),
+            )
+            .catch(() => setError("Could not delete that. Try again in a moment."));
+        },
+      },
+    ]);
+  };
+
+  /** What a comment's "⋯" offers, or null when there is nothing. */
+  const commentActions = (comment: PostComment): ActionItem[] | null => {
+    if (!post) return null;
+    const mine = me !== null && comment.playerId === me;
+    const items: ActionItem[] = [
+      ...(mine
+        ? []
+        : [
+            {
+              key: "report",
+              label: "Report",
+              icon: "flag-outline" as const,
+              onPress: () => setReport({ kind: "comment", targetId: comment.id }),
+            },
+          ]),
+      ...(mine || post.yours
+        ? [
+            {
+              key: "delete",
+              label: "Delete",
+              icon: "trash-outline" as const,
+              onPress: () => removeComment(comment),
+            },
+          ]
+        : []),
+    ];
+    return items.length > 0 ? items : null;
   };
 
   const takeDown = async () => {
@@ -139,11 +233,11 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         });
       }
     } catch (caught) {
-      setError(`Could not take that down (${describeError(caught)}).`);
+      setError(`Could not take that down. ${friendlyError(caught)}`);
     }
   };
 
-  if (failed) {
+  if (gone) {
     return (
       <View
         style={{
@@ -153,7 +247,26 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           paddingVertical: spacing(4),
         }}
       >
-        <Muted>This Flare could not be opened. It may have been taken down.</Muted>
+        <Muted>This Flare has been taken down.</Muted>
+      </View>
+    );
+  }
+
+  /* Nothing loaded yet and the read failed: the reason and a way to
+     try again, in place of a spinner that would never stop. */
+  if (!post && loadError) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.canvas,
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(3),
+        }}
+      >
+        <ErrorLine message={loadError} />
+        <AsyncButton label="Retry" pendingLabel="Retrying…" variant="secondary" onPress={load} />
       </View>
     );
   }
@@ -263,6 +376,18 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
         keyboardShouldPersistTaps="handled"
       >
+        {/* A refresh that failed over a post already on screen: the post
+            stays, and this line offers the read again. */}
+        {loadError ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ErrorLine message={loadError} />
+            </View>
+            <Tap onPress={() => void load()} hitSlop={8} accessibilityLabel="Retry">
+              <Text style={{ color: colors.accent, fontWeight: "700" }}>Retry</Text>
+            </Tap>
+          </View>
+        ) : null}
         {post.store ? (
           /* A STORE's post: the shop's header and what it said, then the
              same heart and thread every post has. No cards, no offers -
@@ -316,7 +441,6 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               ) : null}
             </View>
             <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
-            <ReportSheet target={report} onClose={() => setReport(null)} />
 
             {/* The cards, the way the Feed draws them: one row, or the
                 same row swiped. Tap one to open it big and offer it. */}
@@ -416,6 +540,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   onPress={() =>
                     navigation.navigate("PlayerProfile", { playerId: comment.playerId })
                   }
+                  accessibilityLabel={`${comment.displayName}'s profile`}
                 >
                   <PlayerAvatar
                     displayName={comment.displayName}
@@ -457,9 +582,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                         }}
                       >
                         <Text
+                          maxFontSizeMultiplier={1.3}
                           style={{
                             color: colors.accent,
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: "700",
                             letterSpacing: 0.5,
                           }}
@@ -476,6 +602,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                     {comment.body}
                   </Text>
                 </View>
+                <DotsButton
+                  onPress={commentActions(comment) ? () => setCommentMenu(comment) : null}
+                  label="More about this comment"
+                />
               </View>
             ))
           )}
@@ -516,6 +646,12 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         </View>
         <ErrorLine message={error} />
       </View>
+
+      <ActionSheet
+        items={commentMenu ? commentActions(commentMenu) : null}
+        onClose={() => setCommentMenu(null)}
+      />
+      <ReportSheet target={report} onClose={() => setReport(null)} />
 
       <FlareCardsSheet
         open={cardsSheet}

@@ -157,6 +157,50 @@ export async function setWantQuantity(
   return clamped;
 }
 
+export type WantAdjust =
+  | { ok: true; quantity: number; cardId: string }
+  | { ok: false; reason: "not-found" | "unavailable" };
+
+/**
+ * Moves one of the player's wants by a delta: the plus and minus.
+ *
+ * One statement in the database (`player_want_adjust`), so two quick
+ * taps land on "two more" rather than both reading 2 and writing 3.
+ * Clamped to 1..99 there, the same as `setWantQuantity`. A want that is
+ * not the player's matches nothing and says "not-found"; a failed write
+ * says so, rather than answering with a number nobody stored.
+ */
+export async function adjustWantQuantity(
+  id: string,
+  playerId: string,
+  delta: number,
+): Promise<WantAdjust> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const step = Math.trunc(delta);
+  if (!Number.isFinite(step) || step === 0) return { ok: false, reason: "not-found" };
+
+  const admin = getSupabaseAdmin();
+  const { data, error } = await admin.rpc("player_want_adjust", {
+    p_want: id,
+    p_player: playerId,
+    p_delta: step,
+  });
+  if (error) {
+    console.error("Could not change the want quantity", error);
+    return { ok: false, reason: "unavailable" };
+  }
+  if (typeof data !== "number") return { ok: false, reason: "not-found" };
+
+  const { data: want } = await admin
+    .from("player_wants")
+    .select("card_id")
+    .eq("id", id)
+    .eq("player_id", playerId)
+    .maybeSingle();
+  if (!want) return { ok: false, reason: "not-found" };
+  return { ok: true, quantity: data, cardId: want.card_id };
+}
+
 /**
  * Removing a saved request means "I have it now": the request goes,
  * and every Flare and hunt the card is on reads as found, greyed with

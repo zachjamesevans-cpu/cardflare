@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { getViewer, requireAdmin } from "@/lib/auth/session";
 import { forgetFeed } from "@/lib/feed/memo";
 import { playerForUser } from "@/lib/players/accounts";
+import { REPORT_KINDS } from "./safety-reasons";
 import {
   blockPlayer,
   reportTarget,
@@ -57,7 +58,7 @@ export async function unblockPlayerAction(otherId: string): Promise<SafetyResult
   return { ok: true };
 }
 
-const KINDS: ReportKind[] = ["post", "player", "thread"];
+const KINDS: ReportKind[] = REPORT_KINDS;
 const REASONS: ReportReason[] = ["spam", "scam", "harassment", "other"];
 
 export async function reportAction(input: {

@@ -16,6 +16,9 @@ import { pointFromCoords } from "@/lib/geo/zip";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 
 export const dynamic = "force-dynamic";
+/* A deck-sized post on a board is still card by card (the room's cap is
+   per Flare); give it room rather than the platform's short default. */
+export const maxDuration = 60;
 
 /**
  * The composer's one door: publish a Flare of one or many cards.
@@ -25,6 +28,8 @@ export const dynamic = "force-dynamic";
  * area. Either way it is ONE post, and posting three cards makes one
  * item in the Feed with three slides, never three posts.
  */
+const HUNT_NAME_MESSAGE = "Name your hunt.";
+
 const schema = z.object({
   code: z.string().trim().optional(),
   intent: z.enum(["want", "showcase"]),
@@ -42,7 +47,9 @@ const schema = z.object({
   hunt: z
     .union([
       z.object({ id: z.string().uuid() }),
-      z.object({ name: z.string().trim().min(1).max(60) }),
+      /* Empty is let through the shape and refused below in words:
+         "Unrecognised Flare" told nobody what to fix. */
+      z.object({ name: z.string().trim().max(60) }),
     ])
     .nullable()
     .optional(),
@@ -66,6 +73,12 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = schema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("Unrecognised Flare");
   const body = parsed.data;
+  if (body.intent === "want" && body.hunt && "name" in body.hunt && !body.hunt.name) {
+    return Response.json(
+      { ok: false, error: "hunt-name", message: HUNT_NAME_MESSAGE },
+      { status: 400 },
+    );
+  }
 
   let eventId: string | null = null;
   let session: { id: string; displayName: string } | null = null;
@@ -143,6 +156,12 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     if (result.reason === "empty") return badRequest("Pick a card first.");
+    if (result.reason === "hunt-name") {
+      return Response.json(
+        { ok: false, error: "hunt-name", message: HUNT_NAME_MESSAGE },
+        { status: 400 },
+      );
+    }
     return Response.json({ ok: false, error: "unavailable" }, { status: 500 });
   }
 
@@ -150,13 +169,15 @@ export async function POST(request: Request): Promise<Response> {
   if (eventId && session) {
     const roomId = eventId;
     const poster = session;
-    if (early && body.intent === "want") void notifyEarlyBoardFlares(roomId);
+    if (early && body.intent === "want")
+      afterResponse(() => notifyEarlyBoardFlares(roomId));
     afterResponse(() =>
       notifyRoomFlare(
         roomId,
         poster.id,
         poster.displayName,
-        body.items.map((item) => item.cardId),
+        /* The cards that went up, not every card asked for. */
+        result.postedCardIds,
         body.intent,
       ),
     );
@@ -187,7 +208,13 @@ export async function POST(request: Request): Promise<Response> {
   return Response.json({
     ok: true,
     postId: result.postId,
+    /* Per card, so "Posted 18 of 20 · 2 were already up" is the truth
+       rather than a bare ok. */
+    total: result.total,
     posted: result.posted,
+    alreadyUp: result.alreadyUp,
+    failed: result.failed,
+    postedCardIds: result.postedCardIds,
     huntId: result.huntId,
     atCap: result.atCap,
   });

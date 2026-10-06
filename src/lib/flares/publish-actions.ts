@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { forgetFeed } from "@/lib/feed/memo";
 
 import { LIMITS } from "@/lib/api/throttle";
+import { afterResponse } from "@/lib/after-response";
 import { getViewer } from "@/lib/auth/session";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
 import { autoPostFor } from "@/lib/events/auto-post";
@@ -33,7 +34,16 @@ export async function publishPostAction(input: {
   /** Post to the current room when in one. Off posts to the area. */
   toRoom: boolean;
 }): Promise<
-  | { ok: true; postId: string; posted: number; huntId: string | null; atCap: boolean }
+  | {
+      ok: true;
+      postId: string;
+      total: number;
+      posted: number;
+      alreadyUp: number;
+      failed: number;
+      huntId: string | null;
+      atCap: boolean;
+    }
   | { ok: false; message: string }
 > {
   const viewer = await getViewer();
@@ -96,19 +106,25 @@ export async function publishPostAction(input: {
     if (result.reason === "already-posted")
       return { ok: false, message: "Those cards are already up." };
     if (result.reason === "empty") return { ok: false, message: "Pick a card first." };
-    if (result.reason === "hunt-name")
-      return { ok: false, message: "Give the hunt a name." };
+    if (result.reason === "hunt-name") return { ok: false, message: "Name your hunt." };
     return { ok: false, message: "Could not post that. Try again in a moment." };
   }
 
   if (eventId && session) {
-    if (early && input.intent === "want") void notifyEarlyBoardFlares(eventId);
-    void notifyRoomFlare(
-      eventId,
-      session.id,
-      session.displayName,
-      input.items.map((item) => item.cardId),
-      input.intent,
+    /* After the response, so serverless cannot freeze a fan-out part way
+       through a room (src/lib/after-response.ts). */
+    if (early && input.intent === "want")
+      afterResponse(() => notifyEarlyBoardFlares(eventId));
+    const roomSession = session;
+    afterResponse(() =>
+      notifyRoomFlare(
+        eventId,
+        roomSession.id,
+        roomSession.displayName,
+        /* The cards that went up, not every card asked for. */
+        result.postedCardIds,
+        input.intent,
+      ),
     );
   }
 
@@ -138,7 +154,10 @@ export async function publishPostAction(input: {
   return {
     ok: true,
     postId: result.postId,
+    total: result.total,
     posted: result.posted,
+    alreadyUp: result.alreadyUp,
+    failed: result.failed,
     huntId: result.huntId,
     atCap: result.atCap,
   };

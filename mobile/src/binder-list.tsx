@@ -69,9 +69,10 @@ export function BinderList({
                     }}
                   >
                     <Text
+                      maxFontSizeMultiplier={1.3}
                       style={{
                         color: colors.accentContrast,
-                        fontSize: 10,
+                        fontSize: 11,
                         fontWeight: "700",
                       }}
                     >

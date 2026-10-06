@@ -1,8 +1,11 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { matchScore, rankBy } from "@/lib/search/rank";
 import { avatarWearFor } from "./equips";
+import { blockedSet } from "./safety";
 import { avatarPathFor, avatarSrc } from "./profile-image";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * A value inside a PostgREST `.or()` filter, quoted.
@@ -41,37 +44,83 @@ export interface FoundPlayer {
   aura: string | null;
 }
 
-export async function searchPlayersByName(query: string): Promise<FoundPlayer[]> {
+const SEARCH_LIMIT = 12;
+
+/** Lists in priority order, flattened, each id kept at its first place. */
+export function mergeBestFirst<T>(lists: readonly (readonly T[])[], id: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const list of lists)
+    for (const item of list) {
+      const key = id(item);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      merged.push(item);
+    }
+  return merged;
+}
+
+export async function searchPlayersByName(
+  query: string,
+  /** The signed-in player searching: nobody blocked either way is found. */
+  viewerId: string | null = null,
+): Promise<FoundPlayer[]> {
   const trimmed = query.trim();
   if (!isSupabaseConfigured() || trimmed.length < 2) return [];
 
   /* Escape the LIKE wildcards so "100%" searches for a percent sign. */
   const escaped = trimmed.replace(/[\\%_]/g, "\\$&");
-  const like = quoteFilterValue(`%${escaped}%`);
-
   /*
    * Either half of an identity finds somebody, because a person at a
    * counter will type whichever one they were told. A leading "@" is
    * dropped rather than searched for: it is how a handle is written, not
    * part of the handle itself.
    */
-  const byHandle = quoteFilterValue(`%${escaped.replace(/^@/, "").toLowerCase()}%`);
+  const handleText = escaped.replace(/^@/, "").toLowerCase();
 
-  const { data, error } = await getSupabaseAdmin()
-    .from("players")
-    .select(
-      "id, display_name, handle, avatar_url, avatar_animated, tier, equipped_avatar_frame",
-    )
-    .or(`display_name.ilike.${like},handle.ilike.${byHandle}`)
-    .order("display_name")
-    .limit(12);
+  /*
+   * Three reads, best first, merged before the limit. One alphabetical
+   * "contains" read capped at twelve could leave out the very person
+   * whose name IS the search when a dozen others merely contain it -
+   * searching "Al" and never seeing Al. So exact and starts-with are
+   * asked for on their own and always make the cut.
+   */
+  const filters = [
+    `display_name.ilike.${quoteFilterValue(escaped)},handle.ilike.${quoteFilterValue(handleText)}`,
+    `display_name.ilike.${quoteFilterValue(`${escaped}%`)},handle.ilike.${quoteFilterValue(`${handleText}%`)}`,
+    `display_name.ilike.${quoteFilterValue(`%${escaped}%`)},handle.ilike.${quoteFilterValue(`%${handleText}%`)}`,
+  ];
+  /* Nobody blocked either way is found. Ids from our own table, never
+     from the query string. */
+  const hidden = viewerId ? [...(await blockedSet(viewerId))] : [];
 
-  if (error) {
-    console.error("Could not search players", error);
+  const results = await Promise.all(
+    filters.map((filter) => {
+      let search = getSupabaseAdmin()
+        .from("players")
+        .select(
+          "id, display_name, handle, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+        )
+        .or(filter);
+      if (hidden.length > 0) search = search.not("id", "in", `(${hidden.join(",")})`);
+      return search.order("display_name").limit(SEARCH_LIMIT);
+    }),
+  );
+
+  const failed = results.find((result) => result.error);
+  if (failed?.error) {
+    console.error("Could not search players", failed.error);
     return [];
   }
 
-  const rows = data ?? [];
+  const needle = trimmed.replace(/^@/, "");
+  const rows = rankBy(
+    mergeBestFirst(
+      results.map((result) => result.data ?? []),
+      (row) => row.id,
+    ),
+    (row) => matchScore(needle, [row.display_name, row.handle]),
+  ).slice(0, SEARCH_LIMIT);
   if (rows.length === 0) return [];
 
   const wear = await avatarWearFor(rows.map((row) => row.id));
@@ -81,7 +130,7 @@ export async function searchPlayersByName(query: string): Promise<FoundPlayer[]>
     displayName: row.display_name,
     handle: row.handle,
     avatarUrl: avatarSrc(avatarPathFor(row)),
-    frame: row.equipped_avatar_frame,
+    frame: wornFrame(row),
     ring: wear.get(row.id)?.ring ?? null,
     aura: wear.get(row.id)?.aura ?? null,
   }));

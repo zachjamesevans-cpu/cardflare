@@ -19,6 +19,7 @@ import { findCardsByNumbers } from "@/lib/cards/search";
 import { compactCardNumber, parseDeckList, type DeckImportState } from "./deck-list";
 import { previewDeckList, type DeckPreviewEntry } from "./deck-list-preview";
 import { addEntrySchema, type ListState } from "@/lib/lists/schema";
+import { afterResponse } from "@/lib/after-response";
 import { notifyEarlyBoardFlares } from "@/lib/notifications/notify";
 import { accountRoomIdentity } from "@/lib/players/room-identity";
 import { getPlayerSession, setPlayerCookie } from "@/lib/players/session";
@@ -27,7 +28,12 @@ import { invitePlayer, playerForUser } from "./accounts";
 import { invitePlayerSchema, type InvitePlayerState } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
 import { markCardFound, syncCardQuantity } from "@/lib/players/found";
-import { listOfferings, listWants, removeWant, setWantQuantity } from "./wants";
+import {
+  adjustWantQuantity,
+  listOfferings,
+  listWants,
+  removeWant,
+} from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -185,7 +191,7 @@ export async function rsvpAction(formData: FormData): Promise<void> {
   // An RSVP's Flares wake the store's regulars the same way any early
   // post does; the dedupe makes this free when the digest already went.
   if (phase === "early" && wants.length > 0) {
-    void notifyEarlyBoardFlares(event.id);
+    afterResponse(() => notifyEarlyBoardFlares(event.id));
   }
 
   redirect(`/e/${code}`);
@@ -278,17 +284,12 @@ export async function nudgeWantQuantityAction(formData: FormData): Promise<void>
   const playerId = await playerIdFor(await getViewer());
   if (!playerId) return;
 
-  const wants = await listWants(playerId);
-  const want = wants.find((entry) => entry.id === wantId);
-  if (!want) return;
+  /* One statement in the database, so two quick taps are two steps. */
+  const result = await adjustWantQuantity(wantId, playerId, delta);
+  if (!result.ok) return;
 
-  const quantity = await setWantQuantity(
-    wantId,
-    playerId,
-    want.quantity + Math.trunc(delta),
-  );
   /* The post follows the number on the Flare screen. */
-  await syncCardQuantity(playerId, want.cardId, quantity, "want");
+  await syncCardQuantity(playerId, result.cardId, result.quantity, "want");
   revalidateWants(text(formData, "code"));
 }
 
@@ -551,6 +552,9 @@ export async function importDeckListAction(
   return {
     status: "saved",
     saved: outcome.posted,
+    total: cards.length,
+    alreadyUp: outcome.alreadyUp,
+    failed: outcome.failed,
     unknown,
     unreadable,
     atCap: false,

@@ -8,6 +8,7 @@ import { Check, ClipboardList, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Textarea, TextInput } from "@/components/ui/controls";
+import { postSummary } from "@/lib/flares/post-summary";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import {
   DECK_IMPORT_IDLE,
@@ -166,10 +167,13 @@ export function DeckListForm() {
         <div className="flex flex-col gap-1.5">
           <p role="status" className="flex items-center gap-1.5 text-sm text-success">
             <Check className="size-3.5" aria-hidden="true" />
-            {state.saved} card{state.saved === 1 ? "" : "s"} saved to your list.
-          </p>
-          <p className="text-xs text-text-muted">
-            Walk into any room and it will offer to post them all at once.
+            {/* The same words as the app's paste screen. */}
+            {postSummary({
+              total: state.total ?? state.saved,
+              posted: state.saved,
+              alreadyUp: state.alreadyUp,
+              failed: state.failed,
+            }) ?? `Posted ${state.saved} ${state.saved === 1 ? "card" : "cards"} as one Flare.`}
           </p>
           {state.unknown.length > 0 && (
             /* Named, not counted. A number tells you something went

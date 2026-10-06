@@ -96,9 +96,10 @@ export function FeedPerson({
 export function GuestChip() {
   return (
     <Text
+      maxFontSizeMultiplier={1.3}
       style={{
         color: colors.textMuted,
-        fontSize: 9,
+        fontSize: 11,
         fontWeight: "700",
         letterSpacing: 0.8,
         borderWidth: 1,

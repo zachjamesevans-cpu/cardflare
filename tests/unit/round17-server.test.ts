@@ -83,7 +83,7 @@ describe("notices that read right", () => {
     expect(follower).toContain(
       '"You follow each other now, so you\'re trade partners."',
     );
-    expect(follower).toContain('"Follow back to become trade partners."');
+    expect(follower).toContain('"Follow back and you\'re trade partners."');
   });
 });
 

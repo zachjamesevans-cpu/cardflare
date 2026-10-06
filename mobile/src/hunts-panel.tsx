@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -12,12 +12,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   createHunt,
-  describeError,
+  friendlyError,
+  type Hunt,
+  type HuntCard,
   offerOnHunt,
   serverMessage,
   updateHunt,
-  type Hunt,
-  type HuntCard,
 } from "./api";
 import { BinderCover } from "./binder-cover";
 import { huntCover } from "./binder-covers";
@@ -68,6 +68,7 @@ export function HuntsPanel({
   onOpen,
   onTick,
   onChanged,
+  bare = false,
 }: {
   hunts: Hunt[];
   limit?: number;
@@ -90,6 +91,12 @@ export function HuntsPanel({
   onTick?: (flareId: string, found: boolean) => Promise<void>;
   /** Something was written; the owner of the hunts should re-read them. */
   onChanged?: () => void;
+  /**
+   * Drawn inside a profile pane, whose tab already says "Hunts": no
+   * card around it and no heading, so New hunt sits exactly where New
+   * binder sits on the Binders pane beside it.
+   */
+  bare?: boolean;
 }) {
   void onTick;
   void onAdd;
@@ -114,12 +121,15 @@ export function HuntsPanel({
       onChanged?.();
       onOpen?.(result.huntId);
     } catch (caught) {
-      setError(`Could not start the hunt (${describeError(caught)}).`);
+      setError(`Could not start the hunt. ${friendlyError(caught)}`);
     }
   };
 
+  const Shell = bare ? BareShell : Card;
+
   return (
-    <Card>
+    <Shell>
+      {bare ? null : (
       <View
         style={{
           flexDirection: "row",
@@ -139,6 +149,7 @@ export function HuntsPanel({
           </Text>
         ) : null}
       </View>
+      )}
 
       {/* The owner's way in, above the rows, where the binders tab has
           its New binder. */}
@@ -178,7 +189,6 @@ export function HuntsPanel({
           <View style={{ gap: spacing(1) }}>
             <Button
               label="New hunt"
-              variant="secondary"
               disabled={atLimit}
               onPress={() => setNaming(true)}
             />
@@ -209,8 +219,13 @@ export function HuntsPanel({
           ))}
         </View>
       )}
-    </Card>
+    </Shell>
   );
+}
+
+/** A pane's own spacing, in place of the card a standalone panel wears. */
+function BareShell({ children }: { children: ReactNode }) {
+  return <View style={{ gap: spacing(3) }}>{children}</View>;
 }
 
 /** An older server sends hunts without ids; the name still keys the row. */
@@ -444,7 +459,7 @@ export function HuntOfferReview({
          failure to diagnose. */
       setError(
         serverMessage(caught) ??
-          `That did not send (${describeError(caught)}). Try again.`,
+          `That did not send. ${friendlyError(caught)}`,
       );
       return;
     }
@@ -468,7 +483,7 @@ export function HuntOfferReview({
         <View
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.75)",
+            backgroundColor: colors.scrim,
             justifyContent: "flex-end",
           }}
         >
@@ -660,7 +675,7 @@ export function HuntEditForm({ hunt, onSaved }: { hunt: Hunt; onSaved: () => voi
       });
       onSaved();
     } catch (caught) {
-      setError(`Could not save (${describeError(caught)}).`);
+      setError(`Could not save. ${friendlyError(caught)}`);
     }
   };
 

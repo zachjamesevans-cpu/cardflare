@@ -287,8 +287,8 @@ describe("the words", () => {
     expect(huntingHereLine(4)).toBe("4 cards you're hunting are here");
     expect(wantYoursLine(1)).toBe("1 player wants cards you have");
     expect(wantYoursLine(3)).toBe("3 players want cards you have");
-    expect(bringLine(1)).toBe("Players at this Night are looking for 1 card you own.");
-    expect(bringLine(5)).toBe("Players at this Night are looking for 5 cards you own.");
+    expect(bringLine(1)).toBe("Players at this night are looking for 1 card you own.");
+    expect(bringLine(5)).toBe("Players at this night are looking for 5 cards you own.");
     expect(matchesWithYouLine(1)).toBe("1 match with you");
     expect(matchesWithYouLine(2)).toBe("2 matches with you");
     expect(flaresLine(1)).toBe("1 Flare");

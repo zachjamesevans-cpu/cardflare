@@ -102,26 +102,28 @@ async function openAnyThread(
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const playerId = await viewerPlayerId();
   if (!playerId) return { ok: false, message: SIGN_IN };
-  if (
-    !checkRateLimit(
+
+  /* Charged only when a conversation is actually started; finding the
+     one you already have costs nothing (see OpenThreadOptions). */
+  const mayCreate = () =>
+    checkRateLimit(
       `thread-open:${playerId}`,
       LIMITS.threadOpen.limit,
       LIMITS.threadOpen.windowMs,
-    ).allowed
-  ) {
-    return { ok: false, message: TOO_MANY };
-  }
+    ).allowed;
 
   const outcome =
     "flareId" in on
-      ? await openFlareThread(on.flareId, playerId, body)
+      ? await openFlareThread(on.flareId, playerId, body, { mayCreate })
       : "wantId" in on
-        ? await openWantThread(on.wantId, playerId, body)
-        : await openDirectThread(playerId, on.playerId);
+        ? await openWantThread(on.wantId, playerId, body, { mayCreate })
+        : await openDirectThread(playerId, on.playerId, { mayCreate });
   if (outcome.ok) return outcome;
 
   const message =
-    outcome.reason === "no-account"
+    outcome.reason === "rate-limited"
+      ? TOO_MANY
+      : outcome.reason === "no-account"
       ? "This player posted as a guest, so there is nowhere to send a message."
       : outcome.reason === "yourself"
         ? "playerId" in on
@@ -174,6 +176,7 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
     return {
       ok: false,
       closed: false,
+      blocked: false,
       kind: "direct",
       threadId: null,
       cardName: null,
@@ -184,6 +187,7 @@ export async function readThreadAction(threadId: string): Promise<ThreadReadResu
       messages: [],
       meet: null,
       trade: null,
+      hasOlder: false,
     };
   }
 

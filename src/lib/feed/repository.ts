@@ -31,6 +31,7 @@ import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { blockedSet } from "@/lib/players/safety";
 import { dropBlockedItems } from "./blocks";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * The Feed: the room's question asked from a sofa.
@@ -1604,6 +1605,9 @@ async function ownRoomFlares(viewerId: string) {
   return (data ?? []).map((flare) => ({ ...flare, player_id: viewerId }));
 }
 
+const AREA_FLARE_COLUMNS =
+  "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent";
+
 async function areaHuntsFor(
   authors: Map<string, FollowedPlayer>,
   viewerId: string,
@@ -1613,11 +1617,9 @@ async function areaHuntsFor(
 ): Promise<HuntItem[]> {
   if (authors.size === 0) return [];
 
-  const { data: flares } = await getSupabaseAdmin()
+  let { data: flares } = await getSupabaseAdmin()
     .from("flares")
-    .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
-    )
+    .select(AREA_FLARE_COLUMNS)
     /* One query for everybody rather than one per person followed. */
     .in("player_id", [...authors.keys()])
     .eq("status", "open")
@@ -1629,6 +1631,37 @@ async function areaHuntsFor(
     .gte("created_at", since(RECENT_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
+
+  /*
+   * A READ THAT HIT ITS LIMIT CAN CUT A POST IN HALF.
+   *
+   * The limit counts Flares, and a pasted deck is thirty of them, so the
+   * oldest batch in a full read may have only some of its rows - and a
+   * post that says "View all 12" while holding 7 is the count lying.
+   * When the read came back full, every batch it touched is read again
+   * by id, whole, and the missing rows merged in. One extra query, only
+   * on a busy feed.
+   */
+  if (flares && flares.length >= RECENT_READ) {
+    const batches = [
+      ...new Set(
+        flares.map((flare) => flare.posted_batch).filter((id): id is string => !!id),
+      ),
+    ];
+    if (batches.length > 0) {
+      const { data: rest } = await getSupabaseAdmin()
+        .from("flares")
+        .select(AREA_FLARE_COLUMNS)
+        .in("posted_batch", batches)
+        .in("player_id", [...authors.keys()])
+        .eq("status", "open")
+        .in("intent", ["want", "showcase"])
+        .is("event_id", null)
+        .order("created_at", { ascending: false });
+      const have = new Set(flares.map((flare) => flare.id));
+      flares = [...flares, ...(rest ?? []).filter((row) => !have.has(row.id))];
+    }
+  }
 
   /*
    * YOUR OWN FLARES COUNT WHEREVER YOU POSTED THEM.
@@ -2243,7 +2276,7 @@ async function facesFor(playerIds: string[]): Promise<Map<string, FeedFace>> {
        * came out as their still poster in the feed and nowhere else.
        */
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: worn?.ring ?? null,
       aura: worn?.aura ?? null,
     });
@@ -2919,5 +2952,134 @@ export async function listFeed(
       reason: reasonFor(own),
       tab: tabFor(own, section),
     };
+  });
+}
+
+/** Posts in a guest's sample: enough to show what the app is, no more. */
+const GUEST_SAMPLE_POSTS = 12;
+
+/**
+ * The Feed for somebody with no account: a read-only sample of what is
+ * being hunted and offered lately, so the first screen a guest (or an
+ * App Review tester) sees shows the product instead of an empty column.
+ *
+ * Only AREA Flares, which were posted to the public on purpose: never a
+ * binder, a want list or anything room-only. Nothing here reads a viewer
+ * id, so nothing can leak what a particular account would see; the
+ * blocks rule is trivially kept, because a guest has blocked nobody and
+ * nobody has blocked a guest. `origin`, when the phone sent one, only
+ * adds the "2 mi away" line and is never stored.
+ *
+ * Each post is a `hunt` item with `yours: false`, nothing liked and no
+ * match ring (a guest has no binder to match). The app draws every
+ * action on it as a door to sign-up.
+ */
+export async function guestSampleFeed(origin: Point | null): Promise<FeedEntry[]> {
+  const admin = getSupabaseAdmin();
+
+  const { data: flares, error } = await admin
+    .from("flares")
+    .select(
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, found_quantity, intent",
+    )
+    .eq("status", "open")
+    .in("intent", ["want", "showcase"])
+    .is("event_id", null)
+    .not("player_id", "is", null)
+    .gte("created_at", since(RECENT_DAYS))
+    .order("created_at", { ascending: false })
+    .limit(RECENT_READ);
+
+  if (error) {
+    console.error("Could not read the guest sample", error);
+    return [];
+  }
+  if (!flares || flares.length === 0) return [];
+
+  /* One post per posting act, newest first, the way a follower sees it. */
+  const groups = new Map<string, typeof flares>();
+  for (const flare of flares) {
+    if (!flare.player_id) continue;
+    const key = `${flare.player_id}::${flare.posted_batch ?? flare.id}`;
+    if (!groups.has(key) && groups.size >= GUEST_SAMPLE_POSTS) continue;
+    groups.set(key, [...(groups.get(key) ?? []), flare]);
+  }
+
+  const kept = [...groups.values()].flat();
+  const authorIds = [...new Set(kept.flatMap((flare) => flare.player_id ?? []))];
+  const [facts, faces, { data: names }] = await Promise.all([
+    cardFacts(kept.map((flare) => flare.card_id)),
+    facesFor(authorIds),
+    admin.from("players").select("id, display_name").in("id", authorIds),
+  ]);
+  const nameById = new Map((names ?? []).map((row) => [row.id, row.display_name]));
+
+  return [...groups.entries()].flatMap(([key, group]): FeedEntry[] => {
+    const authorId = key.split("::")[0];
+    const displayName = nameById.get(authorId);
+    /* A poster with no name is not a person a guest can be shown. */
+    if (!displayName) return [];
+    const face = faces.get(authorId);
+    const posted = pointForPostalCode(group[0]?.posted_postal_code);
+    const milesAway =
+      origin && posted ? Math.round(milesApart(origin, posted) * 10) / 10 : null;
+    const cards: FeedCard[] = firstPerCard(group, (flare) => flare.card_id).map(
+      (flare) => {
+        const fact = facts.get(flare.card_id);
+        return {
+          cardId: flare.card_id,
+          cardName: fact?.cardName ?? "Unknown card",
+          cardNumber: fact?.cardNumber ?? "",
+          imageUrl: fact?.imageUrl ?? null,
+          match: null,
+          flareId: flare.id,
+          state: "open",
+          youOffered: false,
+          printingId: flare.printing_id,
+          quantity: flare.quantity,
+          remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
+          huntRequestId: null,
+        };
+      },
+    );
+    const item: HuntItem = {
+      kind: "hunt",
+      postId: key.slice(authorId.length + 2),
+      likes: 0,
+      comments: 0,
+      liked: false,
+      code: null,
+      storeName: null,
+      eventName: null,
+      playerId: authorId,
+      displayName,
+      avatarUrl: face?.avatarUrl ?? null,
+      frame: face?.frame ?? null,
+      ring: face?.ring ?? null,
+      direction: group[0]?.intent === "showcase" ? "showcase" : "want",
+      deckLabel: group[0]?.deck_label ?? null,
+      postedAt: group[0]?.created_at ?? new Date().toISOString(),
+      milesAway,
+      storeId: null,
+      acceptsTrade: group.some((flare) => flare.accepts_trade ?? true),
+      acceptsCash: group.some((flare) => flare.accepts_cash ?? false),
+      note: group.find((flare) => flare.note)?.note ?? null,
+      offers: 0,
+      hunt: null,
+      remainingCopies: 0,
+      completed: false,
+      total: cards.length,
+      youCanAnswer: 0,
+      cards: cards.slice(0, CARD_RAIL_CAP),
+      yours: false,
+    };
+    return [
+      {
+        ...item,
+        section: "nearby",
+        reason: "Posted recently on cardflare",
+        tab: "nearby",
+      },
+    ];
   });
 }

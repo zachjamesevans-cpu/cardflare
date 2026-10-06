@@ -6,17 +6,21 @@ import type { RouteProp } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
   Text,
   View,
 } from "react-native";
+import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
+  ApiError,
   answerThreadTrade,
   blockPlayer,
   proposeThreadTrade,
@@ -28,6 +32,8 @@ import {
   type ThreadTrade,
 } from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { clearActiveThread, setActiveThread, threadIdFromPush } from "../active-thread";
+import { refreshUnread } from "../unread";
 
 /** One read of a conversation, as the server sends it and the disk keeps it. */
 type ThreadRead = Awaited<ReturnType<typeof readLocalThread>>;
@@ -46,7 +52,7 @@ import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, gutter, spacing } from "../theme";
+import { colors, gutter, radius, spacing } from "../theme";
 import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
 
 /**
@@ -61,9 +67,11 @@ import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
  *
  * Loaded fresh on focus — reading is the receipt that marks the other
  * side's messages read and clears the inbox notice — and reloaded after
- * every send. No live socket in v1: a conversation about meeting at a
- * store moves at minutes, not milliseconds, and pull-to-refresh is the
- * honest version of realtime until there is one.
+ * every send. No live socket: while the conversation is on screen and
+ * the app is in front it asks again every few seconds (THREAD_POLL_MS),
+ * at once when a push for this conversation lands (whose banner App.tsx
+ * holds back, src/active-thread.ts), and on a pull down. "Load older"
+ * at the top reads the page before the oldest message shown.
  *
  * "We traded" lives here too, since round 8, opened from the "⋯" menu
  * since round 16. Either side says it, the other side is asked, and the
@@ -77,6 +85,18 @@ import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
  * only at the start and after a pause.
  */
 type ThreadKind = "flare" | "want" | "direct";
+
+/** How often an open conversation asks for new messages. */
+const THREAD_POLL_MS = 5000;
+
+/** Older pages and the newest, joined oldest first, each message once. */
+function joinPages(
+  older: LocalThreadMessage[],
+  newest: LocalThreadMessage[],
+): LocalThreadMessage[] {
+  const seen = new Set(newest.map((message) => message.id));
+  return [...older.filter((message) => !seen.has(message.id)), ...newest];
+}
 
 /** What a settled trade reads as, in one muted line, or null while open. */
 function settledTradeLine(trade: ThreadTrade, withName: string): string | null {
@@ -100,6 +120,11 @@ export function ThreadScreen() {
   const { threadId } = route.params;
 
   const [messages, setMessages] = useState<LocalThreadMessage[] | null>(null);
+  /* Pages read by "Load older", kept across refreshes of the newest page. */
+  const [older, setOlder] = useState<LocalThreadMessage[]>([]);
+  const [hasOlder, setHasOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [withName, setWithName] = useState<string | null>(null);
   const [cardName, setCardName] = useState<string | null>(null);
   const [withPlayerId, setWithPlayerId] = useState<string | null>(null);
@@ -110,6 +135,10 @@ export function ThreadScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   /* Set once a block from this screen has landed. */
   const [blocked, setBlocked] = useState(false);
+  /* The server's word that a block stands between the two, either way
+     round, or a send refused for one: the composer gives way to a
+     plain line instead of a generic "Could not send that." */
+  const [closed, setClosed] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
   const [draft, setDraft] = useState("");
@@ -127,6 +156,24 @@ export function ThreadScreen() {
      admins can read it. The same sheet a post and a profile open. */
   const [report, setReport] = useState<ReportTarget | null>(null);
   const list = useRef<FlatList<LocalThreadMessage>>(null);
+  /* Every read is numbered, so a slow answer never paints over a newer
+     one: the poll, a push and a send can all be in flight at once. */
+  const requestSeq = useRef(0);
+  /* True while "Load older" has just grown the top of the list, so the
+     list stays where the reader is instead of jumping to the end. */
+  const holdPosition = useRef(false);
+  /* The newest message seen, so a new one (not a re-read) scrolls down
+     and resyncs the badge. */
+  const newestSeen = useRef<string | null>(null);
+  /* The newest message the last FRESH read had; undefined before one. */
+  const newestRead = useRef<string | null | undefined>(undefined);
+  /* Set once "Load older" has run: from then its answer says whether
+     there is more, not the newest page's. */
+  const olderLoaded = useRef(false);
+  /* The pair's conversation id, which a push names, when the route held
+     an old anchor's id; and whether this screen is the one in front. */
+  const conversationRef = useRef<string | null>(null);
+  const focused = useRef(false);
 
   /*
    * How far down the screen this view starts. KeyboardAvoidingView
@@ -185,29 +232,86 @@ export function ThreadScreen() {
   }, [threadId]);
 
   const load = useCallback(
-    async (isCurrent: () => boolean = () => true) => {
+    async (
+      isCurrent: () => boolean = () => true,
+      /* A poll fails quietly; the next one is five seconds away. */
+      quiet = false,
+    ) => {
+      const seq = ++requestSeq.current;
       try {
         const thread = await readLocalThread(threadId);
-        if (!isCurrent()) return;
+        if (!isCurrent() || seq !== requestSeq.current) return;
         if (!thread.ok) {
           navigation.goBack();
           return;
         }
         fresh.current = true;
         apply(thread);
+        if (!quiet) setError(null);
+        /* Reading cleared this conversation's notice on the server, so
+           the bell and the icon badge are asked again: on the first read
+           and whenever a new message came in, not on every quiet poll. */
+        const newest = thread.messages[thread.messages.length - 1]?.id ?? null;
+        if (newest !== newestRead.current) {
+          newestRead.current = newest;
+          void refreshUnread();
+        }
         const playerId = await cachedPlayerId();
         if (playerId) void writeCache("thread", playerId, thread, threadId);
       } catch {
-        if (isCurrent()) setError("Could not load the conversation.");
+        if (isCurrent() && !quiet && seq === requestSeq.current) {
+          setError("Could not load the conversation.");
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [threadId, navigation],
   );
 
+  /* "Load older": the page before the oldest message on screen. */
+  const loadOlder = async () => {
+    const shown = joinPages(older, messages ?? []);
+    const oldest = shown[0];
+    if (!oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const page = await readLocalThread(threadId, oldest.sentAt);
+      if (!page.ok) return;
+      holdPosition.current = true;
+      olderLoaded.current = true;
+      setOlder((current) => joinPages(page.messages, current));
+      setHasOlder(page.hasOlder === true);
+    } catch {
+      setError("Could not load older messages.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
+
+  const pullToRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   /** Draws a conversation, fresh or from disk, the same way. */
   function apply(thread: ThreadRead) {
         setMessages(thread.messages);
+        /* Only the newest page says whether there is more until
+           "Load older" has run; then its own answer stands. */
+        if (!olderLoaded.current) setHasOlder(thread.hasOlder === true);
+        if (thread.threadId && thread.threadId !== conversationRef.current) {
+          conversationRef.current = thread.threadId;
+          if (focused.current) setActiveThread([threadId, thread.threadId]);
+        }
+        /* A new message at the bottom: follow it down again. */
+        const newest = thread.messages[thread.messages.length - 1]?.id ?? null;
+        if (newest !== newestSeen.current) {
+          newestSeen.current = newest;
+          holdPosition.current = false;
+        }
         setWithName(thread.withName);
         setCardName(thread.cardName);
         setWithPlayerId(thread.withPlayerId ?? null);
@@ -216,6 +320,7 @@ export function ThreadScreen() {
            with a card name is read as a thread about that card. */
         setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
         setTrade(thread.trade ?? null);
+        setClosed(thread.blocked ?? false);
         /* Instagram's header: their face, their name with the @handle
            under it, all of it opening their profile; the conversation
            is the person. The "⋯" at the right holds the rest. */
@@ -247,14 +352,55 @@ export function ThreadScreen() {
         });
   }
 
+  /*
+   * While on screen: read now, then every THREAD_POLL_MS while the app is
+   * in front (a phone in a pocket polls nothing), at once on a return to
+   * the front, and at once when a push for this conversation lands. The
+   * screen also says it is the open conversation, so App.tsx's handler
+   * keeps that push's banner off the screen it would cover.
+   */
   useFocusEffect(
     useCallback(() => {
       let current = true;
-      void load(() => current);
+      const isCurrent = () => current;
+      const ids = () => [threadId, conversationRef.current];
+      focused.current = true;
+      setActiveThread(ids());
+      void load(isCurrent);
+
+      let timer: ReturnType<typeof setInterval> | null = null;
+      const start = () => {
+        if (timer) return;
+        timer = setInterval(() => void load(isCurrent, true), THREAD_POLL_MS);
+      };
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+      };
+      if (AppState.currentState === "active") start();
+
+      const appState = AppState.addEventListener("change", (next) => {
+        if (next === "active") {
+          void load(isCurrent, true);
+          start();
+        } else {
+          stop();
+        }
+      });
+      const arrived = Notifications.addNotificationReceivedListener((notification) => {
+        const about = threadIdFromPush(notification.request.content.data);
+        if (about && ids().includes(about)) void load(isCurrent, true);
+      });
+
       return () => {
         current = false;
+        stop();
+        appState.remove();
+        arrived.remove();
+        focused.current = false;
+        clearActiveThread(ids());
       };
-    }, [load]),
+    }, [load, threadId]),
   );
 
   const send = async () => {
@@ -271,7 +417,12 @@ export function ThreadScreen() {
       setDraft("");
       await load();
       list.current?.scrollToEnd({ animated: true });
-    } catch {
+    } catch (caught) {
+      /* A 409 "closed" is a block, either way round: say so plainly. */
+      if (caught instanceof ApiError && caught.code === "closed") {
+        setClosed(true);
+        return;
+      }
       setError("Could not send that.");
     }
   };
@@ -370,7 +521,7 @@ export function ThreadScreen() {
           },
         ]
       : []),
-    ...(!blocked && !tradePending && !tradeOpen
+    ...(!blocked && !closed && !tradePending && !tradeOpen
       ? [
           {
             key: "traded",
@@ -401,7 +552,8 @@ export function ThreadScreen() {
       : []),
   ];
 
-  const runs = messageRuns(messages ?? []);
+  const shown = messages === null ? null : joinPages(older, messages);
+  const runs = messageRuns(shown ?? []);
   /* Line height of the composer's text, and the box's cap: five lines,
      then it scrolls inside rather than climbing up the screen. */
   const composerLine = 20;
@@ -435,12 +587,35 @@ export function ThreadScreen() {
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
         }}
-        data={messages ?? []}
+        data={shown ?? []}
         keyExtractor={(message) => message.id}
         /* A conversation opens on its newest message, not its oldest.
            The website gets this from the page scrolling to its own end;
-           a fixed-height list has to be told. */
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+           a fixed-height list has to be told. Not after "Load older",
+           which grows the top while the reader is up there. */
+        onContentSizeChange={() => {
+          if (!holdPosition.current) list.current?.scrollToEnd({ animated: false });
+        }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void pullToRefresh()}
+            tintColor={colors.textMuted}
+          />
+        }
+        ListHeaderComponent={
+          hasOlder && shown && shown.length > 0 ? (
+            <Tap
+              onPress={() => void loadOlder()}
+              accessibilityLabel="Load older messages"
+              style={{ alignSelf: "center", paddingVertical: spacing(2), marginBottom: spacing(3) }}
+            >
+              <Text style={{ color: colors.textSecondary, fontWeight: "600", fontSize: 13 }}>
+                {loadingOlder ? "Loading older…" : "Load older"}
+              </Text>
+            </Tap>
+          ) : null
+        }
         ListEmptyComponent={
           messages === null ? (
             <Loading />
@@ -531,7 +706,7 @@ export function ThreadScreen() {
                   <View
                     style={{
                       backgroundColor: item.yours ? colors.accent : colors.elevated,
-                      borderRadius: 18,
+                      borderRadius: radius.card,
                       paddingHorizontal: spacing(3),
                       paddingVertical: spacing(2),
                     }}
@@ -563,6 +738,8 @@ export function ThreadScreen() {
       >
         {blocked ? (
           <Muted>Blocked. Neither of you can message the other.</Muted>
+        ) : closed ? (
+          <Muted>You can't message this person.</Muted>
         ) : (
           <>
             {/* The trade, when one is open: what you said, waiting on

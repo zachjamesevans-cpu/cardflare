@@ -31,7 +31,7 @@ import {
 import { NightSection } from "../night-section";
 import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, radius, spacing } from "../theme";
-import { Body, Card, CardImage, Loading, Tap, Title, type ZoomCard } from "../ui";
+import { Body, Button, Card, CardImage, Loading, Tap, Title, type ZoomCard } from "../ui";
 
 /**
  * The night behind a code: its id, its name and where it is in its
@@ -43,6 +43,8 @@ export function useNightByCode(code: string): {
   night: { eventId: string; name: string; phase: RoomPhase | null } | null;
   missing: boolean;
   failed: boolean;
+  /** Asks again, for the error card's Try again. */
+  reload: () => void;
 } {
   const [night, setNight] = useState<{
     eventId: string;
@@ -51,6 +53,12 @@ export function useNightByCode(code: string): {
   } | null>(null);
   const [missing, setMissing] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const reload = useCallback(() => {
+    setMissing(false);
+    setFailed(false);
+    setAttempt((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     let live = true;
@@ -73,9 +81,9 @@ export function useNightByCode(code: string): {
     return () => {
       live = false;
     };
-  }, [code]);
+  }, [code, attempt]);
 
-  return { night, missing, failed };
+  return { night, missing, failed, reload };
 }
 
 /**
@@ -91,10 +99,11 @@ export function useNightByCode(code: string): {
 export function NightMatchesScreen({ code }: { code: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const insets = useSafeAreaInsets();
-  const { night, missing, failed } = useNightByCode(code);
+  const { night, missing, failed, reload } = useNightByCode(code);
   const [matches, setMatches] = useState<NightMatches | null>(null);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const load = useCallback(async (eventId: string, alive: () => boolean) => {
     const token = await storedAccessToken();
@@ -103,9 +112,12 @@ export function NightMatchesScreen({ code }: { code: string }) {
     if (!token) return;
     try {
       const fresh = await getNightMatches(eventId);
-      if (alive()) setMatches(fresh);
+      if (alive()) {
+        setMatches(fresh);
+        setError(null);
+      }
     } catch {
-      if (alive()) setError("Could not load your matches. Pull back and try again.");
+      if (alive()) setError("Could not load your matches. Check your connection and try again.");
     }
   }, []);
 
@@ -116,7 +128,7 @@ export function NightMatchesScreen({ code }: { code: string }) {
     return () => {
       live = false;
     };
-  }, [night, load]);
+  }, [night, load, attempt]);
 
   const onPlayer = (playerId: string) =>
     navigation.navigate("NightPlayer", { code, playerId });
@@ -133,6 +145,7 @@ export function NightMatchesScreen({ code }: { code: string }) {
               ? "That code does not point at a night."
               : "Check your connection and try again."}
           </Body>
+          <Button label="Try again" onPress={reload} />
         </Card>
       </View>
     );
@@ -159,6 +172,13 @@ export function NightMatchesScreen({ code }: { code: string }) {
         <Card>
           <Title>Could not load your matches</Title>
           <Body>{error}</Body>
+          <Button
+            label="Try again"
+            onPress={() => {
+              setError(null);
+              setAttempt((n) => n + 1);
+            }}
+          />
         </Card>
       </View>
     );

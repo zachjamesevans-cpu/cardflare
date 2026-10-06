@@ -3,7 +3,9 @@ import "server-only";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarPathFor, avatarSrc } from "./profile-image";
 import { avatarWearFor } from "./equips";
+import { blockedSet } from "./safety";
 import type { CosmeticArtFile } from "./art-files";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * Follows: the founder's option C.
@@ -116,20 +118,27 @@ export interface FollowedPlayer {
  */
 export async function followCounts(
   playerId: string,
+  viewerId: string | null = playerId,
 ): Promise<{ followers: number; following: number }> {
   if (!isSupabaseConfigured()) return { followers: 0, following: 0 };
 
+  /* Nobody the viewer has blocked, or who blocked them, is counted:
+     the numbers agree with the lists they open. */
+  const hidden = viewerId ? [...(await blockedSet(viewerId))] : [];
   const admin = getSupabaseAdmin();
-  const [followers, following] = await Promise.all([
-    admin
-      .from("player_follows")
-      .select("follower_id", { count: "exact", head: true })
-      .eq("followed_id", playerId),
-    admin
-      .from("player_follows")
-      .select("followed_id", { count: "exact", head: true })
-      .eq("follower_id", playerId),
-  ]);
+  let followersQuery = admin
+    .from("player_follows")
+    .select("follower_id", { count: "exact", head: true })
+    .eq("followed_id", playerId);
+  let followingQuery = admin
+    .from("player_follows")
+    .select("followed_id", { count: "exact", head: true })
+    .eq("follower_id", playerId);
+  if (hidden.length > 0) {
+    followersQuery = followersQuery.not("follower_id", "in", `(${hidden.join(",")})`);
+    followingQuery = followingQuery.not("followed_id", "in", `(${hidden.join(",")})`);
+  }
+  const [followers, following] = await Promise.all([followersQuery, followingQuery]);
 
   if (followers.error) console.error("Could not count followers", followers.error);
   if (following.error) console.error("Could not count following", following.error);
@@ -176,7 +185,7 @@ async function hydrate(playerId: string, ids: string[]): Promise<FollowedPlayer[
         playerId: row.id,
         displayName: row.display_name,
         avatarUrl: avatarSrc(avatarPathFor(row)),
-        frame: row.equipped_avatar_frame,
+        frame: wornFrame(row),
         ring: wear.get(row.id)?.ring ?? null,
         aura: wear.get(row.id)?.aura ?? null,
         ringArt: wear.get(row.id)?.ringArt ?? null,
@@ -206,16 +215,42 @@ async function edgeIds(
   return (data ?? []).map((edge) => (edge as Record<string, string>)[otherColumn]);
 }
 
-/** Who this player follows, newest first. */
-export async function listFollowing(playerId: string): Promise<FollowedPlayer[]> {
+/**
+ * Drops everyone blocked either way from the viewer. A null viewer (a
+ * guest in a room) has blocked nobody.
+ */
+async function visibleTo(viewerId: string | null, ids: string[]): Promise<string[]> {
+  if (!viewerId || ids.length === 0) return ids;
+  const hidden = await blockedSet(viewerId);
+  return hidden.size === 0 ? ids : ids.filter((id) => !hidden.has(id));
+}
+
+/**
+ * Who this player follows, newest first. `viewerId` is who is looking,
+ * the owner unless said otherwise: anyone blocked either way between
+ * the viewer and a person on the list is left off it.
+ */
+export async function listFollowing(
+  playerId: string,
+  viewerId: string | null = playerId,
+): Promise<FollowedPlayer[]> {
   if (!isSupabaseConfigured()) return [];
-  const ids = await edgeIds("follower_id", "followed_id", playerId);
+  const ids = await visibleTo(
+    viewerId,
+    await edgeIds("follower_id", "followed_id", playerId),
+  );
   return ids.length === 0 ? [] : hydrate(playerId, ids);
 }
 
-/** Who follows this player, newest first. */
-export async function listFollowers(playerId: string): Promise<FollowedPlayer[]> {
+/** Who follows this player, newest first; blocks as `listFollowing`. */
+export async function listFollowers(
+  playerId: string,
+  viewerId: string | null = playerId,
+): Promise<FollowedPlayer[]> {
   if (!isSupabaseConfigured()) return [];
-  const ids = await edgeIds("followed_id", "follower_id", playerId);
+  const ids = await visibleTo(
+    viewerId,
+    await edgeIds("followed_id", "follower_id", playerId),
+  );
   return ids.length === 0 ? [] : hydrate(playerId, ids);
 }

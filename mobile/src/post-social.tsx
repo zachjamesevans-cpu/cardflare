@@ -1,10 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
-import type { FeedCard, OfferItem, OfferOutcome, PostCard } from "./api";
+import {
+  ApiError,
+  type FeedCard,
+  type OfferItem,
+  type OfferOutcome,
+  type PostCard,
+} from "./api";
 import { colors, spacing } from "./theme";
-import { Tap, type ZoomHave } from "./ui";
+import { ErrorLine, Tap, type ZoomHave } from "./ui";
 
 /**
  * The social row under a Flare post, and the one rule about which card
@@ -33,6 +39,19 @@ export interface PostRef {
  * your own post, a card that already traded, an item that is not a
  * post.
  */
+/**
+ * Each count's tap box: at least 44pt tall and wide, Apple's minimum,
+ * so a thumb that lands a little off the heart still likes the post.
+ */
+const TARGET = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: spacing(1.5),
+  minHeight: 44,
+  minWidth: 44,
+} as const;
+
 export function haveFor(
   card: FeedCard | PostCard,
   post: PostRef | undefined,
@@ -96,23 +115,54 @@ export function PostSocialRow({
     setLikes(initialLikes);
   }
 
+  /*
+   * One heart request per post at a time. A thumb that taps twice fast
+   * used to send like, unlike, like in a race the server settled in
+   * whatever order they landed, and a rollback could undo the wrong
+   * flip. A tap while one is in flight is ignored; the heart already
+   * shows the answer it is waiting on.
+   */
+  const inFlight = useRef(false);
+  /* Said aloud when the server refuses, rather than a heart that
+     quietly flips back. Clears itself after a few seconds. */
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(null), 4000);
+    return () => clearTimeout(timer);
+  }, [error]);
+
   const toggle = () => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     const next = !liked;
     setLiked(next);
     setLikes((current) => Math.max(0, current + (next ? 1 : -1)));
-    onLike(next).catch(() => {
-      setLiked(!next);
-      setLikes((current) => Math.max(0, current + (next ? -1 : 1)));
-    });
+    setError(null);
+    onLike(next)
+      .catch((caught: unknown) => {
+        setLiked(!next);
+        setLikes((current) => Math.max(0, current + (next ? -1 : 1)));
+        setError(
+          caught instanceof ApiError && caught.status === 429
+            ? "That is a lot of likes. Try again in a little while."
+            : "Couldn't save that like. Try again.",
+        );
+      })
+      .finally(() => {
+        inFlight.current = false;
+      });
   };
 
   return (
+    <View style={{ gap: spacing(1) }}>
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
       <Tap
         onPress={toggle}
         hitSlop={6}
         accessibilityLabel={liked ? "Unlike" : "Like"}
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        style={TARGET}
       >
         <Ionicons
           name={liked ? "heart" : "heart-outline"}
@@ -134,7 +184,7 @@ export function PostSocialRow({
         disabled={threadOpen}
         hitSlop={6}
         accessibilityLabel="Show comments"
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        style={TARGET}
       >
         <Ionicons
           name={threadOpen ? "chatbubble" : "chatbubble-outline"}
@@ -156,7 +206,7 @@ export function PostSocialRow({
           onPress={onMessage}
           hitSlop={6}
           accessibilityLabel="Message them"
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+          style={TARGET}
         >
           <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
           {offers !== undefined ? (
@@ -168,6 +218,8 @@ export function PostSocialRow({
           ) : null}
         </Tap>
       ) : null}
+    </View>
+    <ErrorLine message={error} />
     </View>
   );
 }

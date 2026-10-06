@@ -55,9 +55,11 @@ export function FollowButton({
         borderRadius: radius.control,
         borderWidth: 1,
         borderColor: state.following ? colors.border : `${colors.accent}66`,
-        backgroundColor: state.following ? colors.elevated : `${colors.accent}1a`,
+        backgroundColor: state.following ? colors.elevated : colors.accentTint,
         paddingHorizontal: spacing(3),
         paddingVertical: fill ? spacing(2) : spacing(1.5),
+        /* Beside Message on a profile: the standard Button's height. */
+        minHeight: fill ? 48 : undefined,
       }}
     >
       {busy && <ActivityIndicator size="small" color={colors.accent} />}

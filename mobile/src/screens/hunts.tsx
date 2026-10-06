@@ -4,10 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { describeError, getProfile, peekPlayer, type Hunt } from "../api";
+import { friendlyError, getProfile, type Hunt, peekPlayer } from "../api";
 import { HuntsPanel } from "../hunts-panel";
 import { colors, gutter, spacing } from "../theme";
-import { Loading, Muted } from "../ui";
+import { AsyncButton, Loading, Muted } from "../ui";
 
 /**
  * Somebody's hunts on their own screen: the website's /profile/hunts
@@ -42,7 +42,7 @@ export function HuntsScreen({ playerId }: { playerId?: string }) {
       }
       setError(null);
     } catch (caught) {
-      setError(describeError(caught));
+      setError(friendlyError(caught));
     }
   }, [playerId]);
 
@@ -71,7 +71,14 @@ export function HuntsScreen({ playerId }: { playerId?: string }) {
         }}
       >
         {error ? (
-          <Muted>{`The hunts could not be opened (${error}).`}</Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>{`The hunts could not be opened (${error}).`}</Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}

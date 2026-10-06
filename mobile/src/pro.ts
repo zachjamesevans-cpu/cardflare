@@ -1,4 +1,4 @@
-import { syncApplePurchase } from "./api";
+import { ApiError, syncApplePurchase } from "./api";
 
 /**
  * The Apple side of cardflare Pro, in one module.
@@ -82,6 +82,8 @@ export type BuyOutcome =
   | { kind: "pending" }
   /** No store to talk to: old build, simulator, or store trouble. */
   | { kind: "unavailable" }
+  /** This Apple ID's subscription is on another cardflare account. */
+  | { kind: "claimed" }
   | { kind: "failed"; message: string };
 
 /**
@@ -105,11 +107,13 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
   const iap = await store();
   if (!iap) return { kind: "unavailable" };
 
+  buying = true;
   return new Promise<BuyOutcome>((resolve) => {
     let done = false;
     const finish = (outcome: BuyOutcome) => {
       if (done) return;
       done = true;
+      buying = false;
       clearTimeout(timer);
       updated.remove();
       failed.remove();
@@ -145,10 +149,18 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
           /* Only finish what the server has recorded. An unfinished
              transaction is redelivered on next launch, so a network
              blip costs a retry, never the purchase. */
-          await iap.finishTransaction({ purchase });
+          await iap.finishTransaction({ purchase, isConsumable: false });
           finish(result.pro ? { kind: "pro" } : { kind: "unconfirmed" });
-        } catch {
-          finish({ kind: "unconfirmed" });
+        } catch (caught) {
+          /* Apple handed back the subscription this Apple ID already
+             has, and the server has it on another cardflare account. */
+          finish(
+            caught instanceof ApiError &&
+              caught.status === 403 &&
+              caught.code === "claimed"
+              ? { kind: "claimed" }
+              : { kind: "unconfirmed" },
+          );
         }
       })();
     });
@@ -188,31 +200,94 @@ export async function buyPro(playerId: string): Promise<BuyOutcome> {
  * Pro the next time they look, without hunting for Restore. Nothing is
  * prompted: this reads, it does not ask Apple to sync.
  */
-export async function syncOwnedPro(): Promise<boolean> {
+export async function syncOwnedPro(): Promise<SyncOutcome> {
   const iap = await store();
-  if (!iap) return false;
+  if (!iap) return "none";
   try {
     const owned = await iap.getAvailablePurchases();
-    let pro = false;
-    for (const purchase of (owned ?? []).filter((p) => p.productId === PRO_PRODUCT_ID)) {
-      const original =
-        ("originalTransactionIdentifierIOS" in purchase
-          ? purchase.originalTransactionIdentifierIOS
-          : null) ??
-        purchase.transactionId ??
-        null;
-      if (!original) continue;
-      try {
-        const result = await syncApplePurchase(original);
-        if (result.pro) pro = true;
-      } catch {
-        /* Next open tries again. */
-      }
-    }
-    return pro;
+    return await confirmAll(
+      iap,
+      (owned ?? []).filter((p) => p.productId === PRO_PRODUCT_ID),
+    );
   } catch {
-    return false;
+    return "none";
   }
+}
+
+/**
+ * What the server made of the phone's Pro transactions, taken together:
+ * Pro for this account, owned by ANOTHER cardflare account (the server's
+ * 403 "claimed"), or neither.
+ */
+export type SyncOutcome = "pro" | "claimed" | "none";
+
+export { APPLE_SUBSCRIPTIONS_URL, CLAIMED_MESSAGE, renewalLine } from "./pro-copy";
+
+type Purchase = Awaited<ReturnType<Iap["getAvailablePurchases"]>>[number];
+
+function originalIdOf(purchase: Purchase): string | null {
+  return (
+    ("originalTransactionIdentifierIOS" in purchase
+      ? purchase.originalTransactionIdentifierIOS
+      : null) ??
+    purchase.transactionId ??
+    null
+  );
+}
+
+/**
+ * Pokes the server with each transaction, and finishes the ones it
+ * confirmed. Finishing is what tells StoreKit the purchase was
+ * delivered; an unfinished one is redelivered on every launch, which is
+ * the safety net for a lost confirm, so only a confirmed one is
+ * finished. One bad sync does not hide a good one beside it.
+ */
+async function confirmAll(iap: Iap, purchases: Purchase[]): Promise<SyncOutcome> {
+  let pro = false;
+  let claimed = false;
+  for (const purchase of purchases) {
+    const original = originalIdOf(purchase);
+    if (!original) continue;
+    try {
+      const result = await syncApplePurchase(original);
+      if (result.pro) pro = true;
+      await iap.finishTransaction({ purchase, isConsumable: false }).catch(() => {});
+    } catch (caught) {
+      if (caught instanceof ApiError && caught.status === 403 && caught.code === "claimed") {
+        claimed = true;
+      }
+      /* Anything else: next launch tries again. */
+    }
+  }
+  return pro ? "pro" : claimed ? "claimed" : "none";
+}
+
+/* True while the paywall's own buy is in flight, so the app-wide
+   listener below leaves that purchase to buyPro. */
+let buying = false;
+let listening = false;
+
+/**
+ * Once per launch, signed in: finish what the phone owns, and keep
+ * listening for transactions that arrive outside the paywall.
+ *
+ * Renewals, an Ask to Buy approved an hour later, a purchase made on the
+ * App Store's own subscription page: StoreKit delivers each as a
+ * transaction update whenever the app is running, and until now only
+ * the Pro screen ever asked, so a player who paid was not Pro until
+ * they happened to open it. Silent: no prompt, nothing drawn.
+ */
+export async function startProSync(): Promise<void> {
+  const iap = await store();
+  if (!iap) return;
+  await syncOwnedPro().catch(() => "none");
+  if (listening) return;
+  listening = true;
+  iap.purchaseUpdatedListener((purchase) => {
+    if (buying || purchase.productId !== PRO_PRODUCT_ID) return;
+    if ("purchaseState" in purchase && purchase.purchaseState === "pending") return;
+    void confirmAll(iap, [purchase]).catch(() => {});
+  });
 }
 
 export type RestoreOutcome =
@@ -220,6 +295,8 @@ export type RestoreOutcome =
   /** The store answered and holds no Pro subscription for this
       Apple ID. Honest: nothing to restore. */
   | { kind: "none" }
+  /** There is one, and it belongs to another cardflare account. */
+  | { kind: "claimed" }
   | { kind: "unavailable" }
   | { kind: "failed"; message: string };
 
@@ -239,23 +316,8 @@ export async function restorePro(): Promise<RestoreOutcome> {
     const mine = (owned ?? []).filter((p) => p.productId === PRO_PRODUCT_ID);
     if (mine.length === 0) return { kind: "none" };
 
-    let pro = false;
-    for (const purchase of mine) {
-      const original =
-        ("originalTransactionIdentifierIOS" in purchase
-          ? purchase.originalTransactionIdentifierIOS
-          : null) ??
-        purchase.transactionId ??
-        null;
-      if (!original) continue;
-      try {
-        const result = await syncApplePurchase(original);
-        if (result.pro) pro = true;
-      } catch {
-        /* One bad sync should not hide a good one beside it. */
-      }
-    }
-    return pro ? { kind: "pro" } : { kind: "none" };
+    const outcome = await confirmAll(iap, mine);
+    return { kind: outcome };
   } catch (caught) {
     return {
       kind: "failed",

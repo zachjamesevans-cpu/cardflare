@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Animated, {
@@ -22,7 +22,7 @@ import {
   View,
 } from "react-native";
 
-import type { StackParams } from "../../App";
+import type { StackParams, TabParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { GoingButton } from "../going-button";
 import { openRoom } from "../open-room";
@@ -74,7 +74,10 @@ import {
 } from "../ui";
 import { silentCoords } from "../location";
 import { FeedPerson } from "../feed-person";
-import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { agoFrom } from "../ago";
+import { cachedPlayerId, readCache, rememberAccount, writeCache } from "../cache";
+import { feedKeys } from "../feed-keys";
+import { postSubject } from "../flare-copy";
 import { markFeedStale, onFeedStale } from "../feed-refresh";
 import { UndoToast, type UndoOffer } from "../undo-toast";
 import { refreshTick } from "../refresh-tick";
@@ -328,7 +331,9 @@ function WantedRow({
             {entry.card.cardName}
           </Text>
           <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
-            {`${entry.displayName ?? "A player"} · ${entry.storeName} · ${agoFrom(entry.when)}`}
+            {[entry.displayName ?? "A player", entry.storeName, agoFrom(entry.when)]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
         </View>
         <Tap
@@ -361,16 +366,6 @@ function WantedRow({
   );
 }
 
-function agoFrom(iso: string): string {
-  const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
-  if (minutes < 60) return `${Math.max(1, minutes)}m ago`;
-
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-
-  return `${Math.round(hours / 24)}d ago`;
-}
-
 /**
  * The mark is taller than it is wide — BRAND.md's one rule about it. It
  * is sized by height here and its width follows the artwork.
@@ -393,6 +388,15 @@ export function HomeScreen() {
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
+  /* Another screen asking for a tab - Nights' "Find stores near you"
+     lands on Nearby. The tab stays mounted, so this follows the
+     param rather than reading it once. */
+  const askedFor = useRoute<RouteProp<TabParams, "Feed">>().params;
+  const asked = askedFor?.tab;
+  const askedAt = askedFor?.at;
+  useEffect(() => {
+    if (asked) setTab(asked);
+  }, [asked, askedAt]);
   /* How this player wants the Feed drawn. Anything this build does not
      recognise reads as the original card - see feedViewFrom. */
   const view = feedViewFrom(me?.player.feedView);
@@ -405,13 +409,25 @@ export function HomeScreen() {
    * to 5s more. Undo takes the id back out before it restores.
    */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  /*
+   * No account on this phone: the Feed is the server's public sample
+   * (guestSampleFeed), drawn read-only under a "How cardflare works"
+   * card. A guest has nothing to filter, so the three tabs go and the
+   * sample shows whole; every action on it is a door to sign-up.
+   */
+  const [guest, setGuest] = useState(false);
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
-  const shown = feed.filter(
-    (item) =>
-      belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
-  );
+  const shown = guest
+    ? feed
+    : feed.filter(
+        (item) =>
+          belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
+      );
+  const toSignUp = () => navigation.navigate("CreateAccount");
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
+  /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
+  const shownKeys = feedKeys(shown);
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
   /* The post whose cards are open in the sheet, to read or to offer on. */
@@ -447,6 +463,22 @@ export function HomeScreen() {
   /* False until the cached read has resolved, so nothing that means
      "you have nothing" is drawn before we know that is true. */
   const [hydrated, setHydrated] = useState(false);
+  /*
+   * False until the first real feed fetch has answered, either way. A
+   * first run has no cache, so `hydrated` alone let "Nothing from people
+   * yet" flash at somebody whose feed was still on its way.
+   */
+  const [feedSettled, setFeedSettled] = useState(false);
+  /* The fetch failed and there was nothing to keep on screen: an error
+     with a way to try again, never the empty state's "you have nothing". */
+  const [feedFailed, setFeedFailed] = useState(false);
+  /*
+   * Which load is the newest. Focus, a pull, a post elsewhere and a sheet
+   * closing each start one, and their answers land in any order; only
+   * the newest may write, so an older response cannot paint over it.
+   */
+  const loadSeq = useRef(0);
+  const feedReady = hydrated && feedSettled && !feedFailed;
 
   /*
    * The header follows the thumb, on the UI thread.
@@ -575,14 +607,23 @@ export function HomeScreen() {
    * tab has been left does not set state on a gone screen - and so the
    * two entry points cannot drift into two slightly different loads.
    */
-  const load = useCallback(async (alive: () => boolean) => {
+  const loadOnce = useCallback(async (alive: () => boolean) => {
     if (!(await storedAccessToken())) {
       if (alive()) {
+        setGuest(true);
         setMe(null);
-        setFeed([]);
+      }
+      /* The public sample, never cached: it is nobody's feed, and the
+         cache is keyed to an account a guest does not have. */
+      try {
+        const fresh = await getFeed(await silentCoords());
+        if (alive()) setFeed(fresh.items);
+      } catch {
+        if (alive()) setFeed([]);
       }
       return;
     }
+    if (alive()) setGuest(false);
 
     /*
      * Last open's feed, painted before this one has loaded.
@@ -602,6 +643,9 @@ export function HomeScreen() {
       const fresh = await getMe();
       if (alive()) setMe(fresh);
       cachedFor = fresh.player.id;
+      /* The signed-in account's own id: the one place the cache's
+         pointer is set (cache.ts). */
+      void rememberAccount(fresh.player.id);
     } catch {
       /* Offline or mid-refresh. The cache still knows who it belongs
          to, so a feed can be painted from it even when `me` failed —
@@ -623,7 +667,10 @@ export function HomeScreen() {
        */
       const coords = await silentCoords();
       const fresh = await getFeed(coords);
-      if (alive()) setFeed(fresh.items);
+      if (alive()) {
+        setFeed(fresh.items);
+        setFeedFailed(false);
+      }
 
       /* Written after a load that worked, so the cache can only ever
          hold a feed that was real. */
@@ -640,8 +687,24 @@ export function HomeScreen() {
        * worst form — it removes content rather than adding it late.
        */
       if (alive() && feedRef.current.length === 0) setFeed([]);
+      if (alive()) setFeedFailed(feedRef.current.length === 0);
     }
   }, []);
+
+  /* Every load goes through here: newest wins, and the first answer,
+     whichever way it went, lets the empty states speak. */
+  const load = useCallback(
+    async (alive: () => boolean) => {
+      const seq = ++loadSeq.current;
+      const newest = () => alive() && seq === loadSeq.current;
+      try {
+        await loadOnce(newest);
+      } finally {
+        if (newest()) setFeedSettled(true);
+      }
+    },
+    [loadOnce],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -745,6 +808,7 @@ export function HomeScreen() {
     yours: item.yours,
     completed: item.completed ?? false,
     cards: item.cards,
+    total: item.total,
   });
 
   const enter = async (raw: string) => {
@@ -877,8 +941,10 @@ export function HomeScreen() {
 
       <CollapsingHeader
         state={header}
-        onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-        onInbox={() => navigation.navigate("Inbox")}
+        /* No + for a guest: posting needs an account, and a button that
+           only says so is a dead end at the top of the first screen. */
+        onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}
+        onInbox={guest ? toSignUp : () => navigation.navigate("Inbox")}
         unread={unread}
       />
       <Animated.ScrollView
@@ -953,7 +1019,33 @@ export function HomeScreen() {
          */}
 
         {/* The three filters, first thing under the wordmark. */}
-        <FeedFilterTabs value={tab} onChange={setTab} />
+        {guest ? null : <FeedFilterTabs value={tab} onChange={setTab} />}
+
+        {/*
+         * A guest's first screen says what this is and offers the two
+         * real ways in: an account, or the code at a store's counter
+         * (rooms work without one). The sample below is what people
+         * are posting, read-only.
+         */}
+        {guest ? (
+          <Card>
+            <Title>How cardflare works</Title>
+            <Body>
+              Post the cards you are looking for or have to trade. Players nearby see
+              them, raise a hand, and you meet up to trade in person. At a store, scan
+              the code at the counter to join tonight&rsquo;s room.
+            </Body>
+            <Button label="Create account" onPress={toSignUp} />
+            <Button
+              label="Scan a store code"
+              variant="secondary"
+              onPress={() => navigation.navigate("Scan")}
+            />
+            {shown.length > 0 ? (
+              <Muted>Recently posted on cardflare. Sign up to answer one.</Muted>
+            ) : null}
+          </Card>
+        ) : null}
 
         {/*
          * The Room tab's job, as a banner: gone from the bar, never gone
@@ -1021,7 +1113,22 @@ export function HomeScreen() {
          * everywhere needs to be updated." Nothing that means "you have
          * nothing" is drawn before we know that is true.
          */}
-        {!hydrated && shown.length === 0 && <Loading />}
+        {(!hydrated || !feedSettled) && !feedFailed && shown.length === 0 && (
+          <Loading />
+        )}
+
+        {/* The first load failed and nothing was cached to keep. */}
+        {feedFailed && shown.length === 0 && (
+          <Card>
+            <Title>Couldn&rsquo;t load the Feed</Title>
+            <Body>Check your connection and try again.</Body>
+            <Button
+              label="Try again"
+              variant="secondary"
+              onPress={() => void refresh()}
+            />
+          </Card>
+        )}
 
         {shown.map((item, index) => {
           const body =
@@ -1251,8 +1358,8 @@ export function HomeScreen() {
                 {item.onYourListCount > 0 && (
                   <Text style={{ color: colors.accent, fontWeight: "600" }}>
                     {item.onYourListCount === 1
-                      ? "One of these is on your want list"
-                      : `${item.onYourListCount} of these are on your want list`}
+                      ? "One of these is on your Flares"
+                      : `${item.onYourListCount} of these are on your Flares`}
                   </Text>
                 )}
               </Card>
@@ -1292,7 +1399,32 @@ export function HomeScreen() {
                 ))}
               </Card>
             ) : item.kind === "hunt" ? (
-              view === "compact" ? (
+              guest ? (
+                /*
+                 * The guest's read-only post. `post.yours` is set so the
+                 * card offers no "I have this" anywhere inside it (see
+                 * haveFor), and every door it does draw - heart, comments,
+                 * message, the face, Report - goes to sign-up rather than
+                 * to a call that would only answer 401. The heart's
+                 * promise rejects so it springs back unliked.
+                 */
+                <FlareFeedCard
+                  key={`hunt-${item.postId}`}
+                  item={item}
+                  post={{ ...postRef(item), yours: true }}
+                  onOpenProfile={toSignUp}
+                  onLike={async () => {
+                    toSignUp();
+                    throw new Error("guest");
+                  }}
+                  onOpenThread={toSignUp}
+                  onMessage={toSignUp}
+                  onEnterRoom={toSignUp}
+                  onReport={toSignUp}
+                  picks={NO_PICKS}
+                  onPicks={() => {}}
+                />
+              ) : view === "compact" ? (
                 /* The founder's compact view: art and a needed-count,
                    everything else a tap away. See flare-feed-card-compact. */
                 <FlareFeedCardCompact
@@ -1312,7 +1444,7 @@ export function HomeScreen() {
                       : () =>
                           setMessaging({
                             flareId: item.cards[0]?.flareId ?? "",
-                            cardName: item.cards[0]?.cardName ?? "your card",
+                            cardName: postSubject(item),
                             posterName: item.displayName,
                           })
                   }
@@ -1352,7 +1484,7 @@ export function HomeScreen() {
                       : () =>
                           setMessaging({
                             flareId: item.cards[0]?.flareId ?? "",
-                            cardName: item.cards[0]?.cardName ?? "your card",
+                            cardName: postSubject(item),
                             posterName: item.displayName,
                           })
                   }
@@ -1399,7 +1531,7 @@ export function HomeScreen() {
 
                 {item.wants > 0 ? (
                   <Body>
-                    {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your want list to ask about.`}
+                    {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your Flares to ask about.`}
                   </Body>
                 ) : null}
 
@@ -1565,7 +1697,7 @@ export function HomeScreen() {
               )
             ) : item.kind === "pack" ? (
               <Card key={`pack-${index}`}>
-                <Muted>In the Embers store</Muted>
+                <Muted>In the Embers shop</Muted>
                 <Title>{item.name}</Title>
                 <Body>{item.description}</Body>
                 <Muted>
@@ -1658,7 +1790,7 @@ export function HomeScreen() {
                 )}
 
                 <Button
-                  label={item.live ? "Go to the room" : "See the board"}
+                  label={item.live ? "Open the room" : "See the board"}
                   variant="secondary"
                   onPress={() => void enter(item.code)}
                 />
@@ -1684,14 +1816,15 @@ export function HomeScreen() {
            * timeline that is meant to read as one. The website draws
            * none there either.
            */
-          const heading = tab === "following" ? null : sectionHeading(item.section);
+          const heading =
+            guest || tab === "following" ? null : sectionHeading(item.section);
           const opensSection =
             heading !== null &&
             sectionsShown > 1 &&
             (index === 0 || shown[index - 1].section !== item.section);
 
           return (
-            <View key={`entry-${index}`} style={{ gap: spacing(2) }}>
+            <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
               {opensSection ? (
                 <Text
                   style={{
@@ -1705,14 +1838,16 @@ export function HomeScreen() {
                   {heading}
                 </Text>
               ) : null}
-              {body}
-              {/* Why this is on your screen. A feed that explains itself
-                stops feeling arbitrary even when it is thin. A post
-                carries its own label in its header instead - the
-                founder: no separate text between cards. */}
+              {/* Why this is on your screen, ABOVE the card it explains:
+                under it, the line read as the next card's caption. A
+                feed that explains itself stops feeling arbitrary even
+                when it is thin. A post carries its own label in its
+                header instead - the founder: no separate text between
+                cards. */}
               {item.reason && item.kind !== "hunt" ? (
                 <Muted>{item.reason}</Muted>
               ) : null}
+              {body}
             </View>
           );
         })}
@@ -1734,7 +1869,7 @@ export function HomeScreen() {
          * nothing, briefly, is its own kind of disorienting — which is
          * the complaint this whole change exists to answer.
          */}
-        {hydrated && shown.length === 0 && tab === "following" && (
+        {!guest && feedReady && shown.length === 0 && tab === "following" && (
           <Card>
             <Title>Nothing from people yet</Title>
             <Body>
@@ -1750,7 +1885,7 @@ export function HomeScreen() {
         )}
         {/* The restored filter needs its own words. Without them it
             fell through to Nearby's, which talks about store rooms. */}
-        {hydrated && shown.length === 0 && tab === "mine" && (
+        {!guest && feedReady && shown.length === 0 && tab === "mine" && (
           <Card>
             <Title>You have not posted yet</Title>
             <Body>
@@ -1765,7 +1900,7 @@ export function HomeScreen() {
           </Card>
         )}
 
-        {hydrated && shown.length === 0 && tab === "nearby" && (
+        {!guest && feedReady && shown.length === 0 && tab === "nearby" && (
           <Card>
             <Title>Nothing on right now</Title>
             <Body>
@@ -1774,7 +1909,7 @@ export function HomeScreen() {
               tonight&rsquo;s room.
             </Body>
             <Button
-              label="Go to Room"
+              label="Open the room"
               variant="secondary"
               onPress={() => openRoom(navigation)}
             />
@@ -1805,7 +1940,7 @@ export function HomeScreen() {
         />
         <ReportSheet target={report} onClose={() => setReport(null)} />
 
-        {hydrated && feed.length < 3 && (
+        {!guest && feedReady && feed.length < 3 && (
           <Card>
             <Title>How it works</Title>
             <Body>

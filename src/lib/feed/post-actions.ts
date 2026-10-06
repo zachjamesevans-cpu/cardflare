@@ -10,13 +10,19 @@ import { checkRateLimit } from "@/lib/rate-limit";
 import { playerForUser } from "@/lib/players/accounts";
 import {
   addComment,
+  deleteComment,
   likePost,
   listComments,
+  mayDeleteComment,
   offerFromFeed,
   offerItems,
+  postDetail,
+  postOwnerId,
   unlikePost,
+  type PostCard,
   type PostComment,
 } from "./posts";
+import type { ViewerComment } from "./post-schema";
 
 /**
  * The website's side of a social Flare post.
@@ -59,25 +65,62 @@ export async function togglePostLikeAction(
     return false;
   }
 
-  const done = liked
-    ? await likePost(postId, player.id)
-    : await unlikePost(postId, player.id);
-  if (done) revalidatePath("/feed");
-  return done;
+  /*
+   * No revalidatePath here. The heart is already flipped on screen and
+   * the count follows it; rebuilding the whole Feed for every tap of a
+   * heart was the most expensive way to say nothing new. The next load
+   * reads the real count.
+   */
+  return liked ? likePost(postId, player.id) : unlikePost(postId, player.id);
+}
+
+/**
+ * Every card on a post, for the "View all N" sheet when the Feed's rail
+ * carried only the first twenty. Null when it cannot be read; the sheet
+ * then keeps the cards it has.
+ */
+export async function loadPostCardsAction(postId: string): Promise<PostCard[] | null> {
+  const player = await viewerPlayer(await getViewer());
+  if (!player || !postId) return null;
+  const post = await postDetail(postId, player.id);
+  return post?.cards ?? null;
 }
 
 /** The thread, opened on demand rather than shipped with every post. */
-export async function loadPostThreadAction(postId: string): Promise<PostComment[]> {
+export async function loadPostThreadAction(postId: string): Promise<ViewerComment[]> {
   const player = await viewerPlayer(await getViewer());
   if (!player || !postId) return [];
-  return listComments(postId, player.id);
+  const [thread, owner] = await Promise.all([
+    listComments(postId, player.id),
+    postOwnerId(postId),
+  ]);
+  return thread.map((comment) => ({
+    ...comment,
+    mine: comment.playerId === player.id,
+    deletable: mayDeleteComment(player.id, comment.playerId, owner),
+  }));
+}
+
+/**
+ * Takes a comment down, for its author or the post's owner. The lib
+ * checks which; a refusal comes back as false.
+ */
+export async function deletePostCommentAction(
+  postId: string,
+  commentId: string,
+): Promise<boolean> {
+  const player = await viewerPlayer(await getViewer());
+  if (!player || !postId || !commentId) return false;
+  const outcome = await deleteComment(postId, commentId, player.id);
+  if (outcome.ok) revalidatePath("/feed");
+  return outcome.ok;
 }
 
 /** One line under the post. Returns the line as the thread will show it. */
 export async function addPostCommentAction(
   postId: string,
   body: string,
-): Promise<PostComment | null> {
+): Promise<ViewerComment | null> {
   const player = await viewerPlayer(await getViewer());
   if (!player || !postId) return null;
 
@@ -92,8 +135,9 @@ export async function addPostCommentAction(
   }
 
   const comment = await addComment(postId, player.id, player.displayName, body);
-  if (comment) revalidatePath("/feed");
-  return comment;
+  if (!comment) return null;
+  revalidatePath("/feed");
+  return { ...comment, mine: true, deletable: true };
 }
 
 /**

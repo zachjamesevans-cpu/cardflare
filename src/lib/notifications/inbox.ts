@@ -3,7 +3,9 @@ import "server-only";
 import { avatarWearFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
+import { blockedSet } from "@/lib/players/safety";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * The player's inbox, for the website AND the app.
@@ -51,13 +53,29 @@ export interface InboxItem {
   actor: InboxActor | null;
 }
 
+/**
+ * The PostgREST filter that leaves out notices from anyone blocked
+ * either way, or null when nobody is. A notice with no actor (a board
+ * opening) always stays: `not.in` alone would drop it, since a null
+ * is never "not in" anything.
+ */
+export function actorNotBlockedFilter(hidden: Iterable<string>): string | null {
+  const ids = [...hidden];
+  return ids.length === 0
+    ? null
+    : `actor_id.is.null,actor_id.not.in.(${ids.join(",")})`;
+}
+
 export async function listInbox(playerId: string): Promise<InboxItem[]> {
   if (!isSupabaseConfigured()) return [];
 
-  const { data, error } = await getSupabaseAdmin()
+  const notBlocked = actorNotBlockedFilter(await blockedSet(playerId));
+  let query = getSupabaseAdmin()
     .from("notifications")
     .select("id, kind, title, body, url, created_at, read_at, actor_id")
-    .eq("player_id", playerId)
+    .eq("player_id", playerId);
+  if (notBlocked) query = query.or(notBlocked);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -116,7 +134,7 @@ async function actorsFor(ids: (string | null)[]): Promise<Map<string, InboxActor
       playerId: row.id,
       displayName: row.display_name,
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
       ringArt: wear.get(row.id)?.ringArt ?? null,
@@ -131,11 +149,15 @@ async function actorsFor(ids: (string | null)[]): Promise<Map<string, InboxActor
 export async function unreadCount(playerId: string): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
-  const { count, error } = await getSupabaseAdmin()
+  /* The same notices the list shows, so the badge can clear. */
+  const notBlocked = actorNotBlockedFilter(await blockedSet(playerId));
+  let query = getSupabaseAdmin()
     .from("notifications")
     .select("id", { count: "exact", head: true })
     .eq("player_id", playerId)
     .is("read_at", null);
+  if (notBlocked) query = query.or(notBlocked);
+  const { count, error } = await query;
 
   if (error) {
     console.error("Could not count unread notifications", error);

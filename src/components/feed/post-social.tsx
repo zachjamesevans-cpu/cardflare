@@ -10,11 +10,13 @@ import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import {
   addPostCommentAction,
+  deletePostCommentAction,
   loadPostThreadAction,
   togglePostLikeAction,
 } from "@/lib/feed/post-actions";
+import { ReportSheet } from "@/components/players/report-sheet";
 import { FlareMessage, type MessageTarget } from "@/components/feed/flare-message";
-import { POST_COMMENT_MAX, type PostComment } from "@/lib/feed/post-schema";
+import { POST_COMMENT_MAX, type ViewerComment } from "@/lib/feed/post-schema";
 
 /**
  * The row under a Flare post: a heart with its count, a bubble with its
@@ -60,10 +62,29 @@ export function PostSocial({
     setLikes(initialLikes);
   }
   const [open, setOpen] = useState(false);
-  const [thread, setThread] = useState<PostComment[] | null>(null);
+  const [thread, setThread] = useState<ViewerComment[] | null>(null);
+  /* A comment's Report and Delete, the app's "⋯" menu as two quiet
+     words at the line's end. Report opens the one report sheet. */
+  const [reporting, setReporting] = useState<string | null>(null);
+  const [deleting, startDeleting] = useTransition();
+
+  const removeComment = (commentId: string) => {
+    if (deleting || !window.confirm("Delete this comment? It is gone for everyone.")) {
+      return;
+    }
+    startDeleting(async () => {
+      const done = await deletePostCommentAction(postId, commentId);
+      if (!done) return;
+      setThread((current) => (current ?? []).filter((row) => row.id !== commentId));
+      setCount((current) => Math.max(0, current - 1));
+    });
+  };
   const [loading, startLoading] = useTransition();
   const [draft, setDraft] = useState("");
   const [sending, startSending] = useTransition();
+  /* A comment that did not post, or a thread that did not load, says
+     so: a draft that silently stays put reads as a frozen button. */
+  const [error, setError] = useState<string | null>(null);
 
   const toggleLike = () => {
     const next = !liked;
@@ -82,8 +103,17 @@ export function PostSocial({
     const next = !open;
     setOpen(next);
     if (next && thread === null) {
+      setError(null);
       startLoading(async () => {
-        setThread(await loadPostThreadAction(postId));
+        try {
+          setThread(await loadPostThreadAction(postId));
+        } catch {
+          /* Stop the spinner: an empty thread with the reason under it,
+             and closing and reopening tries again. */
+          setThread(null);
+          setOpen(false);
+          setError("Couldn't load comments. Try again.");
+        }
       });
     }
   };
@@ -91,9 +121,20 @@ export function PostSocial({
   const send = () => {
     const body = draft.trim();
     if (!body || sending) return;
+    setError(null);
     startSending(async () => {
-      const comment = await addPostCommentAction(postId, body);
-      if (!comment) return;
+      let comment: ViewerComment | null = null;
+      try {
+        comment = await addPostCommentAction(postId, body);
+      } catch {
+        comment = null;
+      }
+      if (!comment) {
+        /* Refused (too many in an hour) or failed: the draft stays so
+           nothing typed is lost, and the reason is on screen. */
+        setError("Couldn't post that comment. Wait a moment and try again.");
+        return;
+      }
       setDraft("");
       setThread((current) => [...(current ?? []), comment]);
       setCount((current) => current + 1);
@@ -131,6 +172,12 @@ export function PostSocial({
         </button>
         {message && <FlareMessage target={message} count={offers} />}
       </div>
+
+      {error && !open && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       {open && (
         <div className="flex flex-col gap-3 border-t border-border pt-3">
@@ -180,10 +227,40 @@ export function PostSocial({
                       {comment.body}
                     </p>
                   </div>
+                  {(!comment.mine || comment.deletable) && (
+                    <div className="ml-auto flex shrink-0 gap-2 text-xs text-text-muted">
+                      {!comment.mine && (
+                        <button
+                          type="button"
+                          onClick={() => setReporting(comment.id)}
+                          className="cursor-pointer hover:text-text-primary"
+                        >
+                          Report
+                        </button>
+                      )}
+                      {comment.deletable && (
+                        <button
+                          type="button"
+                          onClick={() => removeComment(comment.id)}
+                          disabled={deleting}
+                          className="cursor-pointer hover:text-text-primary disabled:cursor-default disabled:opacity-60"
+                        >
+                          Delete
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+
+          <ReportSheet
+            open={reporting !== null}
+            onClose={() => setReporting(null)}
+            kind="comment"
+            targetId={reporting ?? ""}
+          />
 
           <form
             onSubmit={(event) => {
@@ -209,6 +286,11 @@ export function PostSocial({
               {sending ? "Posting…" : "Post"}
             </button>
           </form>
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>

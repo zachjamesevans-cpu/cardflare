@@ -15,6 +15,7 @@ import {
 import type { StackParams } from "../../App";
 import { ActionSheet, DotsButton, SheetBackdrop } from "../action-menu";
 import {
+  ApiError,
   blockPlayer,
   getPlayerPeople,
   openDirectThread,
@@ -30,11 +31,12 @@ import { BinderList } from "../binder-list";
 import { CosmeticCard } from "../cosmetic-card";
 import { WornBackground, WornScene } from "../cosmetic-paint";
 import { FollowButton } from "../follow-button";
+import { formatHandle } from "../handle";
 import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { ProfileFlares } from "../profile-flares";
-import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import {
   PROFILE_INSET,
   ProfileTabs,
@@ -114,6 +116,13 @@ export function PlayerProfileScreen() {
       live = false;
     };
   }, []);
+
+  /* The header names who this is once it is known: "@kaito", not
+     "Player". Until then the route's own title stands. */
+  const handle = profile?.handle;
+  useEffect(() => {
+    if (handle) navigation.setOptions({ title: formatHandle(handle) });
+  }, [handle, navigation]);
   /*
    * Message, beside Follow. The founder: "I should be able to go on
    * someone's profile and message them directly about anything." The
@@ -155,11 +164,26 @@ export function PlayerProfileScreen() {
      word from `peekPlayer` stands until then. */
   const [blockedHere, setBlockedHere] = useState<boolean | null>(null);
   const [blockError, setBlockError] = useState<string | null>(null);
+  /*
+   * A block hides the profile both ways, as the website's does. The
+   * server answers 404 for it: "blocked" when YOU blocked them (the
+   * screen offers Unblock and nothing else), and the plain not-found
+   * when they blocked you, so it reads exactly as a missing player.
+   */
+  const [hidden, setHidden] = useState<"blocked" | "gone" | null>(null);
+  const [reload, setReload] = useState(0);
   const setBlock = async (next: boolean) => {
     setBlockError(null);
     try {
       await (next ? blockPlayer(playerId) : unblockPlayer(playerId));
       setBlockedHere(next);
+      if (next) {
+        setHidden("blocked");
+      } else if (hidden) {
+        setHidden(null);
+        setProfile(null);
+        setReload((count) => count + 1);
+      }
     } catch (caught) {
       setBlockError(
         serverMessage(caught) ??
@@ -209,13 +233,42 @@ export function PlayerProfileScreen() {
         await Promise.race([warm, new Promise((done) => setTimeout(done, WARM_MS))]);
         if (live) setShelfReady(true);
       })
-      .catch(() => {
-        if (live) setFailed(true);
+      .catch((caught) => {
+        if (!live) return;
+        if (caught instanceof ApiError && caught.status === 404) {
+          setHidden(caught.code === "blocked" ? "blocked" : "gone");
+          return;
+        }
+        setFailed(true);
       });
     return () => {
       live = false;
     };
-  }, [playerId]);
+  }, [playerId, reload]);
+
+  if (hidden) {
+    return (
+      <ScrollView
+        contentContainerStyle={{
+          paddingHorizontal: gutter,
+          paddingVertical: spacing(4),
+          gap: spacing(3),
+        }}
+      >
+        <Card>
+          <Body>
+            {hidden === "blocked"
+              ? "You blocked this player."
+              : "This profile is unavailable."}
+          </Body>
+        </Card>
+        {hidden === "blocked" ? (
+          <Button label="Unblock" variant="secondary" onPress={() => void setBlock(false)} />
+        ) : null}
+        <ErrorLine message={blockError} />
+      </ScrollView>
+    );
+  }
 
   if (failed) {
     return (
@@ -318,7 +371,11 @@ export function PlayerProfileScreen() {
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", gap: spacing(2) }}>
             {profile.showcase.map((entry, index) => (
-              <Tap key={entry.id} onPress={() => setZoomed(shelf[index] ?? null)}>
+              <Tap
+                key={entry.id}
+                onPress={() => setZoomed(shelf[index] ?? null)}
+                accessibilityLabel={`View ${entry.name}`}
+              >
                 <CosmeticCard
                   imageUrl={entry.imageUrl}
                   width={SHELF_TILE}
@@ -522,7 +579,7 @@ export function PlayerProfileScreen() {
                         Blocked
                       </Text>
                     </View>
-                    <HeaderButton
+                    <ProfileActionButton
                       label="Unblock"
                       onPress={() => void setBlock(false)}
                     />
@@ -534,7 +591,7 @@ export function PlayerProfileScreen() {
                       initial={profile.follow}
                       fill
                     />
-                    <HeaderButton
+                    <ProfileActionButton
                       label="Message"
                       icon="chatbubble-outline"
                       disabled={messaging}
@@ -542,7 +599,7 @@ export function PlayerProfileScreen() {
                     />
                   </>
                 ) : guest ? (
-                  <HeaderButton
+                  <ProfileActionButton
                     label="Follow"
                     primary
                     onPress={() => navigation.navigate("CreateAccount")}

@@ -6,12 +6,12 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
-  describeError,
+  friendlyError,
   getProfile,
+  type Profile,
   renameProfile,
   setAbout,
   setHandle,
-  type Profile,
 } from "../api";
 import {
   changeAnimatedPicture,
@@ -90,7 +90,7 @@ export function EditProfileScreen() {
       setProfile(result.profile);
       setLoadFailed(null);
     } catch (caught) {
-      setLoadFailed(describeError(caught));
+      setLoadFailed(friendlyError(caught));
     }
   };
 
@@ -109,7 +109,7 @@ export function EditProfileScreen() {
         <Card>
           <Title>Your profile could not load</Title>
           <Body>Check your signal and try again.</Body>
-          <Muted>What the server said: {loadFailed}</Muted>
+          <Muted>{loadFailed}</Muted>
           <Button label="Try again" variant="secondary" onPress={() => void load()} />
         </Card>
       </ScrollView>
@@ -516,7 +516,7 @@ function EditableRow({
                   onSave(draft)
                     .then(onToggle)
                     .catch((caught: unknown) => {
-                      setError(`Could not save that (${describeError(caught)}).`);
+                      setError(`Could not save that. ${friendlyError(caught)}`);
                     })
                     .finally(() => setSaving(false));
                 }}

@@ -482,7 +482,7 @@ describe("the Flares grid", () => {
       expect(source.flares, name).toContain("Offering");
       expect(source.flares, name).not.toContain("Letting go");
       expect(source.flares, name).toContain(
-        "No Flares yet. Post one from the Flare tab.",
+        "No Flares yet. Tap + on the Feed to post one.",
       );
       expect(source.flares, name).toMatch(/"No Flares yet\."|>\s*No Flares yet\.\s*</);
       expect(source.flares, name).toContain("flares.length");

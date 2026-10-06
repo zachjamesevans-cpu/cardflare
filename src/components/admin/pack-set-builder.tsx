@@ -60,7 +60,7 @@ export function PackSetBuilder({
             New set
           </h2>
           <p className="text-sm text-text-secondary">
-            Created as a draft. Nothing shows in the Embers store until you publish it,
+            Created as a draft. Nothing shows in the Embers shop until you publish it,
             and not before its release date even then.
           </p>
         </div>

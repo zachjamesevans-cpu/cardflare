@@ -98,14 +98,14 @@ const PINNED = {
   ENTER_CODE: "Enter event code",
   GOING_EMPTY: "You're not going to anything yet. Nearby has what's coming up.",
   PAST_EMPTY: "Nothing yet. Nights you went to land here.",
-  BOARD_EARLY: "Board open early",
+  BOARD_EARLY: "You can post already",
   BOARD_EARLY_LINE: "Post now so players know what to bring.",
   BOARD_EARLY_LONG:
     "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the event ends.",
   MATCHES_FOR_YOU: "Matches for you",
   SEE_ALL_MATCHES: "See all matches",
   NO_MATCHES:
-    "No matches yet. Post a Flare or add to your Trade binder and Cardflare keeps looking.",
+    "No matches yet. Post a Flare or add to your trade binder and cardflare keeps looking.",
   MUTUAL_MATCH: "Mutual match",
   YOU_WANT: "You want",
   THEY_WANT: "They want",
@@ -114,11 +114,11 @@ const PINNED = {
   THEY_HAVE_WHAT_YOU_WANT: "They have what you want",
   THEY_WANT_WHAT_YOU_HAVE: "They want what you have",
   FROM_YOUR_FLARE: "You posted a Flare for this",
-  IN_YOUR_BINDER: "In your Trade binder",
+  IN_YOUR_BINDER: "In your trade binder",
   WHAT_TO_BRING: "What to bring",
   PACKED: "Packed",
   VIEW_LIST: "View list",
-  FLARES_AT_THIS_NIGHT: "Flares at this Night",
+  FLARES_AT_THIS_NIGHT: "Flares at this night",
   PLAYERS_GOING: "Players going",
   EVENT_DETAILS: "Event details",
   POST_A_FLARE: "Post a Flare",
@@ -159,8 +159,8 @@ const LINES: Record<string, [unknown, string][]> = {
     [3, "3 players want cards you have"],
   ],
   bringLine: [
-    [1, "Players at this Night are looking for 1 card you own."],
-    [5, "Players at this Night are looking for 5 cards you own."],
+    [1, "Players at this night are looking for 1 card you own."],
+    [5, "Players at this night are looking for 5 cards you own."],
   ],
   wantedByLine: [
     [["CHUNC"], "Wanted by CHUNC"],
@@ -309,7 +309,7 @@ describe("the Nights landing", () => {
       expect(source).toContain("PAST_EMPTY");
     }
     /* Nearby keeps its door to the Feed, where following a store happens. */
-    expect(web.nightList).toContain('href="/feed"');
+    expect(web.nightList).toContain('href="/feed?tab=nearby"');
   });
 
   it("draws a short card: the date block, the venue, the time, one line, on both", () => {

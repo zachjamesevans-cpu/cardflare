@@ -17,7 +17,11 @@ export interface ProfileStats {
   following: number;
 }
 
-export async function profileStats(playerId: string): Promise<ProfileStats> {
+export async function profileStats(
+  playerId: string,
+  /** Who is looking; the follow counts leave out anyone blocked with them. */
+  viewerId: string | null = playerId,
+): Promise<ProfileStats> {
   if (!isSupabaseConfigured()) return { flares: 0, followers: 0, following: 0 };
 
   /* Wants plus offerings: exactly what the profile's Flares grid draws,
@@ -29,7 +33,7 @@ export async function profileStats(playerId: string): Promise<ProfileStats> {
       .select("card_id, printing_id")
       .eq("player_id", playerId),
     countOfferings(playerId),
-    followCounts(playerId),
+    followCounts(playerId, viewerId),
     doneWantKeys(playerId),
   ]);
 

@@ -5,6 +5,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findParticipation, setOpenToTrades } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
+import { roomPhase } from "@/lib/events/schema";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,11 @@ export async function POST(
 
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) return unauthorized();
+
+  /* Nobody is open to trades at a night that has ended. */
+  if (roomPhase(resolved.room) === "finished") {
+    return Response.json({ error: "room-ended" }, { status: 409 });
+  }
 
   const parsed = openSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("open must be true or false");

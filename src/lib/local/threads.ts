@@ -3,11 +3,12 @@ import "server-only";
 import { listLocals } from "@/lib/players/locals";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { notifyMessageReceived } from "@/lib/notifications/notify";
-import { blockedBetween, blockedSet } from "@/lib/players/safety";
+import { blockedBetween, blockedSet, blockState } from "@/lib/players/safety";
 import { latestThreadTrade, type ThreadTrade } from "@/lib/trades/thread-trades";
 import { conversationIdFor, pairThreadId } from "./pairs";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 import { avatarSrc } from "@/lib/players/profile-image";
+import type { FlareMessageRow } from "@/lib/supabase/types";
 
 /**
  * Conversations between two accounts.
@@ -42,7 +43,21 @@ export type ThreadFailure =
   | "yourself"
   | "closed"
   | "not-yours"
-  | "empty";
+  | "empty"
+  /* The caller's `mayCreate` said no: too many NEW conversations. */
+  | "rate-limited";
+
+/**
+ * What a caller may say about opening a conversation.
+ *
+ * `mayCreate` is asked only when a new thread row is about to be made,
+ * never when an existing one is found: the "new conversations per hour"
+ * ceiling (LIMITS.threadOpen) is about starting conversations, and
+ * tapping Message on somebody you already talk to starts nothing.
+ */
+export interface OpenThreadOptions {
+  mayCreate?: () => boolean;
+}
 
 export interface ThreadSummary {
   threadId: string;
@@ -121,6 +136,7 @@ export async function openFlareThread(
   flareId: string,
   responderPlayerId: string,
   rawBody: string,
+  options: OpenThreadOptions = {},
 ): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -166,6 +182,9 @@ export async function openFlareThread(
   let threadId = existing?.id ?? null;
 
   if (!threadId) {
+    if (options.mayCreate && !options.mayCreate()) {
+      return { ok: false, reason: "rate-limited" };
+    }
     const { data: made, error } = await admin
       .from("flare_threads")
       .insert({
@@ -227,6 +246,7 @@ export async function openWantThread(
   wantId: string,
   responderPlayerId: string,
   rawBody: string,
+  options: OpenThreadOptions = {},
 ): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -257,6 +277,9 @@ export async function openWantThread(
   let threadId = existing?.id ?? null;
 
   if (!threadId) {
+    if (options.mayCreate && !options.mayCreate()) {
+      return { ok: false, reason: "rate-limited" };
+    }
     const { data: made, error } = await admin
       .from("flare_threads")
       .insert({
@@ -314,6 +337,7 @@ export async function openWantThread(
 export async function openDirectThread(
   fromPlayerId: string,
   toPlayerId: string,
+  options: OpenThreadOptions = {},
 ): Promise<{ ok: true; threadId: string } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
   if (fromPlayerId === toPlayerId) return { ok: false, reason: "yourself" };
@@ -343,6 +367,9 @@ export async function openDirectThread(
 
   const { data: existing } = await find();
   if (existing) return { ok: true, threadId: existing.id };
+  if (options.mayCreate && !options.mayCreate()) {
+    return { ok: false, reason: "rate-limited" };
+  }
 
   /* The person written to sits in the author's chair, so the role reads
      the same way it does on a Flare: the one who was approached. */
@@ -542,6 +569,18 @@ export async function closeThread(
   return { ok: true };
 }
 
+/** How many conversations the Messages list shows, and how it pages to fill them. */
+const LIST_SIZE = 50;
+const LIST_PAGE = 50;
+const LIST_MAX_PAGES = 4;
+
+interface ThreadRow {
+  id: string;
+  author_player_id: string;
+  responder_player_id: string;
+  last_message_at: string;
+}
+
 /**
  * Every conversation the player is part of, most recent talk first:
  * one row per person, the way Instagram's Messages reads. Only the
@@ -552,27 +591,68 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   if (!isSupabaseConfigured()) return [];
 
   const admin = getSupabaseAdmin();
-
-  const { data: threads, error } = await admin
-    .from("flare_threads")
-    .select("id, author_player_id, responder_player_id, last_message_at")
-    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
-    .is("flare_id", null)
-    .is("want_id", null)
-    .order("last_message_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    console.error("Could not list the threads", error);
-    return [];
-  }
-
-  /* A blocked person's conversation is not listed, either way round. */
   const blocked = await blockedSet(playerId);
-  const rows = (threads ?? []).filter(
-    (row) =>
-      !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
-  );
+
+  /*
+   * Walked a page at a time, newest talk first, until the list is full.
+   * A conversation opened from a profile and never written in still has
+   * a row (and a fresh last_message_at), so it is skipped rather than
+   * counted: an afternoon of tapping Message cannot push real
+   * conversations off the end of the list.
+   */
+  const rows: ThreadRow[] = [];
+  const latest = new Map<string, { body: string; fromYou: boolean }>();
+  for (let page = 0; page < LIST_MAX_PAGES && rows.length < LIST_SIZE; page += 1) {
+    const { data: threads, error } = await admin
+      .from("flare_threads")
+      .select("id, author_player_id, responder_player_id, last_message_at")
+      .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
+      .is("flare_id", null)
+      .is("want_id", null)
+      .order("last_message_at", { ascending: false })
+      .range(page * LIST_PAGE, page * LIST_PAGE + LIST_PAGE - 1);
+
+    if (error) {
+      console.error("Could not list the threads", error);
+      if (page === 0) return [];
+      break;
+    }
+
+    /* A blocked person's conversation is not listed, either way round. */
+    const pageRows = (threads ?? []).filter(
+      (row) =>
+        !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
+    );
+
+    /*
+     * Each conversation's own newest message, looked up by the
+     * (thread_id, created_at) index, rather than the newest few hundred
+     * across every conversation: one busy chat used to fill that window
+     * and leave quieter ones with no preview, so they vanished.
+     */
+    const newest = await Promise.all(
+      pageRows.map((row) =>
+        admin
+          .from("flare_messages")
+          .select("thread_id, sender_player_id, body")
+          .eq("thread_id", row.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ),
+    );
+    newest.forEach(({ data: message }, index) => {
+      const row = pageRows[index];
+      if (!message || rows.length >= LIST_SIZE) return;
+      latest.set(row.id, {
+        body: message.body,
+        fromYou: message.sender_player_id === playerId,
+      });
+      rows.push(row);
+    });
+
+    if ((threads ?? []).length < LIST_PAGE) break;
+  }
   if (rows.length === 0) return [];
 
   const threadIds = rows.map((row) => row.id);
@@ -586,32 +666,23 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
     ),
   ];
 
-  const [{ data: others }, { data: messages }] = await Promise.all([
+  const [{ data: others }, { data: waiting }] = await Promise.all([
     admin.from("players").select("id, display_name, avatar_url").in("id", otherIds),
-    /* Recent messages for previews and unread counts, one query. 50
-       conversations x a busy one still fits comfortably. */
+    /* Only the unread ones, so the count is right however long a chat is. */
     admin
       .from("flare_messages")
-      .select("thread_id, sender_player_id, body, created_at, read_at")
+      .select("thread_id")
       .in("thread_id", threadIds)
-      .order("created_at", { ascending: false })
-      .limit(500),
+      .neq("sender_player_id", playerId)
+      .is("read_at", null)
+      .limit(5000),
   ]);
 
   const otherById = new Map((others ?? []).map((row) => [row.id, row]));
 
-  const latest = new Map<string, { body: string; fromYou: boolean }>();
   const unread = new Map<string, number>();
-  for (const message of messages ?? []) {
-    if (!latest.has(message.thread_id)) {
-      latest.set(message.thread_id, {
-        body: message.body,
-        fromYou: message.sender_player_id === playerId,
-      });
-    }
-    if (message.sender_player_id !== playerId && message.read_at === null) {
-      unread.set(message.thread_id, (unread.get(message.thread_id) ?? 0) + 1);
-    }
+  for (const message of waiting ?? []) {
+    unread.set(message.thread_id, (unread.get(message.thread_id) ?? 0) + 1);
   }
 
   return rows.flatMap((row) => {
@@ -711,6 +782,12 @@ async function meetSuggestion(
 export interface ThreadRead {
   ok: boolean;
   closed: boolean;
+  /**
+   * Either has blocked the other: nothing can be sent, and the screen
+   * says so in place of the composer. Which side blocked is not said.
+   * The blocker keeps the history; the person blocked does not.
+   */
+  blocked: boolean;
   /** What it is about: a posted Flare, a saved want, or the two people. */
   kind: "flare" | "want" | "direct";
   /**
@@ -733,15 +810,42 @@ export interface ThreadRead {
    * sees it, or null. See `src/lib/trades/thread-trades.ts`.
    */
   trade: ThreadTrade | null;
+  /**
+   * True when there may be messages before the oldest one returned: the
+   * thread view offers "Load older", which asks again with `before` set
+   * to that oldest message's time.
+   */
+  hasOlder: boolean;
 }
+
+/** How many messages one read of a conversation returns. */
+export const THREAD_PAGE_SIZE = 200;
+
+/** The columns of a message `readThread` draws from. */
+type ThreadMessageRow = Pick<
+  FlareMessageRow,
+  | "id"
+  | "sender_player_id"
+  | "body"
+  | "created_at"
+  | "card_id"
+  | "card_ids"
+  | "printing_ids"
+>;
 
 export async function readThread(
   threadId: string,
   viewerId: string,
+  /**
+   * An ISO time: only messages sent before it, for "Load older". A
+   * plain read (the newest page) leaves it out.
+   */
+  before?: string | null,
 ): Promise<ThreadRead> {
   const empty: ThreadRead = {
     ok: false,
     closed: false,
+    blocked: false,
     kind: "direct",
     threadId: null,
     cardName: null,
@@ -752,6 +856,7 @@ export async function readThread(
     messages: [],
     meet: null,
     trade: null,
+    hasOlder: false,
   };
   if (!isSupabaseConfigured()) return empty;
 
@@ -764,20 +869,29 @@ export async function readThread(
   const admin = getSupabaseAdmin();
   const otherId = asked.authorId === viewerId ? asked.responderId : asked.authorId;
 
+  const block = await blockState(viewerId, otherId);
+  const blocked = block.blocked || block.blockedBy;
+  /* Blocked BY them: the conversation is closed to you, history and
+     all. The blocker still reads what was said. */
+  const hideHistory = block.blockedBy && !block.blocked;
+
+  let page = admin
+    .from("flare_messages")
+    .select("id, sender_player_id, body, created_at, card_id, card_ids, printing_ids")
+    .eq("thread_id", conversationId);
+  if (before) page = page.lt("created_at", before);
+
   const [{ data: messages }, { data: other }, meet, trade] = await Promise.all([
-    admin
-      .from("flare_messages")
-      .select("id, sender_player_id, body, created_at, card_id, card_ids, printing_ids")
-      .eq("thread_id", conversationId)
-      .order("created_at", { ascending: false })
-      .limit(200),
+    hideHistory
+      ? Promise.resolve({ data: [] as ThreadMessageRow[] })
+      : page.order("created_at", { ascending: false }).limit(200),
     admin
       .from("players")
       .select("display_name, avatar_url, handle")
       .eq("id", otherId)
       .maybeSingle(),
-    meetSuggestion(viewerId, otherId).catch(() => null),
-    latestThreadTrade(conversationId, viewerId).catch(() => null),
+    blocked ? null : meetSuggestion(viewerId, otherId).catch(() => null),
+    hideHistory ? null : latestThreadTrade(conversationId, viewerId).catch(() => null),
   ]);
 
   /* The newest 200, drawn oldest first. */
@@ -874,6 +988,7 @@ export async function readThread(
   return {
     ok: true,
     closed: false,
+    blocked,
     kind: "direct",
     threadId: conversationId,
     cardName: null,
@@ -900,6 +1015,7 @@ export async function readThread(
     }),
     meet,
     trade,
+    hasOlder: (messages ?? []).length >= THREAD_PAGE_SIZE,
   };
 }
 
@@ -911,12 +1027,22 @@ export async function unreadMessages(playerId: string): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
 
   const admin = getSupabaseAdmin();
-  const { data: threads } = await admin
-    .from("flare_threads")
-    .select("id")
-    .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`);
+  const [{ data: threads }, blocked] = await Promise.all([
+    admin
+      .from("flare_threads")
+      .select("id, author_player_id, responder_player_id")
+      .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`),
+    blockedSet(playerId),
+  ]);
 
-  const ids = (threads ?? []).map((row) => row.id);
+  /* Not a conversation with somebody blocked either way: Messages does
+     not list it, so its unread would be a dot nothing could clear. */
+  const ids = (threads ?? [])
+    .filter(
+      (row) =>
+        !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
+    )
+    .map((row) => row.id);
   if (ids.length === 0) return 0;
 
   const { count } = await admin

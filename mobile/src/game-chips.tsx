@@ -62,7 +62,7 @@ export function GameSearchField({
         {locked ? (
           <View style={pill}>
             <Ionicons name="lock-closed" size={12} color={colors.accent} />
-            <Text style={pillLabel}>{label}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={pillLabel}>{label}</Text>
           </View>
         ) : (
           <Tap
@@ -70,7 +70,7 @@ export function GameSearchField({
             accessibilityLabel={`Searching ${label}. Change game`}
             style={pill}
           >
-            <Text style={pillLabel}>{label}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={pillLabel}>{label}</Text>
             <Ionicons
               name={open ? "chevron-up" : "chevron-down"}
               size={13}
@@ -153,7 +153,7 @@ function Row({
         borderRadius: 8,
         paddingHorizontal: spacing(3),
         paddingVertical: spacing(2.5),
-        backgroundColor: on ? "rgba(198,238,79,0.15)" : "transparent",
+        backgroundColor: on ? colors.accentTint : "transparent",
       }}
     >
       <Text
@@ -167,7 +167,11 @@ function Row({
         {label}
       </Text>
       {on && <Ionicons name="checkmark" size={15} color={colors.accent} />}
-      {yours && <Text style={{ color: colors.textMuted, fontSize: 11 }}>yours</Text>}
+      {yours && (
+        <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11 }}>
+          yours
+        </Text>
+      )}
     </Tap>
   );
 }
@@ -192,7 +196,7 @@ const pill = {
   borderRadius: 8,
   borderWidth: 1,
   borderColor: colors.accent,
-  backgroundColor: "rgba(198,238,79,0.15)",
+  backgroundColor: colors.accentTint,
   paddingHorizontal: spacing(2.5),
   paddingVertical: spacing(1.5),
 };

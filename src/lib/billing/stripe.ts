@@ -132,6 +132,47 @@ async function stripeGet<T>(path: string): Promise<StripeResult<T>> {
   }
 }
 
+/**
+ * Cancels a subscription outright, now, not at period end.
+ *
+ * Used when the account it belongs to is deleted: a person who removed
+ * their account must not keep being charged for a profile that no
+ * longer exists, and there is nobody left to sign in and cancel it.
+ */
+export async function cancelStripeSubscription(
+  subscriptionId: string,
+): Promise<StripeResult<{ id: string; status?: string }>> {
+  if (!/^sub_[A-Za-z0-9_]+$/.test(subscriptionId)) {
+    return { ok: false, reason: "stripe-error" };
+  }
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return { ok: false, reason: "not-configured" };
+
+  try {
+    const response = await fetch(
+      `${STRIPE_API}/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      {
+        method: "DELETE",
+        headers: { authorization: `Bearer ${key}` },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    const data = (await response.json()) as {
+      id: string;
+      status?: string;
+      error?: { message?: string };
+    };
+    if (!response.ok) {
+      console.error("Stripe refused the cancel", data.error?.message ?? response.status);
+      return { ok: false, reason: "stripe-error" };
+    }
+    return { ok: true, data };
+  } catch (caught) {
+    console.error("Could not reach Stripe", caught);
+    return { ok: false, reason: "stripe-error" };
+  }
+}
+
 /** The subscription as Stripe returns it inside an expanded session. */
 export interface StripeSubscriptionObject {
   id: string;

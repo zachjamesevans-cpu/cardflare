@@ -67,7 +67,7 @@ export function FlareMessageSheet({
           onPress={onClose}
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.75)",
+            backgroundColor: colors.scrim,
             alignItems: "center",
             justifyContent: "center",
             padding: spacing(4),

@@ -35,7 +35,7 @@ export function DotsButton({
 }) {
   if (!onPress) return null;
   return (
-    <Tap onPress={onPress} hitSlop={8} accessibilityLabel={label}>
+    <Tap onPress={onPress} hitSlop={12} accessibilityLabel={label}>
       <Ionicons name="ellipsis-horizontal" size={20} color={colors.textMuted} />
     </Tap>
   );

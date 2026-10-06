@@ -287,6 +287,9 @@ export async function setOpenToTradesAction(formData: FormData): Promise<void> {
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) redirect(`/e/${code}`);
 
+  /* Nobody is open to trades at a night that has ended. */
+  if (roomPhase(resolved.room) === "finished") redirect(`/e/${code}`);
+
   try {
     await setOpenToTrades(resolved.room.id, session.id, open);
   } catch (error) {

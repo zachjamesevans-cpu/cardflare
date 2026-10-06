@@ -69,8 +69,10 @@ describe("the block is total", () => {
     expect(posts).toContain("!blocked.has(row.player_id)");
   });
 
-  it("never touches follows", () => {
-    expect(lib).not.toContain("player_follows");
+  it("cuts the follows both ways (App Store guideline 1.2)", () => {
+    expect(lib).toContain('.from("player_follows")');
+    expect(lib).toContain("follower_id.eq.${blockerId},followed_id.eq.${blockedId}");
+    expect(lib).toContain("follower_id.eq.${blockedId},followed_id.eq.${blockerId}");
   });
 });
 

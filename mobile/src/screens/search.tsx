@@ -13,6 +13,7 @@ import {
   type FoundPlayer,
   type FoundStore,
 } from "../api";
+import { displayCardName } from "../card-name";
 import { gameShortName } from "../games";
 import { useTabBarInset } from "../glass";
 import { formatHandle } from "../handle";
@@ -81,9 +82,11 @@ interface Results {
   stores: FoundStore[];
   /** Searches still out. "Nothing for that yet." waits for zero. */
   pending: number;
+  /** Which search these answers belong to. */
+  request: number;
 }
 
-const NOTHING_YET: Omit<Results, "text"> = {
+const NOTHING_YET: Omit<Results, "text" | "request"> = {
   cards: [],
   players: [],
   stores: [],
@@ -151,7 +154,9 @@ export function SearchScreen() {
       /* Each section lands as its answer does, ranked as it lands; a
          failed one is an empty one. The "nothing" line waits until all
          three are in, so a fast empty answer never says nothing while
-         a slow full one is still coming. */
+         a slow full one is still coming. Until a section's new answer
+         lands, the last search's rows stay up: typing one more letter
+         never blanks the list and redraws it. */
       const settle = <K extends "cards" | "players" | "stores">(
         key: K,
         rows: Promise<Results[K]>,
@@ -161,12 +166,25 @@ export function SearchScreen() {
           .then((value) => {
             if (latest.current !== request) return;
             setFound((current) => {
-              const base = current ?? { ...NOTHING_YET, text: trimmed };
+              const base =
+                current?.request === request
+                  ? current
+                  : {
+                      ...NOTHING_YET,
+                      ...(current
+                        ? {
+                            cards: current.cards,
+                            players: current.players,
+                            stores: current.stores,
+                          }
+                        : {}),
+                      text: trimmed,
+                      request,
+                    };
               return { ...base, [key]: value, pending: base.pending - 1 };
             });
           });
       };
-      setFound(null);
       settle(
         "cards",
         onlyPlayers
@@ -222,6 +240,8 @@ export function SearchScreen() {
   const nothing =
     found !== null &&
     found.pending === 0 &&
+    /* The last search said nothing, but a newer one is still out. */
+    found.text === readQuery(query).text &&
     sections.every(({ kind }) => found[kind].length === 0);
 
   const typing = query.trim() !== "";
@@ -272,7 +292,7 @@ export function SearchScreen() {
                     numberOfLines={1}
                     style={{ color: colors.textPrimary, fontWeight: "600" }}
                   >
-                    {card.name}
+                    {displayCardName(card.name, card.cardNumber)}
                   </Text>
                   <Text
                     numberOfLines={1}

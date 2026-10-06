@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -17,7 +16,7 @@ import {
   ApiError,
   BINDER_NAME_MAX,
   createBinder,
-  describeError,
+  friendlyError,
   serverMessage,
 } from "./api";
 import { BinderCover } from "./binder-cover";
@@ -27,7 +26,7 @@ import {
   type BinderCoverId,
 } from "./binder-covers";
 import { colors, radius, spacing } from "./theme";
-import { AsyncButton, ErrorLine, Input, Tap } from "./ui";
+import { AsyncButton, ErrorLine, Input, SheetClose, Tap } from "./ui";
 
 /** Under the Up for trade switch, here and in the binder's settings. */
 export const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";
@@ -76,7 +75,7 @@ export function CreateBinderSheet({
         caught instanceof ApiError && caught.code === "at-cap"
           ? "You have twenty binders already. Delete one to start another."
           : (serverMessage(caught) ??
-              `Could not start the binder (${describeError(caught)}).`),
+              `Could not start the binder. ${friendlyError(caught)}`),
       );
     }
   };
@@ -122,9 +121,7 @@ export function CreateBinderSheet({
               >
                 New binder
               </Text>
-              <Tap onPress={onClose} accessibilityLabel="Close">
-                <Ionicons name="close" size={22} color={colors.textMuted} />
-              </Tap>
+              <SheetClose onPress={onClose} />
             </View>
 
             <Input

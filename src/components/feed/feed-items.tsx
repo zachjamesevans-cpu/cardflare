@@ -241,8 +241,8 @@ export function Item({
         {item.onYourListCount > 0 && (
           <p className="text-sm font-medium text-accent">
             {item.onYourListCount === 1
-              ? "One of these is on your want list"
-              : `${item.onYourListCount} of these are on your want list`}
+              ? "One of these is on your Flares"
+              : `${item.onYourListCount} of these are on your Flares`}
           </p>
         )}
       </Card>
@@ -432,7 +432,7 @@ export function Item({
           <p className="text-sm text-text-secondary">
             {/* What there is to do when you get there. A want list is the
                 reason to walk in, and the number is the size of it. */}
-            {item.wants} {item.wants === 1 ? "card" : "cards"} on your want list to ask
+            {item.wants} {item.wants === 1 ? "card" : "cards"} on your Flares to ask
             about
           </p>
         )}
@@ -580,7 +580,7 @@ export function Item({
     return (
       <Card className="flex flex-col gap-3 p-4">
         <div className="flex flex-col gap-0.5">
-          <p className="text-sm font-medium text-accent">In the Embers store</p>
+          <p className="text-sm font-medium text-accent">In the Embers shop</p>
           <p className="text-lg font-semibold text-text-primary">{item.name}</p>
           <p className="text-sm text-text-secondary">{item.description}</p>
         </div>
@@ -688,7 +688,7 @@ export function Item({
       )}
 
       <Link href={`/e/${item.code}`} className={buttonStyles("secondary", "sm")}>
-        {item.live ? "Go to the room" : "See the board"}
+        {item.live ? "Open the room" : "See the board"}
       </Link>
     </Card>
   );

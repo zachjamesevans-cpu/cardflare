@@ -49,7 +49,7 @@ export function AccountPitch({
           size="sm"
           data-analytics-event="room_signup_cta_clicked"
         >
-          Create free account
+          Create account
         </ButtonLink>
         <ButtonLink href={`/login?next=${back}`} size="sm" variant="ghost">
           Sign in

@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Image, KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 
-import { type DeckPreviewEntry, describeError, previewDeckList, saveDeckList } from "../api";
+import { type DeckPreviewEntry, friendlyError, previewDeckList, saveDeckList } from "../api";
+import { postSummary } from "../post-summary";
 import { parseDeckList } from "../deck-list";
 import { QuantityBadge } from "../quantity-badge";
 import { colors, gutter, spacing } from "../theme";
@@ -193,13 +194,21 @@ function DeckListField() {
               result.unknown.length > 0
                 ? ` Not in the catalogue: ${result.unknown.slice(0, 6).join(", ")}.`
                 : "";
+            /* "Posted 18 of 20 · 2 were already up" when some did not
+               go up; the website's paste says the same words. */
+            const partial = postSummary({
+              total: result.total ?? result.saved,
+              posted: result.saved,
+              alreadyUp: result.alreadyUp,
+              failed: result.failed,
+            });
             setSaid(
               result.saved > 0
-                ? `Posted ${result.saved} ${result.saved === 1 ? "card" : "cards"} as one Flare.${unknown}`
+                ? `${partial ? `${partial}.` : `Posted ${result.saved} ${result.saved === 1 ? "card" : "cards"} as one Flare.`}${unknown}`
                 : `Nothing to post.${unknown}`,
             );
           } catch (caught) {
-            setSaid(`That did not post (${describeError(caught)}). Try again.`);
+            setSaid(`That did not post. ${friendlyError(caught)}`);
           }
         }}
       />

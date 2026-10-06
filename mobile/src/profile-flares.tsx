@@ -70,7 +70,7 @@ export function ProfileFlares({
       {flares.length === 0 ? (
         yours ? (
           <View style={{ gap: spacing(1), paddingHorizontal: PROFILE_INSET }}>
-            <Muted>No Flares yet. Post one from the Flare tab.</Muted>
+            <Muted>No Flares yet. Tap + on the Feed to post one.</Muted>
             {onPost ? (
               <Tap onPress={onPost} accessibilityLabel="Post a Flare">
                 <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
@@ -115,15 +115,16 @@ export function ProfileFlares({
                     left: 4,
                     bottom: 4,
                     borderRadius: 4,
-                    backgroundColor: "rgba(0,0,0,0.8)",
+                    backgroundColor: colors.scrim,
                     paddingHorizontal: 4,
                     paddingVertical: 1,
                   }}
                 >
                   <Text
+                    maxFontSizeMultiplier={1.3}
                     style={{
                       color: colors.textSecondary,
-                      fontSize: 9,
+                      fontSize: 11,
                       fontWeight: "700",
                     }}
                   >

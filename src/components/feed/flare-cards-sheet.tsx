@@ -15,7 +15,7 @@ import { Stepper } from "@/components/ui/stepper";
 import { cn } from "@/lib/cn";
 import { cardCountLabel } from "@/lib/feed/card-copy";
 import { reviewLabel, selectionSummary } from "@/lib/feed/offer-copy";
-import { offerItemsAction } from "@/lib/feed/post-actions";
+import { loadPostCardsAction, offerItemsAction } from "@/lib/feed/post-actions";
 import type { FeedCard } from "@/lib/feed/repository";
 
 /**
@@ -54,7 +54,7 @@ export function FlareCardsSheet({
   open,
   onClose,
   postId,
-  cards,
+  cards: railCards,
   total,
   direction,
   yours,
@@ -70,6 +70,28 @@ export function FlareCardsSheet({
   completed: boolean;
 }) {
   const [review, setReview] = useState(false);
+
+  /*
+   * EVERY CARD, NOT THE RAIL'S. The Feed ships a post's first twenty
+   * cards; a thirty-card deck said "30 cards wanted" over a list of
+   * twenty. When the post has more than it carried, the whole post is
+   * read once on opening and the list is the post's own.
+   */
+  const [fullCards, setFullCards] = useState<FeedCard[] | null>(null);
+  const partial = total > railCards.length;
+  useEffect(() => {
+    if (!open || !partial || fullCards) return;
+    let live = true;
+    loadPostCardsAction(postId)
+      .then((read) => {
+        if (live && read) setFullCards(read);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [open, partial, fullCards, postId]);
+  const cards = fullCards ?? railCards;
 
   /*
    * OFFERED AT ONCE. An offer sent from the zoom, or from this very

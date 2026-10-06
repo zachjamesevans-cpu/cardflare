@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { CosmeticKind, CosmeticRow } from "@/lib/supabase/types";
+import { tierAllows } from "@/lib/tiers";
 import { purchaseRef } from "./ember-rules";
 import { spendEmbers } from "./embers";
 
@@ -170,6 +171,33 @@ export function ownsCosmetic(
 }
 
 /**
+ * Whether wearing this item needs Pro.
+ *
+ * WEARING is a Pro capability - the founder's pricing pivot: the free
+ * tier customizes nothing but the profile picture (see setEquip in
+ * equips.ts, which gates the newer catalogue the same way). The one
+ * exception in these older slots is the live, zero-cost item of each
+ * kind: it is what an empty slot already shows everybody, so letting a
+ * free player pick it is not customization, it is the default.
+ */
+export function wearingNeedsPro(
+  item: Pick<CosmeticRow, "cost_embers" | "status">,
+): boolean {
+  return !(item.cost_embers === 0 && item.status === "live");
+}
+
+/** The tier gate itself, read fresh: a lapsed Pro is free from the
+    moment the tier drops. */
+export async function tierMayWear(playerId: string): Promise<boolean> {
+  const { data: wearer } = await getSupabaseAdmin()
+    .from("players")
+    .select("tier")
+    .eq("id", playerId)
+    .maybeSingle();
+  return tierAllows(wearer?.tier ?? null, "cosmetics");
+}
+
+/**
  * The shop and the wardrobe are the same screen, so this is one call.
  *
  * Everything is returned, owned or not: a locked item that shows what it
@@ -239,7 +267,13 @@ export type BuyOutcome =
   | { ok: true; slug: string }
   | {
       ok: false;
-      reason: "unknown" | "owned" | "locked" | "too-expensive" | "unavailable";
+      reason:
+        | "unknown"
+        | "owned"
+        | "locked"
+        | "too-expensive"
+        | "not-pro"
+        | "unavailable";
     };
 
 /**
@@ -297,6 +331,13 @@ export async function buyCosmetic(
         : null);
   if (!target || kindForSlot(target) !== item.kind) {
     return { ok: false, reason: "unknown" };
+  }
+
+  /* Buying always ends in wearing (see above), and wearing is Pro. Asked
+     BEFORE the Embers move: charging a free player and then refusing to
+     dress them would leave them paid-for and undressed. */
+  if (wearingNeedsPro(item) && !(await tierMayWear(playerId))) {
+    return { ok: false, reason: "not-pro" };
   }
 
   const owned = await ownedCosmetics(playerId);
@@ -403,6 +444,9 @@ export async function equipCosmetic(
 
     if (!item || item.kind !== kindForSlot(slot)) return false;
     if (!ownsCosmetic(item, await ownedCosmetics(playerId))) return false;
+    /* Owning is not enough to wear: see wearingNeedsPro. Clearing (a
+       null slug) stays free, so a lapsed player can always undress. */
+    if (wearingNeedsPro(item) && !(await tierMayWear(playerId))) return false;
   }
 
   const { error } = await admin

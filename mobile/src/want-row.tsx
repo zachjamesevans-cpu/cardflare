@@ -170,7 +170,8 @@ export function WantRow({
             <Tap
               onPress={() => void run(want.quantity <= 1 ? onDrop : () => onNudge(-1))}
               disabled={busy}
-              hitSlop={6}
+              hitSlop={8}
+              accessibilityLabel="Remove one"
               style={styles.stepButton}
             >
               <MaterialCommunityIcons
@@ -183,7 +184,8 @@ export function WantRow({
             <Tap
               onPress={() => void run(() => onNudge(1))}
               disabled={busy || want.quantity >= 99}
-              hitSlop={6}
+              hitSlop={8}
+              accessibilityLabel="Add one"
               style={[styles.stepButton, want.quantity >= 99 && { opacity: 0.4 }]}
             >
               <MaterialCommunityIcons

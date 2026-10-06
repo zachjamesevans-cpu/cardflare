@@ -1,23 +1,23 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState, type ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
   ApiError,
-  describeError,
+  friendlyError,
   getCardPage,
   openDirectThread,
   serverMessage,
   type CardPage,
   type CardPagePlayer,
 } from "../api";
+import { displayCardName } from "../card-name";
 import { gameShortName } from "../games";
 import { PlayerAvatar } from "../player-avatar";
-import { RemoteImage } from "../remote-image";
 import { colors, gutter, radius, spacing } from "../theme";
-import { Button, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Button, CardImage, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
 
 /**
  * One card, whole: the website's /cards/[cardId], reached from a
@@ -37,6 +37,7 @@ export function aboutMiles(miles: number): string {
 
 export function CardScreen({ cardId }: { cardId: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
@@ -48,7 +49,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
       setError(null);
     } catch (caught) {
       if (caught instanceof ApiError && caught.status === 404) setMissing(true);
-      else setError(describeError(caught));
+      else setError(friendlyError(caught));
     }
   }, [cardId]);
 
@@ -71,7 +72,14 @@ export function CardScreen({ cardId }: { cardId: string }) {
         {missing ? (
           <Muted>No such card.</Muted>
         ) : error ? (
-          <Muted>{`This card could not be opened (${error}).`}</Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>{`This card could not be opened. ${error}`}</Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}
@@ -80,6 +88,10 @@ export function CardScreen({ cardId }: { cardId: string }) {
   }
 
   const { card, you, located, holders, hunters, stores } = page;
+  /* The provider's name, without a bracketed number printed below it. */
+  const name = displayCardName(card.name, card.number);
+  /* Large, but never wider than a card reads comfortably. */
+  const artWidth = Math.min(240, screenWidth - gutter * 2);
 
   return (
     <ScrollView
@@ -90,30 +102,20 @@ export function CardScreen({ cardId }: { cardId: string }) {
         gap: spacing(4),
       }}
     >
-      {/* The card: art large-ish on the left, the round 16b shape, the
-          name, the number and the game beside it. */}
-      <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing(3) }}>
-        <View
-          style={{
-            width: 88,
-            height: 123,
-            flexShrink: 0,
-            borderRadius: 8,
-            borderWidth: 1,
-            borderColor: colors.border,
-            overflow: "hidden",
-            backgroundColor: colors.surface,
-          }}
-        >
-          <RemoteImage uri={card.imageUrl} style={{ width: "100%", height: "100%" }} />
-        </View>
-        <View
-          style={{ flex: 1, minWidth: 0, gap: spacing(1), justifyContent: "center" }}
-        >
-          <Title>{card.name}</Title>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>{card.number}</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-            {gameShortName(card.game)}
+      {/* The card: the art large and centred, tap to read it at full
+          size like every other card in the app, then the name, the
+          number and the game under it. */}
+      <View style={{ alignItems: "center", gap: spacing(3) }}>
+        <CardImage
+          imageUrl={card.imageUrl}
+          width={artWidth}
+          name={name}
+          cardNumber={card.number}
+        />
+        <View style={{ alignItems: "center", gap: spacing(1) }}>
+          <Title>{name}</Title>
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {`${card.number} · ${gameShortName(card.game)}`}
           </Text>
         </View>
       </View>
@@ -122,7 +124,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
           this when signed out; the server sends `you` as null. */}
       {you ? (
         <View style={{ gap: spacing(2) }}>
-          {you.inTradeBinder ? <Fact>In your Trade binder</Fact> : null}
+          {you.inTradeBinder ? <Fact>In your trade binder</Fact> : null}
           {you.onHunt ? (
             <Tap
               onPress={() =>
@@ -141,7 +143,6 @@ export function CardScreen({ cardId }: { cardId: string }) {
           {you.wanted ? <Fact>You want this</Fact> : null}
           <Button
             label="Post a Flare for it"
-            variant="secondary"
             /* The card goes with it, as the draft's first line: the
                founder, "Should autofill as the first flare." */
             onPress={() =>

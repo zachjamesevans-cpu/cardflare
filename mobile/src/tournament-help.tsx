@@ -21,7 +21,7 @@ export function TournamentHelpModal({
 }) {
   return (
     <Modal visible={open} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }}>
+      <View style={{ flex: 1, backgroundColor: colors.scrim }}>
         <Pressable style={{ height: spacing(12) }} onPress={onClose} />
         <View
           style={{

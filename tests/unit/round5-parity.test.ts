@@ -179,7 +179,9 @@ describe("dates render once, in the reader's clock", () => {
 describe("the small bugs", () => {
   it("says now, not 1m ago, under a minute on both", () => {
     expect(web.feedCard).toContain('if (seconds < 60) return "now";');
-    expect(app.feedCard).toContain('"now"');
+    /* The app's one copy lives in src/ago.ts; the post re-exports it. */
+    expect(app.feedCard).toContain("export { agoFrom }");
+    expect(read("mobile/src/ago.ts")).toContain('if (seconds < 60) return "now";');
   });
 
   it("pluralises followers by count on both profile headers", () => {
@@ -225,7 +227,9 @@ describe("copy the audit sent back", () => {
       expect(source).not.toContain("Trade partners.");
       expect(source).not.toContain("nothing to pledge");
     }
-    expect(web.notify.match(/Follow back to become trade partners\./g)).toHaveLength(2);
+    expect(web.notify.match(/Follow back and you're trade partners\./g)).toHaveLength(
+      2,
+    );
     expect(web.profile).toContain("nothing to offer on here");
   });
 

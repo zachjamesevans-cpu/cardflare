@@ -47,7 +47,9 @@ describe("found cards come off a profile", () => {
       hunts.indexOf("export async function setRequestFound"),
       hunts.indexOf("export async function removeHuntRequest"),
     );
-    expect(set).toContain('.eq("hunt_request_id", requestId)');
-    expect(set).toContain("found_quantity: Math.min(flare.quantity, next)");
+    expect(set).toContain("await syncRequestFlares(requestId, next, now)");
+    const sync = hunts.slice(hunts.indexOf("async function syncRequestFlares"));
+    expect(sync).toContain('.eq("hunt_request_id", requestId)');
+    expect(sync).toContain("splitFound(found, rows)");
   });
 });

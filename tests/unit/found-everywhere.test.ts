@@ -40,10 +40,10 @@ describe("found, everywhere", () => {
 
     /* The copies wanted, changed on the Flare screen, both platforms' doors. */
     expect(read("src/lib/players/account-actions.ts")).toContain(
-      'await syncCardQuantity(playerId, want.cardId, quantity, "want")',
+      'await syncCardQuantity(playerId, result.cardId, result.quantity, "want")',
     );
     expect(read("src/app/api/v1/wants/[id]/route.ts")).toContain(
-      'await syncCardQuantity(player.playerId, want.cardId, quantity, "want")',
+      'await syncCardQuantity(player.playerId, result.cardId, result.quantity, "want")',
     );
   });
 

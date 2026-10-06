@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,7 +18,7 @@ import { gameShortName, type GameSlug } from "./games";
 import { QuantityBadge } from "./quantity-badge";
 import { SwipeToClose } from "./sheet-swipe";
 import { colors, gutter, radius, spacing } from "./theme";
-import { Button, CardImage, Loading, Muted, Tap, Title } from "./ui";
+import { Button, CardImage, Loading, Muted, SheetClose, Tap, Title } from "./ui";
 
 /**
  * The Flare picker, on its own: search, results, tap to add, tap again
@@ -118,6 +118,16 @@ export function useCardSearch(target: PostTarget) {
     setHits([]);
   };
 
+  /*
+   * Read through a ref inside the search, not as a dependency of it. The
+   * search itself remembers the game it ran in, and with `remembered` in
+   * the dependency list that write re-ran the effect: the first answer
+   * was thrown away as stale and the same query went out a second time,
+   * 300ms later, on every first search in a game.
+   */
+  const rememberedRef = useRef(remembered);
+  rememberedRef.current = remembered;
+
   useEffect(() => {
     if (query.trim().length < 2) {
       setHits([]);
@@ -127,7 +137,7 @@ export function useCardSearch(target: PostTarget) {
     setSearching(true);
     let stale = false;
     const timer = setTimeout(() => {
-      if (scopedGame && !scope.locked && remembered !== scopedGame) {
+      if (scopedGame && !scope.locked && rememberedRef.current !== scopedGame) {
         setRemembered(scopedGame);
         void rememberSearchGame(scopedGame);
       }
@@ -146,7 +156,7 @@ export function useCardSearch(target: PostTarget) {
       stale = true;
       clearTimeout(timer);
     };
-  }, [query, scopedGame, scope.locked, remembered]);
+  }, [query, scopedGame, scope.locked]);
 
   return { query, setQuery, hits, searching, scope, scopedGame, playerGames, pickGame };
 }
@@ -176,7 +186,7 @@ export function PickCount({
     <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
       <Tap
         onPress={onLess}
-        hitSlop={6}
+        hitSlop={10}
         accessibilityLabel={`One fewer ${name}`}
         style={{
           width: 24,
@@ -308,9 +318,7 @@ export function CardSelectSheet({
           }}
         >
           <Title>{title}</Title>
-          <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close">
-            <Ionicons name="close" size={24} color={colors.textSecondary} />
-          </Pressable>
+          <SheetClose onPress={onClose} />
         </View>
         {above}
         {body ?? (
@@ -558,7 +566,7 @@ export function CardSelectSheet({
                 {items
                   .map(
                     (item) =>
-                      `${item.name}${item.quantity > 1 ? ` x${item.quantity}` : ""}`,
+                      `${item.name}${item.quantity > 1 ? ` ×${item.quantity}` : ""}`,
                   )
                   .join(", ")}
               </Muted>

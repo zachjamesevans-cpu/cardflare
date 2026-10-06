@@ -84,7 +84,7 @@ export default async function WelcomePage() {
         suggestion={account.displayName}
         withPassword
         signedInAs={email}
-        submitLabel="Create my account"
+        submitLabel="Create account"
       />
     ),
   });
@@ -113,7 +113,7 @@ function passwordOnly({ email, player = false }: { email: string; player?: boole
         signedInAs={email}
         passwordLabel="Password"
         confirmLabel="Confirm password"
-        submitLabel="Create my account"
+        submitLabel="Create account"
         savedTitle="You're all set"
         savedBody={
           player

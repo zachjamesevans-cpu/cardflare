@@ -1,6 +1,7 @@
 import "server-only";
 
 import { unreadCount } from "@/lib/notifications/inbox";
+import { postHref, truncatePreview } from "@/lib/notifications/preview";
 import { groupForKind } from "@/lib/notifications/push-prefs";
 import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
 import type { NotificationRow } from "@/lib/supabase/types";
@@ -9,6 +10,7 @@ import { sendEmail } from "@/lib/email/client";
 import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarSrc } from "@/lib/players/profile-image";
+import { blockedBetween } from "@/lib/players/safety";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { siteUrl } from "@/lib/site";
 import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
@@ -698,7 +700,7 @@ export const TEST_NOTICES = {
   },
   "new-follower": {
     title: "Kaito followed you",
-    body: "Follow back to become trade partners.",
+    body: "Follow back and you're trade partners.",
   },
   "room-flare": {
     title: "Kaito is looking for Umbreon VMAX",
@@ -792,6 +794,8 @@ export async function notifyNewFollower(
   followedId: string,
 ): Promise<void> {
   if (!isSupabaseConfigured() || followerId === followedId) return;
+  /* Never across a block, whichever side made it. */
+  if (await blockedBetween(followerId, followedId)) return;
 
   try {
     const { data: follower } = await getSupabaseAdmin()
@@ -815,7 +819,7 @@ export async function notifyNewFollower(
     const body =
       (alreadyFollowing ?? 0) > 0
         ? "You follow each other now, so you're trade partners."
-        : "Follow back to become trade partners.";
+        : "Follow back and you're trade partners.";
     const path = `/p/${followerId}`;
 
     const id = await record({
@@ -1065,7 +1069,7 @@ export async function notifyMessageReceived(
     const title = card?.exact_name
       ? `${name} messaged about ${card.exact_name}`
       : `${name} sent a message`;
-    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
+    const preview = truncatePreview(body);
     /* The thread itself, not the list: a tap lands in the conversation. */
     const path = `/local?thread=${encodeURIComponent(threadId)}`;
 
@@ -1109,11 +1113,15 @@ export async function notifyPostComment(
   body: string,
 ): Promise<void> {
   if (!isSupabaseConfigured() || authorId === commenterId) return;
+  /* Never across a block: the comment was refused anyway, and a notice
+     from somebody you blocked is exactly what a block is for. */
+  if (await blockedBetween(authorId, commenterId)) return;
 
   try {
     const title = `${commenterName} commented on your Flare`;
-    const preview = body.length > 120 ? `${body.slice(0, 119)}…` : body;
-    const path = "/feed";
+    const preview = truncatePreview(body);
+    /* The post itself, not the Feed: a tap lands on what was said. */
+    const path = postHref(postId);
 
     const id = await record({
       playerId: authorId,
@@ -1512,7 +1520,7 @@ export async function notifyStorePost(
     if (followers.size === 0) return;
 
     const title = `${store.name} posted an update`;
-    const body = postTitle.length > 120 ? `${postTitle.slice(0, 119)}…` : postTitle;
+    const body = truncatePreview(postTitle);
     const path = `/s/${storeId}`;
 
     const everyone = [...followers];

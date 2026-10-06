@@ -337,16 +337,32 @@ export async function syncStoreTierFromSubscription(storeId: string): Promise<vo
   if (error) console.error("Could not sync the store's tier", error);
 }
 
-/** Marks a Stripe subscription ended; the entitlement tail still honours
-    whatever period was already paid. */
+/**
+ * Marks a Stripe subscription ended, as of now.
+ *
+ * `customer.subscription.deleted` is not "will cancel" (that is an
+ * update with cancel_at_period_end) - it is Stripe saying the
+ * subscription IS over: the paid period ran out, or it was cancelled
+ * immediately (a refund, a dispute, a dashboard cancel). Keeping the
+ * old period end here let the entitlement tail honour a period Stripe
+ * had just ended, so the period end is pulled back to the moment of
+ * deletion and the tier sync that follows lowers the owner straight
+ * away.
+ */
 export async function markStripeSubscriptionCanceled(
   stripeSubscriptionId: string,
 ): Promise<"written" | "unavailable"> {
   if (!isSupabaseConfigured()) return "unavailable";
 
+  const now = new Date().toISOString();
   const { error } = await getSupabaseAdmin()
     .from("subscriptions")
-    .update({ status: "canceled", updated_at: new Date().toISOString() })
+    .update({
+      status: "canceled",
+      current_period_end: now,
+      cancel_at_period_end: false,
+      updated_at: now,
+    })
     .eq("stripe_subscription_id", stripeSubscriptionId);
 
   if (error) {

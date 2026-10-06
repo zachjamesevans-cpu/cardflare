@@ -75,7 +75,7 @@ describe("reading the conversation", () => {
   });
 
   it("draws the newest messages oldest first, each with its card", () => {
-    expect(readFn).toContain('.order("created_at", { ascending: false }) .limit(200)');
+    expect(readFn).toContain('.order("created_at", { ascending: false }).limit(200)');
     expect(readFn).toContain("[...(messages ?? [])].reverse()");
     expect(readFn).toContain("card: cards[0] ?? null,");
   });

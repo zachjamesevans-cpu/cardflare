@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Text, View } from "react-native";
 
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
+import { agoFrom } from "./ago";
 import type { FeedEntry } from "./api";
 import { cardsLabel } from "./flare-copy";
 import {
@@ -56,22 +57,9 @@ import { Button, Tap, type ZoomPicks } from "./ui";
 
 type Hunt = Extract<FeedEntry, { kind: "hunt" }>;
 
-/**
- * How long ago, in the shortest true form.
- *
- * Under a minute is "now": the composer's preview is a post written
- * this second, and "1m ago" on it was a rounding, not a fact. The
- * website's `agoFrom` says the same.
- */
-export function agoFrom(iso: string): string {
-  const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
-  if (seconds < 60) return "now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.round(hours / 24)}d ago`;
-}
+/* How long ago: one helper for the whole app (src/ago.ts), re-exported
+   here because the post's siblings already import it from the post. */
+export { agoFrom };
 
 /** "2.1 mi away", or "nearby" under a mile. */
 export function awayLabel(miles: number): string {
@@ -403,9 +391,10 @@ export function FlareFeedCard({
                 {item.playerId === null ? <GuestChip /> : null}
                 {item.yours ? (
                   <Text
+                    maxFontSizeMultiplier={1.3}
                     style={{
                       color: colors.textMuted,
-                      fontSize: 10,
+                      fontSize: 11,
                       fontWeight: "700",
                       letterSpacing: 0.6,
                       borderWidth: 1,

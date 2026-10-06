@@ -71,24 +71,27 @@ export async function haveThisAction(
 ): Promise<{ ok: true; threadId: string } | { ok: false; message: string }> {
   const player = await viewerPlayer();
   if (!player) return { ok: false, message: SIGN_IN };
-  if (
-    !checkRateLimit(
+  /* Charged only when a conversation is actually started (see
+     OpenThreadOptions); a second "I have this" lands in the first. */
+  const mayCreate = () =>
+    checkRateLimit(
       `thread-open:${player.id}`,
       LIMITS.threadOpen.limit,
       LIMITS.threadOpen.windowMs,
-    ).allowed
-  ) {
+    ).allowed;
+
+  const body = mode === "message" ? messageOpener() : haveThisMessage(storeName);
+  const outcome =
+    ask.kind === "want"
+      ? await openWantThread(ask.id, player.id, body, { mayCreate })
+      : await openFlareThread(ask.id, player.id, body, { mayCreate });
+
+  if (!outcome.ok && outcome.reason === "rate-limited") {
     return {
       ok: false,
       message: "That is a lot of conversations at once. Give it a minute.",
     };
   }
-
-  const body = mode === "message" ? messageOpener() : haveThisMessage(storeName);
-  const outcome =
-    ask.kind === "want"
-      ? await openWantThread(ask.id, player.id, body)
-      : await openFlareThread(ask.id, player.id, body);
 
   if (outcome.ok) {
     touched();

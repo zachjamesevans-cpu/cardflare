@@ -88,20 +88,39 @@ export function onSignedOut(listener: () => void): () => void {
 export async function signOut(): Promise<void> {
   await forgetDevice();
   await forgetAuth();
+  await forgetAccountLocals();
+  for (const listener of signedOut) listener();
+}
+
+/**
+ * Everything on this phone that belonged to the account, apart from the
+ * tokens and the push registration, which each caller drops its own
+ * way (a refused refresh has no live token to unregister with).
+ */
+async function forgetAccountLocals(): Promise<void> {
   /* The guest room identity goes too: it was joined under this
      account's name and would follow the next sign-in into the room. */
   await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
+
+  /*
+   * The last room, its game scope and the search game chip. Small
+   * things, but together they reopened the previous person's Room tab,
+   * narrowed to their game, the moment somebody else signed in on the
+   * same phone.
+   */
+  await SecureStore.deleteItemAsync(LAST_ROOM_KEY).catch(() => {});
+  await SecureStore.deleteItemAsync(LAST_ROOM_GAME_KEY).catch(() => {});
+  await SecureStore.deleteItemAsync(SEARCH_GAME_KEY).catch(() => {});
 
   /*
    * And the cached feed, which is the part that is easy to forget.
    * Tokens are what stop the app talking to the server; the cache is
    * what the NEXT person to open this phone would see painted on the
    * screen before it ever tries — a feed, a profile, a wardrobe.
-   * Signing out has to take both.
+   * Signing out has to take both. Recent searches are kept under the
+   * cache's prefix (recent-search-list.ts), so this sweeps them too.
    */
   await clearCache();
-
-  for (const listener of signedOut) listener();
 }
 
 /**
@@ -233,6 +252,15 @@ export async function signUp(
     };
   }
 
+  /* The account was made and only the sign-in after it stumbled
+     upstream: "try again" would hit "already has an account". */
+  if (result.errorCode === "upstream") {
+    return {
+      ok: false,
+      message: "Your account is ready, but signing in did not finish. Sign in to continue.",
+    };
+  }
+
   return { ok: false, message: "Could not create the account. Try again." };
 }
 
@@ -312,19 +340,65 @@ async function refreshOnce(): Promise<boolean> {
   }
 
   /*
-   * The server answered and said no: the refresh token is dead
+   * Only a refusal of the refresh token itself signs the phone out: the
+   * server answers 401 "invalid-refresh" when Supabase rejected it
    * (password changed on the website, session revoked, long expiry).
-   * The tokens stay in the keychain otherwise, every call 401s, and the
-   * profile shows "could not load" with no Sign out in reach. So a
-   * refusal signs the phone out properly, back to the front door. A
-   * network failure (status 0) is not a refusal and changes nothing.
+   * The tokens would otherwise stay in the keychain, every call 401s,
+   * and the profile shows "could not load" with no Sign out in reach,
+   * so that case goes back to the front door properly.
+   *
+   * Everything else is weather, not a verdict: no network (status 0),
+   * a rate limit (429), Supabase having a bad minute (503 "upstream").
+   * Signing somebody out because the auth server hiccuped once cost
+   * them their session for nothing. The tokens stay, this call fails
+   * honestly, and the next call tries the refresh again.
    */
-  if (result.status !== 0) {
+  if (isRefreshRefusal(result.status, result.errorCode)) {
+    await forgetDeviceWithoutRefresh();
     await forgetAuth();
-    await clearCache();
+    await forgetAccountLocals();
     for (const listener of signedOut) listener();
   }
   return false;
+}
+
+/** The one refresh answer that means "this session is over". */
+export function isRefreshRefusal(status: number, errorCode: string | null): boolean {
+  return status === 401 && errorCode === "invalid-refresh";
+}
+
+/**
+ * forgetDevice, for the one caller already inside a refresh.
+ *
+ * `call()` refreshes a stale token first, and a refresh in flight is
+ * shared, so unregistering through it from here would wait on itself
+ * forever. This asks once with whatever access token is left (it can
+ * still be good for a few minutes) and, either way, drops the push
+ * token from the phone the same as signing out does.
+ */
+async function forgetDeviceWithoutRefresh(): Promise<void> {
+  try {
+    const pushToken = await SecureStore.getItemAsync(PUSH_KEY);
+    const access = await storedAccessToken();
+    if (pushToken && access) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5_000);
+      await fetch(`${API_BASE}/api/v1/devices`, {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${access}`,
+          "x-cf-access-token": access,
+          "x-cf-payload": encodeURIComponent(JSON.stringify({ pushToken })),
+        },
+        signal: controller.signal,
+      })
+        .catch(() => {})
+        .finally(() => clearTimeout(timer));
+    }
+    await SecureStore.deleteItemAsync(PUSH_KEY);
+  } catch {
+    /* Nothing to unregister, or nowhere to say so. */
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -352,22 +426,53 @@ export function serverMessage(caught: unknown): string | null {
 }
 
 /**
- * A failure, named for a screen. Generic "could not load" messages cost
- * days of blind debugging; every error surface appends this instead, so
- * a screenshot of the failure IS the diagnosis: "timeout" and
+ * A failure, named for the log. Generic "could not load" messages cost
+ * days of blind debugging, so the console gets this with every error;
+ * a screen shows `friendlyError` instead. "timeout" and
  * "unauthorized (401)" point at different bugs from the same couch.
  */
 export function describeError(caught: unknown): string {
-  /* Not a bug to diagnose but a plan to start: said in words, the same
-     words the web console uses. */
+  /* Not a bug to diagnose but a plan to start: said in words. No URL
+     and no price, though: a store's plan is bought on the web, and an
+     app that points players at an outside purchase is an App Store
+     3.1.1 rejection. The owner knows where their console is. */
   if (caught instanceof ApiError && caught.code === "ultra-required") {
-    return "FlareCast is part of cardflare Ultra. The store's owner can start the 14-day free trial from the store console at cardflare.gg/store.";
+    return "FlareCast is not switched on for this store yet. The store's owner can start it from their store console.";
   }
   if (caught instanceof ApiError) {
     if (caught.status === 0) return caught.code;
     return `${caught.code} ${caught.status}`;
   }
   return caught instanceof Error ? caught.message : "unknown";
+}
+
+/**
+ * A failure, said to a person: one plain sentence, never a code.
+ *
+ * `describeError` reads "not-found 404", which is a diagnosis, not
+ * something a player can act on. The screen shows this sentence; the
+ * code still reaches the console, so a bug report keeps its clue.
+ */
+export function friendlyError(caught: unknown): string {
+  console.warn("[cardflare]", describeError(caught));
+  if (caught instanceof ApiError) {
+    /* A plan to start, already in words: kept exactly as written. */
+    if (caught.code === "ultra-required") return describeError(caught);
+    if (caught.detail) return caught.detail;
+    const { status, code } = caught;
+    if (status === 0 || code === "bad-json" || code === "network" || code === "timeout") {
+      return "Couldn't reach cardflare. Check your connection and try again.";
+    }
+    if (status === 401) return "You've been signed out. Sign in again and retry.";
+    if (status === 403) return "That isn't available to your account.";
+    if (status === 404 || status === 410) return "That's no longer available.";
+    if (status === 409) return "That changed in the meantime. Refresh and try again.";
+    if (status === 413) return "That file is too big. Try a smaller one.";
+    if (status === 429) return "That's a lot at once. Wait a moment and try again.";
+    if (status === 400 || status === 422) return "That didn't look right. Check it and try again.";
+    if (status >= 500) return "Something went wrong on our side. Try again in a moment.";
+  }
+  return "Something went wrong. Try again.";
 }
 
 /**
@@ -1081,11 +1186,24 @@ export interface GoingAnswer {
  * `no-account` for a guest, `not-open` once the night has finished,
  * and `not-found` for an id it does not know.
  */
-export const setGoing = (eventId: string, going: boolean) =>
-  call<GoingAnswer>(
+export async function setGoing(eventId: string, going: boolean): Promise<GoingAnswer> {
+  const result = await call<GoingAnswer & { sessionToken?: string }>(
     going ? "POST" : "DELETE",
     `/api/v1/nights/${encodeURIComponent(eventId)}/going`,
   );
+
+  /*
+   * Handed out once, when Going had to mint the account's room identity
+   * for a phone holding none. Kept exactly as the join keeps it: a phone
+   * that dropped it would mint a new identity on every tap.
+   */
+  if (result.sessionToken) {
+    await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+  }
+
+  const { sessionToken: _token, ...answer } = result;
+  return answer;
+}
 
 export async function joinRoom(
   code: string,
@@ -1132,19 +1250,6 @@ export async function joinRoom(
 
   return result;
 }
-
-/**
- * A hunt saved straight to the account — no room involved, so a
- * midnight Flare never keeps a closed store's room warm. The next room
- * the player walks into offers to post it.
- */
-export const saveToList = (entry: {
-  cardId: string;
-  printingId?: string | null;
-  quantity: number;
-  note?: string;
-  deckLabel?: string | null;
-}) => call<{ ok: true }>("POST", "/api/v1/wants", entry);
 
 /**
  * Nudges a saved want's quantity, plus or minus, and returns where it
@@ -1674,6 +1779,17 @@ export interface Profile {
   tier?: string;
   pro?: boolean;
   /**
+   * The player's own subscription, for the Pro screen's renewal line and
+   * its Manage subscription door. Null with none; absent (undefined)
+   * from a server older than this field, which the screen treats as
+   * "do not know" and draws no date.
+   */
+  subscription?: {
+    source: "stripe" | "apple";
+    renewsAt: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
+  /**
    * Private. The founder's two-number rule: this is what is left to
    * spend, it never appears on anybody else's screen, and the server
    * only ever puts it on the authenticated player's own profile.
@@ -1960,7 +2076,7 @@ export const getPlayerPeople = (playerId: string) =>
 /* Report and block                                                    */
 /* ------------------------------------------------------------------ */
 
-export type ReportKind = "post" | "player" | "thread";
+export type ReportKind = "post" | "player" | "thread" | "comment";
 export type ReportReason = "spam" | "scam" | "harassment" | "other";
 
 /**
@@ -2546,16 +2662,6 @@ export const updateHunt = (
     ...patch,
   });
 
-export const addHuntCards = (
-  huntId: string,
-  items: { cardId: string; printingId?: string | null; quantity: number }[],
-) =>
-  call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
-    action: "add-cards",
-    huntId,
-    items,
-  });
-
 /** Copies in hand for one request: "+1 found", the stepper, undo. */
 export const setRequestFound = (requestId: string, found: number) =>
   call<{ hunts: Hunt[]; limit: number }>("POST", "/api/v1/hunts", {
@@ -2598,7 +2704,13 @@ export const publishFlare = (input: {
   call<{
     ok: boolean;
     postId?: string;
+    /** Per card: what was asked, what went up, and why the rest did not. */
+    total?: number;
     posted?: number;
+    alreadyUp?: number;
+    failed?: number;
+    /** The cards that went up; older servers leave it out. */
+    postedCardIds?: string[];
     huntId?: string | null;
     atCap?: boolean;
     error?: string;
@@ -2644,8 +2756,8 @@ const OFFER_REASONS = new Set([
  * A refused offer, in the website's words (src/lib/feed/offer-copy.ts),
  * keyed by the reason the server named in its 409. A 429 is the
  * throttle, which the website reads as "too-many". Anything else gets
- * the plain line with the diagnosis in brackets, so a screenshot of
- * the failure still says which failure it was.
+ * the plain line, and the diagnosis goes to the console, where a bug
+ * report can still say which failure it was.
  */
 export function offerErrorMessage(caught: unknown): string {
   const reason =
@@ -2654,9 +2766,10 @@ export function offerErrorMessage(caught: unknown): string {
         ? "too-many"
         : caught.code
       : "";
-  return OFFER_REASONS.has(reason)
-    ? offerFailureMessage(reason)
-    : `${offerFailureMessage(reason)} (${describeError(caught)})`;
+  /* The diagnosis goes to the console, not the screen: a player can do
+     nothing with "http-500", and a bug report still has it. */
+  if (!OFFER_REASONS.has(reason)) console.warn("[cardflare] offer", describeError(caught));
+  return offerFailureMessage(reason);
 }
 
 /**
@@ -2836,9 +2949,6 @@ export const setFeedView = (view: string) =>
     view,
   });
 
-export const tickHuntCard = (flareId: string, found: boolean) =>
-  call<{ hunts: Hunt[] }>("POST", "/api/v1/hunts", { flareId, found });
-
 export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
     action: liked ? "like" : "unlike",
@@ -2880,13 +2990,15 @@ export const commentOnPost = (postId: string, body: string) =>
     { action: "comment", body },
   );
 
-/** "I have this" on one card of a post, with a note for the thread. */
-export const offerFromPost = (postId: string, flareId: string, note: string) =>
-  call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
-    action: "offer",
-    flareId,
-    note,
-  });
+/**
+ * Takes a comment down: yours, or anybody's under your own post. The
+ * server checks which; a refusal is a 403.
+ */
+export const deletePostComment = (postId: string, commentId: string) =>
+  call<{ ok: true }>(
+    "DELETE",
+    `/api/v1/posts/${encodeURIComponent(postId)}/comments/${encodeURIComponent(commentId)}`,
+  );
 
 /** Which part of the screen an item belongs to. Mirrors the server. */
 export type FeedSection =
@@ -3456,6 +3568,10 @@ export const saveDeckList = (list: string, deckLabel?: string | null) =>
   call<{
     ok: true;
     saved: number;
+    /** Matched cards in the paste; older servers leave these out. */
+    total?: number;
+    alreadyUp?: number;
+    failed?: number;
     unknown: string[];
     unreadable: string[];
     atCap: boolean;
@@ -3789,11 +3905,30 @@ export interface ThreadTrade {
 /** The limit the form and the server share. */
 export const THREAD_TRADE_QUANTITY_MAX = 99;
 
-/** Reading a thread is what marks it read. */
-export const readLocalThread = (threadId: string) =>
+/**
+ * Reading a thread is what marks it read. `before` (a message's
+ * `sentAt`) reads the page of messages before it, for "Load older".
+ */
+export const readLocalThread = (threadId: string, before?: string) =>
   call<{
     ok: boolean;
     closed: boolean;
+    /**
+     * The conversation actually read, which may differ from the id
+     * asked for when an old link held an anchor's id.
+     */
+    threadId?: string | null;
+    /**
+     * More messages wait before the oldest one returned. Optional: an
+     * older server does not say, and then there is no "Load older".
+     */
+    hasOlder?: boolean;
+    /**
+     * A block stands between the two, either way round: nothing can be
+     * sent, and the screen says so in place of the composer. Absent
+     * from an older server.
+     */
+    blocked?: boolean;
     /**
      * What it is about: a posted Flare, a saved want, or the two
      * people. Optional: an older server does not say, and a thread
@@ -3816,7 +3951,12 @@ export const readLocalThread = (threadId: string) =>
     meet?: MeetSuggestion | null;
     /** The newest "We traded" in this conversation. Optional, as above. */
     trade?: ThreadTrade | null;
-  }>("GET", `/api/v1/local/threads/${encodeURIComponent(threadId)}`);
+  }>(
+    "GET",
+    `/api/v1/local/threads/${encodeURIComponent(threadId)}${
+      before ? `?before=${encodeURIComponent(before)}` : ""
+    }`,
+  );
 
 /**
  * "We traded": one side's word, written as a trade that waits for the
@@ -3880,12 +4020,6 @@ export const sendLocalMessage = (threadId: string, body: string) =>
     "POST",
     `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
     { body },
-  );
-
-export const closeLocalThread = (threadId: string) =>
-  call<{ ok: boolean }>(
-    "DELETE",
-    `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
   );
 
 /**

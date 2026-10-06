@@ -103,7 +103,7 @@ export function ShowcaseZoom({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.85)" }}>
+      <View style={{ flex: 1, backgroundColor: colors.scrim }}>
         {/* The closer sits behind rather than wrapping: a Pressable
             around the rail would claim the pan and the cards would not
             move. */}
@@ -156,6 +156,8 @@ export function ShowcaseZoom({
                     {shelf.map((entry, index) => (
                       <Pressable
                         key={entry.id ?? index}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${entry.name}. Close`}
                         onPress={() => {
                           if (scrolled.current) return;
                           onClose();
@@ -176,7 +178,11 @@ export function ShowcaseZoom({
                   </ScrollView>
                 </View>
               ) : (
-                <Pressable onPress={onClose}>
+                <Pressable
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${shown.name}. Close`}
+                >
                   <CosmeticCard
                     imageUrl={shown.imageUrl}
                     width={hero}

@@ -16,7 +16,7 @@ import { heldByCard, MAX_OFFER_MESSAGE, matchFor } from "@/lib/matching/schema";
 import { afterResponse } from "@/lib/after-response";
 import { offeredLine } from "@/lib/feed/offer-copy";
 import { notifyOfferReceived, notifyPostComment } from "@/lib/notifications/notify";
-import { blockedSet } from "@/lib/players/safety";
+import { blockedBetween, blockedSet } from "@/lib/players/safety";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { sessionsForPlayers } from "@/lib/players/accounts";
@@ -28,6 +28,7 @@ import {
   type PostSocial,
 } from "./post-queries";
 import { POST_COMMENT_MAX, type CardState, type PostComment } from "./post-schema";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * A Flare post as something people can answer under, not just walk to.
@@ -330,7 +331,7 @@ async function facesFor(playerIds: string[]): Promise<
     out.set(row.id, {
       displayName: row.display_name,
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: wear.get(row.id)?.ring ?? null,
       aura: wear.get(row.id)?.aura ?? null,
     });
@@ -422,6 +423,15 @@ export async function addComment(
 
   const context = await postContext(postId);
   if (!context) return null;
+  /* Not under the post of somebody blocked either way: the comment is
+     refused exactly as a failed write is, so nothing says why. */
+  if (
+    context.ownerPlayerId &&
+    context.ownerPlayerId !== playerId &&
+    (await blockedBetween(context.ownerPlayerId, playerId))
+  ) {
+    return null;
+  }
 
   const id = await writeComment(postId, playerId, body, answer);
   if (!id) return null;
@@ -442,6 +452,75 @@ export async function addComment(
     thread.filter((row) => row.id === id),
   );
   return comment ?? null;
+}
+
+/** The player behind a post, or null for a store's post or none. */
+export async function postOwnerId(postId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  return (await postContext(postId))?.ownerPlayerId ?? null;
+}
+
+export type DeleteCommentOutcome =
+  { ok: true } | { ok: false; reason: "not-found" | "not-allowed" | "unavailable" };
+
+/**
+ * Who may take a line down: the person who wrote it, or the person
+ * whose post it sits under. Pure, so the rule is tested on its own.
+ */
+export function mayDeleteComment(
+  viewerId: string,
+  commentAuthorId: string,
+  postOwnerId: string | null,
+): boolean {
+  return (
+    viewerId === commentAuthorId || (postOwnerId !== null && viewerId === postOwnerId)
+  );
+}
+
+/**
+ * Takes a comment down, for its author or for the post's owner. The id
+ * is checked against the post it is said to be under, so a comment id
+ * cannot be fished for from another post. Anybody else reads as
+ * not-allowed; a comment that is not there reads as not-found.
+ */
+export async function deleteComment(
+  postId: string,
+  commentId: string,
+  viewerId: string,
+): Promise<DeleteCommentOutcome> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const admin = getSupabaseAdmin();
+
+  const { data: comment, error } = await admin
+    .from("flare_post_comments")
+    .select("id, post_id, player_id")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (error) {
+    console.error("Could not read the comment", error);
+    return { ok: false, reason: "unavailable" };
+  }
+  if (!comment || comment.post_id !== postId) return { ok: false, reason: "not-found" };
+
+  /* The post's owner only matters when the viewer did not write it. */
+  const ownerId =
+    comment.player_id === viewerId
+      ? null
+      : ((await postContext(postId))?.ownerPlayerId ?? null);
+  if (!mayDeleteComment(viewerId, comment.player_id, ownerId)) {
+    return { ok: false, reason: "not-allowed" };
+  }
+
+  const { error: deleteError } = await admin
+    .from("flare_post_comments")
+    .delete()
+    .eq("id", commentId)
+    .eq("post_id", postId);
+  if (deleteError) {
+    console.error("Could not delete the comment", deleteError);
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: true };
 }
 
 /**
@@ -525,6 +604,15 @@ export async function postDetail(
 
   const context = await postContext(postId);
   if (!context) return null;
+  /* A post by somebody blocked either way is not there for the viewer,
+     the same as on the Feed. */
+  if (
+    context.ownerPlayerId &&
+    context.ownerPlayerId !== viewerId &&
+    (await blockedSet(viewerId)).has(context.ownerPlayerId)
+  ) {
+    return null;
+  }
 
   const admin = getSupabaseAdmin();
   const viewerSessions = await sessionsForPlayers([viewerId]);
@@ -736,6 +824,13 @@ export async function offerItems(
   const context = await postContext(postId);
   if (!context) return { ok: false, reason: "not-found" };
   if (context.ownerPlayerId === playerId) return { ok: false, reason: "own-flare" };
+  /* No offers across a block: the post is not there for them. */
+  if (
+    context.ownerPlayerId &&
+    (await blockedBetween(context.ownerPlayerId, playerId))
+  ) {
+    return { ok: false, reason: "not-found" };
+  }
 
   const session = await binderSessionFor(playerId, displayName, true);
   if (!session) return { ok: false, reason: "unavailable" };

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { findParticipation } from "@/lib/events/participants";
 import { isValidJoinCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { resolveCode } from "@/lib/events/rooms";
+import { roomPhase } from "@/lib/events/schema";
 import { text } from "@/lib/form-value";
 import {
   notifyTradeAcknowledged,
@@ -55,6 +56,9 @@ export async function confirmTradeAction(formData: FormData): Promise<void> {
   const participation = await findParticipation(resolved.room.id, session.id);
   if (!participation) redirect(`/e/${code}`);
 
+  /* A night that has ended takes no more trades. */
+  if (roomPhase(resolved.room) === "finished") redirect(`/e/${code}`);
+
   const partner = text(formData, "partnerSessionId");
 
   const outcome = await confirmTrade(
@@ -92,8 +96,6 @@ export async function acknowledgeTradeAction(formData: FormData): Promise<void> 
   if (!isValidJoinCode(code)) return;
 
   const tradeId = text(formData, "tradeId");
-  const flareId = text(formData, "flareId");
-  const requesterSessionId = text(formData, "requesterSessionId");
   if (!tradeId) redirect(`/e/${code}`);
 
   const session = await getPlayerSession();
@@ -102,11 +104,14 @@ export async function acknowledgeTradeAction(formData: FormData): Promise<void> 
   const resolved = await resolveCode(code);
   if (resolved.outcome !== "room") redirect(`/e/${code}`);
 
+  if (roomPhase(resolved.room) === "finished") redirect(`/e/${code}`);
+
   const outcome = await acknowledgeTrade(tradeId, session.id);
-  if (outcome.ok && flareId && requesterSessionId) {
+  /* Who to tell comes from the stored trade, never from the form. */
+  if (outcome.ok && outcome.flareId && outcome.requesterSessionId) {
     await notifyTradeAcknowledged(
-      flareId,
-      requesterSessionId,
+      outcome.flareId,
+      outcome.requesterSessionId,
       session.display_name,
       session.id,
     );

@@ -176,7 +176,7 @@ export function StorePostBody({
           style={{
             width: "100%",
             aspectRatio: 16 / 9,
-            borderRadius: 14,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.elevated,
@@ -262,7 +262,7 @@ export function StorePostCard({
         <View
           style={{
             gap: spacing(2),
-            borderRadius: 14,
+            borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.border,
             backgroundColor: colors.elevated,

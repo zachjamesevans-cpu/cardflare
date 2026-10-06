@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resetApiPlayerMemory } from "@/lib/api/auth";
@@ -12,6 +14,8 @@ const playerForUser = vi.fn();
 const followPlayer = vi.fn();
 const unfollowPlayer = vi.fn();
 const followStateFn = vi.fn();
+const blockedBetween = vi.fn();
+const notifyNewFollower = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
@@ -28,6 +32,16 @@ vi.mock("@/lib/players/follows", () => ({
   followPlayer: (a: string, b: string) => followPlayer(a, b),
   unfollowPlayer: (a: string, b: string) => unfollowPlayer(a, b),
   followState: (a: string, b: string) => followStateFn(a, b),
+}));
+
+vi.mock("@/lib/players/safety", () => ({
+  blockedBetween: (a: string, b: string) => blockedBetween(a, b),
+  blockState: async () => ({ blocked: false, blockedBy: false }),
+  profileHiddenBy: () => null,
+}));
+
+vi.mock("@/lib/notifications/notify", () => ({
+  notifyNewFollower: (a: string, b: string) => notifyNewFollower(a, b),
 }));
 
 vi.mock("@/lib/auth/session", () => ({
@@ -49,7 +63,7 @@ vi.mock("@/lib/players/cosmetics", () => ({
 const route = await import("@/app/api/players/[playerId]/route");
 
 function request(payload: unknown, token: string | null = "jwt-1"): Request {
-  return new Request("https://cardflare.gg/api/players/target-1", {
+  return new Request("https://cardflare.gg/api/players/5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71", {
     method: "POST",
     headers: {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
@@ -58,7 +72,7 @@ function request(payload: unknown, token: string | null = "jwt-1"): Request {
   });
 }
 
-const params = { params: Promise.resolve({ playerId: "target-1" }) };
+const params = { params: Promise.resolve({ playerId: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71" }) };
 
 beforeEach(() => {
   /* apiPlayer remembers a token for two minutes; every case here fakes
@@ -70,9 +84,13 @@ beforeEach(() => {
     followPlayer,
     unfollowPlayer,
     followStateFn,
+    blockedBetween,
+    notifyNewFollower,
   ]) {
     fn.mockReset();
   }
+  blockedBetween.mockResolvedValue(false);
+  notifyNewFollower.mockResolvedValue(undefined);
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   playerForUser.mockResolvedValue({ id: "me-1", display_name: "Kaito" });
   followPlayer.mockResolvedValue(true);
@@ -92,7 +110,7 @@ describe("POST /api/players/[playerId]", () => {
   });
 
   it("refuses following yourself", async () => {
-    playerForUser.mockResolvedValue({ id: "target-1", display_name: "Me" });
+    playerForUser.mockResolvedValue({ id: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71", display_name: "Me" });
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(400);
     expect(followPlayer).not.toHaveBeenCalled();
@@ -101,9 +119,30 @@ describe("POST /api/players/[playerId]", () => {
   it("follows and returns the settled state", async () => {
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(200);
-    expect(followPlayer).toHaveBeenCalledWith("me-1", "target-1");
+    expect(followPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
     const body = (await response.json()) as { follow: { following: boolean } };
     expect(body.follow.following).toBe(true);
+  });
+
+  it("refuses a follow across a block, either way, and rings nobody", async () => {
+    blockedBetween.mockResolvedValue(true);
+    const response = await route.POST(request({ action: "follow" }), params);
+    expect(response.status).toBe(404);
+    expect(blockedBetween).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
+    expect(followPlayer).not.toHaveBeenCalled();
+    expect(notifyNewFollower).not.toHaveBeenCalled();
+  });
+
+  it("still lets an unfollow through a block", async () => {
+    blockedBetween.mockResolvedValue(true);
+    followStateFn.mockResolvedValue({
+      following: false,
+      followsYou: false,
+      partners: false,
+    });
+    const response = await route.POST(request({ action: "unfollow" }), params);
+    expect(response.status).toBe(200);
+    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
   });
 
   it("unfollows through the same door", async () => {
@@ -114,11 +153,34 @@ describe("POST /api/players/[playerId]", () => {
     });
     const response = await route.POST(request({ action: "unfollow" }), params);
     expect(response.status).toBe(200);
-    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "target-1");
+    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
   });
 
   it("rejects an unknown action", async () => {
     const response = await route.POST(request({ action: "poke" }), params);
     expect(response.status).toBe(400);
+  });
+
+  it("refuses an id that is not a uuid before it reaches anything", async () => {
+    const response = await route.POST(request({ action: "follow" }), {
+      params: Promise.resolve({ playerId: "x),id.neq.(y" }),
+    });
+    expect(response.status).toBe(404);
+    expect(followPlayer).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/players/[playerId]", () => {
+  it("validates the id and checks the caller before building the profile", async () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/app/api/players/[playerId]/route.ts"),
+      "utf8",
+    );
+    const get = source.slice(source.indexOf("export async function GET"));
+    expect(get.indexOf("playerIdSchema.safeParse")).toBeGreaterThan(-1);
+    const refused = get.indexOf('"Join a room first."');
+    expect(refused).toBeGreaterThan(-1);
+    expect(refused).toBeLessThan(get.indexOf("publicProfile("));
+    expect(refused).toBeLessThan(get.indexOf("dressedEquipsFor("));
   });
 });

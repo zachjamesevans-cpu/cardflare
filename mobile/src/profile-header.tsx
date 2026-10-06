@@ -15,6 +15,7 @@ import { EmberBadge } from "./ember-badge";
 import { formatHandle } from "./handle";
 import { OrganizerChips } from "./remote-entry";
 import { Tap } from "./ui";
+import { HEADER } from "./header-metrics";
 import { colors, radius, spacing } from "./theme";
 import { WornBadge, WornName, WornTitle } from "./worn-name";
 
@@ -192,10 +193,12 @@ function Stat({
 }
 
 /**
- * A header button: half the row, the secondary shape. Two of them
- * make Instagram's Edit profile / Share profile pair.
+ * A profile action: half the row, the secondary shape and the standard
+ * Button's height. Two of them make Instagram's Edit profile / Share
+ * profile pair. Not a header button - those are the glyph boxes in
+ * header.tsx - so it is not named like one.
  */
-export function HeaderButton({
+export function ProfileActionButton({
   label,
   icon,
   onPress,
@@ -224,6 +227,7 @@ export function HeaderButton({
         backgroundColor: primary ? colors.accent : colors.elevated,
         paddingHorizontal: spacing(3),
         paddingVertical: spacing(2),
+        minHeight: 48,
         opacity: disabled ? 0.6 : 1,
       }}
     >
@@ -284,17 +288,13 @@ export function ShareProfileIcon({
       }}
       accessibilityLabel="Share profile"
       style={{
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
+        width: HEADER.slot,
+        height: HEADER.slot,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Ionicons name="share-outline" size={20} color={colors.textSecondary} />
+      <Ionicons name="share-outline" size={HEADER.icon} color={colors.textPrimary} />
     </Tap>
   );
 }

@@ -102,7 +102,7 @@ describe("the Nights screen", () => {
 
   it("files a finished night in Past, a Going one in Going, the rest in Nearby", () => {
     expect(nights).toMatch(
-      /if \(night\.phase === "finished"\) return "past";\s*if \(night\.youGoing\) return "going";\s*return "nearby";/,
+      /if \(phaseOf\(night, now\) === "finished"\) return "past";\s*if \(night\.youGoing\) return "going";\s*return "nearby";/,
     );
   });
 
@@ -122,7 +122,7 @@ describe("the Nights screen", () => {
     expect(nights).toContain(
       '{tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}',
     );
-    expect(nights).toContain('navigation.navigate("Tabs", { screen: "Feed" })');
+    expect(nights).toContain('params: { tab: "nearby", at: Date.now() },');
   });
 
   it("keeps the code door behind the QR icon, named the old way for a screen reader", () => {
@@ -226,7 +226,7 @@ describe("the API client", () => {
       'export const getNights = () => call<{ nights: NightItem[] }>("GET", "/api/v1/nights");',
     );
     expect(api).toMatch(
-      /export const setGoing = \(eventId: string, going: boolean\) =>\s*call<GoingAnswer>\(\s*going \? "POST" : "DELETE",\s*`\/api\/v1\/nights\/\$\{encodeURIComponent\(eventId\)\}\/going`,/,
+      /export async function setGoing\(eventId: string, going: boolean\): Promise<GoingAnswer> \{\s*const result = await call<GoingAnswer & \{ sessionToken\?: string \}>\(\s*going \? "POST" : "DELETE",\s*`\/api\/v1\/nights\/\$\{encodeURIComponent\(eventId\)\}\/going`,/,
     );
   });
 

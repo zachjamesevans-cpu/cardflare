@@ -14,11 +14,11 @@ import {
 import type { StackParams } from "../../App";
 import {
   ApiError,
-  describeError,
+  type FoundPlayer,
+  friendlyError,
   getMe,
   logTrade,
   searchPlayersByName,
-  type FoundPlayer,
 } from "../api";
 import {
   CardPicker,
@@ -81,7 +81,7 @@ function failureMessage(caught: unknown): string {
       return "Trade history is part of cardflare Pro.";
     }
   }
-  return `Could not log that (${describeError(caught)}).`;
+  return `Could not log that. ${friendlyError(caught)}`;
 }
 
 export function LogTradeScreen() {
@@ -442,7 +442,7 @@ function PlayerPicker({ onPick }: { onPick: (player: FoundPlayer) => void }) {
           setQuery(text);
           searchFor(text);
         }}
-        placeholder="Find on CardFlare"
+        placeholder="Find on cardflare"
         autoCapitalize="none"
         autoCorrect={false}
       />

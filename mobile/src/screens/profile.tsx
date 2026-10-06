@@ -20,28 +20,28 @@ import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { handleSeedFrom } from "../handle";
 import {
   addToShowcase,
+  type CardHit,
   chooseUsername,
-  describeError,
+  type CosmeticItem,
   dressAllShowcase,
   dressShowcase,
+  type FollowedPlayer,
+  friendlyError,
   getFollowers,
   getFollowing,
   getGames,
   getProfile,
   getTradeHistory,
   lastSearchGame,
+  type Profile,
   rememberSearchGame,
   removeFromShowcase,
   searchCards,
   setShowcaseNote,
   SHOWCASE_NOTE_MAX,
+  type ShowcaseCard,
   signOut,
   storedAccessToken,
-  type CardHit,
-  type CosmeticItem,
-  type FollowedPlayer,
-  type Profile,
-  type ShowcaseCard,
   type TradeHistory,
   type Wardrobe,
 } from "../api";
@@ -54,7 +54,8 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares } from "../profile-flares";
-import { HeaderButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { HeaderButton } from "../header";
+import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
 import {
   OWN_TABS,
@@ -176,6 +177,9 @@ export function ProfileScreen() {
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
+  /* Remove hides behind Edit: a shelf is for looking at, and a word
+     under every card read as a list of things to get rid of. */
+  const [editingShowcase, setEditingShowcase] = useState(false);
   /* The add-a-card form, folded behind the "+" tile at the rail's end. */
   const [addingShowcase, setAddingShowcase] = useState(false);
   /* The new-binder sheet, behind the "+" at the highlights row's end. */
@@ -253,7 +257,7 @@ export function ProfileScreen() {
        */
       if (!profileRef.current) {
         setProfile(null);
-        setLoadFailed(describeError(caught));
+        setLoadFailed(friendlyError(caught));
       }
     } finally {
       setChecked(true);
@@ -331,7 +335,7 @@ export function ProfileScreen() {
       return true;
     } catch (caught) {
       setMessage(
-        `That did not go through (${describeError(caught)}). Try again in a moment.`,
+        `That did not go through. ${friendlyError(caught)}`,
       );
       return false;
     } finally {
@@ -360,7 +364,7 @@ export function ProfileScreen() {
             The connection to cardflare.gg did not go through. Check your signal and try
             again.
           </Body>
-          <Muted>What the server said: {loadFailed}</Muted>
+          <Muted>{loadFailed}</Muted>
           <AsyncButton
             label="Try again"
             pendingLabel="Retrying…"
@@ -492,7 +496,7 @@ export function ProfileScreen() {
           <Tap
             onPress={() => setShowcaseHelp((open) => !open)}
             accessibilityLabel="What is a showcase?"
-            hitSlop={8}
+            hitSlop={11}
             style={{
               width: 22,
               height: 22,
@@ -514,6 +518,23 @@ export function ProfileScreen() {
             </Text>
           </Tap>
         </View>
+        {profile.showcase.length > 0 ? (
+          <Tap
+            onPress={() => setEditingShowcase((on) => !on)}
+            accessibilityLabel={editingShowcase ? "Done editing the showcase" : "Edit the showcase"}
+            style={{
+              marginLeft: "auto",
+              minHeight: 44,
+              minWidth: 44,
+              alignItems: "flex-end",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
+              {editingShowcase ? "Done" : "Edit"}
+            </Text>
+          </Tap>
+        ) : null}
       </View>
       {/* The explanation read as clutter once you knew it - the
           founder's call. It folds behind the "?" now: there for the
@@ -535,7 +556,10 @@ export function ProfileScreen() {
       >
         {profile.showcase.map((entry) => (
           <View key={entry.id} style={{ gap: spacing(1), width: SHELF_TILE }}>
-            <Tap onPress={() => setDressing(entry)}>
+            <Tap
+              onPress={() => setDressing(entry)}
+              accessibilityLabel={`Dress ${entry.name}`}
+            >
               <CosmeticCard
                 imageUrl={entry.imageUrl}
                 width={SHELF_TILE}
@@ -553,26 +577,26 @@ export function ProfileScreen() {
             >
               {entry.name}
             </Text>
-            <Tap
-              disabled={busy === entry.id}
-              onPress={() =>
-                void act(
-                  entry.id,
-                  () => removeFromShowcase(entry.id),
-                  "Taken off the shelf.",
-                )
-              }
-            >
-              <Text
-                style={{
-                  color: colors.textMuted,
-                  fontSize: 11,
-                  textDecorationLine: "underline",
-                }}
+            {editingShowcase ? (
+              <Tap
+                disabled={busy === entry.id}
+                hitSlop={12}
+                accessibilityLabel={`Remove ${entry.name}`}
+                onPress={() =>
+                  void act(
+                    entry.id,
+                    () => removeFromShowcase(entry.id),
+                    "Taken off the shelf.",
+                  )
+                }
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
               >
-                Remove
-              </Text>
-            </Tap>
+                <Ionicons name="remove-circle" size={16} color={colors.danger} />
+                <Text style={{ color: colors.danger, fontSize: 12, fontWeight: "600" }}>
+                  Remove
+                </Text>
+              </Tap>
+            ) : null}
           </View>
         ))}
         {/* The way in, at the end of the rail: a "+" tile the size
@@ -712,13 +736,15 @@ export function ProfileScreen() {
       >
         <View style={{ flex: 1, gap: spacing(1) }}>
           <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
-            Embers store
+            Embers shop
           </Text>
           <Muted>Frames, holo patterns and effects. Spend what you have earned.</Muted>
-          {/* The second line is the difference between the two numbers:
-              what feeds the balance, and that only trading feeds both. */}
+          {/* The second line answers the number beside it: where Embers
+              to spend come from. The ledger's sources, every one of
+              them (src/lib/players/ember-rules.ts, packs/repository.ts). */}
           <Muted>
-            Packs, duplicates and gifts add to what you can spend. Trading adds to both.
+            Embers to spend come from trades, turning up at your stores, duplicate
+            pack pulls and gifts.
           </Muted>
         </View>
         <View
@@ -772,6 +798,7 @@ export function ProfileScreen() {
               hunts={profile.hunts ?? []}
               limit={profile.huntLimit}
               yours
+              bare
               onAdd={(huntId) =>
                 navigation.navigate("Tabs", {
                   screen: "Flare",
@@ -884,45 +911,22 @@ export function ProfileScreen() {
         <View
           style={{
             position: "absolute",
-            top: spacing(3),
-            right: spacing(3),
+            top: spacing(1),
+            right: spacing(1),
             flexDirection: "row",
-            gap: spacing(2),
           }}
         >
           <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
-          <Tap
+          <HeaderButton
+            icon="color-wand"
+            label="Customize your profile"
             onPress={() => navigation.navigate("Customize", { area: "profile" })}
-            accessibilityLabel="Customize your profile"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="color-wand" size={20} color={colors.textSecondary} />
-          </Tap>
-          <Tap
+          />
+          <HeaderButton
+            icon="settings-outline"
+            label="Settings"
             onPress={() => navigation.navigate("Settings")}
-            accessibilityLabel="Settings"
-            style={{
-              width: 40,
-              height: 40,
-              borderRadius: 999,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Ionicons name="settings-outline" size={20} color={colors.textSecondary} />
-          </Tap>
+          />
         </View>
 
         {/*
@@ -970,7 +974,7 @@ export function ProfileScreen() {
               <>
                 {/* Instagram's button, to Instagram's screen: picture,
                     effects, name, username, pronouns and bio, in rows. */}
-                <HeaderButton
+                <ProfileActionButton
                   label="Edit profile"
                   onPress={() => navigation.navigate("EditProfile")}
                 />
@@ -1442,7 +1446,7 @@ function DressModal({
           onPress={onClose}
           style={{
             flex: 1,
-            backgroundColor: "rgba(0,0,0,0.75)",
+            backgroundColor: colors.scrim,
             alignItems: "center",
             justifyContent: "center",
             paddingHorizontal: spacing(4),

@@ -4,6 +4,7 @@ import { autoPostFor } from "@/lib/events/auto-post";
 import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { addFlareBatch } from "@/lib/lists/repository";
 import type { Accepts } from "@/lib/lists/schema";
+import { afterResponse } from "@/lib/after-response";
 import { notifyRoomFlare } from "@/lib/notifications/notify";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -126,12 +127,9 @@ export async function followOntoNights(input: {
       if (batch.posted.length === 0) continue;
       boards += 1;
       if (input.intent === "want") {
-        void notifyRoomFlare(
-          event.id,
-          sessionId,
-          input.displayName,
-          batch.posted,
-          "want",
+        const posted = batch.posted;
+        afterResponse(() =>
+          notifyRoomFlare(event.id, sessionId, input.displayName, posted, "want"),
         );
       }
     }

@@ -167,7 +167,7 @@ export default async function FeedPage({
               the scanner for the person already standing in a shop. */}
           <div className="flex flex-wrap gap-2">
             <Link href="/signup?next=%2Ffeed" className={buttonStyles("primary", "sm")}>
-              Create free account
+              Create account
             </Link>
             <Link
               href="/login?next=%2Ffeed"
@@ -176,7 +176,7 @@ export default async function FeedPage({
               Sign in
             </Link>
             <Link href="/room" className={buttonStyles("ghost", "sm")}>
-              Go to Room
+              Open the room
             </Link>
           </div>
         </Card>
@@ -271,7 +271,7 @@ export default async function FeedPage({
             tonight&rsquo;s room.
           </p>
           <Link href="/room" className={buttonStyles("secondary", "sm")}>
-            Go to Room
+            Open the room
           </Link>
         </Card>
       ) : (
@@ -296,15 +296,17 @@ export default async function FeedPage({
                   {sectionHeading(item.section)}
                 </h2>
               )}
-            <Item item={item} view={view} />
-            {/* Why this is on your screen. A feed that explains itself
-                stops feeling arbitrary even when it is thin. A post
-                carries its own label in its header instead - the
-                founder: no separate text between cards - and a store's
-                post is a post, so it goes without one too. */}
+            {/* Why this is on your screen, ABOVE the card it explains:
+                under it, the line read as the next card's caption. A
+                feed that explains itself stops feeling arbitrary even
+                when it is thin. A post carries its own label in its
+                header instead - the founder: no separate text between
+                cards - and a store's post is a post, so it goes without
+                one too. */}
             {item.kind !== "hunt" && item.kind !== "storePost" && (
-              <p className="-mt-1 text-xs text-text-muted">{item.reason}</p>
+              <p className="-mb-1 text-xs text-text-muted">{item.reason}</p>
             )}
+            <Item item={item} view={view} />
           </div>
         ))
       )}

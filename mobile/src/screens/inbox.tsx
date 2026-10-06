@@ -7,7 +7,13 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { followHref } from "../follow-href";
 import { openRoom } from "../open-room";
-import { getNotifications, markRead, storedAccessToken, type InboxItem } from "../api";
+import {
+  friendlyError,
+  getNotifications,
+  markRead,
+  storedAccessToken,
+  type InboxItem,
+} from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { syncBadge } from "../push";
 import { setUnread } from "../unread";
@@ -49,6 +55,13 @@ export function InboxScreen() {
    */
   const [fresh, setFresh] = useState(false);
   const freshRef = useRef(false);
+  /*
+   * A load that failed, in words, when there is nothing painted to
+   * show instead. "Nothing yet" would be a lie: there may be plenty,
+   * we just could not ask. Try again asks again.
+   */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   /*
    * THE PAINT: last visit's notices, from the `inbox` kind, so the
@@ -80,6 +93,7 @@ export function InboxScreen() {
           const { notifications } = await getNotifications();
           if (!live) return;
           freshRef.current = true;
+          setLoadError(null);
           setItems(notifications);
           setFresh(true);
 
@@ -99,14 +113,14 @@ export function InboxScreen() {
             /* And the dot on the tab goes with the badge. */
             setUnread(0);
           }
-        } catch {
-          if (live) setItems((current) => current ?? []);
+        } catch (caught) {
+          if (live) setLoadError(friendlyError(caught));
         }
       })();
       return () => {
         live = false;
       };
-    }, []),
+    }, [attempt]),
   );
 
   const openProfile = (playerId: string) =>
@@ -140,7 +154,40 @@ export function InboxScreen() {
           "Inbox", and printing it twice on one screen reads as a
           mistake. The website has one because it has no nav bar. */}
 
-      {items === null && <Loading />}
+      {items === null && loadError === null && <Loading />}
+
+      {items === null && loadError !== null && (
+        <Card>
+          <View
+            style={{
+              alignItems: "center",
+              gap: spacing(3),
+              paddingVertical: spacing(6),
+            }}
+          >
+            <Ionicons name="cloud-offline-outline" size={24} color={colors.textMuted} />
+            <Text
+              accessibilityRole="alert"
+              style={{
+                color: colors.textSecondary,
+                textAlign: "center",
+                maxWidth: 280,
+                lineHeight: 21,
+              }}
+            >
+              {loadError}
+            </Text>
+            <Button
+              label="Try again"
+              variant="secondary"
+              onPress={() => {
+                setLoadError(null);
+                setAttempt((n) => n + 1);
+              }}
+            />
+          </View>
+        </Card>
+      )}
 
       {items?.length === 0 && (
         <Card>
@@ -164,7 +211,7 @@ export function InboxScreen() {
               early at a store you follow, it lands here.
             </Text>
             <Button
-              label="Find a room"
+              label="Open the room"
               variant="secondary"
               onPress={() => openRoom(navigation)}
             />
@@ -174,8 +221,8 @@ export function InboxScreen() {
 
       {items !== null && items.length > 0 && (
         <Card style={{ padding: spacing(2), gap: 0 }}>
-          {items.map((item) => {
-            const unread = fresh && !item.readAt;
+          {collapseRuns(items).map(({ item, count, anyUnread }) => {
+            const unread = fresh && anyUnread;
             const actor = item.actor ?? null;
             const { lead, rest } = splitTitle(item.title, actor?.displayName);
             const open = destination(item);
@@ -257,6 +304,12 @@ export function InboxScreen() {
                     >
                       {rest}
                     </Text>
+                    {count > 1 ? (
+                      <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                        {" "}
+                        ×{count}
+                      </Text>
+                    ) : null}
                     <Text style={{ color: colors.textMuted }}>
                       {" "}
                       {ago(item.createdAt)}
@@ -324,6 +377,34 @@ function splitTitle(
     return { lead: actorName, rest: title.slice(actorName.length) };
   }
   return { lead: null, rest: title };
+}
+
+/**
+ * Back-to-back notices that say the same thing, as one row with a
+ * count. The website's `collapseRuns`, word for word.
+ */
+function collapseRuns<
+  T extends {
+    id: string;
+    kind: string;
+    title: string;
+    url: string | null;
+    readAt: string | null;
+    actor?: { playerId: string } | null;
+  },
+>(items: T[]): { item: T; count: number; anyUnread: boolean }[] {
+  const runs: { item: T; count: number; anyUnread: boolean; key: string }[] = [];
+  for (const n of items) {
+    const key = [n.kind, n.actor?.playerId ?? "", n.title, n.url ?? ""].join("|");
+    const last = runs[runs.length - 1];
+    if (last && last.key === key) {
+      last.count += 1;
+      if (!n.readAt) last.anyUnread = true;
+    } else {
+      runs.push({ item: n, count: 1, anyUnread: !n.readAt, key });
+    }
+  }
+  return runs.map(({ item, count, anyUnread }) => ({ item, count, anyUnread }));
 }
 
 /** The icon a row with nobody behind it leads with. */

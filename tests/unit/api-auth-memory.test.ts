@@ -68,3 +68,23 @@ describe("apiPlayer's memory", () => {
     expect((await auth.apiPlayer(request("tok")))?.displayName).toBe("Zed");
   });
 });
+
+describe("a deleted account's tokens", () => {
+  it("are forgotten on the instance that deleted it", async () => {
+    await auth.apiPlayer(request("phone"));
+    await auth.apiPlayer(request("laptop"));
+    auth.forgetApiPlayerById("p1");
+    playerForUser.mockResolvedValue(null);
+    expect(await auth.apiPlayer(request("phone"))).toBeNull();
+    expect(await auth.apiPlayer(request("laptop"))).toBeNull();
+  });
+
+  it("are remembered for thirty seconds at most anywhere else", async () => {
+    await auth.apiPlayer(request("tok"));
+    const now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(now + 31_000);
+    playerForUser.mockResolvedValue(null);
+    expect(await auth.apiPlayer(request("tok"))).toBeNull();
+    clock.mockRestore();
+  });
+});

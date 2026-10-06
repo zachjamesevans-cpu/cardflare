@@ -865,11 +865,17 @@ export type TradeRow = {
   disputed_at: string | null;
   disputed_by: string | null;
   dispute_note: string | null;
+  /** When this trade counted its copies as found. Null = it never did. */
+  found_applied_at: string | null;
+  /** The copies it added to the found count, which a reversal takes off. */
+  found_copies: number;
 };
 
 export type TradeInsert = Omit<
   TradeRow,
   | "id"
+  | "found_applied_at"
+  | "found_copies"
   | "event_id"
   | "thread_id"
   | "requester_player_id"
@@ -884,6 +890,8 @@ export type TradeInsert = Omit<
   | "dispute_note"
 > & {
   id?: string;
+  found_applied_at?: string | null;
+  found_copies?: number;
   event_id?: string | null;
   thread_id?: string | null;
   requester_player_id?: string | null;
@@ -1551,6 +1559,16 @@ export type LoggedTradeRow = {
   /** A calendar date, "YYYY-MM-DD". */
   traded_on: string;
   note: string | null;
+  /** What logging it did to the binders, so a delete undoes exactly that. */
+  binder_changes: LoggedTradeBinderChange[];
+};
+
+/** One binder card moved by a logged trade. */
+export type LoggedTradeBinderChange = {
+  binder_id: string;
+  card_id: string;
+  printing_id: string | null;
+  delta: number;
 };
 
 /**
@@ -1627,11 +1645,13 @@ export type PlayerReportRow = {
   id: string;
   created_at: string;
   reporter_id: string;
-  target_kind: "post" | "player" | "thread";
+  target_kind: "post" | "player" | "thread" | "comment";
   target_id: string;
   target_player_id: string | null;
   reason: "spam" | "scam" | "harassment" | "other";
   note: string | null;
+  /** A reported comment's words, kept after the comment is deleted. */
+  target_excerpt: string | null;
   status: "open" | "resolved";
   resolved_at: string | null;
   resolved_by: string | null;
@@ -1646,6 +1666,7 @@ export type PlayerReportInsert = Omit<
   | "resolved_by"
   | "note"
   | "target_player_id"
+  | "target_excerpt"
 > & {
   id?: string;
   created_at?: string;
@@ -1653,6 +1674,7 @@ export type PlayerReportInsert = Omit<
   resolved_at?: string | null;
   resolved_by?: string | null;
   note?: string | null;
+  target_excerpt?: string | null;
   target_player_id?: string | null;
 };
 
@@ -1683,6 +1705,7 @@ export type LoggedTradeInsert = Omit<
   | "partner_name"
   | "place"
   | "note"
+  | "binder_changes"
 > & {
   id?: string;
   created_at?: string;
@@ -1691,6 +1714,7 @@ export type LoggedTradeInsert = Omit<
   partner_name?: string | null;
   place?: string | null;
   note?: string | null;
+  binder_changes?: LoggedTradeBinderChange[];
 };
 
 /**
@@ -2183,6 +2207,27 @@ export type Database = {
       binder_save_order: {
         Args: { p_binder: string; p_ids: string[] };
         Returns: undefined;
+      };
+      /* Moves one binder card by a delta; returns the change actually made. */
+      binder_card_adjust: {
+        Args: {
+          p_binder: string;
+          p_card: string;
+          p_printing: string | null;
+          p_delta: number;
+        };
+        Returns: number;
+      };
+      /* A want's plus/minus; the new quantity, or null when not theirs. */
+      player_want_adjust: {
+        Args: { p_want: string; p_player: string; p_delta: number };
+        Returns: number | null;
+      };
+      /* One hit against a key in its current fixed window, shared by
+         every instance. See src/lib/rate-limit.ts. */
+      rate_limit_hit: {
+        Args: { p_key: string; p_window_ms: number };
+        Returns: { hits: number; resets_at: string }[];
       };
       catalog_sets: {
         Args: Record<string, never>;

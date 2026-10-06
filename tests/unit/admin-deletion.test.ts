@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { confirmsName, realCollateral } from "@/lib/admin/deletion-schema";
+import * as cleanup from "@/lib/players/account-cleanup";
 
 /**
  * Deleting a store or a player.
@@ -110,5 +111,62 @@ describe("the rules that make it safe", () => {
     const code = deletion.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
     expect(code).not.toMatch(/formData|request\./);
+  });
+
+  it("cancels the Stripe subscription and empties storage, after the row goes", async () => {
+    const deletion = await readFile("src/lib/admin/deletion.ts", "utf8");
+    const body = deletion.slice(deletion.indexOf("export async function deletePlayer"));
+    const rowGone = body.indexOf('from("players").delete()');
+
+    /* Read before (the row cascades), act after (a failed delete must
+       not cost somebody their subscription). */
+    expect(body.indexOf("liveStripeSubscription(")).toBeLessThan(rowGone);
+    expect(body.indexOf("cancelDeletedPlayersSubscription(")).toBeGreaterThan(rowGone);
+    expect(body.indexOf("removePlayerStorage(")).toBeGreaterThan(rowGone);
+    expect(body.indexOf("forgetApiPlayerById(")).toBeGreaterThan(rowGone);
+  });
+});
+
+describe("what a deleted account leaves outside the cascade", () => {
+  it("knows every prefix a player's pictures live under", () => {
+    expect(cleanup.playerStoragePrefixes("p1")).toEqual([
+      "p1",
+      "covers/p1",
+      "tmp/p1",
+    ]);
+  });
+
+  it("removes avatars, covers and half-uploaded chunks, and survives a failure", async () => {
+    const tree: Record<string, { name: string; id: string | null }[]> = {
+      p1: [
+        { name: "1.jpg", id: "a" },
+        { name: "2.gif", id: "b" },
+      ],
+      "covers/p1": [{ name: "3.jpg", id: "c" }],
+      "tmp/p1": [{ name: "up-1", id: null }],
+      "tmp/p1/up-1": [{ name: "000", id: "d" }],
+    };
+    const removed: string[][] = [];
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const admin = {
+      storage: {
+        from: () => ({
+          list: async (prefix: string) =>
+            prefix === "covers/p1"
+              ? { data: null, error: { message: "storage down" } }
+              : { data: tree[prefix] ?? [], error: null },
+          remove: async (paths: string[]) => {
+            removed.push(paths);
+            return { error: null };
+          },
+        }),
+      },
+    } as unknown as Parameters<typeof cleanup.removePlayerStorage>[1];
+
+    await cleanup.removePlayerStorage("p1", admin);
+
+    expect(removed).toEqual([["p1/1.jpg", "p1/2.gif"], ["tmp/p1/up-1/000"]]);
+    expect(errors).toHaveBeenCalledTimes(1);
+    errors.mockRestore();
   });
 });

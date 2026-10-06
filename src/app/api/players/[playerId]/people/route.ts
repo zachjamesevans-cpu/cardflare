@@ -5,6 +5,8 @@ import {
   listFollowing,
   type FollowedPlayer,
 } from "@/lib/players/follows";
+import { playerForUser } from "@/lib/players/accounts";
+import { blockedBetween } from "@/lib/players/safety";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 
@@ -37,17 +39,27 @@ export async function GET(
   const { playerId } = await params;
 
   const viewer = await getViewer();
-  if (
-    viewer.kind === "anonymous" &&
-    !(await getPlayerSession()) &&
-    !(await apiPlayer(request))
-  ) {
+  const api = await apiPlayer(request);
+  if (viewer.kind === "anonymous" && !(await getPlayerSession()) && !api) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
 
+  /* The signed-in player looking, when there is one: nobody blocked
+     either way with them is on either list, and a profile hidden from
+     them by a block has no lists to open at all. */
+  const me =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : viewer.kind !== "anonymous"
+        ? ((await playerForUser(viewer.user.id))?.id ?? null)
+        : (api?.playerId ?? null);
+  if (me && me !== playerId && (await blockedBetween(me, playerId))) {
+    return Response.json({ error: "No such player." }, { status: 404 });
+  }
+
   const [followers, following] = await Promise.all([
-    listFollowers(playerId),
-    listFollowing(playerId),
+    listFollowers(playerId, me),
+    listFollowing(playerId, me),
   ]);
 
   return Response.json({

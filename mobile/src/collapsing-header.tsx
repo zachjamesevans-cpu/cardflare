@@ -153,8 +153,11 @@ export function CollapsingHeader({
   unread,
 }: {
   state: HeaderScroll;
-  /** The + at the top left: Post a Flare, the way Instagram posts. */
-  onPost: () => void;
+  /**
+   * The + at the top left: Post a Flare, the way Instagram posts.
+   * Absent for a guest, who has no account to post with.
+   */
+  onPost?: () => void;
   /** The bell: the notices, which used to be the Inbox tab. */
   onInbox: () => void;
   /** Unread notices; above zero, the bell wears the accent dot. */
@@ -266,7 +269,9 @@ export function CollapsingHeader({
             contents,
           ]}
         >
-          <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+          {onPost ? (
+            <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+          ) : null}
         </Animated.View>
 
         {/*

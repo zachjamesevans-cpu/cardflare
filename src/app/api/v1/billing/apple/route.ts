@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
-import { isAppleConfigured, lookUpAppleSubscription } from "@/lib/billing/apple";
+import {
+  isAppleConfigured,
+  lookUpAppleSubscription,
+  sandboxMayEntitle,
+} from "@/lib/billing/apple";
 import {
   playerForAppleTransaction,
   syncPlayerTierFromSubscription,
@@ -60,6 +64,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const { facts } = lookup;
+
+  /* A sandbox purchase is free to make; see sandboxMayEntitle. To the
+     caller it is a purchase we could not find, which is the truth as
+     far as production entitlement goes. */
+  if (lookup.environment === "sandbox" && !sandboxMayEntitle(player.playerId)) {
+    return Response.json({ error: "not-found" }, { status: 404 });
+  }
 
   if (facts.appAccountToken && facts.appAccountToken !== player.playerId) {
     return Response.json({ error: "claimed" }, { status: 403 });

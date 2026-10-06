@@ -22,6 +22,7 @@ function chain(response: Response_, calls: Record<string, unknown[][]>) {
     "eq",
     "in",
     "is",
+    "or",
     "order",
     "limit",
     "insert",
@@ -369,7 +370,7 @@ describe("notifications inbox", () => {
           id: "n2",
           kind: "new-follower",
           title: "Kaito followed you",
-          body: "Follow back to become trade partners.",
+          body: "Follow back and you're trade partners.",
           url: "/p/kaito",
           created_at: "2026-08-07T00:00:00Z",
           read_at: null,
@@ -389,13 +390,14 @@ describe("notifications inbox", () => {
             display_name: "Kaito",
             avatar_url: "avatars/kaito/1.jpg",
             avatar_animated: null,
-            tier: "free",
+            /* Pro: a frame is only drawn on a tier that wears. */
+            tier: "pro",
             equipped_avatar_frame: "ember-edge",
           },
         ],
         error: null,
       },
-      { data: [{ id: "kaito", tier: "free" }], error: null },
+      { data: [{ id: "kaito", tier: "pro" }], error: null },
     );
 
     const response = await notifications.GET(request("GET"));

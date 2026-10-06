@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams, TabParams } from "../../App";
 import {
+  describeError,
   dropWant,
   getMe,
   getRoom,
@@ -178,12 +179,19 @@ export function HubScreen() {
     }, [loadWants]),
   );
 
-  /** A want edit, then the truth re-read — the room's `act` in miniature. */
+  /*
+   * A want edit, then the truth re-read — the room's `act` in miniature.
+   * A refused or failed edit is said under the list rather than
+   * swallowed: the re-read alone would just look like a tap that did
+   * nothing.
+   */
+  const [wantError, setWantError] = useState<string | null>(null);
   const editWant = async (work: () => Promise<unknown>) => {
+    setWantError(null);
     try {
       await work();
-    } catch {
-      // The reload shows the honest state either way.
+    } catch (caught) {
+      setWantError(`Could not change that. Try again. (${describeError(caught)})`);
     }
     await loadWants();
   };
@@ -288,7 +296,7 @@ export function HubScreen() {
               The room door stays for the guest already standing at a
               counter, the same two buttons the website's guest card has. */}
           <Button
-            label="Create free account"
+            label="Create account"
             onPress={() => navigation.navigate("CreateAccount")}
           />
           <Button
@@ -338,6 +346,15 @@ export function HubScreen() {
                 {`${working.length} ${working.length === 1 ? "card" : "cards"}`}
               </Muted>
             </View>
+
+            {wantError ? (
+              <Text
+                accessibilityRole="alert"
+                style={{ color: colors.danger, fontSize: 14 }}
+              >
+                {wantError}
+              </Text>
+            ) : null}
 
             {working.length === 0 ? (
               <Body>

@@ -23,6 +23,18 @@ export function isGameSlug(value: string | null | undefined): value is GameSlug 
   return (GAME_SLUGS as string[]).includes(value ?? "");
 }
 
+/**
+ * "For One Piece, Riftbound, ... and Flesh & Blood players": the line
+ * under the welcome pitch. "Find your cards" alone could mean sports
+ * cards or a deck of 52; naming the games says what this is for. Built
+ * from the list so a game added here is named there too.
+ */
+export function playersLine(): string {
+  const names = TCG_GAMES.map((game) => game.shortName as string);
+  const last = names.pop();
+  return `For ${names.join(", ")} and ${last} players`;
+}
+
 export function gameShortName(slug: string): string {
   return TCG_GAMES.find((game) => game.slug === slug)?.shortName ?? slug;
 }

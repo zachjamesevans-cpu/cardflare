@@ -67,6 +67,10 @@ export async function DELETE(request: Request): Promise<Response> {
   const parsed = deleteSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("id is required");
 
-  const ok = await deleteLoggedTrade(player.playerId, parsed.data.id);
+  const ok = await deleteLoggedTrade(
+    player.playerId,
+    parsed.data.id,
+    player.displayName,
+  );
   return Response.json({ ok }, { status: ok ? 200 : 500 });
 }
