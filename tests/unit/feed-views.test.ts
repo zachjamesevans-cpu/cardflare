@@ -82,10 +82,11 @@ describe("feed views", () => {
     expect(route).not.toContain('select("avatar_url, embers_balance, feed_view")');
   });
 
-  it("draws the compact card on both platforms, with the count on the art", async () => {
+  it("draws the compact card on both platforms, with the black ×N tag", async () => {
     /*
-     * "a green quantity count of the card they're needing on the card.
-     * so if it's a bonney, the bottom right will show a '1x'."
+     * The green "1x" chip took over the post; the founder: "just stick
+     * to the black quantity thing tbh that we have elsewhere". The
+     * shared tag draws nothing for one copy.
      */
     const app = await read("mobile/src/flare-feed-card-compact.tsx");
     const web = await read("src/components/feed/flare-feed-card-compact.tsx");
@@ -94,11 +95,10 @@ describe("feed views", () => {
       expect(source).toContain("function NeedBadge");
       /* What is STILL wanted, not what was asked for. */
       expect(source).toContain("card.remaining ?? card.quantity ?? 1");
-      /* Bottom right, and in the accent. */
-      expect(source).toMatch(/bottom/);
+      expect(source).toContain("<QuantityBadge quantity={wanted}");
+      /* No green chip. */
+      expect(source).not.toMatch(/\{wanted\}x|\$\{wanted\}x/);
     }
-    expect(app).toContain("`${wanted}x`");
-    expect(web).toContain("{wanted}x");
   });
 
   it("shows the whole card rather than cropping its border off", async () => {

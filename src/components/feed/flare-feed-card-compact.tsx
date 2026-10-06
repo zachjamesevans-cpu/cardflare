@@ -5,6 +5,7 @@ import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { PostMenu, UnlessHidden } from "@/components/feed/post-actions";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { agoFrom } from "@/components/feed/flare-feed-card";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { FeedCard, HuntItem } from "@/lib/feed/repository";
@@ -152,18 +153,18 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
 }
 
 /**
- * "1x", bottom right, in the accent.
+ * How many are still wanted, as the small black ×N tag every other count
+ * of copies wears - the binder's "lowkey black and white box" - top left.
+ * The app draws the same (mobile NeedBadge).
  *
- * The founder asked for exactly this. It says what is STILL wanted
- * rather than what was asked for - a card three of four found is a card
- * somebody needs one of, and the number that helps is the one you could
- * answer today. A card fully found wears a tick instead: zero is not a
- * quantity worth drawing.
+ * This was a green "1x" chip, bottom right, made half again as big when
+ * the founder asked. With one copy on almost every card it was mostly
+ * noise, sat over the art and covered the OFFERED band. The founder, on
+ * the Feed: "just stick to the black quantity thing tbh that we have
+ * elsewhere". So one copy draws nothing, as everywhere.
  *
- * Half again as big as it started. The founder: "make the '1x'/quanity
- * stuff like 50% bigger when soemone posts a quantity." At nine points
- * it was a mark you noticed rather than a number you read, which is the
- * wrong way round for the one fact this view keeps.
+ * It says what is STILL wanted rather than what was asked for - a card
+ * three of four found is a card somebody needs one of.
  */
 function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
   const wanted = card.remaining ?? card.quantity ?? 1;
@@ -173,12 +174,5 @@ function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
      the founder's "overlapping gray checkmark thing". */
   if (done) return null;
 
-  return (
-    <span
-      aria-label={`${wanted} still wanted`}
-      className="absolute right-1 bottom-1 rounded-[6px] bg-accent px-1.5 py-0.5 text-[13px] leading-none font-extrabold text-accent-contrast tabular-nums"
-    >
-      {wanted}x
-    </span>
-  );
+  return <QuantityBadge quantity={wanted} className="absolute top-1 left-1" />;
 }
