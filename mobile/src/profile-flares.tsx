@@ -30,11 +30,6 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
 const GAP = 2;
 const ACROSS = 3;
 
-/** "7 Flares", "1 Flare". */
-export function flaresCountLine(count: number): string {
-  return `${count} ${count === 1 ? "Flare" : "Flares"}`;
-}
-
 export function ProfileFlares({
   flares,
   yours,
@@ -67,22 +62,15 @@ export function ProfileFlares({
       style={{ gap: spacing(3) }}
       onLayout={(event) => setMeasured(Math.floor(event.nativeEvent.layout.width))}
     >
-      {/* The words keep their distance from the edge; only the grid
-          under them runs to it. */}
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 12,
-          paddingHorizontal: PROFILE_INSET,
-        }}
-      >
-        {flaresCountLine(flares.length)}
-      </Text>
-
+      {/* No "41 Flares" line over the grid: the header's Flares number
+          already says it. The founder: "notice how the text below flare
+          icon? just delete that entirely". An empty profile says so in
+          the pane instead. Words keep their distance from the edge; only
+          the grid runs to it. */}
       {flares.length === 0 ? (
         yours ? (
           <View style={{ gap: spacing(1), paddingHorizontal: PROFILE_INSET }}>
-            <Muted>No Flares up. Post one from the Flare tab.</Muted>
+            <Muted>No Flares yet. Post one from the Flare tab.</Muted>
             {onPost ? (
               <Tap onPress={onPost} accessibilityLabel="Post a Flare">
                 <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
@@ -93,7 +81,7 @@ export function ProfileFlares({
           </View>
         ) : (
           <View style={{ paddingHorizontal: PROFILE_INSET }}>
-            <Muted>No Flares up.</Muted>
+            <Muted>No Flares yet.</Muted>
           </View>
         )
       ) : (
