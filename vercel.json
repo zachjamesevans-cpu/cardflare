@@ -10,7 +10,7 @@
     },
     {
       "path": "/api/cron/push-receipts",
-      "schedule": "0 10 * * *"
+      "schedule": "0 */2 * * *"
     },
     {
       "path": "/api/cron/night-reminder",

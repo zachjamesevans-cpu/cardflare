@@ -7,6 +7,7 @@ import { playerForUser } from "@/lib/players/accounts";
 import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followPlayer, followState, unfollowPlayer } from "@/lib/players/follows";
+import { afterResponse } from "@/lib/after-response";
 import { notifyNewFollower } from "@/lib/notifications/notify";
 import { publicProfile } from "@/lib/players/profile";
 import { blockState } from "@/lib/players/safety";
@@ -196,7 +197,7 @@ export async function POST(
   // Being followed is worth knowing about. Fire and forget: the edge is
   // already written, and the dedupe key makes a refollow free.
   if (action === "follow") {
-    void notifyNewFollower(me, playerId);
+    afterResponse(() => notifyNewFollower(me, playerId));
   }
 
   return Response.json({ follow: await followState(me, playerId) });

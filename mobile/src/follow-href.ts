@@ -18,7 +18,7 @@ import { openRoom } from "./open-room";
  * rows and a tap on a push notification, so the three cannot disagree.
  *
  * Every path a notice can carry has a line here: /e/<code> (with or
- * without a query), /local?thread=<id>, /local, /feed, /inbox,
+ * without a query), /local?thread=<id>, /local, /feed, /feed?post=<id>, /inbox,
  * /profile, /p/<playerId>, /s/<storeId>, /cards/<cardId> and /nights.
  * A tap on a push used to land a message notice on the Messages list
  * with the conversation one row down; now the path names the thread
@@ -59,7 +59,15 @@ export async function followHref(
     navigation.navigate("Tabs", { screen: "Profile" });
     return;
   }
-  if (href === "/feed") {
+  /* A comment notice names its post: /feed?post=<id>. */
+  if (href.startsWith("/feed?")) {
+    const postId = queryValue(href, "post");
+    if (postId) {
+      navigation.navigate("FlarePost", { postId });
+      return;
+    }
+  }
+  if (href === "/feed" || href.startsWith("/feed?")) {
     navigation.navigate("Tabs", { screen: "Feed" });
     return;
   }

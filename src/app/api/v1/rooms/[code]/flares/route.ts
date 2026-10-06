@@ -80,7 +80,7 @@ export async function POST(
   // The first Flares on an early board wake the store's regulars. A
   // showcase is not a hunt, so it does not count towards that.
   if (flarePhase === "early" && intent === "want") {
-    void notifyEarlyBoardFlares(resolved.room.id);
+    afterResponse(() => notifyEarlyBoardFlares(resolved.room.id));
   }
 
   // Everyone in the room hears about it, exactly as the website's

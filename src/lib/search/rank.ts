@@ -32,12 +32,17 @@ export function readQuery(raw: string): { text: string; playersOnly: boolean } {
   return { text: trimmed, playersOnly: false };
 }
 
+/*
+ * Accents come off (NFKD then drop the marks) so "Pokémon" finds
+ * "pokemon", but letters of every script stay: a name in kana, Hangul or
+ * Cyrillic is still a name, and folding it to nothing made it unfindable.
+ */
 function fold(value: string): string {
   return value
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/\p{M}+/gu, "")
     .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 }
 
