@@ -4,6 +4,7 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { EmberReason } from "@/lib/supabase/types";
 import {
   SEASON_DAYS,
+  WEEKLY_CEILING,
   ageInDays,
   attendanceRef,
   attendancePays,
@@ -279,8 +280,16 @@ async function weekEarned(playerId: string): Promise<number> {
     .gt("created_at", new Date(Date.now() - 7 * DAY_MS).toISOString());
 
   if (error) {
+    /*
+     * Fail toward the smaller award, like the pair and room counts
+     * above. Zero here would read as "nothing earned this week" and pay
+     * the full rate, so a failing ledger read would lift the weekly
+     * ceiling exactly when we cannot see it. Reporting the week as
+     * full pays nothing extra; an honest player loses one trade's
+     * Embers to a blip.
+     */
     console.error("Could not sum the week's Embers", error);
-    return 0;
+    return WEEKLY_CEILING;
   }
   return (data ?? []).reduce((sum, row) => sum + row.earned_delta, 0);
 }
