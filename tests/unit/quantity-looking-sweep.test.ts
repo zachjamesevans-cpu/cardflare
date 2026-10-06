@@ -47,7 +47,7 @@ const appTagged: [string, string][] = [
     'import { QuantityBadge } from "../quantity-badge";',
   ],
   [
-    "mobile/src/screens/settings.tsx",
+    "mobile/src/screens/deck-paste.tsx",
     'import { QuantityBadge } from "../quantity-badge";',
   ],
 ];

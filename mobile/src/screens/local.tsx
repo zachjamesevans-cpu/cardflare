@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -14,6 +14,7 @@ import {
   type LocalFlare,
   type LocalThread,
 } from "../api";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { LOCAL_RADII, MESSAGE_MAX_LENGTH, agoLabel, milesLabel } from "../local-shared";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
@@ -75,7 +76,36 @@ export function LocalScreen({
 
   const [feed, setFeed] = useState<LocalFeed | null>(null);
   const [threads, setThreads] = useState<LocalThread[]>([]);
+  /* True once the list is known - from the last visit's copy or a fresh
+     read - so "no conversations yet" never flashes before the real list
+     lands. */
+  const [threadsKnown, setThreadsKnown] = useState(false);
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  /* Set once a fresh read has painted, so a slow disk read never paints
+     an older list over it. */
+  const fresh = useRef(false);
+
+  /*
+   * The last visit's conversations, painted at once. The founder:
+   * "messages takes a second to load too. please make sure that stays
+   * cached". The list started empty on every open and waited for the
+   * network; now the disk copy shows while the fresh read lands over it.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const playerId = await cachedPlayerId();
+      if (!playerId) return;
+      const cached = await readCache<LocalThread[]>("threads", playerId);
+      if (!live || !cached || fresh.current) return;
+      setThreads(cached);
+      setThreadsKnown(true);
+      setSignedIn((was) => was ?? true);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
   const [refreshing, setRefreshing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   /*
@@ -113,9 +143,13 @@ export function LocalScreen({
           listLocalThreads(),
         ]);
         if (!isCurrent()) return;
+        fresh.current = true;
         setFeed(nextFeed);
         setThreads(nextThreads.threads);
+        setThreadsKnown(true);
         setFailure(null);
+        const playerId = await cachedPlayerId();
+        if (playerId) void writeCache("threads", playerId, nextThreads.threads);
       } catch {
         if (!isCurrent()) return;
         setFailure(
@@ -198,7 +232,7 @@ export function LocalScreen({
   if (threads.length > 0) {
     if (!threadsOnly) rows.push({ kind: "threads-heading" });
     for (const thread of threads) rows.push({ kind: "thread", thread });
-  } else if (threadsOnly && signedIn) {
+  } else if (threadsOnly && signedIn && threadsKnown) {
     rows.push({ kind: "no-threads" });
   }
   if (feed) {

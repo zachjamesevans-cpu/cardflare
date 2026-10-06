@@ -536,6 +536,8 @@ export interface Me {
     feedView?: string;
     /** Joining a room posts their Flares to it. Absent on an older server: on. */
     autoPostFlares?: boolean;
+    /** The sign-in email, for Settings. Absent on an older server. */
+    email?: string | null;
   };
   wants: {
     id: string;
@@ -3466,6 +3468,10 @@ export const saveDeckList = (list: string, deckLabel?: string | null) =>
  * places somebody within a few miles, which is all a list of nearby
  * shops needs and is a long way from an address.
  */
+/** The ZIP on the account, for Settings to show and change. */
+export const getPostalCode = () =>
+  call<{ postalCode: string | null }>("GET", "/api/v1/me/location");
+
 export const savePostalCode = (postalCode: string) =>
   call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", { postalCode });
 

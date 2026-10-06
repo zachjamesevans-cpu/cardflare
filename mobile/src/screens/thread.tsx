@@ -27,6 +27,10 @@ import {
   type LocalThreadMessage,
   type ThreadTrade,
 } from "../api";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
+
+/** One read of a conversation, as the server sends it and the disk keeps it. */
+type ThreadRead = Awaited<ReturnType<typeof readLocalThread>>;
 import { ActionSheet, type ActionItem } from "../action-menu";
 import {
   CardPicker,
@@ -155,6 +159,31 @@ export function ThreadScreen() {
     };
   }, []);
 
+  /* Set once a fresh read has painted, so a slow disk read never paints
+     an older conversation over it. */
+  const fresh = useRef(false);
+
+  /*
+   * The conversation as last seen, painted at once. The founder:
+   * "messages takes a second to load too. please make sure that stays
+   * cached". Each conversation is kept on disk by its id; the fresh read
+   * lands over it, new messages and all.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const playerId = await cachedPlayerId();
+      if (!playerId) return;
+      const cached = await readCache<ThreadRead>("thread", playerId, threadId);
+      if (live && cached?.ok && !fresh.current) apply(cached);
+    })();
+    return () => {
+      live = false;
+    };
+    // `apply` is stable for a thread; the read is once per thread.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadId]);
+
   const load = useCallback(
     async (isCurrent: () => boolean = () => true) => {
       try {
@@ -164,6 +193,20 @@ export function ThreadScreen() {
           navigation.goBack();
           return;
         }
+        fresh.current = true;
+        apply(thread);
+        const playerId = await cachedPlayerId();
+        if (playerId) void writeCache("thread", playerId, thread, threadId);
+      } catch {
+        if (isCurrent()) setError("Could not load the conversation.");
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [threadId, navigation],
+  );
+
+  /** Draws a conversation, fresh or from disk, the same way. */
+  function apply(thread: ThreadRead) {
         setMessages(thread.messages);
         setWithName(thread.withName);
         setCardName(thread.cardName);
@@ -202,12 +245,7 @@ export function ThreadScreen() {
             />
           ),
         });
-      } catch {
-        if (isCurrent()) setError("Could not load the conversation.");
-      }
-    },
-    [threadId, navigation],
-  );
+  }
 
   useFocusEffect(
     useCallback(() => {

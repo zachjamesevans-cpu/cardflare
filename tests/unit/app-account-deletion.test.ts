@@ -15,7 +15,8 @@ import { describe, expect, it } from "vitest";
 const root = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
-const WARNING = "Everything goes: profile, Flares, lists, showcase and unlocks.";
+const WARNING =
+  "Everything goes: your profile, Flares, hunts, binders, showcase, trade history, Embers and unlocks.";
 
 describe("account deletion", () => {
   it("has a server endpoint the app calls and a helper the website shares", () => {

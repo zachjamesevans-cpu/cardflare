@@ -1,26 +1,25 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Image, ScrollView, Text, View } from "react-native";
+import Constants from "expo-constants";
+import * as Notifications from "expo-notifications";
+import { AppState, Linking, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 
 import { API_BASE } from "../config";
 import {
   ApiError,
-  type DeckPreviewEntry,
   deleteAccount,
   describeError,
   getMe,
-  getProfile,
+  getPostalCode,
   getPushPrefs,
   listBlockedPlayers,
   type BlockedPlayer,
   type Me,
-  previewDeckList,
-  type Profile,
-  saveDeckList,
+  savePostalCode,
   setAutoPost as saveAutoPost,
   setFeedView,
   setPushPref,
@@ -36,12 +35,13 @@ import {
   Card,
   ErrorLine,
   Input,
+  Loading,
   Muted,
   Tap,
   Title,
 } from "../ui";
-import { parseDeckList } from "../deck-list";
-import { QuantityBadge } from "../quantity-badge";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
+import { restorePro } from "../pro";
 import {
   PUSH_GROUPS,
   PUSH_HEADING,
@@ -59,109 +59,26 @@ import {
 } from "../feed-views";
 
 /**
- * Settings: what the Account tab used to be, now behind the profile's cog.
+ * Settings, behind the profile's cog: how the app behaves for you, and
+ * the account housekeeping App Review expects to find in one place.
  *
- * Nothing here changed but where it lives — the founder's instruction was
- * exactly that. Your collection, how the Feed is drawn, the deck-list
- * paste box, and the connection test that has earned its keep more than
- * once.
- *
- * The wants list is deliberately NOT here any more: it was a second copy
- * of the Flare tab's, which is the tab named after it. Your name and
- * handle moved too: they are rows on Edit profile now, with the
- * pronouns and the bio, the way Instagram keeps them.
+ * The founder's review (2026-10-06): "a lot of that stuff is old from
+ * much earlier builds". So, top to bottom: your store's bar, your
+ * collection, Feed view, Rooms, push, blocked players, then Account
+ * (email, ZIP, Pro, help and the legal pages, the version), Sign out,
+ * and Delete account last. The deck paste moved to its own screen,
+ * opened from Post a Flare; the dev connection probe is gone. Name,
+ * handle, pronouns and bio live on Edit profile, the way Instagram keeps
+ * them.
  */
 
-/** GET and POST the no-auth ping; the verdict names where POSTs die. */
-function ConnectionTest() {
-  const [result, setResult] = useState<string | null>(null);
-
-  const probe = async (
-    label: string,
-    method: string,
-    body?: string,
-    contentType?: string,
-    payloadHeader?: string,
-  ) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10_000);
-    const started = Date.now();
-    try {
-      const response = await fetch(`${API_BASE}/api/v1/ping`, {
-        method,
-        signal: controller.signal,
-        headers: {
-          ...(contentType ? { "content-type": contentType } : {}),
-          ...(payloadHeader ? { "x-cf-payload": payloadHeader } : {}),
-        },
-        ...(body === undefined ? {} : { body }),
-      });
-      // The header probe checks arrival, not just status: the server
-      // echoes how many header bytes it saw, and that number must match
-      // what was sent or a middlebox is stripping the header.
-      if (payloadHeader) {
-        const echo = (await response.json().catch(() => ({}))) as {
-          headerBytes?: number;
-        };
-        const intact = echo.headerBytes === payloadHeader.length;
-        return `${label}: ${response.status}, ${
-          intact ? "arrived intact" : "MANGLED"
-        } in ${Date.now() - started}ms`;
-      }
-      return `${label}: ${response.status} in ${Date.now() - started}ms`;
-    } catch {
-      return `${label}: FAILED after ${Date.now() - started}ms`;
-    } finally {
-      clearTimeout(timer);
-    }
-  };
-
-  /*
-   * Each row changes exactly one variable; the first FAILED names it.
-   * The last row is the transport the app's writes actually use now —
-   * payload in the x-cf-payload header, no body — and must pass.
-   */
-  const MATRIX: [
-    string,
-    string,
-    string | undefined,
-    string | undefined,
-    string | undefined,
-  ][] = [
-    ["GET", "GET", undefined, undefined, undefined],
-    ["POST empty", "POST", undefined, undefined, undefined],
-    ["POST body+json", "POST", "{}", "application/json", undefined],
-    ["POST body+plain", "POST", "{}", "text/plain", undefined],
-    ["POST body only", "POST", "{}", undefined, undefined],
-    ["DELETE empty", "DELETE", undefined, undefined, undefined],
-    [
-      "POST header payload",
-      "POST",
-      undefined,
-      undefined,
-      encodeURIComponent(JSON.stringify({ probe: true })),
-    ],
-  ];
-
-  return (
-    <Card>
-      <Title>Connection test</Title>
-      {result && <Body>{result}</Body>}
-      <AsyncButton
-        label="Run test"
-        pendingLabel="Testing…"
-        variant="secondary"
-        onPress={async () => {
-          setResult("Testing…");
-          const lines: string[] = [];
-          for (const [label, method, body, type] of MATRIX) {
-            lines.push(await probe(label, method, body, type));
-            setResult(lines.join("\n"));
-          }
-        }}
-      />
-    </Card>
-  );
+/** Everything the screen reads on open, kept together on disk too. */
+interface SettingsData {
+  me: Me;
+  /* The ZIP on the account, which Nearby and distances read. */
+  postalCode: string | null;
+  prefs: PushPrefs | null;
+  blocked: BlockedPlayer[];
 }
 
 export function SettingsScreen() {
@@ -185,34 +102,95 @@ export function SettingsScreen() {
      account says otherwise, which is also what an older server means. */
   const [autoPost, setAutoPost] = useState(true);
   const [autoPostError, setAutoPostError] = useState<string | null>(null);
-  /* The handle, for the delete-account lock at the bottom. Name and
-     handle are edited on Edit profile, not here. */
-  const [profile, setProfile] = useState<Profile | null>(null);
+  /* The ZIP, shown and changed on the Account card. */
+  const [postalCode, setPostalCode] = useState<string | null>(null);
+
+  /* The switches and the blocked list, read in the same batch as the
+     account so the screen arrives whole. Null until that batch lands. */
+  const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(null);
+  /* True once the first batch has settled, or the last visit's copy
+     painted: until then one loading line, not a screen assembling. */
+  const [ready, setReady] = useState(false);
+  /* Set once a fresh read has painted, so a slow disk read never
+     paints last week's copy over it. */
+  const fresh = useRef(false);
+
+  /*
+   * ONE READ, ONE PAINT.
+   *
+   * The founder, backing out of Settings and coming back: "seems like
+   * they dont load everything at once and stuff pops in". It was four
+   * reads landing on their own schedules - the account and profile,
+   * the push switches and the blocked list each in their own component
+   * - and sections that only draw once their data arrives (your store,
+   * your collection, the switches), so the page grew and shifted as each
+   * one came back. The profile read is gone from it too: Delete account
+   * needed only the handle, which the account already carries.
+   *
+   * Now all four go out together and the screen paints once they have
+   * all settled. The last visit's copy is kept on disk, so a second
+   * open paints at once from it while the fresh read lands over the
+   * top in a single step.
+   */
+  const apply = useCallback((data: SettingsData) => {
+    setMe(data.me);
+    setPostalCode(data.postalCode);
+    setView(feedViewFrom(data.me.player.feedView));
+    setAutoPost(data.me.player.autoPostFlares ?? true);
+    setPrefs(data.prefs);
+    setBlocked(data.blocked);
+    setReady(true);
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const playerId = await cachedPlayerId();
+      if (!playerId) return;
+      const cached = await readCache<SettingsData>("settings", playerId);
+      /* Only if the fresh read has not beaten it here. */
+      if (live && cached && !fresh.current) apply(cached);
+    })();
+    return () => {
+      live = false;
+    };
+  }, [apply]);
 
   useFocusEffect(
     useCallback(() => {
       let live = true;
       void (async () => {
-        try {
-          const [result, mine] = await Promise.all([
-            getMe(),
-            getProfile().catch(() => null),
-          ]);
-          if (live) {
-            setMe(result);
-            setProfile(mine?.profile ?? null);
-            setView(feedViewFrom(result.player.feedView));
-            setAutoPost(result.player.autoPostFlares ?? true);
-          }
-        } catch {
-          if (live) setMe(null);
+        const [account, zip, push, blocks] = await Promise.allSettled([
+          getMe(),
+          getPostalCode(),
+          getPushPrefs(),
+          listBlockedPlayers(),
+        ]);
+        if (!live) return;
+        if (account.status !== "fulfilled") {
+          /* Draw what can be drawn rather than spin forever. */
+          setReady(true);
+          return;
         }
+        const data: SettingsData = {
+          me: account.value,
+          postalCode: zip.status === "fulfilled" ? zip.value.postalCode : null,
+          prefs: push.status === "fulfilled" ? push.value.prefs : null,
+          /* An older server has no list: an empty one, not a gap. */
+          blocked: blocks.status === "fulfilled" ? blocks.value.blocked : [],
+        };
+        fresh.current = true;
+        apply(data);
+        void writeCache("settings", data.me.player.id, data);
       })();
       return () => {
         live = false;
       };
-    }, []),
+    }, [apply]),
   );
+
+  if (!ready) return <Loading />;
 
   /* The stores this account owns that carry a bar; nobody else's. */
   const ownedGifts = (me?.staff ?? []).flatMap((row) =>
@@ -244,30 +222,22 @@ export function SettingsScreen() {
       {me?.collection && (
         <Card>
           <Title>Your collection</Title>
-          <Muted>
-            {`${me.collection.cardsMatched.toLocaleString()} cards along, matched quietly in every room and never listed.`}
-          </Muted>
+          <Body>
+            {`${me.collection.cardsMatched.toLocaleString()} cards imported. Rooms quietly flag the Flares you could answer; nobody else ever sees it.`}
+          </Body>
+          {/* The Collectr import is a file upload, which the website does
+              well and a phone does badly. */}
+          <Tap
+            accessibilityLabel="Update your collection on cardflare.gg"
+            onPress={() => void Linking.openURL(`${API_BASE}/profile/settings`)}
+          >
+            <Text style={{ color: colors.accent, fontWeight: "600" }}>
+              Update it on cardflare.gg →
+            </Text>
+          </Tap>
         </Card>
       )}
 
-      {/*
-       * One list, not two.
-       *
-       * This was a second copy of the Flare tab's list - the founder:
-       * "the 'saved wants' section in the settings is kinda redundant,
-       * since it's just the flare section, jsut elsewhere." He is right,
-       * and two renderings of one list is how they drift: the tab learned
-       * to say which cards are live on a board and this one never would.
-       *
-       * The paste box stays, because pasting a deck is a settings-shaped
-       * act - done once, at home, with a keyboard - and it has nowhere
-       * better to live yet.
-       */}
-      {/*
-       * The Lab, from Settings rather than from a gesture nobody would
-       * find. It ships in the binary on purpose: the person who needs it
-       * is holding a TestFlight build, not a debug one.
-       */}
       {/*
        * HOW THE FEED IS DRAWN. The founder: "lets develop a few 'views'
        * for the feed, that can be changed under settings in the
@@ -384,9 +354,9 @@ export function SettingsScreen() {
         {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
-      <PushPrefSwitches />
+      <PushPrefSwitches initial={prefs} />
 
-      <BlockedPlayers />
+      <BlockedPlayers initial={blocked} />
 
       {/* Tooling, for a development build only. A player's settings
           page is not the place for a design lab or a connection probe;
@@ -406,39 +376,29 @@ export function SettingsScreen() {
         </Card>
       )}
 
-      <Card>
-        <Title>Paste a deck list</Title>
-        <Body>
-          Every card in it becomes a Flare. Walk into any room and it offers to post the
-          lot in one go.
-        </Body>
+      <AccountCard
+        email={me?.player.email ?? null}
+        postalCode={postalCode}
+        onPostalCode={setPostalCode}
+      />
 
-        <DeckListField />
+      <ProCard />
 
-        <Tap
-          onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
-          accessibilityLabel="Open your Flares"
-          style={{ paddingTop: spacing(1) }}
-        >
-          <Text style={{ color: colors.accent, fontWeight: "600" }}>
-            {me && me.wants.length > 0
-              ? `See all ${me.wants.length} on the Flare tab →`
-              : "Your Flares live on the Flare tab →"}
-          </Text>
-        </Tap>
-      </Card>
+      <HelpCard />
 
-      <Card>
-        <Title>Email and password</Title>
-        <Body>
-          Both live on the website: open cardflare.gg, go to your profile, then
-          settings. Signing in here uses whatever you set there.
-        </Body>
-      </Card>
+      <AsyncButton
+        label="Sign out"
+        pendingLabel="Signing out…"
+        variant="secondary"
+        onPress={async () => {
+          await signOut();
+        }}
+      />
 
-      {__DEV__ && <ConnectionTest />}
-
-      {profile && <DeleteAccount handle={profile.handle} />}
+      {/* Always here when the account is: App Review's 5.1.1(v). It used
+          to wait on a separate profile read and vanished when that one
+          failed. */}
+      {me?.player.handle ? <DeleteAccount handle={me.player.handle} /> : null}
     </ScrollView>
   );
 }
@@ -449,41 +409,43 @@ export function SettingsScreen() {
  * (src/components/players/push-pref-toggles.tsx); the Inbox keeps
  * every notice whatever these say.
  *
- * Null until the first read lands, so the switches never paint a
- * default somebody then "turns off" that was never on. Its own read,
- * so a settings screen on an older server still draws everything
- * else. Optimistic on a tap, the way the Rooms switch is: the switch
- * moves at once, the write follows, and a failure paints the truth
- * back and says so.
+ * Read with the rest of the screen, in its one batch, and handed in:
+ * null when that read failed, so the switches never paint a default
+ * somebody then "turns off" that was never on, and the line says why.
+ * Optimistic on a tap, the way the Rooms switch is: the switch moves
+ * at once, the write follows, and a failure paints the truth back and
+ * says so.
  */
-function PushPrefSwitches() {
-  const [prefs, setPrefs] = useState<PushPrefs | null>(null);
+function PushPrefSwitches({ initial }: { initial: PushPrefs | null }) {
+  const [prefs, setPrefs] = useState<PushPrefs | null>(initial);
   const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      getPushPrefs()
-        .then((result) => {
-          if (!live) return;
-          setPrefs(result.prefs);
-          setError(null);
-        })
-        .catch(() => {
-          /* No switches to draw until the read lands; the line says why. */
-          if (!live) return;
-          setPrefs((current) => {
-            if (!current) {
-              setError("Could not load these right now. Try again in a moment.");
-            }
-            return current;
-          });
-        });
-      return () => {
-        live = false;
-      };
-    }, []),
-  );
+  /* A fresher batch landing (the next open) takes over. */
+  useEffect(() => {
+    if (initial) setPrefs(initial);
+  }, [initial]);
+
+  const unread = prefs === null ? "Could not load these right now. Try again in a moment." : null;
+
+  /*
+   * Whether iOS lets the app buzz at all. These switches are the
+   * account's; the phone's own permission sits above them, and with it
+   * off every switch still read "on" while nothing ever arrived. Checked
+   * again whenever the app comes back, so turning it on in iOS Settings
+   * clears the line without reopening the screen.
+   */
+  const [phoneOff, setPhoneOff] = useState(false);
+  useEffect(() => {
+    const check = () =>
+      void Notifications.getPermissionsAsync()
+        .then((status) => setPhoneOff(!status.granted))
+        .catch(() => setPhoneOff(false));
+    check();
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") check();
+    });
+    return () => sub.remove();
+  }, []);
 
   const flip = (group: PushGroup) => {
     if (!prefs) return;
@@ -502,6 +464,17 @@ function PushPrefSwitches() {
     <Card>
       <Title>{PUSH_HEADING}</Title>
       <Muted>{PUSH_LINE}</Muted>
+      {phoneOff ? (
+        <Tap
+          accessibilityLabel="Notifications are off for CardFlare. Open iOS Settings"
+          onPress={() => void Linking.openSettings()}
+        >
+          <Text style={{ color: colors.danger, fontSize: 13 }}>
+            Notifications are off for CardFlare on this phone, so none of these will
+            arrive. Turn them on in iOS Settings →
+          </Text>
+        </Tap>
+      ) : null}
       {prefs ? (
         <View style={{ gap: spacing(2) }}>
           {PUSH_GROUPS.map(({ key, label, line }) => {
@@ -539,7 +512,7 @@ function PushPrefSwitches() {
           })}
         </View>
       ) : null}
-      <ErrorLine message={error} />
+      <ErrorLine message={error ?? unread} />
     </Card>
   );
 }
@@ -547,35 +520,30 @@ function PushPrefSwitches() {
 /**
  * The people you have blocked, with Unblock beside each: the website's
  * settings card. A block is made on somebody's profile and undone
- * either there or here. Re-read on focus, because a block made on a
- * profile a moment ago belongs on this list the moment it opens.
+ * either there or here. Read with the rest of the screen on every
+ * focus, because a block made on a profile a moment ago belongs on this
+ * list the moment it opens.
  */
-function BlockedPlayers() {
-  /* Null until the first read lands, so an empty list is the server's
-     word and not a loading gap. */
-  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(null);
+function BlockedPlayers({ initial }: { initial: BlockedPlayer[] | null }) {
+  const [blocked, setBlocked] = useState<BlockedPlayer[] | null>(initial);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
 
-  const load = useCallback(async (alive: () => boolean = () => true) => {
+  /* A fresher batch landing (the next open) takes over. */
+  useEffect(() => {
+    if (initial) setBlocked(initial);
+  }, [initial]);
+
+  /* After an unblock, the list as the server now has it. */
+  const load = async () => {
     try {
       const result = await listBlockedPlayers();
-      if (alive()) setBlocked(result.blocked);
+      setBlocked(result.blocked);
     } catch {
       /* An older server has no list; the card stays on its last word. */
-      if (alive()) setBlocked((current) => current ?? []);
+      setBlocked((current) => current ?? []);
     }
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      let live = true;
-      void load(() => live);
-      return () => {
-        live = false;
-      };
-    }, [load]),
-  );
+  };
 
   const unblock = async (playerId: string) => {
     if (busy) return;
@@ -594,6 +562,10 @@ function BlockedPlayers() {
   return (
     <Card>
       <Title>Blocked players</Title>
+      <Muted>
+        You do not see their posts, and neither of you can message the other. They are
+        not told.
+      </Muted>
       {blocked === null ? null : blocked.length === 0 ? (
         <Muted>Nobody. Blocking somebody on their profile puts them here.</Muted>
       ) : (
@@ -665,8 +637,12 @@ function DeleteAccount({ handle }: { handle: string }) {
     <Card>
       <Title>Delete your account</Title>
       <Body>
-        Everything goes: profile, Flares, lists, showcase and unlocks. There is no undo.
+        {"Everything goes: your profile, Flares, hunts, binders, showcase, trade history, Embers and unlocks. There is no undo."}
       </Body>
+      <Muted>
+        Pro through the App Store is billed by Apple: cancel it in your Apple ID
+        subscriptions too, or it keeps renewing.
+      </Muted>
       {open ? (
         <>
           <Body>Type your handle, @{handle}, to confirm.</Body>
@@ -719,171 +695,199 @@ function DeleteAccount({ handle }: { handle: string }) {
   );
 }
 
+/** A row on a settings card: a label, what it says, and a tap if any. */
+function Row({
+  label,
+  value,
+  onPress,
+  accessibilityLabel,
+}: {
+  label: string;
+  value?: string | null;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
+  const body = (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: spacing(3),
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.elevated,
+        padding: spacing(3),
+      }}
+    >
+      <Text style={{ color: colors.textPrimary, fontWeight: "700", flexShrink: 0 }}>
+        {label}
+      </Text>
+      <View
+        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1), flexShrink: 1 }}
+      >
+        {value ? (
+          <Text numberOfLines={1} style={{ color: colors.textMuted, flexShrink: 1 }}>
+            {value}
+          </Text>
+        ) : null}
+        {onPress ? (
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        ) : null}
+      </View>
+    </View>
+  );
+  return onPress ? (
+    <Tap accessibilityLabel={accessibilityLabel ?? label} onPress={onPress}>
+      {body}
+    </Tap>
+  ) : (
+    body
+  );
+}
+
 /**
- * Paste a deck, get a want list — the app's twin of the website's form.
+ * ACCOUNT: the sign-in email, the ZIP, and the version.
  *
- * What lands here are wants, not Flares. The room posts them as one
- * batch when the player walks in, which is what keeps a thirty-card deck
- * to a single notification and a single Feed item.
+ * This was a card that said email and password "live on the website" -
+ * the app never showed which email you signed in with, and the website
+ * says an email does not change without getting in touch. So it shows
+ * it, and says how. The ZIP was reachable only from Home's Nearby card;
+ * it is account housekeeping, so it is here too, saved the same way.
+ * The version is for a bug report from a TestFlight build.
  */
-function DeckListField() {
-  const [list, setList] = useState("");
-  const [label, setLabel] = useState("");
+function AccountCard({
+  email,
+  postalCode,
+  onPostalCode,
+}: {
+  email: string | null;
+  postalCode: string | null;
+  onPostalCode: (zip: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [typed, setTyped] = useState(postalCode ?? "");
   const [said, setSaid] = useState<string | null>(null);
 
-  const { lines } = parseDeckList(list);
-
-  /*
-   * The looked-up preview, held WITH the text that produced it, so
-   * "still loading" is derived by comparison — the website form's exact
-   * shape. The founder's ask: "have a loading screen that loads all
-   * cards, with images, for confirmation that they are the cards
-   * someone wants." Null entries mean the lookup itself failed; the
-   * save is not blocked over a courtesy, but the screen says so.
-   */
-  const [settled, setSettled] = useState<{
-    list: string;
-    entries: DeckPreviewEntry[] | null;
-  } | null>(null);
-
-  useEffect(() => {
-    if (parseDeckList(list).lines.length === 0) return;
-
-    let current = true;
-    const timer = setTimeout(() => {
-      previewDeckList(list)
-        .then((result) => {
-          if (current) setSettled({ list, entries: result.entries });
-        })
-        .catch(() => {
-          if (current) setSettled({ list, entries: null });
-        });
-    }, 500);
-
-    return () => {
-      current = false;
-      clearTimeout(timer);
-    };
-  }, [list]);
-
-  const preview = settled?.list === list ? settled.entries : undefined;
-  const loading = lines.length > 0 && preview === undefined;
+  const version = Constants.expoConfig?.version ?? "?";
+  const build = Constants.expoConfig?.ios?.buildNumber;
 
   return (
-    <View style={{ gap: spacing(2) }}>
-      <Input
-        value={list}
-        onChangeText={(next) => {
-          setList(next);
-          setSaid(null);
-        }}
-        placeholder={"Paste a deck list\n4x OP17-001\n2xOP17-005"}
-        multiline
-        numberOfLines={5}
-        autoCapitalize="characters"
-        autoCorrect={false}
-        style={{ minHeight: 110, textAlignVertical: "top" }}
-      />
-      <Input
-        value={label}
-        onChangeText={setLabel}
-        placeholder="Call it something (optional)"
-        maxLength={40}
-      />
+    <Card>
+      <Title>Account</Title>
+      <Row label="Email" value={email ?? "Not available"} />
       <Muted>
-        One card per line. Counts in front or behind both work, with or without a space,
-        and anything after the number is ignored.
+        To change your email, get in touch below. Passwords reset from the sign-in screen.
       </Muted>
 
-      {loading && <Muted>Loading your cards…</Muted>}
-      {preview === null && lines.length > 0 && (
-        <Muted>Could not load the previews. You can still save.</Muted>
-      )}
-
-      {preview && preview.length > 0 && (
+      {editing ? (
         <View style={{ gap: spacing(2) }}>
-          <Muted>Check the faces, then save.</Muted>
-          {preview.map((entry) => (
-            <View
-              key={entry.cardNumber}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing(2),
-              }}
-            >
-              {/* The confirmation IS the picture. An empty slot where
-                  one should be is itself the message: this number
-                  matched nothing. */}
-              <View
-                style={{
-                  width: 40,
-                  height: 56,
-                  borderRadius: 4,
-                  overflow: "hidden",
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  backgroundColor: colors.canvas,
-                }}
-              >
-                {entry.imageUrl ? (
-                  <Image
-                    source={{ uri: entry.imageUrl }}
-                    style={{ width: "100%", height: "100%" }}
-                    resizeMode="cover"
-                  />
-                ) : null}
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text
-                  numberOfLines={1}
-                  style={{
-                    color: entry.name ? colors.textPrimary : colors.danger,
-                    fontSize: 14,
-                    fontWeight: "600",
-                  }}
-                >
-                  {entry.name ?? "Not in the catalogue yet"}
-                </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                  {entry.cardNumber}
-                </Text>
-              </View>
-              <QuantityBadge quantity={entry.quantity} size="md" />
-            </View>
-          ))}
+          <Input
+            value={typed}
+            onChangeText={(next) => {
+              setTyped(next.replace(/\D/g, "").slice(0, 5));
+              setSaid(null);
+            }}
+            placeholder="5-digit ZIP"
+            keyboardType="number-pad"
+            maxLength={5}
+            accessibilityLabel="Your ZIP code"
+          />
+          <AsyncButton
+            label={typed.length === 0 ? "Clear ZIP" : "Save ZIP"}
+            pendingLabel="Saving…"
+            disabled={typed.length !== 0 && typed.length !== 5}
+            onPress={async () => {
+              try {
+                const result = await savePostalCode(typed);
+                onPostalCode(result.postalCode);
+                setEditing(false);
+                setSaid(null);
+              } catch (caught) {
+                setSaid(describeError(caught));
+              }
+            }}
+          />
+          <Tap
+            accessibilityLabel="Keep the ZIP"
+            onPress={() => {
+              setEditing(false);
+              setTyped(postalCode ?? "");
+              setSaid(null);
+            }}
+          >
+            <Muted>Cancel</Muted>
+          </Tap>
+          {said ? <ErrorLine message={said} /> : null}
         </View>
+      ) : (
+        <Row
+          label="ZIP code"
+          value={postalCode ?? "Not set"}
+          accessibilityLabel={`ZIP code, ${postalCode ?? "not set"}. Change it`}
+          onPress={() => {
+            setTyped(postalCode ?? "");
+            setEditing(true);
+          }}
+        />
       )}
 
+      <Row label="Version" value={build ? `${version} (${build})` : version} />
+    </Card>
+  );
+}
+
+/**
+ * PRO: manage the subscription and restore it, from Settings as well as
+ * the Pro screen. Apple bills it, so managing it is Apple's page; Restore
+ * is the same call the Pro screen makes.
+ */
+function ProCard() {
+  const [said, setSaid] = useState<string | null>(null);
+  return (
+    <Card>
+      <Title>Pro</Title>
+      {/* The same button as Restore under it: two actions, one shape. */}
+      <Button
+        label="Manage subscription"
+        variant="secondary"
+        onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
+      />
       <AsyncButton
-        label={
-          lines.length === 0
-            ? "Paste a list first"
-            : loading
-              ? "Loading your cards…"
-              : `These are right, save ${lines.length}`
-        }
-        pendingLabel="Saving…"
-        disabled={lines.length === 0 || loading}
+        label="Restore purchases"
+        pendingLabel="Restoring…"
+        variant="secondary"
         onPress={async () => {
           setSaid(null);
-          try {
-            const result = await saveDeckList(list, label.trim() || null);
-            setList("");
-            setLabel("");
-            setSaid(
-              `${result.saved} saved.${
-                result.unknown.length > 0
-                  ? ` Not in the catalogue: ${result.unknown.slice(0, 6).join(", ")}.`
-                  : ""
-              }${result.atCap ? " Your list is full, so the rest were skipped." : ""}`,
-            );
-          } catch (caught) {
-            setSaid(describeError(caught));
-          }
+          const outcome = await restorePro();
+          setSaid(
+            outcome.kind === "pro"
+              ? "Pro restored. Welcome back."
+              : outcome.kind === "none"
+                ? "No Pro subscription found on this Apple ID."
+                : outcome.kind === "unavailable"
+                  ? "The App Store is not available right now. Try again later."
+                  : `Restore did not finish: ${outcome.message}`,
+          );
         }}
       />
       {said ? <Muted>{said}</Muted> : null}
-    </View>
+    </Card>
+  );
+}
+
+/** HELP: getting in touch, and the two pages App Review reads for. */
+function HelpCard() {
+  return (
+    <Card>
+      <Title>Help</Title>
+      <Row label="Contact us" onPress={() => void Linking.openURL(`${API_BASE}/contact`)} />
+      <Row label="Terms of use" onPress={() => void Linking.openURL(`${API_BASE}/terms`)} />
+      <Row
+        label="Privacy policy"
+        onPress={() => void Linking.openURL(`${API_BASE}/privacy`)}
+      />
+    </Card>
   );
 }

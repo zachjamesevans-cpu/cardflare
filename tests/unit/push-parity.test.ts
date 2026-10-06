@@ -172,10 +172,10 @@ describe("the app's settings screen", () => {
     expect(appSettings).toContain("<Muted>{PUSH_LINE}</Muted>");
     const rooms = appSettings.indexOf("<Title>Rooms</Title>");
     /* The section inline, or lifted into its own component and placed. */
-    const placed = appSettings.indexOf("<PushPrefSwitches />");
+    const placed = appSettings.indexOf("<PushPrefSwitches initial={prefs} />");
     const push =
       placed >= 0 ? placed : appSettings.indexOf("<Title>{PUSH_HEADING}</Title>");
-    const blocked = appSettings.indexOf("<BlockedPlayers />");
+    const blocked = appSettings.indexOf("<BlockedPlayers initial={blocked} />");
     expect(rooms).toBeGreaterThan(-1);
     expect(push).toBeGreaterThan(rooms);
     expect(blocked).toBeGreaterThan(push);

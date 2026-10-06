@@ -58,6 +58,7 @@ import { RoomTab } from "./src/screens/room";
 import { ThreadScreen } from "./src/screens/thread";
 import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
+import { DeckPasteScreen } from "./src/screens/deck-paste";
 import { StoreScreen } from "./src/screens/store";
 import { CustomizeScreen } from "./src/screens/customize";
 import { ProScreen } from "./src/screens/pro";
@@ -162,6 +163,8 @@ export type StackParams = {
   CreateAccount: undefined;
   Scan: undefined;
   Settings: undefined;
+  /* Paste a deck list: every card goes up as one Flare post. */
+  DeckPaste: undefined;
   /** Instagram's Edit profile: picture, effects, name, username,
       pronouns, bio. The website's /profile/edit. */
   EditProfile: undefined;
@@ -895,6 +898,11 @@ function AppGates() {
             name="Settings"
             component={SettingsScreen}
             options={{ title: "Settings" }}
+          />
+          <Stack.Screen
+            name="DeckPaste"
+            component={DeckPasteScreen}
+            options={{ title: "Paste a deck list" }}
           />
           <Stack.Screen
             name="EditProfile"

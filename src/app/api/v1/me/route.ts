@@ -76,6 +76,7 @@ export async function GET(request: Request): Promise<Response> {
     autoPost,
     staff,
     foundCards,
+    email,
   ] = await Promise.all([
     listWants(player.playerId),
     /* Both directions on one list: see the Flare tab. */
@@ -106,6 +107,16 @@ export async function GET(request: Request): Promise<Response> {
     staffedStores(player.userId),
     /* Cards with every copy in hand, which say "Found" instead of "Live". */
     foundCardsFor(player.playerId),
+    /* The sign-in email, for the app's Settings: it never showed it. A
+       failed read costs the line, not the endpoint. */
+    (async () => {
+      try {
+        const { data } = await getSupabaseAdmin().auth.admin.getUserById(player.userId);
+        return data.user?.email ?? null;
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   return Response.json({
@@ -128,6 +139,7 @@ export async function GET(request: Request): Promise<Response> {
       feedView,
       /* Joining a room posts their Flares to it, unless they said no. */
       autoPostFlares: autoPost,
+      email,
     },
     wants: [...asked, ...offering].map((want) => ({
       id: want.id,

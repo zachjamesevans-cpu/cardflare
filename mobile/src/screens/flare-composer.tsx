@@ -586,6 +586,20 @@ export function FlareComposer({
                 </Muted>
               </View>
 
+              {/* A whole deck at once, from the paste that used to live in
+                  Settings. Only on an empty want: once cards are in, the
+                  tray is the way. */}
+              {draft.items.length === 0 && draft.intent === "want" ? (
+                <Tap
+                  accessibilityLabel="Paste a deck list"
+                  onPress={() => navigation.navigate("DeckPaste")}
+                >
+                  <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 13 }}>
+                    Have a whole deck? Paste the list →
+                  </Text>
+                </Tap>
+              ) : null}
+
               <CardTray
                 items={draft.items.map((item) => ({
                   key: keyOf(item),
