@@ -848,8 +848,10 @@ function ProCard() {
   return (
     <Card>
       <Title>Pro</Title>
-      <Row
+      {/* The same button as Restore under it: two actions, one shape. */}
+      <Button
         label="Manage subscription"
+        variant="secondary"
         onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
       />
       <AsyncButton
