@@ -102,7 +102,7 @@ describe("the Nights screen", () => {
 
   it("files a finished night in Past, a Going one in Going, the rest in Nearby", () => {
     expect(nights).toMatch(
-      /if \(night\.phase === "finished"\) return "past";\s*if \(night\.youGoing\) return "going";\s*return "nearby";/,
+      /if \(phaseOf\(night, now\) === "finished"\) return "past";\s*if \(night\.youGoing\) return "going";\s*return "nearby";/,
     );
   });
 

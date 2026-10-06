@@ -207,9 +207,15 @@ export async function confirmTrade(
 export async function acknowledgeTrade(
   tradeId: string,
   holderSessionId: string,
-): Promise<{ ok: true } | { ok: false; reason: "not-found" | "unavailable" }> {
+): Promise<
+  | { ok: true; flareId: string | null; requesterSessionId: string | null }
+  | { ok: false; reason: "not-found" | "unavailable" }
+> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
+  /* The Flare and author come back from the stored trade, so the push
+     that follows goes to the trade's real author and nobody a request
+     body names. */
   const { data, error } = await getSupabaseAdmin()
     .from("trades")
     .update({ acknowledged_at: new Date().toISOString() })
@@ -217,7 +223,7 @@ export async function acknowledgeTrade(
     .eq("holder_session_id", holderSessionId)
     .is("acknowledged_at", null)
     .is("disputed_at", null)
-    .select("id")
+    .select("id, flare_id, requester_session_id")
     .maybeSingle();
 
   if (error) {
@@ -227,7 +233,11 @@ export async function acknowledgeTrade(
   if (!data) return { ok: false, reason: "not-found" };
 
   await awardTradeEmbers(tradeId, "acknowledged");
-  return { ok: true };
+  return {
+    ok: true,
+    flareId: data.flare_id,
+    requesterSessionId: data.requester_session_id,
+  };
 }
 
 /**

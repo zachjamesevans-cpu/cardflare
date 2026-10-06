@@ -22,6 +22,7 @@ import {
   rememberRoom,
   storedAccessToken,
   type NightItem,
+  type NightPhase,
 } from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { useTabBarInset } from "../glass";
@@ -68,12 +69,29 @@ export const TAB_ORDER: NightTab[] = ["going", "nearby", "past"];
 export const DEFAULT_TAB: NightTab = "going";
 
 /**
+ * The night's phase as of now. The server says "finished" for a night
+ * past its end, but a list painted from the cache, or left open on the
+ * screen, can outlive that: a night whose end has gone by reads as
+ * ended here too, never as live.
+ */
+export function phaseOf(night: NightItem, now: number = Date.now()): NightPhase {
+  if (
+    night.phase !== "finished" &&
+    night.endsAt &&
+    now >= new Date(night.endsAt).getTime()
+  ) {
+    return "finished";
+  }
+  return night.phase;
+}
+
+/**
  * Which tab a night belongs to. Past is a night that has ended (the
  * server lists only the ones the viewer went to); Going is a night the
  * viewer said Going to that has not; Nearby is everything else.
  */
-export function tabFor(night: NightItem): NightTab {
-  if (night.phase === "finished") return "past";
+export function tabFor(night: NightItem, now: number = Date.now()): NightTab {
+  if (phaseOf(night, now) === "finished") return "past";
   if (night.youGoing) return "going";
   return "nearby";
 }
@@ -93,9 +111,10 @@ export function dateBlock(
 }
 
 /** "11:00 AM" in the store's zone, "Open now" live, "Ended" in Past. */
-export function startLine(night: NightItem): string {
-  if (night.phase === "live") return "Open now";
-  if (night.phase === "finished") return "Ended";
+export function startLine(night: NightItem, now: number = Date.now()): string {
+  const phase = phaseOf(night, now);
+  if (phase === "live") return "Open now";
+  if (phase === "finished") return "Ended";
   return new Intl.DateTimeFormat("en-US", {
     hour: "numeric",
     minute: "2-digit",
@@ -399,8 +418,9 @@ function NightCard({
   onStore: () => void;
 }) {
   const { month, day } = dateBlock(night.startsAt, night.timeZone);
-  const past = night.phase === "finished";
-  const live = night.phase === "live";
+  const phase = phaseOf(night);
+  const past = phase === "finished";
+  const live = phase === "live";
   const matches = night.matches ?? null;
 
   return (

@@ -9,26 +9,63 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * The reminder on the day of a night.
+ * The reminder before a night.
  *
- * Runs once a day at 16:00 UTC, which is the morning in the Americas
- * and the late afternoon in Europe, and reminds everyone going to a
- * scheduled night that starts in the next HORIZON hours: the time, the
- * matches on the board for them, the cards to bring. A night further
- * out waits for tomorrow's run; one already finished is skipped. The
- * per-night, per-player dedupe key makes a rerun free.
+ * Runs every 30 minutes and reminds everyone going to a scheduled night
+ * that starts within the next HORIZON hours: the time, the matches on
+ * the board for them, the cards to bring. A fixed daily run reminded a
+ * 7pm night in Sydney at 2am; this way the reminder lands a couple of
+ * hours before doors wherever the store is.
  *
- * Bounded: a run reminds at most NOTICE_CAP players, so a sudden
- * hundred nights cannot run the function past its minute. What is
- * left is said in the response rather than swallowed.
+ * Once per player per night. The notification's dedupe key
+ * (`reminder:<night>:<player>`) is the sent-marker: players who already
+ * have one are skipped before any work is done for them, so a run only
+ * spends time on people still owed a reminder.
+ *
+ * No cap that starves anyone: a run works through every due player,
+ * night by night, and stops only when it nears the function's time
+ * limit (TIME_BUDGET_MS). Whoever it did not reach is still unmarked,
+ * so the next run, half an hour later and well inside the horizon,
+ * picks them up first. What was left is said in the response.
  *
  * Guarded by CRON_SECRET, and fail-closed.
  */
 
-/** How far ahead a night may start and still be "today". */
-const HORIZON_MS = 14 * 60 * 60 * 1000;
-/** Notices per run. */
-const NOTICE_CAP = 150;
+/** How far ahead a night may start and still be reminded about now. */
+const HORIZON_MS = 3 * 60 * 60 * 1000;
+/** Stop starting new players this far into the run; maxDuration is 60s. */
+const TIME_BUDGET_MS = 45 * 1000;
+/** Dedupe keys looked up per query. */
+const KEY_PAGE = 200;
+
+const reminderKey = (eventId: string, playerId: string) =>
+  `reminder:${eventId}:${playerId}`;
+
+/** The players of one night who already have their reminder. */
+async function alreadyReminded(eventId: string, players: string[]): Promise<Set<string>> {
+  const admin = getSupabaseAdmin();
+  const done = new Set<string>();
+  for (let start = 0; start < players.length; start += KEY_PAGE) {
+    const page = players.slice(start, start + KEY_PAGE);
+    const { data, error } = await admin
+      .from("notifications")
+      .select("dedupe_key")
+      .in(
+        "dedupe_key",
+        page.map((playerId) => reminderKey(eventId, playerId)),
+      );
+    if (error) {
+      /* Unknown is not "nobody": the dedupe key still stops a repeat. */
+      console.error("Could not read who was reminded", error);
+      continue;
+    }
+    for (const row of data ?? []) {
+      const playerId = row.dedupe_key?.split(":")[2];
+      if (playerId) done.add(playerId);
+    }
+  }
+  return done;
+}
 
 export async function GET(request: Request): Promise<Response> {
   const secret = process.env.CRON_SECRET;
@@ -49,10 +86,11 @@ export async function GET(request: Request): Promise<Response> {
     .eq("kind", "scheduled")
     .is("cancelled_at", null)
     .gt("starts_at", new Date(now).toISOString())
-    .lte("starts_at", new Date(now + HORIZON_MS).toISOString());
+    .lte("starts_at", new Date(now + HORIZON_MS).toISOString())
+    .order("starts_at");
 
   if (error) {
-    console.error("Could not list today's nights", error);
+    console.error("Could not list the coming nights", error);
     return Response.json({ ok: false }, { status: 500 });
   }
 
@@ -68,6 +106,7 @@ export async function GET(request: Request): Promise<Response> {
 
   let sent = 0;
   let considered = 0;
+  let skipped = 0;
   let truncated = false;
 
   for (const event of events ?? []) {
@@ -92,9 +131,12 @@ export async function GET(request: Request): Promise<Response> {
     const players = [
       ...new Set(roster.flatMap((row) => (row.playerId ? [row.playerId] : []))),
     ];
+    const reminded = await alreadyReminded(event.id, players);
+    skipped += reminded.size;
 
     for (const playerId of players) {
-      if (considered >= NOTICE_CAP) {
+      if (reminded.has(playerId)) continue;
+      if (Date.now() - now >= TIME_BUDGET_MS) {
         truncated = true;
         break;
       }
@@ -120,6 +162,7 @@ export async function GET(request: Request): Promise<Response> {
     nights: (events ?? []).length,
     considered,
     sent,
+    skipped,
     truncated,
   });
 }
