@@ -79,6 +79,7 @@ export const BUY_REFUSALS: Record<string, string> = {
   unknown: "That item is not in the shop any more.",
   locked: "Trade a little more first. This one needs a higher lifetime total.",
   "too-expensive": "Not enough Embers yet. Confirm a few more trades.",
+  "not-pro": "Wearing cosmetics is a cardflare Pro feature.",
   unavailable: "Something went wrong. Please try again in a moment.",
 };
 

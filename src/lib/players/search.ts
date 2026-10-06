@@ -5,6 +5,7 @@ import { matchScore, rankBy } from "@/lib/search/rank";
 import { avatarWearFor } from "./equips";
 import { blockedSet } from "./safety";
 import { avatarPathFor, avatarSrc } from "./profile-image";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * A value inside a PostgREST `.or()` filter, quoted.
@@ -129,7 +130,7 @@ export async function searchPlayersByName(
     displayName: row.display_name,
     handle: row.handle,
     avatarUrl: avatarSrc(avatarPathFor(row)),
-    frame: row.equipped_avatar_frame,
+    frame: wornFrame(row),
     ring: wear.get(row.id)?.ring ?? null,
     aura: wear.get(row.id)?.aura ?? null,
   }));

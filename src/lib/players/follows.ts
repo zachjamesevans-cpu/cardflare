@@ -5,6 +5,7 @@ import { avatarPathFor, avatarSrc } from "./profile-image";
 import { avatarWearFor } from "./equips";
 import { blockedSet } from "./safety";
 import type { CosmeticArtFile } from "./art-files";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * Follows: the founder's option C.
@@ -184,7 +185,7 @@ async function hydrate(playerId: string, ids: string[]): Promise<FollowedPlayer[
         playerId: row.id,
         displayName: row.display_name,
         avatarUrl: avatarSrc(avatarPathFor(row)),
-        frame: row.equipped_avatar_frame,
+        frame: wornFrame(row),
         ring: wear.get(row.id)?.ring ?? null,
         aura: wear.get(row.id)?.aura ?? null,
         ringArt: wear.get(row.id)?.ringArt ?? null,

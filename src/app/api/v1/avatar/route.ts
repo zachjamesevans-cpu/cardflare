@@ -93,6 +93,9 @@ const schema = z.discriminatedUnion("action", [
 /** What a staged chunk is stored as. Has to be on the bucket's allowed list. */
 const CHUNK_TYPE = "application/octet-stream";
 
+/** Chunks fetched at once on commit. */
+const DOWNLOAD_CONCURRENCY = 16;
+
 const chunkPath = (playerId: string, upload: string, index: number) =>
   `tmp/${playerId}/${upload}/${String(index).padStart(3, "0")}`;
 
@@ -141,13 +144,12 @@ export async function POST(request: Request): Promise<Response> {
       );
 
     if (error) {
+      /* The storage refusal is logged here, with the path, and NOT sent
+         to the phone: its message names buckets, paths and policy
+         internals that are nobody's business outside the server. The
+         log is where the founder's "chunk-failed 500" gets diagnosed. */
       console.error("Could not store an avatar chunk", error);
-      /* The storage refusal rides along, so the next time this fails
-         the phone says why instead of a number. */
-      return Response.json(
-        { error: `chunk-failed (${error.message})` },
-        { status: 500 },
-      );
+      return Response.json({ error: "chunk-failed" }, { status: 500 });
     }
 
     return Response.json({ ok: true });
@@ -159,13 +161,28 @@ export async function POST(request: Request): Promise<Response> {
   );
 
   try {
-    const pieces: string[] = [];
-    for (const path of paths) {
-      const { data, error } = await admin.storage.from("avatars").download(path);
-      if (error || !data) {
-        return badRequest("The upload is missing a piece. Start it again.");
-      }
-      pieces.push(await data.text());
+    /*
+     * Fetched several at a time, not one after another: a GIF is a few
+     * hundred pieces, and one round trip each was most of a commit's
+     * time. Bounded, so one commit cannot open four hundred requests to
+     * Storage at once. Order is kept by index, never by arrival.
+     */
+    const pieces: (string | null)[] = new Array(paths.length).fill(null);
+    let missing = false;
+    for (let start = 0; start < paths.length && !missing; start += DOWNLOAD_CONCURRENCY) {
+      await Promise.all(
+        paths.slice(start, start + DOWNLOAD_CONCURRENCY).map(async (path, offset) => {
+          const { data, error } = await admin.storage.from("avatars").download(path);
+          if (error || !data) {
+            missing = true;
+            return;
+          }
+          pieces[start + offset] = await data.text();
+        }),
+      );
+    }
+    if (missing || pieces.some((piece) => piece === null)) {
+      return badRequest("The upload is missing a piece. Start it again.");
     }
 
     const encoded = pieces.join("");

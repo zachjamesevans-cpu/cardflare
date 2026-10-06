@@ -130,6 +130,50 @@ describe("POST /api/v1/avatar", () => {
     expect(source).not.toContain('"text/plain"');
   });
 
+  it("never hands the phone Storage's own error text", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    storage.upload.mockResolvedValueOnce({
+      data: null,
+      error: { message: "new row violates policy for bucket avatars at tmp/..." },
+    });
+    const response = await route.POST(
+      request({
+        action: "chunk",
+        uploadId: "8b7df143-d91c-4396-a527-9a341b3c295d",
+        index: 0,
+        data: "aGVsbG8=",
+      }),
+    );
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: "chunk-failed" });
+  });
+
+  it("commit fetches pieces side by side and still stitches them by index", async () => {
+    const whole = Buffer.from("hello world").toString("base64");
+    const pieces = [whole.slice(0, 8), whole.slice(8)];
+    /* The first piece arrives LAST. */
+    storage.download
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(() => resolve({ data: { text: async () => pieces[0] }, error: null }), 5),
+          ),
+      )
+      .mockResolvedValueOnce({ data: { text: async () => pieces[1] }, error: null });
+
+    const response = await route.POST(
+      request({
+        action: "commit",
+        uploadId: "8b7df143-d91c-4396-a527-9a341b3c295d",
+        count: 2,
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    const [, file] = setAvatar.mock.calls[0] as [string, { arrayBuffer(): Promise<ArrayBuffer> }];
+    expect(Buffer.from(await file.arrayBuffer()).toString()).toBe("hello world");
+  });
+
   it("commit stitches the chunks in order and feeds setAvatar", async () => {
     /* "hello world" split across two text chunks. */
     const whole = Buffer.from("hello world").toString("base64");

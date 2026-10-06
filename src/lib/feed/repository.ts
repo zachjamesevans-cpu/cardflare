@@ -31,6 +31,7 @@ import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { blockedSet } from "@/lib/players/safety";
 import { dropBlockedItems } from "./blocks";
 import { answersFor, foundInPosts, socialForPosts } from "./post-queries";
+import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
  * The Feed: the room's question asked from a sofa.
@@ -2275,7 +2276,7 @@ async function facesFor(playerIds: string[]): Promise<Map<string, FeedFace>> {
        * came out as their still poster in the feed and nowhere else.
        */
       avatarUrl: avatarSrc(avatarPathFor(row)),
-      frame: row.equipped_avatar_frame,
+      frame: wornFrame(row),
       ring: worn?.ring ?? null,
       aura: worn?.aura ?? null,
     });

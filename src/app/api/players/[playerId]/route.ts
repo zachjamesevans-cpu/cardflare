@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { forOldBuild } from "@/app/api/v1/binders/_shared";
 import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer } from "@/lib/api/auth";
@@ -15,6 +17,13 @@ import { profileStats } from "@/lib/players/stats";
 import { getPlayerSession } from "@/lib/players/session";
 import { siteUrl } from "@/lib/site";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
+
+/*
+ * The id is checked before it touches anything. It reaches PostgREST
+ * filters and the follow writes; a non-uuid there is at best a 500 from
+ * Postgres and at worst a string somebody crafted for a filter.
+ */
+const playerIdSchema = z.string().uuid();
 
 /** Repo-shipped art, made fetchable by a client with no origin. */
 function absoluteArt<T extends { url: string } | null>(art: T): T {
@@ -59,19 +68,20 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ playerId: string }> },
 ) {
-  const { playerId } = await params;
+  const parsedId = playerIdSchema.safeParse((await params).playerId);
+  if (!parsedId.success) {
+    return Response.json({ error: "No such player." }, { status: 404 });
+  }
+  const playerId = parsedId.data;
 
   /*
-   * Everything that needs only the id, at once: who is asking, whether
-   * they may, and the profile itself. These used to run one after
-   * another, with the bearer token verified twice, and a profile took
-   * the sum of nine round trips to open. Now it takes the longest one.
+   * Who is asking and whether they may, at once (these used to run one
+   * after another, with the bearer token verified twice). The answer
+   * gates everything after it: a caller with no right to look gets the
+   * 401 before a single read of the profile is made, rather than after
+   * the whole thing was built and thrown away.
    */
-  const [allowed, me, dressed] = await Promise.all([
-    mayLook(request),
-    viewerPlayerId(request),
-    dressedEquipsFor(playerId),
-  ]);
+  const [allowed, me] = await Promise.all([mayLook(request), viewerPlayerId(request)]);
   if (!allowed) {
     return Response.json({ error: "Join a room first." }, { status: 401 });
   }
@@ -89,7 +99,10 @@ export async function GET(
 
   /* After the viewer, because the binder's panel depends on who asks:
      a private binder is absent for everyone but its owner. */
-  const profile = await publicProfile(playerId, me);
+  const [dressed, profile] = await Promise.all([
+    dressedEquipsFor(playerId),
+    publicProfile(playerId, me),
+  ]);
   if (!profile) {
     return Response.json({ error: "No such player." }, { status: 404 });
   }
@@ -179,7 +192,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ playerId: string }> },
 ) {
-  const { playerId } = await params;
+  const parsedId = playerIdSchema.safeParse((await params).playerId);
+  if (!parsedId.success) {
+    return Response.json({ error: "No such player." }, { status: 404 });
+  }
+  const playerId = parsedId.data;
 
   const me = await viewerPlayerId(request);
   if (!me) return Response.json({ error: "Sign in to follow." }, { status: 401 });

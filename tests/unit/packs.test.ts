@@ -69,3 +69,39 @@ describe("pack series", () => {
     }
   });
 });
+
+describe("buying and opening, where the money moves", () => {
+  const source = readFileSync(
+    join(process.cwd(), "src/lib/packs/repository.ts"),
+    "utf8",
+  );
+
+  it("refunds a failed purchase under a ref only that purchase can use", () => {
+    /* ember_ledger.ref is unique across every player: a per-series
+       refund ref paid back the first failure ever and nobody since. */
+    expect(source).not.toMatch(/`pack-refund:\$\{series\.id\}`/);
+    expect(source).toContain("`pack-refund:${series.id}:${playerId}:${purchase}`");
+    expect(source).toContain("`pack:${series.id}:${purchase}`");
+  });
+
+  it("never reports a pull as won when its row did not land", () => {
+    const failed = source.slice(source.indexOf('"Could not grant a pull"'));
+    expect(failed).toContain("duplicate: true");
+    expect(failed).toContain("embersInstead: compensated ? DUPLICATE_EMBERS : 0");
+    /* The won branch is only reached when the insert had no error. */
+    expect(source).toMatch(/if \(!error\) \{\s*owned\.add\(entry\.slug\);/);
+  });
+});
+
+describe("the weekly ceiling when the ledger cannot be read", () => {
+  it("counts the week as full rather than empty", () => {
+    const source = readFileSync(
+      join(process.cwd(), "src/lib/players/embers.ts"),
+      "utf8",
+    );
+    const week = source.slice(source.indexOf("async function weekEarned"));
+    const body = week.slice(0, week.indexOf("\n}\n"));
+    expect(body).toContain("return WEEKLY_CEILING;");
+    expect(body).not.toMatch(/return 0;/);
+  });
+});

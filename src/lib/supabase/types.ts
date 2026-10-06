@@ -2223,6 +2223,12 @@ export type Database = {
         Args: { p_want: string; p_player: string; p_delta: number };
         Returns: number | null;
       };
+      /* One hit against a key in its current fixed window, shared by
+         every instance. See src/lib/rate-limit.ts. */
+      rate_limit_hit: {
+        Args: { p_key: string; p_window_ms: number };
+        Returns: { hits: number; resets_at: string }[];
+      };
       catalog_sets: {
         Args: Record<string, never>;
         Returns: {

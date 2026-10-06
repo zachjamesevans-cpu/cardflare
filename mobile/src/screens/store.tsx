@@ -4,6 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import {
+  ApiError,
   buyCosmetic,
   getPacks,
   getProfile,
@@ -87,7 +88,14 @@ export function StoreScreen() {
           item.owned ? `${item.name} equipped.` : `${item.name} unlocked and equipped.`,
         );
       })
-      .catch(() => setMessage("That did not go through. Try again in a moment."))
+      .catch((caught) =>
+        setMessage(
+          /* The website's words for the same refusal (BUY_REFUSALS). */
+          caught instanceof ApiError && caught.code === "not-pro"
+            ? "Wearing cosmetics is a cardflare Pro feature."
+            : "That did not go through. Try again in a moment.",
+        ),
+      )
       .finally(() => setBusy(null));
   };
 

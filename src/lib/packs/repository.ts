@@ -100,22 +100,35 @@ export async function buyPackWithEmbers(
      as already-paid, which is right for one-off cosmetics and dead
      wrong for consumables - the founder's second pack was refused as
      "not enough Embers" by exactly this. */
+  const purchase = crypto.randomUUID();
   const paid = await spendEmbers(
     playerId,
     series.priceEmbers,
-    `pack:${series.id}:${crypto.randomUUID()}`,
+    `pack:${series.id}:${purchase}`,
     `${series.name} pack`,
   );
   if (!paid) return "cannot-afford";
 
   const granted = await grantPack(playerId, series.id, "purchase");
   if (!granted) {
-    /* The pack failed to mint after payment: give the Embers back. */
-    await grantSpendableEmbers(
+    /* The pack failed to mint after payment: give the Embers back.
+       The refund ref names THIS purchase, for the same reason the
+       spend does: `ember_ledger.ref` is unique across every player,
+       so a bare `pack-refund:<series>` would refund the first failed
+       purchase anyone ever made and silently keep everyone else's. */
+    const refunded = await grantSpendableEmbers(
       playerId,
       series.priceEmbers,
-      `pack-refund:${series.id}`,
+      `pack-refund:${series.id}:${playerId}:${purchase}`,
+      `${series.name} pack refund`,
     );
+    if (!refunded) {
+      console.error("A pack purchase failed AND its refund failed", {
+        playerId,
+        series: series.id,
+        purchase,
+      });
+    }
     return "failed";
   }
   return "bought";
@@ -182,12 +195,35 @@ export async function openPack(
       const { error } = await admin
         .from("player_cosmetics")
         .insert({ player_id: playerId, cosmetic_slug: entry.slug });
-      if (error) console.error("Could not grant a pull", error);
+      if (!error) {
+        owned.add(entry.slug);
+        pulls.push({
+          slug: entry.slug,
+          rarity: entry.rarity,
+          duplicate: false,
+          embersInstead: 0,
+        });
+        continue;
+      }
+      /*
+       * The pack is already claimed, so a pull that did not land can't
+       * be drawn again. Never show it as won when the row is not there:
+       * the player would go looking in Customize for something they do
+       * not own. It becomes Embers instead, exactly as a duplicate
+       * does - and if even that fails, it is reported as nothing, not
+       * as a prize.
+       */
+      console.error("Could not grant a pull", error);
+      const compensated = await grantSpendableEmbers(
+        playerId,
+        DUPLICATE_EMBERS,
+        `pack-duplicate:${packId}:${entry.slug}`,
+      );
       pulls.push({
         slug: entry.slug,
         rarity: entry.rarity,
-        duplicate: false,
-        embersInstead: 0,
+        duplicate: true,
+        embersInstead: compensated ? DUPLICATE_EMBERS : 0,
       });
     }
   }
