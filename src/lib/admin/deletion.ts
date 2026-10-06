@@ -1,7 +1,13 @@
 import "server-only";
 
+import { forgetApiPlayerById } from "@/lib/api/auth";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { disputeTrade } from "@/lib/trades/repository";
+import {
+  cancelDeletedPlayersSubscription,
+  liveStripeSubscription,
+  removePlayerStorage,
+} from "@/lib/players/account-cleanup";
 import type { Database } from "@/lib/supabase/types";
 import type { DeletePreview, Collateral } from "@/lib/admin/deletion-schema";
 
@@ -296,8 +302,21 @@ export async function deletePlayer(playerId: string): Promise<{
    */
   await reverseRecentTrades(playerId, admin);
 
+  /* Read before the row goes - the subscription cascades with it - and
+     acted on only after, so a delete that fails does not leave somebody
+     with an account and no subscription. */
+  const stripeSubscription = await liveStripeSubscription(playerId, admin);
+
   const { error } = await admin.from("players").delete().eq("id", playerId);
   if (error) return { ok: false, error: error.message };
+  forgetApiPlayerById(playerId);
+
+  /* Outside the cascade: the card at Stripe and the pictures in
+     Storage. Best effort, logged; see account-cleanup.ts. */
+  if (stripeSubscription) {
+    await cancelDeletedPlayersSubscription(playerId, stripeSubscription);
+  }
+  await removePlayerStorage(playerId, admin);
 
   if (player.user_id) {
     const { error: authError } = await admin.auth.admin.deleteUser(player.user_id);
