@@ -362,19 +362,6 @@ async function assemble(
   };
 }
 
-function summarize(binder: Binder): BinderSummary {
-  return {
-    id: binder.id,
-    name: binder.name,
-    forTrade: binder.forTrade,
-    isPublic: binder.isPublic,
-    count: binder.count,
-    layout: binder.layout,
-    cover: binder.cover,
-    onYourHunts: binder.onYourHunts,
-  };
-}
-
 /**
  * A binder, for whoever is looking. Null when the owner has no
  * account, the binder does not exist, or it is private and the viewer
@@ -451,8 +438,69 @@ export async function listBinders(
 ): Promise<BinderSummary[]> {
   const [name, rows] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
   if (!name) return [];
-  const binders = await Promise.all(rows.map((row) => assemble(row, name, viewerId)));
-  return binders.flatMap((binder) => (binder ? [summarize(binder)] : []));
+  const yours = viewerId === ownerId;
+  const visible = rows.filter((row) => yours || row.for_trade);
+  if (visible.length === 0) return [];
+
+  /*
+   * A summary is a count and a hunt tally, so it is read as one: the
+   * card ids of every visible binder in a single (paged) query and the
+   * viewer's wants once, rather than building every binder in full —
+   * names, printings and art for cards nobody is about to see.
+   */
+  const [cards, wanted] = await Promise.all([
+    binderCardIds(visible.map((row) => row.id)),
+    yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
+  ]);
+  return summarizeBinders(visible, cards, wanted);
+}
+
+/** Every card id in these binders, by binder. Paged past the row limit. */
+async function binderCardIds(
+  binderIds: string[],
+): Promise<{ binder_id: string; card_id: string }[]> {
+  const admin = getSupabaseAdmin();
+  const PAGE = 1000;
+  const all: { binder_id: string; card_id: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from("binder_cards")
+      .select("binder_id, card_id")
+      .in("binder_id", binderIds)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) {
+      console.error("Could not count the binders' cards", error);
+      return all;
+    }
+    all.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) return all;
+  }
+}
+
+/** The summaries, in the binders' own order, from their card ids. */
+export function summarizeBinders(
+  rows: Pick<BinderRow, "id" | "name" | "for_trade" | "cover">[],
+  cards: { binder_id: string; card_id: string }[],
+  wanted: Set<string>,
+): BinderSummary[] {
+  const counts = new Map<string, { count: number; onYourHunts: number }>();
+  for (const card of cards) {
+    const tally = counts.get(card.binder_id) ?? { count: 0, onYourHunts: 0 };
+    tally.count += 1;
+    if (wanted.has(card.card_id)) tally.onYourHunts += 1;
+    counts.set(card.binder_id, tally);
+  }
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    forTrade: row.for_trade,
+    isPublic: row.for_trade,
+    count: counts.get(row.id)?.count ?? 0,
+    layout: DEFAULT_BINDER_LAYOUT,
+    cover: isBinderCover(row.cover) ? row.cover : DEFAULT_BINDER_COVER,
+    onYourHunts: counts.get(row.id)?.onYourHunts ?? 0,
+  }));
 }
 
 /**
@@ -533,6 +581,83 @@ async function syncTradeCard(
     (entry) => entry.cardId === cardId && entry.printingId === printingId,
   );
   for (const entry of entries) await removeFromBinder(entry.id, session.id);
+}
+
+/**
+ * Every copy of one card in the owner's binders up for trade, binder by
+ * binder in the owner's order: what a logged "gave" takes copies from.
+ */
+export async function tradeHoldings(
+  playerId: string,
+  cardId: string,
+): Promise<{ binderId: string; cardId: string; printingId: string | null; quantity: number }[]> {
+  if (!isSupabaseConfigured()) return [];
+  const up = (await binderRows(playerId)).filter((row) => row.for_trade);
+  if (up.length === 0) return [];
+  const { data, error } = await getSupabaseAdmin()
+    .from("binder_cards")
+    .select("binder_id, card_id, printing_id, quantity")
+    .in(
+      "binder_id",
+      up.map((row) => row.id),
+    )
+    .eq("card_id", cardId);
+  if (error) {
+    console.error("Could not read the card's binder copies", error);
+    return [];
+  }
+  const order = new Map(up.map((row, index) => [row.id, index]));
+  return (data ?? [])
+    .map((row) => ({
+      binderId: row.binder_id,
+      cardId: row.card_id,
+      printingId: row.printing_id,
+      quantity: row.quantity,
+    }))
+    .sort((a, b) => (order.get(a.binderId) ?? 0) - (order.get(b.binderId) ?? 0));
+}
+
+/**
+ * Moves one card in one of the owner's binders by a delta, in a single
+ * statement (`binder_card_adjust`): copies are added to the count that
+ * is there, or taken off it, and the card leaves the binder only at
+ * zero. Returns the change actually made, which the 99-copy and
+ * 200-card caps can make smaller than asked. The Have list follows.
+ */
+export async function adjustBinderCard(
+  playerId: string,
+  displayName: string,
+  change: { binderId: string; cardId: string; printingId: string | null; delta: number },
+): Promise<number> {
+  if (!isSupabaseConfigured() || change.delta === 0) return 0;
+  const row = await binderRow(playerId, change.binderId);
+  if (!row) return 0;
+  const { data, error } = await getSupabaseAdmin().rpc("binder_card_adjust", {
+    p_binder: change.binderId,
+    p_card: change.cardId,
+    p_printing: change.printingId,
+    p_delta: Math.round(change.delta),
+  });
+  if (error) {
+    console.error("Could not move the binder card", error);
+    return 0;
+  }
+  const applied = typeof data === "number" ? data : 0;
+  if (applied !== 0 && row.for_trade) {
+    await syncTradeCard(playerId, displayName, change.cardId, change.printingId);
+  }
+  return applied;
+}
+
+/**
+ * The binder a card that came in by trade goes into: the owner's first
+ * binder up for trade, or a new "Trade binder" when none is up.
+ */
+export async function tradeBinderFor(playerId: string): Promise<string | null> {
+  const existing = await firstTradeBinderId(playerId);
+  if (existing) return existing;
+  const made = await createBinder(playerId, { name: FIRST_BINDER_NAME, forTrade: true });
+  return made.ok ? made.id : null;
 }
 
 /** Every card of one binder, brought in step: after a toggle or a delete. */

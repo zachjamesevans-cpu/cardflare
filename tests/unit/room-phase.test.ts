@@ -36,9 +36,24 @@ function draftEvent(startsInMs: number, earlyBoardHours: number, now: number) {
 describe("roomPhase", () => {
   const now = Date.parse("2026-08-12T18:00:00Z");
 
-  it("an open room is live, whatever the clock says", () => {
+  it("an open room is live until its end", () => {
     expect(
       roomPhase({ ...draftEvent(-2 * HOUR, 0, now), status: "open" as const }, now),
+    ).toBe("live");
+  });
+
+  it("an open night past its end has ended, before any sweep closes it", () => {
+    expect(
+      roomPhase({ ...draftEvent(-5 * HOUR, 0, now), status: "open" as const }, now),
+    ).toBe("finished");
+  });
+
+  it("a walk-in room has no clock end and stays live while open", () => {
+    expect(
+      roomPhase(
+        { ...draftEvent(-5 * HOUR, 0, now), kind: "walk_in" as const, status: "open" as const },
+        now,
+      ),
     ).toBe("live");
   });
 

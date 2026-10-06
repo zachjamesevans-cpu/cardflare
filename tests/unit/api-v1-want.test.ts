@@ -14,9 +14,8 @@ import { resetApiPlayerMemory } from "@/lib/api/auth";
 
 const getUser = vi.fn();
 const playerForUser = vi.fn();
-const listWants = vi.fn();
 const removeWant = vi.fn();
-const setWantQuantity = vi.fn();
+const adjustWantQuantity = vi.fn();
 
 vi.mock("@/lib/supabase/admin", () => ({
   isSupabaseConfigured: () => true,
@@ -28,9 +27,8 @@ vi.mock("@/lib/players/accounts", () => ({
   playerForUser: (...a: unknown[]) => playerForUser(...a),
 }));
 vi.mock("@/lib/players/wants", () => ({
-  listWants: (...a: unknown[]) => listWants(...a),
   removeWant: (...a: unknown[]) => removeWant(...a),
-  setWantQuantity: (...a: unknown[]) => setWantQuantity(...a),
+  adjustWantQuantity: (...a: unknown[]) => adjustWantQuantity(...a),
 }));
 /* The post following the number is the found rule's job, pinned in
    found-everywhere.test.ts; here it only has to be reachable. */
@@ -58,27 +56,39 @@ beforeEach(() => {
   /* apiPlayer remembers a token for two minutes; every case here fakes
      a different answer for the same token. */
   resetApiPlayerMemory();
-  for (const fn of [getUser, playerForUser, listWants, removeWant, setWantQuantity]) {
+  for (const fn of [getUser, playerForUser, removeWant, adjustWantQuantity]) {
     fn.mockReset();
   }
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   playerForUser.mockResolvedValue({ id: "player-1", display_name: "Kaito" });
-  listWants.mockResolvedValue([{ id: "w1", quantity: 2 }]);
-  setWantQuantity.mockResolvedValue(3);
+  adjustWantQuantity.mockImplementation(async (id: string, _p: string, delta: number) =>
+    id === "w1"
+      ? { ok: true, quantity: 2 + delta, cardId: "card-1" }
+      : { ok: false, reason: "not-found" },
+  );
 });
 
 describe("POST /api/v1/wants/[id]", () => {
-  it("adds the delta to the stored quantity and answers with the result", async () => {
+  it("hands the delta to the database and answers with the stored result", async () => {
     const response = await route.POST(request("POST", { delta: 1 }), params("w1"));
 
-    expect(setWantQuantity).toHaveBeenCalledWith("w1", "player-1", 3);
+    expect(adjustWantQuantity).toHaveBeenCalledWith("w1", "player-1", 1);
     expect(await response.json()).toEqual({ ok: true, quantity: 3 });
   });
 
   it("subtracts as readily as it adds", async () => {
     await route.POST(request("POST", { delta: -1 }), params("w1"));
 
-    expect(setWantQuantity).toHaveBeenCalledWith("w1", "player-1", 1);
+    expect(adjustWantQuantity).toHaveBeenCalledWith("w1", "player-1", -1);
+  });
+
+  /* A failed write is an error, never a number nobody stored. */
+  it("answers a failed write with an error, not success", async () => {
+    adjustWantQuantity.mockResolvedValueOnce({ ok: false, reason: "unavailable" });
+    const response = await route.POST(request("POST", { delta: 1 }), params("w1"));
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, error: "unavailable" });
   });
 
   /* The founder's network eats POST bodies; the header is the way in. */
@@ -93,7 +103,7 @@ describe("POST /api/v1/wants/[id]", () => {
 
     await route.POST(headed, params("w1"));
 
-    expect(setWantQuantity).toHaveBeenCalledWith("w1", "player-1", 3);
+    expect(adjustWantQuantity).toHaveBeenCalledWith("w1", "player-1", 1);
   });
 
   it("refuses a request with no bearer token", async () => {
@@ -103,7 +113,7 @@ describe("POST /api/v1/wants/[id]", () => {
     );
 
     expect(response.status).toBe(401);
-    expect(setWantQuantity).not.toHaveBeenCalled();
+    expect(adjustWantQuantity).not.toHaveBeenCalled();
   });
 
   it("refuses a delta that is missing, zero, or not a number", async () => {
@@ -112,7 +122,7 @@ describe("POST /api/v1/wants/[id]", () => {
       expect(response.status).toBe(400);
     }
 
-    expect(setWantQuantity).not.toHaveBeenCalled();
+    expect(adjustWantQuantity).not.toHaveBeenCalled();
   });
 
   it("changes nothing for a want the player does not own", async () => {
@@ -122,7 +132,6 @@ describe("POST /api/v1/wants/[id]", () => {
     );
 
     expect(response.status).toBe(400);
-    expect(setWantQuantity).not.toHaveBeenCalled();
   });
 });
 

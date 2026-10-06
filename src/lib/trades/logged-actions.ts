@@ -78,7 +78,7 @@ export async function deleteLoggedTradeAction(id: string): Promise<LogTradeResul
   const player = await viewer();
   if (!player) return { ok: false, message: "Sign in first." };
 
-  const removed = await deleteLoggedTrade(player.id, id);
+  const removed = await deleteLoggedTrade(player.id, id, player.displayName);
   if (!removed) return { ok: false, message: "Could not remove that trade." };
 
   repaint();

@@ -70,7 +70,7 @@ describe("what a hunt is made of", () => {
     /* A trade counts once, through the same door. */
     expect(hunts).toContain("export async function recordTradeFound");
     const trades = await readFile("src/lib/trades/repository.ts", "utf8");
-    expect(trades).toContain("await recordTradeFound(flareId, flare.quantity)");
+    expect(trades).toContain("await recordTradeFound(tradeId)");
   });
 
   it("lets only the owner move progress, and never below what a trade brought", async () => {

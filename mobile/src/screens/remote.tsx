@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useKeepAwake } from "expo-keep-awake";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import { friendlyError, getMe, type Me } from "../api";
@@ -105,14 +105,40 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
     };
   }, [storeId]);
 
+  /*
+   * The server's clock minus this phone's, from the hub's `at`. A phone
+   * whose clock is a minute out would otherwise count a minute wrong;
+   * with this, the digits come from the server's idea of now, which is
+   * the wall's. Measured against the middle of the round trip.
+   */
+  const [skew, setSkew] = useState(0);
+
+  /*
+   * Which answers may paint. Every poll takes a number and only the
+   * newest may land; every press bumps the epoch at its start and its
+   * end, so a poll that left before or during a press (and so carries
+   * the clock as it was) is dropped rather than undoing what the press
+   * just showed.
+   */
+  const pollSeq = useRef(0);
+  const pressEpoch = useRef(0);
+
   const poll = useCallback(async () => {
     if (!picked) return;
+    const mine = ++pollSeq.current;
+    const epoch = pressEpoch.current;
+    const sent = Date.now();
     try {
       const fresh = await getHub(picked);
+      const heard = Date.now();
+      if (mine !== pollSeq.current || epoch !== pressEpoch.current) return;
+      const serverAt = Date.parse(fresh.at);
+      if (Number.isFinite(serverAt)) setSkew(serverAt - (sent + heard) / 2);
       setHub(fresh);
-      setHeardAt(Date.now());
+      setHeardAt(heard);
       setError(null);
     } catch (caught) {
+      if (mine !== pollSeq.current) return;
       setError(friendlyError(caught));
     }
   }, [picked]);
@@ -127,7 +153,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
     }, [picked, poll]),
   );
 
-  /* The digits, from this phone's clock. */
+  /* The digits tick on this phone's clock, read through the skew. */
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
@@ -135,6 +161,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
 
   const press = useCallback(async (timer: RemoteTimer, op: RemoteOp) => {
     setBusy((current) => ({ ...current, [timer.id]: op }));
+    pressEpoch.current += 1;
     try {
       const { timer: fresh } = await controlTimer(timer.id, op);
       setHub((current) =>
@@ -152,6 +179,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
     } catch (caught) {
       setError(friendlyError(caught));
     } finally {
+      pressEpoch.current += 1;
       setBusy((current) => {
         const next = { ...current };
         delete next[timer.id];
@@ -290,7 +318,7 @@ export function RemoteScreen({ storeId }: { storeId?: string }) {
                 <TimerCard
                   key={timer.id}
                   timer={timer}
-                  now={now}
+                  now={now + skew}
                   busy={busy[timer.id] ?? null}
                   onPress={(op) => void press(timer, op)}
                 />

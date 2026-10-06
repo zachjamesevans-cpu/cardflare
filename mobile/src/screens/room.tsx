@@ -23,6 +23,7 @@ import { UndoToast, type UndoOffer } from "../undo-toast";
 import type { StackParams } from "../../App";
 import {
   ApiError,
+  describeError,
   getTrades,
   type TradeRecord,
   acknowledgeTrade,
@@ -488,7 +489,21 @@ function RoomScreen({
   const railContent = useRef<Record<string, number>>({});
   const railLayout = useRef<Record<string, number>>({});
 
-  const inFlight = useRef(false);
+  /*
+   * Reads in flight, and the number of the newest one started. The
+   * poll skips a beat while any read is out; everything else (an
+   * action, a pull, Try again) reads anyway, and whichever read started
+   * last is the only one allowed to paint. A slow poll that answers
+   * after an action's read would otherwise put the card it just
+   * removed back on the board.
+   */
+  const inFlight = useRef(0);
+  const latestRead = useRef(0);
+
+  /* What an action said when it failed: a strip over the board, so a
+     tap that did nothing says why instead of looking ignored. */
+  const [actionError, setActionError] = useState<string | null>(null);
+  const dismissActionError = useCallback(() => setActionError(null), []);
 
   /* The viewer's own trades tonight, the web's private list. */
   const [trades, setTrades] = useState<TradeRecord[]>([]);
@@ -530,12 +545,16 @@ function RoomScreen({
   const guest = signedIn === false && !state?.account;
 
   const refresh = useCallback(
-    async (options?: { matches?: boolean }) => {
-      if (inFlight.current) return;
-      inFlight.current = true;
+    async (options?: { matches?: boolean; poll?: boolean }) => {
+      if (options?.poll && inFlight.current > 0) return;
+      const mine = ++latestRead.current;
+      /* Still the newest read: nothing started since may be overwritten. */
+      const current = () => mine === latestRead.current;
+      inFlight.current += 1;
 
       try {
         const fresh = await getRoom(code);
+        if (!current()) return;
         setState(fresh);
         setError(null);
 
@@ -551,7 +570,8 @@ function RoomScreen({
         if (eventId && wanted && (await storedAccessToken())) {
           matchesAt.current = Date.now();
           try {
-            setMatches(await getNightMatches(eventId));
+            const read = await getNightMatches(eventId);
+            if (current()) setMatches(read);
           } catch {
             /* Garnish on the room; the room must not fail over it. */
           }
@@ -581,12 +601,14 @@ function RoomScreen({
 
         if (fresh.joined) {
           try {
-            setTrades((await getTrades(code)).trades);
+            const read = (await getTrades(code)).trades;
+            if (current()) setTrades(read);
           } catch {
             /* The list is garnish; the room must not fail over it. */
           }
         }
       } catch (caught) {
+        if (!current()) return;
         const missing = caught instanceof ApiError && caught.status === 404;
         setDead(missing);
         setError(
@@ -595,7 +617,7 @@ function RoomScreen({
             : "Could not reach the room. Check your connection and pull to retry.",
         );
       } finally {
-        inFlight.current = false;
+        inFlight.current -= 1;
       }
     },
     [code],
@@ -617,7 +639,7 @@ function RoomScreen({
   const pollMs = pollMsFor(phase);
   useEffect(() => {
     if (pollMs === null) return;
-    const timer = setInterval(() => void refresh(), pollMs);
+    const timer = setInterval(() => void refresh({ poll: true }), pollMs);
     return () => clearInterval(timer);
   }, [refresh, pollMs]);
 
@@ -657,12 +679,26 @@ function RoomScreen({
     }
   };
 
-  /** Every board action: do it, re-read the truth, never crash the screen. */
+  /**
+   * Every board action: do it, say so when it failed, and re-read the
+   * truth whether or not a poll is already out (refresh sequences the
+   * answers, so the newest read wins). Never crashes the screen.
+   */
   const act = async (work: () => Promise<unknown>) => {
+    setActionError(null);
     try {
-      await work();
-    } catch {
-      // The re-render shows the truthful state either way.
+      const result = await work();
+      /* A 200 that says no is still a no. */
+      if (
+        result &&
+        typeof result === "object" &&
+        "ok" in result &&
+        (result as { ok: unknown }).ok === false
+      ) {
+        throw new Error("refused");
+      }
+    } catch (caught) {
+      setActionError(actionFailure(caught));
     }
     await refresh();
   };
@@ -676,21 +712,25 @@ function RoomScreen({
    */
   const takeDown = async (flareId: string) => {
     let offer: UndoOffer | null = null;
+    setActionError(null);
     try {
       const result = await takeDownRoomFlare(code, flareId);
+      if (!result.ok) throw new Error("refused");
       if (result.ok && result.flareIds.length > 0) {
         const flareIds = result.flareIds;
         offer = {
           key: `${flareId}:${Date.now()}`,
           message: "Taken down.",
           onUndo: async () => {
-            await restoreRoomFlares(code, flareIds).catch(() => undefined);
+            await restoreRoomFlares(code, flareIds).catch((caught) =>
+              setActionError(actionFailure(caught)),
+            );
             await refresh();
           },
         };
       }
-    } catch {
-      // The re-render shows the truthful state either way.
+    } catch (caught) {
+      setActionError(actionFailure(caught));
     }
     await refresh();
     if (offer) setUndo(offer);
@@ -1742,10 +1782,13 @@ function RoomScreen({
                         gap: spacing(3),
                       }}
                     >
-                      <Button
+                      {/* Busy while it pays out: a second tap used to
+                          send a second acknowledge. */}
+                      <AsyncButton
                         label="Yes, we traded"
+                        pendingLabel="Confirming…"
                         onPress={() =>
-                          void act(() =>
+                          act(() =>
                             acknowledgeTrade(
                               code,
                               trade.id,
@@ -1841,6 +1884,75 @@ function RoomScreen({
         onDismiss={dismissUndo}
         bottom={FAB_HEIGHT + bottomClear + spacing(6)}
       />
+
+      {/* A failed action, said where it can be seen: above the undo
+          strip, so the two never cover each other. */}
+      <ActionErrorToast
+        message={actionError}
+        onDismiss={dismissActionError}
+        bottom={FAB_HEIGHT + bottomClear + spacing(undo ? 22 : 6)}
+      />
+    </View>
+  );
+}
+
+/** How long a failed action's strip stays up on its own. */
+const ACTION_ERROR_MS = 6000;
+
+/** A failed board action, in words, with the reason appended. */
+function actionFailure(caught: unknown): string {
+  if (caught instanceof ApiError) {
+    if (caught.code === "room-ended" || caught.code === "not-open") {
+      return "This room has ended, so that can't be done any more.";
+    }
+    return `That didn't go through (${describeError(caught)}). Try again.`;
+  }
+  return "That didn't go through. Try again.";
+}
+
+function ActionErrorToast({
+  message,
+  onDismiss,
+  bottom,
+}: {
+  message: string | null;
+  onDismiss: () => void;
+  bottom: number;
+}) {
+  useEffect(() => {
+    if (!message) return;
+    const timer = setTimeout(onDismiss, ACTION_ERROR_MS);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
+  if (!message) return null;
+  return (
+    <View
+      pointerEvents="box-none"
+      style={{ position: "absolute", left: spacing(3), right: spacing(3), bottom }}
+    >
+      <View
+        accessibilityLiveRegion="assertive"
+        accessibilityRole="alert"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: spacing(3),
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: colors.danger,
+          backgroundColor: colors.elevated,
+          paddingVertical: spacing(2.5),
+          paddingHorizontal: spacing(4),
+        }}
+      >
+        <Text style={{ flex: 1, color: colors.danger, fontSize: 14, fontWeight: "600" }}>
+          {message}
+        </Text>
+        <Tap onPress={onDismiss} hitSlop={8} accessibilityLabel="Dismiss">
+          <MaterialCommunityIcons name="close" size={18} color={colors.textMuted} />
+        </Tap>
+      </View>
     </View>
   );
 }
@@ -2199,29 +2311,29 @@ function CarouselFlare({
         {/* The action rows, only on the viewer's own tiles: a Flare's
             two exits, and nothing under anybody else's card, where an
             empty strip would otherwise sit under every one. "Found it"
-            is the old Remove; "Take down" withdraws it with an undo. */}
+            is the old Remove; "Take down" withdraws it with an undo.
+            Two separate 44pt targets with 12pt words, stacked: a thumb
+            in a busy room should never take a card down when it meant
+            Found it. */}
         {mine && (
-          <View style={{ height: 44, gap: 2 }}>
+          <View style={{ gap: 4 }}>
             <Tap
               onPress={() => void run(onRemove)}
               disabled={removing}
-              hitSlop={4}
+              accessibilityLabel={`Found it: ${flare.cardName}`}
               style={styles.removeButton}
             >
-              <Text
-                maxFontSizeMultiplier={1.3}
-                style={{ color: colors.textMuted, fontSize: 11, fontWeight: "600" }}
-              >
+              <Text maxFontSizeMultiplier={1.3} style={[styles.tileAction, { color: colors.textSecondary }]}>
                 Found it
               </Text>
             </Tap>
             <Tap
               onPress={() => void run(onTakeDown)}
               disabled={removing}
-              hitSlop={4}
+              accessibilityLabel={`Take down: ${flare.cardName}`}
               style={styles.takeDownButton}
             >
-              <Text maxFontSizeMultiplier={1.3} style={{ color: colors.danger, fontSize: 11, fontWeight: "600" }}>
+              <Text maxFontSizeMultiplier={1.3} style={[styles.tileAction, { color: colors.danger }]}>
                 Take down
               </Text>
             </Tap>
@@ -2340,10 +2452,18 @@ function FlareRow({
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
             >
-              <Tap onPress={() => void run(onRemove)} disabled={removing} hitSlop={8}>
+              <Tap
+                onPress={() => void run(onRemove)}
+                disabled={removing}
+                style={styles.linkTarget}
+              >
                 <Text style={styles.removeLink}>Found it</Text>
               </Tap>
-              <Tap onPress={() => void run(onTakeDown)} disabled={removing} hitSlop={8}>
+              <Tap
+                onPress={() => void run(onTakeDown)}
+                disabled={removing}
+                style={styles.linkTarget}
+              >
                 <Text style={styles.takeDownLink}>Take down</Text>
               </Tap>
             </View>
@@ -2493,6 +2613,13 @@ const styles = StyleSheet.create({
     textDecorationLine: "underline",
     fontSize: 14,
   },
+  /* A whole 44pt box per link, so the two never share a thumb. */
+  linkTarget: {
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   /* Take down, in the danger colour: the exit that says nothing. */
   takeDownLink: {
     color: colors.danger,
@@ -2603,7 +2730,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   removeButton: {
-    height: 21,
+    minHeight: 44,
+    minWidth: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 6,
@@ -2612,10 +2740,19 @@ const styles = StyleSheet.create({
   },
   /* The ghost of the pair: no border, the danger colour on the word. */
   takeDownButton: {
-    height: 21,
+    minHeight: 44,
+    minWidth: 44,
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+  },
+  /* 12pt, the floor for words a thumb has to aim at. Two lines fit in
+     the 44pt target when the tile is narrower than the word. */
+  tileAction: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });
 

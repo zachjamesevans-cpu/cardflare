@@ -66,6 +66,9 @@ export type ThreadTradeFailure =
 
 export { THREAD_TRADE_QUANTITY_MAX } from "./thread-trade-copy";
 
+/** The partial unique index that allows one pending trade per conversation. */
+const ONE_PENDING_INDEX = "trades_one_pending_per_thread_idx";
+
 interface ThreadRow {
   id: string;
   flare_id: string | null;
@@ -160,8 +163,12 @@ export async function latestThreadTrade(
   };
 }
 
-/** The Flare closes as traded once its own author has a hand on it. */
-async function closeFlareAsTraded(flareId: string, quantity: number): Promise<void> {
+/**
+ * The Flare closes as traded once its own author has a hand on it, and
+ * only then does the trade count its copies as found, remembered on the
+ * trade so a later decline takes back exactly what was counted.
+ */
+async function closeFlareAsTraded(flareId: string, tradeId: string): Promise<void> {
   const admin = getSupabaseAdmin();
   const { data } = await admin
     .from("flares")
@@ -170,7 +177,7 @@ async function closeFlareAsTraded(flareId: string, quantity: number): Promise<vo
     .eq("status", "open")
     .select("id")
     .maybeSingle();
-  if (data) await recordTradeFound(flareId, quantity);
+  if (data) await recordTradeFound(tradeId);
 }
 
 export interface ProposeInput {
@@ -208,6 +215,8 @@ export async function proposeThreadTrade(
   const admin = getSupabaseAdmin();
   const conversationId = (await conversationIdFor(threadId)) ?? threadId;
 
+  /* The friendly early answer; the unique index on the table is what
+     actually holds the rule when two taps race (see the insert). */
   const { data: open } = await admin
     .from("trades")
     .select("id")
@@ -308,13 +317,20 @@ export async function proposeThreadTrade(
     .maybeSingle();
 
   if (error || !inserted) {
-    /* One trade per Flare, whichever place it was confirmed in. */
-    if (error?.code === "23505") return { ok: false, reason: "already-traded" };
+    if (error?.code === "23505") {
+      /* Two "We traded" racing in one conversation: the database holds
+         the one-pending rule, and the loser reads as the pending one. */
+      if (`${error.message ?? ""} ${error.details ?? ""}`.includes(ONE_PENDING_INDEX)) {
+        return { ok: false, reason: "pending" };
+      }
+      /* One trade per Flare, whichever place it was confirmed in. */
+      return { ok: false, reason: "already-traded" };
+    }
     console.error("Could not write the conversation's trade", error);
     return { ok: false, reason: "unavailable" };
   }
 
-  if (flareId && authorSaid) await closeFlareAsTraded(flareId, quantity);
+  if (flareId && authorSaid) await closeFlareAsTraded(flareId, inserted.id);
 
   await notifyThreadTrade(conversationId, inserted.id, viewerId, otherId, "proposed");
 
@@ -388,7 +404,7 @@ export async function answerThreadTrade(
 
   /* The Flare's author just agreed: their Flare is done. */
   if (trade.flare_id && trade.requester_player_id === viewerId) {
-    await closeFlareAsTraded(trade.flare_id, trade.quantity);
+    await closeFlareAsTraded(trade.flare_id, tradeId);
   }
 
   if (proposer) {

@@ -21,7 +21,7 @@ const joinEvent = vi.fn();
 const addFlareBatch = vi.fn();
 const listWants = vi.fn();
 const removeWant = vi.fn();
-const setWantQuantity = vi.fn();
+const adjustWantQuantity = vi.fn();
 const saveLocal = vi.fn();
 const removeLocal = vi.fn();
 const createPlayerSession = vi.fn();
@@ -69,7 +69,7 @@ vi.mock("@/lib/lists/repository", () => ({
 vi.mock("@/lib/players/wants", () => ({
   listWants: (...a: unknown[]) => listWants(...a),
   removeWant: (...a: unknown[]) => removeWant(...a),
-  setWantQuantity: (...a: unknown[]) => setWantQuantity(...a),
+  adjustWantQuantity: (...a: unknown[]) => adjustWantQuantity(...a),
 }));
 vi.mock("@/lib/players/locals", () => ({
   saveLocal: (...a: unknown[]) => saveLocal(...a),
@@ -120,7 +120,7 @@ beforeEach(() => {
     addFlareBatch,
     listWants,
     removeWant,
-    setWantQuantity,
+    adjustWantQuantity,
     saveLocal,
     removeLocal,
     createPlayerSession,
@@ -213,19 +213,23 @@ describe("removeWantAction", () => {
 
 describe("nudgeWantQuantityAction", () => {
   beforeEach(() => {
-    listWants.mockResolvedValue([{ ...want("w1", "card-1"), quantity: 2 }]);
+    adjustWantQuantity.mockImplementation(async (id: string, _p: string, delta: number) =>
+      id === "w1"
+        ? { ok: true, quantity: 2 + delta, cardId: "card-1" }
+        : { ok: false, reason: "not-found" },
+    );
   });
 
-  it("adds the delta to the quantity the database holds", async () => {
+  it("hands the delta to the database, which adds it to what it holds", async () => {
     await nudgeWantQuantityAction(form({ wantId: "w1", delta: "1" }));
 
-    expect(setWantQuantity).toHaveBeenCalledWith("w1", "player-1", 3);
+    expect(adjustWantQuantity).toHaveBeenCalledWith("w1", "player-1", 1);
   });
 
   it("subtracts as readily as it adds", async () => {
     await nudgeWantQuantityAction(form({ wantId: "w1", delta: "-1" }));
 
-    expect(setWantQuantity).toHaveBeenCalledWith("w1", "player-1", 1);
+    expect(adjustWantQuantity).toHaveBeenCalledWith("w1", "player-1", -1);
   });
 
   it("changes nothing for a guest", async () => {
@@ -233,22 +237,14 @@ describe("nudgeWantQuantityAction", () => {
 
     await nudgeWantQuantityAction(form({ wantId: "w1", delta: "1" }));
 
-    expect(setWantQuantity).not.toHaveBeenCalled();
-  });
-
-  /* Someone else's want id is not in this player's list, so it resolves
-     to nothing and the write never happens. */
-  it("changes nothing for a want the player does not own", async () => {
-    await nudgeWantQuantityAction(form({ wantId: "someone-elses", delta: "1" }));
-
-    expect(setWantQuantity).not.toHaveBeenCalled();
+    expect(adjustWantQuantity).not.toHaveBeenCalled();
   });
 
   it("ignores a delta that is not a usable number", async () => {
     await nudgeWantQuantityAction(form({ wantId: "w1", delta: "banana" }));
     await nudgeWantQuantityAction(form({ wantId: "w1", delta: "0" }));
 
-    expect(setWantQuantity).not.toHaveBeenCalled();
+    expect(adjustWantQuantity).not.toHaveBeenCalled();
   });
 });
 

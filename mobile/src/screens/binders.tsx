@@ -14,7 +14,7 @@ import {
 import { BinderList } from "../binder-list";
 import { CreateBinderSheet } from "../create-binder-sheet";
 import { colors, gutter, spacing } from "../theme";
-import { Button, Loading, Muted } from "../ui";
+import { AsyncButton, Button, Loading, Muted } from "../ui";
 
 /**
  * Every binder somebody has, as a list: the website's
@@ -90,7 +90,14 @@ export function BindersScreen({ playerId }: { playerId?: string }) {
         {error === "private" ? (
           <Muted>These binders are private.</Muted>
         ) : error ? (
-          <Muted>{`The binders could not be opened (${error}).`}</Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>{`The binders could not be opened (${error}).`}</Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}

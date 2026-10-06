@@ -158,23 +158,34 @@ describe("the Nights tab", () => {
   });
 
   it("files every night under one of Going, Nearby, Past", () => {
-    const tabFor = lift<(night: unknown) => string>(
+    const phaseOf = lift<(night: unknown, now: number) => string>(
       nights,
-      /export function tabFor\(night: NightItem\): NightTab \{([\s\S]*?)\n\}/,
-      ["night"],
+      /export function phaseOf\(night: NightItem, now: number = Date\.now\(\)\): NightPhase \{([\s\S]*?)\n\}/,
+      ["night", "now"],
     );
+    const tabBody = lift<(night: unknown, now: number, phaseOf: unknown) => string>(
+      nights,
+      /export function tabFor\(night: NightItem, now: number = Date\.now\(\)\): NightTab \{([\s\S]*?)\n\}/,
+      ["night", "now", "phaseOf"],
+    );
+    const now = Date.parse("2026-10-06T20:00:00Z");
+    const tabFor = (night: object) => tabBody(night, now, phaseOf);
     expect(tabFor({ phase: "finished", youGoing: true })).toBe("past");
     expect(tabFor({ phase: "live", youGoing: true })).toBe("going");
     expect(tabFor({ phase: "upcoming", youGoing: true })).toBe("going");
     expect(tabFor({ phase: "early", youGoing: false })).toBe("nearby");
     expect(tabFor({ phase: "live", youGoing: false })).toBe("nearby");
+    /* A list painted before the night ended still files it under Past. */
+    expect(
+      tabFor({ phase: "live", youGoing: true, endsAt: "2026-10-06T19:00:00Z" }),
+    ).toBe("past");
   });
 
   it("draws a short card with the date block and the one line, matches outranking attendance", () => {
     expect(nights).toContain("export function dateBlock(");
     expect(nights).toContain('month: part("month").toUpperCase()');
-    expect(nights).toContain('if (night.phase === "live") return "Open now";');
-    expect(nights).toContain('if (night.phase === "finished") return "Ended";');
+    expect(nights).toContain('if (phase === "live") return "Open now";');
+    expect(nights).toContain('if (phase === "finished") return "Ended";');
     /* Going with a check when going; the chip otherwise; nothing in Past. */
     expect(nights).toMatch(
       /\{past \? null : night\.youGoing \? \([\s\S]*?name="checkmark"[\s\S]*?\{GOING\}[\s\S]*?\) : \(\s*<GoingButton[\s\S]*?withCount=\{false\}[\s\S]*?size="chip"/,
@@ -265,7 +276,9 @@ describe("the night's page", () => {
     expect(room).toContain(
       "options?.matches || Date.now() - matchesAt.current >= MATCHES_REFRESH_MS",
     );
-    expect(room).toContain("setMatches(await getNightMatches(eventId));");
+    expect(room).toContain("const read = await getNightMatches(eventId);");
+    /* Only the newest read paints: a slow poll cannot undo an action. */
+    expect(room).toContain("if (current()) setMatches(read);");
     expect(room).toContain("onSettled={() => void refresh({ matches: true })}");
     expect(room).toMatch(
       /onRefresh=\{\(\) => \{[\s\S]*?refresh\(\{ matches: true \}\)/,

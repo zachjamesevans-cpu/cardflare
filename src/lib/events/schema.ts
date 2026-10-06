@@ -232,8 +232,19 @@ export function roomPhase(
   // Date.now(), which the compiler lint rightly refuses mid-render.
   now: number = Date.now(),
 ): RoomPhase {
-  if (event.status === "open") return "live";
   if (event.status === "closed") return "finished";
+  /*
+   * A night past its end is over whatever its row says: the sweep that
+   * closes it runs on a clock (/api/cron/close-nights) and on the next
+   * scan, and between the two the room must not read as live.
+   */
+  if (event.status === "open") {
+    return event.kind === "scheduled" &&
+      event.endsAt &&
+      now >= new Date(event.endsAt).getTime()
+      ? "finished"
+      : "live";
+  }
 
   // Draft. Walk-in rooms are never drafts, so this is a scheduled event
   // that the store has not opened yet.

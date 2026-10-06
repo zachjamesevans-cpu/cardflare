@@ -77,11 +77,15 @@ describe("the reminder on the day", () => {
     expect(body).toContain('"night-reminder");');
   });
 
-  it("rides a daily cron in the hours before doors, bounded, fail-closed", () => {
+  it("rides a half-hourly cron in the hours before doors, bounded by time, fail-closed", () => {
     const route = read("src/app/api/cron/night-reminder/route.ts");
     expect(route).toContain("process.env.CRON_SECRET");
-    expect(route).toContain("const HORIZON_MS = 14 * 60 * 60 * 1000;");
-    expect(route).toContain("const NOTICE_CAP = 150;");
+    expect(route).toContain("const HORIZON_MS = 3 * 60 * 60 * 1000;");
+    expect(route).toContain("const TIME_BUDGET_MS = 45 * 1000;");
+    expect(route).not.toContain("NOTICE_CAP");
+    /* The sent-marker: whoever already has the reminder is skipped. */
+    expect(route).toContain("const reminded = await alreadyReminded(event.id, players);");
+    expect(route).toContain("if (reminded.has(playerId)) continue;");
     expect(route).toContain("if (!boardReadable(phase)) continue;");
     expect(route).toContain("nightMatches(event.id, playerId)");
     expect(route).toContain("matches: matches.summary.total,");
@@ -92,7 +96,39 @@ describe("the reminder on the day", () => {
     const cron = vercel.crons.find(
       (entry) => entry.path === "/api/cron/night-reminder",
     );
-    expect(cron?.schedule).toBe("0 16 * * *");
+    expect(cron?.schedule).toBe("*/30 * * * *");
+  });
+});
+
+describe("nights that have ended", () => {
+  it("are closed by a fail-closed cron on a short clock", () => {
+    const route = read("src/app/api/cron/close-nights/route.ts");
+    expect(route).toContain("process.env.CRON_SECRET");
+    expect(route).toContain("if (!secret ||");
+    expect(route).toContain("await sweepEndedScheduledEvents(new Date().toISOString());");
+    const vercel = JSON.parse(read("vercel.json")) as {
+      crons: { path: string; schedule: string }[];
+    };
+    expect(vercel.crons).toContainEqual({
+      path: "/api/cron/close-nights",
+      schedule: "*/15 * * * *",
+    });
+  });
+
+  it("refuse trades and open-to-trades once the room has ended", () => {
+    const trades = read("src/app/api/v1/rooms/[code]/trades/route.ts");
+    const open = read("src/app/api/v1/rooms/[code]/open/route.ts");
+    for (const route of [trades, open]) {
+      expect(route).toContain('if (roomPhase(resolved.room) === "finished") {');
+      expect(route).toContain('{ error: "room-ended" }');
+    }
+  });
+
+  it("never paint as live in the app's Nights list", () => {
+    const nights = read("mobile/src/screens/nights.tsx");
+    expect(nights).toContain("export function phaseOf(night: NightItem");
+    expect(nights).toContain('if (phaseOf(night, now) === "finished") return "past";');
+    expect(nights).toContain("const phase = phaseOf(night);");
   });
 });
 

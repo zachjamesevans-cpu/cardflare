@@ -28,6 +28,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, spacing } from "../theme";
 import {
   Body,
+  Button,
   Card,
   CardImage,
   Loading,
@@ -60,10 +61,11 @@ export function NightPlayerScreen({
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const insets = useSafeAreaInsets();
-  const { night, missing, failed } = useNightByCode(code);
+  const { night, missing, failed, reload } = useNightByCode(code);
   const [view, setView] = useState<NightPlayerView | null>(null);
   const [gone, setGone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!night) return;
@@ -82,7 +84,7 @@ export function NightPlayerScreen({
     return () => {
       live = false;
     };
-  }, [night, playerId]);
+  }, [night, playerId, attempt]);
 
   if (missing || failed || gone || error) {
     return (
@@ -100,6 +102,20 @@ export function NightPlayerScreen({
               ? "They are not going to this night any more, so there is nothing to match."
               : (error ?? "Check your connection and try again.")}
           </Body>
+          {/* Somebody who left is not a failure to retry. */}
+          {gone || missing ? null : (
+            <Button
+              label="Try again"
+              onPress={() => {
+                if (failed) {
+                  reload();
+                  return;
+                }
+                setError(null);
+                setAttempt((n) => n + 1);
+              }}
+            />
+          )}
         </Card>
       </View>
     );

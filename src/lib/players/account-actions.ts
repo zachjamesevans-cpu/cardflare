@@ -28,7 +28,12 @@ import { invitePlayer, playerForUser } from "./accounts";
 import { invitePlayerSchema, type InvitePlayerState } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
 import { markCardFound, syncCardQuantity } from "@/lib/players/found";
-import { listOfferings, listWants, removeWant, setWantQuantity } from "./wants";
+import {
+  adjustWantQuantity,
+  listOfferings,
+  listWants,
+  removeWant,
+} from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 
@@ -279,17 +284,12 @@ export async function nudgeWantQuantityAction(formData: FormData): Promise<void>
   const playerId = await playerIdFor(await getViewer());
   if (!playerId) return;
 
-  const wants = await listWants(playerId);
-  const want = wants.find((entry) => entry.id === wantId);
-  if (!want) return;
+  /* One statement in the database, so two quick taps are two steps. */
+  const result = await adjustWantQuantity(wantId, playerId, delta);
+  if (!result.ok) return;
 
-  const quantity = await setWantQuantity(
-    wantId,
-    playerId,
-    want.quantity + Math.trunc(delta),
-  );
   /* The post follows the number on the Flare screen. */
-  await syncCardQuantity(playerId, want.cardId, quantity, "want");
+  await syncCardQuantity(playerId, result.cardId, result.quantity, "want");
   revalidateWants(text(formData, "code"));
 }
 

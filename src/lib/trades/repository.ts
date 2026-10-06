@@ -114,23 +114,59 @@ export async function confirmTrade(
    * trade and then failed to close the Flare.
    */
   let tradeId = inserted?.id ?? null;
+  let acknowledgedNow = false;
 
   if (!tradeId) {
     const { data: existing, error: readError } = await admin
       .from("trades")
-      .select("id")
+      .select(
+        "id, thread_id, proposed_by, requester_player_id, acknowledged_at, disputed_at",
+      )
       .eq("flare_id", flareId)
       .maybeSingle();
 
     if (readError) console.error("Could not read back the trade", readError);
     tradeId = existing?.id ?? null;
+
+    /*
+     * The Flare's trade was already said in a conversation, by the other
+     * side, and is waiting on the author's word. The author confirming it
+     * here IS that word: the trade is acknowledged and pays, exactly as
+     * the "Yes" in the conversation would have.
+     */
+    if (
+      existing &&
+      existing.thread_id &&
+      !existing.acknowledged_at &&
+      !existing.disputed_at &&
+      existing.proposed_by &&
+      existing.proposed_by !== existing.requester_player_id
+    ) {
+      const { data: acked } = await admin
+        .from("trades")
+        .update({ acknowledged_at: new Date().toISOString() })
+        .eq("id", existing.id)
+        .is("acknowledged_at", null)
+        .is("disputed_at", null)
+        .select("id")
+        .maybeSingle();
+      acknowledgedNow = Boolean(acked);
+    }
   }
 
-  const { error: closeError } = await admin
+  /*
+   * Closed only while still open, so of two confirms racing each other
+   * exactly one closes the Flare, and only that one counts the copies
+   * and settles the trade. The other reads as done.
+   */
+  const { data: closed, error: closeError } = await admin
     .from("flares")
     .update({ status: "traded", updated_at: new Date().toISOString() })
     .eq("id", flareId)
-    .eq("player_session_id", requesterSessionId);
+    .eq("player_session_id", requesterSessionId)
+    .eq("status", "open")
+    .select("id")
+    .maybeSingle();
 
   if (closeError) {
     // The tally exists; the board still shows the Flare. A retry closes it.
@@ -138,9 +174,13 @@ export async function confirmTrade(
     return { ok: false, reason: "unavailable" };
   }
 
+  if (acknowledgedNow && tradeId) await awardTradeEmbers(tradeId, "acknowledged");
+
+  if (!closed) return { ok: true, tradeId: tradeId ?? undefined };
+
   /* The card is in hand now: its hunt request moves, or its own count
-     does. Once per trade, and a trade happens once per Flare. */
-  await recordTradeFound(flareId, flare.quantity);
+     does. Once per trade, which the trade itself remembers. */
+  if (tradeId) await recordTradeFound(tradeId);
 
   /*
    * The payout waits for the second hand.
@@ -152,7 +192,7 @@ export async function confirmTrade(
    * revisits it. Keyed and survivable either way: the trade is the
    * product and the Embers are the garnish.
    */
-  if (tradeId && !partnerSessionId) {
+  if (tradeId && !partnerSessionId && !acknowledgedNow) {
     await awardTradeEmbers(tradeId, "acknowledged");
   }
 
@@ -167,9 +207,15 @@ export async function confirmTrade(
 export async function acknowledgeTrade(
   tradeId: string,
   holderSessionId: string,
-): Promise<{ ok: true } | { ok: false; reason: "not-found" | "unavailable" }> {
+): Promise<
+  | { ok: true; flareId: string | null; requesterSessionId: string | null }
+  | { ok: false; reason: "not-found" | "unavailable" }
+> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
+  /* The Flare and author come back from the stored trade, so the push
+     that follows goes to the trade's real author and nobody a request
+     body names. */
   const { data, error } = await getSupabaseAdmin()
     .from("trades")
     .update({ acknowledged_at: new Date().toISOString() })
@@ -177,7 +223,7 @@ export async function acknowledgeTrade(
     .eq("holder_session_id", holderSessionId)
     .is("acknowledged_at", null)
     .is("disputed_at", null)
-    .select("id")
+    .select("id, flare_id, requester_session_id")
     .maybeSingle();
 
   if (error) {
@@ -187,7 +233,11 @@ export async function acknowledgeTrade(
   if (!data) return { ok: false, reason: "not-found" };
 
   await awardTradeEmbers(tradeId, "acknowledged");
-  return { ok: true };
+  return {
+    ok: true,
+    flareId: data.flare_id,
+    requesterSessionId: data.requester_session_id,
+  };
 }
 
 /**
@@ -229,12 +279,9 @@ export async function disputeTrade(
   note: string,
   disputedBy: string | null,
 ): Promise<boolean> {
-  const { data: trade } = await getSupabaseAdmin()
-    .from("trades")
-    .select("flare_id, quantity")
-    .eq("id", tradeId)
-    .maybeSingle();
-  if (trade?.flare_id) await reverseTradeFound(trade.flare_id, trade.quantity);
+  /* Only the copies this trade itself counted come off, if it counted
+     any: a claim declined before its Flare closed never did. */
+  await reverseTradeFound(tradeId);
   return reverseTradeEmbers(tradeId, note, disputedBy);
 }
 

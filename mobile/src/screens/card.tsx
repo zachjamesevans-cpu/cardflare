@@ -17,7 +17,7 @@ import { displayCardName } from "../card-name";
 import { gameShortName } from "../games";
 import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, radius, spacing } from "../theme";
-import { Button, CardImage, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
+import { AsyncButton, Button, CardImage, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
 
 /**
  * One card, whole: the website's /cards/[cardId], reached from a
@@ -72,7 +72,14 @@ export function CardScreen({ cardId }: { cardId: string }) {
         {missing ? (
           <Muted>No such card.</Muted>
         ) : error ? (
-          <Muted>{`This card could not be opened. ${error}`}</Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>{`This card could not be opened. ${error}`}</Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}

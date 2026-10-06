@@ -79,6 +79,7 @@ import {
 import { RemoteImage } from "../remote-image";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
+  AsyncButton,
   Body,
   Button,
   CardImage,
@@ -460,7 +461,14 @@ export function BinderScreen({
         ) : error === "private" ? (
           <Muted>This binder is private.</Muted>
         ) : error ? (
-          <Muted>{`This binder could not be opened (${error}).`}</Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>{`This binder could not be opened (${error}).`}</Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}
