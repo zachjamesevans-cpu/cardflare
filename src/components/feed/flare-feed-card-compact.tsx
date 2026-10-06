@@ -1,10 +1,12 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { CheckCircle2, Crosshair, PackageOpen } from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { PostMenu, UnlessHidden } from "@/components/feed/post-actions";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { agoFrom } from "@/components/feed/flare-feed-card";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
 import type { FeedCard, HuntItem } from "@/lib/feed/repository";
@@ -114,7 +116,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
           the page scroll sideways. */}
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
           {item.cards.map((card, index) => (
-            <div key={card.cardId} className="relative shrink-0">
+            <NeedStack key={card.cardId} card={card} offering={offering}>
               <FeedTile
                 imageUrl={card.imageUrl}
                 name={card.cardName}
@@ -127,8 +129,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
                 siblings={shelf}
                 position={index}
               />
-              <NeedBadge card={card} offering={offering} />
-            </div>
+            </NeedStack>
           ))}
         </div>
 
@@ -152,33 +153,57 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
 }
 
 /**
- * "1x", bottom right, in the accent.
+ * How many are still wanted, drawn the way a room draws it: one copy is
+ * just the card, more are faded copies fanned out behind it to the
+ * right with the small black ×N tag on top - the binder's "lowkey black
+ * and white box". The app draws the same (mobile NeedStack).
  *
- * The founder asked for exactly this. It says what is STILL wanted
- * rather than what was asked for - a card three of four found is a card
- * somebody needs one of, and the number that helps is the one you could
- * answer today. A card fully found wears a tick instead: zero is not a
- * quantity worth drawing.
+ * This was a green "1x" chip on every tile. With one copy on almost
+ * every card it was mostly noise, sat over the art and on top of the
+ * OFFERED band. The founder: "seems to take up a lot of the screen ...
+ * utilize the same quantity thing we do in the rooms - where the cards
+ * are 'stacked'." So one copy draws nothing, and a stack is rare enough
+ * to read at a glance.
  *
- * Half again as big as it started. The founder: "make the '1x'/quanity
- * stuff like 50% bigger when soemone posts a quantity." At nine points
- * it was a mark you noticed rather than a number you read, which is the
- * wrong way round for the one fact this view keeps.
+ * It says what is STILL wanted, not what was asked for. A card fully
+ * found is a single card; its own foot says FOUND. The fan's bleed is
+ * reserved as margin so neighbours never collide, as in the room.
  */
-function NeedBadge({ card, offering }: { card: FeedCard; offering: boolean }) {
+function NeedStack({
+  card,
+  offering,
+  children,
+}: {
+  card: FeedCard;
+  offering: boolean;
+  children: ReactNode;
+}) {
   const wanted = card.remaining ?? card.quantity ?? 1;
   const done = card.state === "found" || (!offering && wanted <= 0);
-
-  /* The tile's own foot says FOUND; a second tick on top of it was
-     the founder's "overlapping gray checkmark thing". */
-  if (done) return null;
+  const copies = done ? 1 : Math.max(1, wanted);
+  const ghosts = Math.min(copies, 4) - 1;
 
   return (
-    <span
-      aria-label={`${wanted} still wanted`}
-      className="absolute right-1 bottom-1 rounded-[6px] bg-accent px-1.5 py-0.5 text-[13px] leading-none font-extrabold text-accent-contrast tabular-nums"
+    <div
+      className="relative shrink-0"
+      style={ghosts > 0 ? { marginRight: ghosts * 4 } : undefined}
     >
-      {wanted}x
-    </span>
+      {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
+        <div
+          key={depth}
+          aria-hidden="true"
+          className="absolute inset-0 rounded-[6px] border border-border bg-elevated opacity-40"
+          style={{ transform: `translate(${depth * 4}px, 0)` }}
+        />
+      ))}
+      {/* Positioned, so it paints over the copies behind it. */}
+      <div className="relative">{children}</div>
+      {done ? null : (
+        <QuantityBadge
+          quantity={copies}
+          className="absolute top-1 left-1"
+        />
+      )}
+    </div>
   );
 }

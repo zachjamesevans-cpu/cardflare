@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { ActionSheet, DotsButton } from "./action-menu";
@@ -8,6 +8,7 @@ import { agoFrom, postActions } from "./flare-feed-card";
 import { shelfFor } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
+import { QuantityBadge } from "./quantity-badge";
 import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap } from "./ui";
 
@@ -179,7 +180,7 @@ export function FlareFeedCardCompact({
         contentContainerStyle={{ gap: spacing(1.5) }}
       >
         {item.cards.map((card, index) => (
-          <View key={card.cardId}>
+          <NeedStack key={card.cardId} card={card} offering={offering}>
             <CardImage
               imageUrl={card.imageUrl}
               width={COMPACT_TILE}
@@ -189,8 +190,7 @@ export function FlareFeedCardCompact({
               siblings={shelf}
               position={index}
             />
-            <NeedBadge card={card} offering={offering} />
-          </View>
+          </NeedStack>
         ))}
       </ScrollView>
 
@@ -217,58 +217,72 @@ export function FlareFeedCardCompact({
 /** Small enough that four fit across a phone, big enough to recognise. */
 const COMPACT_TILE = 64;
 
+/** The card's height at the compact tile's width: the 63:88 card. */
+const COMPACT_HEIGHT = Math.round((COMPACT_TILE * 88) / 63);
+/** How far each copy behind the card shows, fanned to the right. */
+const FAN_STEP = 4;
+
 /**
- * "1x", bottom right, in the accent.
+ * How many are still wanted, drawn the way a room draws it: one copy is
+ * just the card, more are faded copies fanned out behind it to the
+ * right with the small black ×N tag on top - the binder's "lowkey black
+ * and white box".
  *
- * The founder asked for exactly this: "a green quantity count of the
- * card they're needing on the card. so if it's a bonney, the bottom
- * right will show a '1x'."
+ * This was a green "1x" chip on every tile, made half again as big when
+ * the founder asked: quantity was the one fact this view kept. With one
+ * copy on almost every card it was mostly noise, sat over the art and
+ * on top of the OFFERED band. The founder, later: "seems to take up a
+ * lot of the screen ... utilize the same quantity thing we do in the
+ * rooms - where the cards are 'stacked'." So one copy draws nothing,
+ * and a stack is rare enough to read at a glance.
  *
  * It says what is STILL wanted, not what was asked for - a card three
- * of four found is a card somebody needs one of, and the number that
- * helps is the one you could answer today. A card fully found says so
- * with a tick instead: zero is not a quantity worth drawing.
- *
- * Half again as big as it started. The founder: "make the '1x'/quanity
- * stuff like 50% bigger when soemone posts a quantity." At nine points
- * it was a mark you noticed rather than a number you read, which is the
- * wrong way round for the one fact this view keeps.
+ * of four found is a card somebody needs one of. A card fully found is
+ * a single card; its own foot says FOUND. The tile widens by the fan so
+ * neighbours never collide, the same as the room's rail.
  */
-function NeedBadge({
+function NeedStack({
   card,
   offering,
+  children,
 }: {
   card: Hunt["cards"][number];
   offering: boolean;
+  children: ReactNode;
 }) {
   const wanted = card.remaining ?? card.quantity ?? 1;
   const done = card.state === "found" || (!offering && wanted <= 0);
-
-  /* The tile's own foot says FOUND; a second tick on top of it was
-     the founder's "overlapping gray checkmark thing". */
-  if (done) return null;
+  const copies = done ? 1 : Math.max(1, wanted);
+  const ghosts = Math.min(copies, 4) - 1;
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        right: 3,
-        bottom: 3,
-        borderRadius: 6,
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        backgroundColor: colors.accent,
-      }}
-    >
-      <Text
-        style={{
-          color: colors.canvas,
-          fontSize: 13,
-          fontWeight: "800",
-        }}
-      >
-        {`${wanted}x`}
-      </Text>
+    <View style={{ width: COMPACT_TILE + ghosts * FAN_STEP }}>
+      {/* Deepest first, so each sits under the one before it. */}
+      {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
+        <View
+          key={depth}
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            bottom: 0,
+            left: depth * FAN_STEP,
+            width: COMPACT_TILE,
+            height: COMPACT_HEIGHT,
+            borderRadius: radius.control / 2,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.canvas,
+            opacity: 0.4,
+          }}
+        />
+      ))}
+      {children}
+      {done ? null : (
+        <QuantityBadge
+          quantity={copies}
+          style={{ position: "absolute", top: 4, left: 4 }}
+        />
+      )}
     </View>
   );
 }

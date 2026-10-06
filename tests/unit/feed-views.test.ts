@@ -82,23 +82,28 @@ describe("feed views", () => {
     expect(route).not.toContain('select("avatar_url, embers_balance, feed_view")');
   });
 
-  it("draws the compact card on both platforms, with the count on the art", async () => {
+  it("draws the compact card on both platforms, with the count as a stack", async () => {
     /*
-     * "a green quantity count of the card they're needing on the card.
-     * so if it's a bonney, the bottom right will show a '1x'."
+     * The green "1x" chip on every tile took over the post - the
+     * founder: "seems to take up a lot of the screen ... utilize the same
+     * quantity thing we do in the rooms - where the cards are 'stacked'."
+     * One copy is just the card; more fan out behind it with the small
+     * black ×N tag.
      */
     const app = await read("mobile/src/flare-feed-card-compact.tsx");
     const web = await read("src/components/feed/flare-feed-card-compact.tsx");
 
     for (const source of [app, web]) {
-      expect(source).toContain("function NeedBadge");
+      expect(source).toContain("function NeedStack");
+      expect(source).not.toContain("function NeedBadge");
       /* What is STILL wanted, not what was asked for. */
       expect(source).toContain("card.remaining ?? card.quantity ?? 1");
-      /* Bottom right, and in the accent. */
-      expect(source).toMatch(/bottom/);
+      /* The room's fan: up to three copies behind, 4 apart. */
+      expect(source).toContain("const ghosts = Math.min(copies, 4) - 1;");
+      /* The binder's tag, which draws nothing for one copy. */
+      expect(source).toContain("<QuantityBadge");
+      expect(source).not.toMatch(/\{wanted\}x|\$\{wanted\}x/);
     }
-    expect(app).toContain("`${wanted}x`");
-    expect(web).toContain("{wanted}x");
   });
 
   it("shows the whole card rather than cropping its border off", async () => {

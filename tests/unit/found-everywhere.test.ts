@@ -160,12 +160,15 @@ describe("found, everywhere", () => {
     expect(read("src/components/feed/feed-tile.tsx")).toContain(
       '"opacity-60 grayscale"',
     );
-    expect(read("src/components/feed/flare-feed-card-compact.tsx")).toContain(
-      "if (done) return null;",
-    );
-    expect(read("mobile/src/flare-feed-card-compact.tsx")).toContain(
-      "if (done) return null;",
-    );
+    /* A found card is one card with no count on it: no stack, no tag. */
+    for (const path of [
+      "src/components/feed/flare-feed-card-compact.tsx",
+      "mobile/src/flare-feed-card-compact.tsx",
+    ]) {
+      const source = read(path);
+      expect(source).toContain("const copies = done ? 1 : Math.max(1, wanted);");
+      expect(source).toContain("{done ? null : (");
+    }
     const foil = read("mobile/src/foil.tsx");
     expect(foil).toContain("function Greyed(");
     expect(foil).toContain("<ColorMatrix matrix={GREY} />");
