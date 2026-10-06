@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Logo } from "@/components/brand/logo";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
 
 /**
@@ -17,12 +18,15 @@ import { SITE } from "@/lib/site";
  */
 export function TabPageShell({
   title,
+  leading,
   trailing,
   trailingCount = 1,
   children,
 }: {
   /** The page's name for screen readers; nothing draws it. */
   title: string;
+  /** A control on the left of the wordmark: on the Feed, the + that posts a Flare. */
+  leading?: React.ReactNode;
   /** The controls on the right of the wordmark, when there are any. */
   trailing?: React.ReactNode;
   /** How many round buttons `trailing` holds, so the blank on the left
@@ -42,10 +46,17 @@ export function TabPageShell({
             left keeps the mark centred whether or not there is a door. */}
         <div className="flex w-full max-w-2xl flex-wrap items-center gap-3">
           <h1 className="sr-only">{title}</h1>
+          {/* As wide as the controls on the right, so the wordmark stays
+              centred whether the left holds a control or nothing. */}
           <span
-            aria-hidden="true"
-            className={trailingCount === 2 ? "h-9 w-20 shrink-0" : "size-9 shrink-0"}
-          />
+            aria-hidden={leading ? undefined : true}
+            className={cn(
+              "flex shrink-0 items-center",
+              trailingCount === 2 ? "h-9 w-20" : "size-9",
+            )}
+          >
+            {leading}
+          </span>
           <span className="flex flex-1 justify-center">
             <Link href="/feed" aria-label={`${SITE.name} Feed`}>
               <Logo size={30} priority />

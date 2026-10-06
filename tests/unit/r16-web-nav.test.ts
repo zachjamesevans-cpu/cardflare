@@ -49,34 +49,27 @@ const web = {
 };
 
 describe("the tab bar", () => {
-  it("is Feed, Nights, the raised +, Messages, Profile, with no Inbox", () => {
+  it("is Feed, Nights, Messages, Profile, with no Inbox and no raised +", () => {
     inOrder(web.tabs, [
       'label: "Feed"',
       'label: "Nights"',
-      'label: "Post a Flare"',
       'label: "Messages"',
       'label: "Profile"',
     ]);
     expect(web.tabs).not.toContain('label: "Inbox"');
     expect(web.tabs).not.toContain('href: "/inbox"');
+    /* The founder: "Not a fan of the big plus." */
+    expect(web.tabs).not.toContain('"raised" in tab');
+    expect(web.tabs).not.toContain('href: "/flare"');
     /* Local's switch is untouched. */
     expect(web.tabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
-  it("draws the + as a raised accent circle, labelled Post a Flare, to the composer", () => {
-    expect(web.tabs).toContain(
-      '{ href: "/flare", label: "Post a Flare", icon: Plus, raised: true }',
-    );
-    expect(web.tabs).toContain("aria-label={tab.label}");
-    expect(web.tabs).toContain(
-      "-mt-6 flex size-14 items-center justify-center rounded-full bg-accent text-accent-contrast",
-    );
-    /* No word under the circle. */
-    const raised = web.tabs.slice(
-      web.tabs.indexOf('if ("raised" in tab)'),
-      web.tabs.indexOf("const dot ="),
-    );
-    expect(raised).not.toMatch(/>\s*\{tab\.label\}/);
+  it("posts a Flare from the + at the Feed's top left, a player's", () => {
+    expect(web.feedPage).toContain('href="/flare"');
+    expect(web.feedPage).toContain('aria-label="Post a Flare"');
+    expect(web.feedPage).toContain('<Plus className="size-5" aria-hidden="true" />');
+    expect(web.shell).toContain("{leading}");
   });
 
   it("puts Messages on the conversations list, with the unread dot fed by messages", () => {
@@ -116,7 +109,7 @@ describe("the Feed's bell", () => {
     expect(web.feedPage).toContain("<Shell playerId={playerId} unread={unread}>");
     /* The blank on the left matches two buttons, so the mark stays centred. */
     expect(web.feedPage).toContain("trailingCount={playerId ? 2 : 1}");
-    expect(web.shell).toContain('trailingCount === 2 ? "h-9 w-20 shrink-0"');
+    expect(web.shell).toContain('trailingCount === 2 ? "h-9 w-20" : "size-9"');
   });
 
   it("leaves the notifications page a way back to the Feed, and Messages none to the Inbox", () => {

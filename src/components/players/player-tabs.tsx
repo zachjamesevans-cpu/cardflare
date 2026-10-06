@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarDays,
-  Home,
-  MapPin,
-  MessageCircle,
-  Plus,
-  UserCircle2,
-} from "lucide-react";
+import { CalendarDays, Home, MapPin, MessageCircle, UserCircle2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -18,16 +11,16 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
  * The app's bottom bar, on the website.
  *
  * The founder's parity call: somebody who uses the app on Wednesday and
- * the site on Thursday should not have to learn two products. Same five
- * places, same order: Feed, Nights, the raised +, Messages, Profile,
- * so a thumb that knows one knows the other.
+ * the site on Thursday should not have to learn two products. Same four
+ * places, same order: Feed, Nights, Messages, Profile, so a thumb that
+ * knows one knows the other.
  *
- * Round 16 reshaped it the way Instagram's is. The + in the middle is
- * a raised accent circle that opens Post a Flare: posting is the one
- * thing the bar exists to make easy, so it is the one thing that stands
- * up out of it. Messages took the Inbox's slot, because conversations
- * are where people come back to; notifications moved to a bell in the
- * Feed's top right (feed/notification-bell.tsx).
+ * Round 16 reshaped it the way Instagram's is. Messages took the
+ * Inbox's slot, because conversations are where people come back to;
+ * notifications moved to a bell in the Feed's top right
+ * (feed/notification-bell.tsx), and posting a Flare is the + at the
+ * Feed's top left. A raised + in the middle of the bar was tried and
+ * the founder took it out: "Not a fan of the big plus."
  *
  * Fixed to the bottom on every width. On a laptop that is unusual for a
  * website and deliberate here: this is the signed-in player surface, the
@@ -50,8 +43,6 @@ const TABS = [
   ...(LOCAL_ENABLED
     ? [{ href: "/local", label: "Local", icon: MapPin } as const]
     : [{ href: "/nights", label: "Nights", icon: CalendarDays } as const]),
-  /* The raised +, with no label under it: the circle is the label. */
-  { href: "/flare", label: "Post a Flare", icon: Plus, raised: true },
   /* The conversations list. With Local off, /local is the Messages
      page; with it on, the same page leads with them. */
   { href: "/local", label: "Messages", icon: MessageCircle },
@@ -108,24 +99,6 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
         {TABS.map((tab) => {
           const active = isActive(tab.label, tab.href, pathname);
           const Icon = tab.icon;
-
-          if ("raised" in tab) {
-            return (
-              <li key={tab.label} className="flex flex-1 items-center justify-center">
-                {/* Raised out of the bar: it overlaps the bar's top edge,
-                    and the ring in the surface colour cuts it clean from
-                    the glass behind. */}
-                <Link
-                  href={tab.href}
-                  aria-label={tab.label}
-                  aria-current={active ? "page" : undefined}
-                  className="-mt-6 flex size-14 items-center justify-center rounded-full bg-accent text-accent-contrast shadow-[var(--shadow-glow)] ring-4 ring-surface transition-[transform,background-color] hover:bg-accent-hover active:scale-95"
-                >
-                  <Icon className="size-7" strokeWidth={2.5} aria-hidden="true" />
-                </Link>
-              </li>
-            );
-          }
 
           const dot = tab.label === "Messages" && unread > 0;
 

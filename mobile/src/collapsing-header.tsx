@@ -148,11 +148,14 @@ export function settleHeader(state: HeaderScroll): void {
 
 export function CollapsingHeader({
   state,
+  onPost,
   onSearch,
   onInbox,
   unread,
 }: {
   state: HeaderScroll;
+  /** The + at the top left: Post a Flare, the way Instagram posts. */
+  onPost: () => void;
   onSearch: () => void;
   /** The bell: the notices, which used to be the Inbox tab. */
   onInbox: () => void;
@@ -237,6 +240,38 @@ export function CollapsingHeader({
             contents,
           ]}
         />
+
+        {/*
+         * THE +, top left: Post a Flare. The founder: "Let's just make a +
+         * icon in top left of feed so it's like instagram and you're making
+         * a post there." The middle of the tab bar is Messages, which gets
+         * opened far more often than a Flare gets posted. Same weight as
+         * the search and the bell, the way Instagram's + sits.
+         */}
+        <Animated.View
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              top: insets.top,
+              bottom: 0,
+              justifyContent: "center",
+            },
+            contents,
+          ]}
+        >
+          <Tap
+            accessibilityLabel="Post a Flare"
+            onPress={onPost}
+            style={{
+              paddingLeft: spacing(4),
+              paddingRight: spacing(2),
+              paddingVertical: spacing(2),
+            }}
+          >
+            <Ionicons name="add" size={26} color={colors.textPrimary} />
+          </Tap>
+        </Animated.View>
 
         {/*
          * The positioning lives on this wrapper, NOT on the Tap.

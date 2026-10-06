@@ -122,11 +122,11 @@ describe("the picker", () => {
 describe("the centre tab", () => {
   const app = read("mobile/App.tsx");
 
-  it("is the raised + (round 16), and never the old mark image", () => {
-    /* The flame gave way to the raised accent + that posts a Flare;
-       tests/unit/r16-app-nav.test.ts pins it. */
-    expect(app).toContain("function PostButton(");
-    expect(app).toContain('<Ionicons name="add"');
+  it("is gone: posting is the + at the Feed's top left, never the old mark image", () => {
+    /* The flame gave way to a raised +, and the founder took that out
+       too ("Not a fan of the big plus"); tests/unit/r16-app-nav.test.ts
+       pins the + in the Feed header. */
+    expect(app).not.toContain("function PostButton(");
     expect(app).not.toContain("MarkIcon");
     expect(app).not.toContain("cardflare-mark.png");
     /* The mark still has a home: the pack shop. */

@@ -375,66 +375,6 @@ function MessagesDot() {
   return <UnreadDot ring={colors.elevated} style={{ top: -1, right: -3 }} />;
 }
 
-/*
- * THE RAISED +. The middle of the bar posts a Flare: an accent circle
- * with a plus, no label, sitting a little proud of the pill so it reads
- * as the one thing to do rather than a fifth place to go. It opens the
- * Flare tab, the screen the old flame tab showed, so every "Post a
- * Flare" door in the app (navigate("Tabs", { screen: "Flare" })) still
- * lands in the same place. The website's dock draws the same circle.
- */
-export const POST_BUTTON = { size: 46, lift: 10 } as const;
-
-function PostButton({ onPress, onLongPress, testID }: BottomTabBarButtonProps) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      accessibilityRole="button"
-      accessibilityLabel="Post a Flare"
-      testID={testID}
-      style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
-      onPressIn={() => {
-        Animated.spring(scale, {
-          toValue: 0.88,
-          speed: 60,
-          bounciness: 0,
-          useNativeDriver: true,
-        }).start();
-      }}
-      onPressOut={() => {
-        Animated.spring(scale, {
-          toValue: 1,
-          speed: 25,
-          bounciness: 14,
-          useNativeDriver: true,
-        }).start();
-      }}
-    >
-      <Animated.View
-        style={{
-          width: POST_BUTTON.size,
-          height: POST_BUTTON.size,
-          borderRadius: POST_BUTTON.size / 2,
-          backgroundColor: colors.accent,
-          alignItems: "center",
-          justifyContent: "center",
-          shadowColor: colors.canvas,
-          shadowOpacity: 0.45,
-          shadowRadius: 8,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 6,
-          transform: [{ translateY: -POST_BUTTON.lift }, { scale }],
-        }}
-      >
-        <Ionicons name="add" size={28} color={colors.accentContrast} />
-      </Animated.View>
-    </Pressable>
-  );
-}
-
 function Tabs() {
   /* Unread messages, for the dot on Messages. src/unread-messages.ts
      holds the one value; the notices' count is the Feed bell's. */
@@ -467,8 +407,11 @@ function Tabs() {
         headerStyle: { backgroundColor: colors.canvas },
         headerTintColor: colors.textPrimary,
         headerTitleStyle: { fontWeight: "700" },
+        /* Post a Flare keeps its route (every "Post a Flare" door in the
+           app navigates to it) but has no slot in the bar: it opens from
+           the + at the top left of the Feed. */
         tabBarButton: (props) =>
-          route.name === "Flare" ? <PostButton {...props} /> : <TabButton {...props} />,
+          route.name === "Flare" ? null : <TabButton {...props} />,
         /*
          * LIQUID GLASS, which means the bar stops being a floor and
          * starts being a surface the list runs under.
@@ -490,27 +433,13 @@ function Tabs() {
          * it stays.
          */
         tabBarBackground: () => (
-          /* The clip lives on the background now, not on the bar, so
-             the raised + can sit proud of the pill's top edge. */
-          <View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              borderRadius: TAB_BAR_RADIUS,
-              overflow: "hidden",
-            }}
-          >
-            <GlassFill
-              style={{ borderRadius: TAB_BAR_RADIUS }}
-              /* Without the material, the pill still has to read as a
-                 pill: a flat black shape on a black page is invisible, so
-                 the fallback is the raised surface and keeps an edge. */
-              fallback={colors.elevated}
-            />
-          </View>
+          <GlassFill
+            style={{ borderRadius: TAB_BAR_RADIUS }}
+            /* Without the material, the pill still has to read as a
+               pill: a flat black shape on a black page is invisible, so
+               the fallback is the raised surface and keeps an edge. */
+            fallback={colors.elevated}
+          />
         ),
         tabBarStyle: {
           position: "absolute",
@@ -534,9 +463,9 @@ function Tabs() {
           /* A pill has no top edge to draw a hairline along; without
              glass the fallback surface is what separates it instead. */
           borderTopWidth: 0,
-          /* Not clipped here: the background clips itself (above),
-             and the raised + needs to reach past the pill's top. */
-          overflow: "visible",
+          /* Clips the material to the pill on the fallback path, where
+             a plain View will not round its own children. */
+          overflow: "hidden",
           /* The bar draws its own material; a shadow under a glass
              surface is the one thing that makes it look pasted on. */
           elevation: 0,
@@ -612,18 +541,6 @@ function Tabs() {
           }}
         />
       )}
-      {/* The raised + in the middle: Post a Flare. No label under it;
-          the header says what the screen is for, the same words as the
-          website's page heading. */}
-      <Tab.Screen
-        name="Flare"
-        component={HubScreen}
-        options={{
-          title: "Post a Flare",
-          tabBarLabel: "Post a Flare",
-          tabBarAccessibilityLabel: "Post a Flare",
-        }}
-      />
       {/* The conversations, the screen the Inbox's Messages row used to
           open, now a tab of its own with a dot while anything is
           unread. Local, while it is on, keeps its own list too. */}
@@ -640,6 +557,18 @@ function Tabs() {
         {() => <LocalScreen threadsOnly />}
       </Tab.Screen>
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* Post a Flare: no slot in the bar (see tabBarButton above); the +
+          at the Feed's top left opens it. Last, so it never shifts the
+          visible tabs. */}
+      <Tab.Screen
+        name="Flare"
+        component={HubScreen}
+        options={{
+          title: "Post a Flare",
+          tabBarLabel: "Post a Flare",
+          tabBarAccessibilityLabel: "Post a Flare",
+        }}
+      />
     </Tab.Navigator>
   );
 }

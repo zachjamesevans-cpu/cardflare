@@ -44,17 +44,16 @@ function inOrder(source: string, markers: string[]) {
   }
 }
 
-describe("the tab bar: Feed, Nights, +, Messages, Profile", () => {
+describe("the tab bar: Feed, Nights, Messages, Profile", () => {
   const tabs = app.slice(
     app.indexOf("function Tabs() {"),
     app.indexOf("class StartupGuard"),
   );
 
-  it("draws the five in order, and the Inbox is no longer one of them", () => {
+  it("draws the four in order, and the Inbox is no longer one of them", () => {
     inOrder(tabs, [
       'name="Feed"',
       'name="Nights"',
-      'name="Flare"',
       'name="Messages"',
       'name="Profile"',
     ]);
@@ -64,26 +63,20 @@ describe("the tab bar: Feed, Nights, +, Messages, Profile", () => {
     expect(tabs).toContain('<Tab.Screen name="Local" component={LocalScreen}');
   });
 
-  it("the middle is a raised accent +, no label, that opens the Flare composer", () => {
-    expect(tabs).toContain(
-      'route.name === "Flare" ? <PostButton {...props} /> : <TabButton {...props} />',
-    );
-    const button = app.slice(
-      app.indexOf("function PostButton("),
-      app.indexOf("function Tabs() {"),
-    );
-    expect(button).toContain('accessibilityLabel="Post a Flare"');
-    expect(button).toContain("backgroundColor: colors.accent,");
-    expect(button).toContain(
-      '<Ionicons name="add" size={28} color={colors.accentContrast} />',
-    );
-    expect(button).toContain("translateY: -POST_BUTTON.lift");
-    /* It draws no label: the children (icon and label) are never rendered. */
-    expect(button).not.toContain("{children}");
-    /* The screen the old flame tab showed. */
+  it("keeps Post a Flare's route but gives it no slot: the Feed's + opens it", () => {
+    /* The founder: "Not a fan of the big plus... move the + to top left
+       and messages bottom middle." */
+    expect(tabs).toContain('route.name === "Flare" ? null : <TabButton {...props} />');
     expect(tabs).toMatch(/name="Flare"\s*component=\{HubScreen\}/);
-    /* The pill's clip moved to the background so the + can rise above it. */
-    expect(app).toContain('overflow: "visible",');
+    expect(app).not.toContain("function PostButton(");
+    const header = read("mobile/src/collapsing-header.tsx");
+    expect(header).toContain('accessibilityLabel="Post a Flare"');
+    expect(header).toContain(
+      '<Ionicons name="add" size={26} color={colors.textPrimary} />',
+    );
+    expect(read("mobile/src/screens/home.tsx")).toContain(
+      'onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}',
+    );
   });
 
   it("Messages is the conversations list, with a dot from the unread message count", () => {

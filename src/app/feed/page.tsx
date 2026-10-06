@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
+import { Plus } from "lucide-react";
 import { FeedSearch } from "@/components/feed/feed-search";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { Item } from "@/components/feed/feed-items";
@@ -85,6 +86,21 @@ function Shell({
   return (
     <TabPageShell
       title="Feed"
+      /* The + at the top left posts a Flare, the way Instagram's posts:
+         the founder gave the tab bar's middle to Messages, which gets
+         opened far more often than a Flare gets posted. A player's: a
+         guest posts from a room. */
+      leading={
+        playerId ? (
+          <Link
+            href="/flare"
+            aria-label="Post a Flare"
+            className="flex size-9 items-center justify-center rounded-full border border-border bg-surface text-text-primary transition-colors hover:border-border-strong"
+          >
+            <Plus className="size-5" aria-hidden="true" />
+          </Link>
+        ) : undefined
+      }
       trailingCount={playerId ? 2 : 1}
       trailing={
         <FeedSearch

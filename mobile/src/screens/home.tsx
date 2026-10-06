@@ -877,6 +877,7 @@ export function HomeScreen() {
 
       <CollapsingHeader
         state={header}
+        onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
         onSearch={() => navigation.navigate("Search")}
         onInbox={() => navigation.navigate("Inbox")}
         unread={unread}
