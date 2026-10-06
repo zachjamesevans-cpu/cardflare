@@ -354,16 +354,19 @@ describe("the home screen's furniture", () => {
     expect(repo).not.toContain("const RECENT_SAMPLE");
   });
 
-  it("puts finding a player on the feed, on both", () => {
-    /* "Let's make a search icon in the top right of the main feed." */
-    expect(webPage).toContain("<FeedSearch");
-
-    /* It lives on the Feed screen now rather than in the navigator: the
-       app's header floats over its own list so it can get out of the
-       way on scroll, which a navigator header cannot do. Same place on
-       screen, different owner. */
+  it("puts finding a player one tap from the feed, on both", () => {
+    /* "Let's make a search icon in the top right of the main feed" was
+       the first answer; Search is a tab of its own now, on both bars
+       (Feed, Nights, Messages, Search, Profile), and the Feed's empty
+       Following list sends people there. */
+    expect(read("src/components/players/player-tabs.tsx")).toContain(
+      '{ href: "/search", label: "Search", icon: Search }',
+    );
+    expect(read("mobile/App.tsx")).toMatch(
+      /name="Search"\s*component=\{SearchScreen\}/,
+    );
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      'navigation.navigate("Search")',
+      'navigation.navigate("Tabs", { screen: "Search" })',
     );
     expect(read("mobile/src/screens/home.tsx")).not.toContain("FindPlayer");
   });

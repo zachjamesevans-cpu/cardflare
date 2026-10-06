@@ -149,14 +149,12 @@ export function settleHeader(state: HeaderScroll): void {
 export function CollapsingHeader({
   state,
   onPost,
-  onSearch,
   onInbox,
   unread,
 }: {
   state: HeaderScroll;
   /** The + at the top left: Post a Flare, the way Instagram posts. */
   onPost: () => void;
-  onSearch: () => void;
   /** The bell: the notices, which used to be the Inbox tab. */
   onInbox: () => void;
   /** Unread notices; above zero, the bell wears the accent dot. */
@@ -298,17 +296,6 @@ export function CollapsingHeader({
           ]}
         >
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Tap
-              accessibilityLabel="Search"
-              onPress={onSearch}
-              style={{
-                paddingLeft: spacing(4),
-                paddingRight: spacing(2),
-                paddingVertical: spacing(2),
-              }}
-            >
-              <Ionicons name="search" size={20} color={colors.textSecondary} />
-            </Tap>
             {/*
              * THE BELL. The notices were a tab; the founder gave the slot
              * to Messages and put them here, top right of the Feed, the

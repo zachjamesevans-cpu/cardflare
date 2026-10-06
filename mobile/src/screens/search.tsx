@@ -14,6 +14,7 @@ import {
   type FoundStore,
 } from "../api";
 import { gameShortName } from "../games";
+import { useTabBarInset } from "../glass";
 import { formatHandle } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { withRecent } from "../recent-search-list";
@@ -34,12 +35,13 @@ import { colors, gutter, radius, spacing } from "../theme";
 import { VerifiedMark } from "../verified-mark";
 
 /**
- * One search for everything, from the Feed's own header.
+ * One search for everything: the Search tab, fourth in the bar.
  *
  * This began as "Find a player": the founder, "the social features
  * should be a litle more front and center... let's make a search icon
  * in the top right of the main feed." Now the same door finds a card,
- * a player or a store. The website's `EverythingSearch`
+ * a player or a store, and it is a tab of its own (Feed, Nights,
+ * Messages, Search, Profile) on both platforms. The website's `EverythingSearch`
  * (src/components/feed/everything-search.tsx) is the same thing with
  * the same words; tests/unit/search-parity.test.ts holds them together.
  *
@@ -108,6 +110,8 @@ const best = <T,>(items: readonly T[], score: (item: T) => number) =>
 
 export function SearchScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  /* A tab now, so the floating bar sits over the bottom of the list. */
+  const tabInset = useTabBarInset();
   const [query, setQuery] = useState("");
   /* Null until a search has run: before typing, nothing is said. */
   const [found, setFound] = useState<Results | null>(null);
@@ -378,7 +382,8 @@ export function SearchScreen() {
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
+        paddingTop: spacing(4),
+        paddingBottom: spacing(4) + tabInset,
         gap: spacing(3),
       }}
       keyboardShouldPersistTaps="handled"

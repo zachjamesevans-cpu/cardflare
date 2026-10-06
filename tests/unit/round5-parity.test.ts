@@ -130,21 +130,15 @@ describe("a Flare has two exits: Found it and Take down", () => {
 describe("the Messages door in the Inbox", () => {
   const SENTENCE = "Conversations about cards, and with players you message.";
 
-  it("is a row card at the top of both inboxes, with a count pill", () => {
-    expect(web.inbox).toContain("Messages");
-    expect(web.inbox).toContain(SENTENCE);
-    expect(web.inbox).toContain("<MessageCircle");
-    expect(web.inbox).toContain('href="/local"');
-    expect(web.inbox).toContain("unreadMessages(playerId)");
-    expect(web.inbox).toContain("{unreadThreads > 0 && (");
-    /* Above the notices, and drawn before the empty state is decided. */
-    expect(web.inbox.indexOf(SENTENCE)).toBeLessThan(web.inbox.indexOf("Nothing yet."));
-
-    expect(app.inbox).toContain("Messages");
-    expect(app.inbox).toContain(SENTENCE);
-    expect(app.inbox).toContain("chatbubble");
-    /* Round 16: Messages is a tab now. */
-    expect(app.inbox).toContain('navigate("Tabs", { screen: "Messages" })');
+  it("is gone from both inboxes: Messages has its own tab", () => {
+    /* The founder: "Remove the 'messages' thing inside notifications
+       it's not needed anymore since it has its own button". */
+    expect(web.inbox).not.toContain(SENTENCE);
+    expect(web.inbox).not.toContain('href="/local"');
+    expect(web.inbox).not.toContain("unreadMessages(");
+    expect(app.inbox).not.toContain(SENTENCE);
+    expect(app.inbox).not.toContain("chatbubble");
+    expect(app.inbox).not.toContain('screen: "Messages"');
   });
 
   it("keeps the Messages tab lit while a conversation is read", () => {

@@ -38,7 +38,7 @@ const web = {
   tabs: read("src/components/players/player-tabs.tsx"),
   tabBar: read("src/components/players/player-tab-bar.tsx"),
   feedPage: read("src/app/feed/page.tsx"),
-  feedSearch: read("src/components/feed/feed-search.tsx"),
+  searchPanel: read("src/components/feed/search-panel.tsx"),
   bell: read("src/components/feed/notification-bell.tsx"),
   shell: read("src/components/players/tab-page-shell.tsx"),
   search: read("src/components/feed/everything-search.tsx"),
@@ -49,13 +49,17 @@ const web = {
 };
 
 describe("the tab bar", () => {
-  it("is Feed, Nights, Messages, Profile, with no Inbox and no raised +", () => {
+  it("is Feed, Nights, Messages, Search, Profile, with no Inbox and no raised +", () => {
+    /* The founder: "Tabs should be in this order left to right. Feed -
+       nights - messages - search - profile". */
     inOrder(web.tabs, [
       'label: "Feed"',
       'label: "Nights"',
       'label: "Messages"',
+      'label: "Search"',
       'label: "Profile"',
     ]);
+    expect(web.tabs).toContain('{ href: "/search", label: "Search", icon: Search }');
     expect(web.tabs).not.toContain('label: "Inbox"');
     expect(web.tabs).not.toContain('href: "/inbox"');
     /* The founder: "Not a fan of the big plus." */
@@ -90,25 +94,25 @@ describe("the tab bar", () => {
 });
 
 describe("the Feed's bell", () => {
-  it("sits at the top right, after the search, and opens the notifications", () => {
+  it("sits alone at the top right and opens the notifications", () => {
     expect(web.bell).toContain('href="/inbox"');
     expect(web.bell).toContain("<Bell");
     expect(web.bell).toContain(
       'unread > 0 ? "Notifications, unread" : "Notifications"',
     );
     expect(web.bell).toContain("rounded-full bg-accent ring-2 ring-surface");
-    /* After the search icon, inside the same group. */
-    inOrder(web.feedSearch, ["<Search", "{bell}", "<EverythingSearch"]);
+    /* Alone: search is a tab now, not an icon beside it. */
+    expect(web.feedPage).not.toContain("FeedSearch");
   });
 
   it("is a player's, with the dot from the notifications' unread count", () => {
     expect(web.feedPage).toContain("unreadCount(playerId)");
-    expect(web.feedPage).toContain(
-      "bell={playerId ? <NotificationBell unread={unread} /> : undefined}",
+    expect(web.feedPage).toMatch(
+      /playerId \? \(\s*<NotificationBell unread=\{unread\} \/>/,
     );
     expect(web.feedPage).toContain("<Shell playerId={playerId} unread={unread}>");
-    /* The blank on the left matches two buttons, so the mark stays centred. */
-    expect(web.feedPage).toContain("trailingCount={playerId ? 2 : 1}");
+    /* One button each side, so the mark stays centred. */
+    expect(web.feedPage).not.toContain("trailingCount=");
     expect(web.shell).toContain('trailingCount === 2 ? "h-9 w-20" : "size-9"');
   });
 
@@ -170,7 +174,7 @@ describe("search", () => {
     expect(web.search).toContain("remember(query)");
     /* Per account. */
     expect(web.search).toContain("recentKey(account)");
-    expect(web.feedSearch).toContain("<EverythingSearch account={account} />");
+    expect(web.searchPanel).toContain("<EverythingSearch account={account} />");
   });
 
   it("touches storage only inside try/catch", () => {

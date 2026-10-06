@@ -39,7 +39,8 @@ function inOrder(source: string, markers: string[]) {
 
 const web = {
   feedPage: read("src/app/feed/page.tsx"),
-  feedSearch: read("src/components/feed/feed-search.tsx"),
+  searchPage: read("src/app/search/page.tsx"),
+  searchPanel: read("src/components/feed/search-panel.tsx"),
   search: read("src/components/feed/everything-search.tsx"),
   playerSearch: read("src/components/players/player-search.tsx"),
   cardRoute: read("src/app/cards/[cardId]/page.tsx"),
@@ -84,10 +85,16 @@ describe("search, from the Feed", () => {
     }
   });
 
-  it("the website's Feed icon opens the combined search, built on the three actions", () => {
-    expect(web.feedPage).toContain("<FeedSearch");
-    expect(web.feedSearch).toContain("<EverythingSearch account={account} />");
-    expect(web.feedSearch).not.toContain("PlayerSearch");
+  it("the website's Search tab is the combined search, built on the three actions", () => {
+    expect(web.searchPage).toContain("<SearchPanel account={playerId} />");
+    expect(web.searchPage).toContain("<TabPageShell");
+    expect(web.searchPanel).toContain("<EverythingSearch account={account} />");
+    /* It reads this device's recents as it draws, so never on the server. */
+    expect(web.searchPanel).toContain("{ ssr: false }");
+    expect(web.searchPanel).not.toContain("PlayerSearch");
+    /* Somebody with no bell, who may have no bar, keeps a door to it. */
+    expect(web.feedPage).toContain('href="/search"');
+    expect(web.feedPage).not.toContain("FeedSearch");
     /* The profile keeps its own player search. */
     expect(web.playerSearch).toContain("export function PlayerSearch");
     expect(web.search).toContain('"use client"');
@@ -117,11 +124,11 @@ describe("search, from the Feed", () => {
     expect(stores).toContain("[store.city, store.region]");
   });
 
-  it("the app's header icon opens the Search screen, the same three asks", () => {
+  it("the app's Search tab is the Search screen, the same three asks", () => {
     expect(app.App).toContain('name="Search"');
     expect(app.App).toContain('title: "Search"');
     expect(app.App).toContain("Card: { cardId: string }");
-    expect(app.home).toContain('navigation.navigate("Search")');
+    expect(app.home).toContain('navigation.navigate("Tabs", { screen: "Search" })');
     expect(app.search).toContain("searchCards(");
     expect(app.search).toContain("searchPlayersByName(");
     expect(app.search).toContain("searchStores(");

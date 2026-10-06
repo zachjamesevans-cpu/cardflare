@@ -878,7 +878,6 @@ export function HomeScreen() {
       <CollapsingHeader
         state={header}
         onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-        onSearch={() => navigation.navigate("Search")}
         onInbox={() => navigation.navigate("Inbox")}
         unread={unread}
       />
@@ -1739,13 +1738,13 @@ export function HomeScreen() {
           <Card>
             <Title>Nothing from people yet</Title>
             <Body>
-              Follow a friend and their Flares show up here. Find them by name from the
-              search up top.
+              Follow a friend and their Flares show up here. Find them by name in
+              Search.
             </Body>
             <Button
               label="Find a player"
               variant="secondary"
-              onPress={() => navigation.navigate("Search")}
+              onPress={() => navigation.navigate("Tabs", { screen: "Search" })}
             />
           </Card>
         )}

@@ -44,19 +44,23 @@ function inOrder(source: string, markers: string[]) {
   }
 }
 
-describe("the tab bar: Feed, Nights, Messages, Profile", () => {
+describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
   const tabs = app.slice(
     app.indexOf("function Tabs() {"),
     app.indexOf("class StartupGuard"),
   );
 
-  it("draws the four in order, and the Inbox is no longer one of them", () => {
+  it("draws the five in order, and the Inbox is no longer one of them", () => {
+    /* The founder: "Tabs should be in this order left to right. Feed -
+       nights - messages - search - profile". */
     inOrder(tabs, [
       'name="Feed"',
       'name="Nights"',
       'name="Messages"',
+      'name="Search"',
       'name="Profile"',
     ]);
+    expect(tabs).toMatch(/name="Search"\s*component=\{SearchScreen\}/);
     expect(tabs).not.toContain('name="Inbox"');
     /* Local still takes the second slot when it is switched on. */
     expect(tabs).toContain("{LOCAL_ENABLED ? (");
@@ -68,6 +72,9 @@ describe("the tab bar: Feed, Nights, Messages, Profile", () => {
        and messages bottom middle." */
     expect(tabs).toContain('route.name === "Flare" ? null : <TabButton {...props} />');
     expect(tabs).toMatch(/name="Flare"\s*component=\{HubScreen\}/);
+    /* Its box goes too, or the bar keeps an empty slot: "Missing a
+       whole tab at the bottom." */
+    expect(tabs).toContain('tabBarItemStyle: { display: "none" }');
     expect(app).not.toContain("function PostButton(");
     const header = read("mobile/src/collapsing-header.tsx");
     expect(header).toContain('accessibilityLabel="Post a Flare"');
@@ -106,16 +113,20 @@ describe("the tab bar: Feed, Nights, Messages, Profile", () => {
     expect(href).toContain('navigation.navigate("Inbox");');
     expect(href).toContain('navigation.navigate("Tabs", { screen: "Messages" });');
     expect(href).not.toContain('screen: "Inbox"');
-    expect(inbox).toContain('navigation.navigate("Tabs", { screen: "Messages" })');
+    /* The Inbox's Messages row is gone: Messages has its own tab. */
+    expect(inbox).not.toContain('screen: "Messages"');
+    expect(inbox).not.toContain("listLocalThreads");
   });
 });
 
 describe("the Feed's bell", () => {
-  it("sits top right after search, opens the Inbox, and wears the dot when unread", () => {
+  it("sits alone top right, opens the Inbox, and wears the dot when unread", () => {
     expect(home).toContain('onInbox={() => navigation.navigate("Inbox")}');
     expect(home).toContain("const unread = useUnread();");
+    /* Search is a tab now, so the header has no search icon. */
+    expect(header).not.toContain('accessibilityLabel="Search"');
+    expect(home).not.toContain("onSearch");
     inOrder(header, [
-      'accessibilityLabel="Search"',
       'unread > 0 ? "Notifications, unread" : "Notifications"',
       'name="notifications-outline"',
       "{unread > 0 ? (",
