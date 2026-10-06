@@ -29,6 +29,7 @@ import { aboutSchema, displayNameSchema } from "@/lib/players/profile-schema";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
 import { tierAllows } from "@/lib/tiers";
+import { subscriptionForPlayer } from "@/lib/billing/repository";
 import { huntLimitFor } from "@/lib/players/hunts";
 import { autoPostFor, setAutoPost } from "@/lib/events/auto-post";
 import { feedViewFor, setFeedView } from "@/lib/feed/view-settings";
@@ -77,7 +78,7 @@ export async function GET(request: Request): Promise<Response> {
   const profile = await ownProfile(player.playerId);
   if (!profile) return Response.json({ error: "not-found" }, { status: 404 });
 
-  const [wardrobe, worn, wearing, equips, stats] = await Promise.all([
+  const [wardrobe, worn, wearing, equips, stats, subscription] = await Promise.all([
     wardrobeFor(
       player.playerId,
       { earned: profile.embersEarned, balance: profile.embersBalance },
@@ -87,6 +88,7 @@ export async function GET(request: Request): Promise<Response> {
     avatarWearFor([player.playerId]),
     dressedEquipsFor(player.playerId),
     profileStats(player.playerId),
+    subscriptionForPlayer(player.playerId),
   ]);
 
   const wear = wearing.get(player.playerId);
@@ -117,6 +119,20 @@ export async function GET(request: Request): Promise<Response> {
        */
       tier: profile.tier,
       pro: tierAllows(profile.tier, "cosmetics"),
+      /*
+       * The Pro screen's "Renews 12 Nov" (or "Ends", once cancelled) and
+       * where it is managed: Apple's subscription page for an app
+       * purchase, the website's billing for a Stripe one. Only this
+       * player's own row, on their own profile; null with no
+       * subscription, and absent from an older server.
+       */
+      subscription: subscription
+        ? {
+            source: subscription.source,
+            renewsAt: subscription.current_period_end,
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          }
+        : null,
       /* The stores that named them an organizer: the TO chip. */
       organizerAt: profile.organizerAt,
       binders: absoluteImageUrls(profile.binders.map(forOldBuild)),

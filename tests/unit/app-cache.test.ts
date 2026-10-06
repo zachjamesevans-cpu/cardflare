@@ -102,8 +102,15 @@ describe("the store", () => {
       api.indexOf("export async function signOut"),
       api.indexOf("export async function signOut") + 800,
     );
+    /* Through the helper a refused refresh shares, so both ways out
+       of an account sweep the same things. */
+    const locals = api.slice(
+      api.indexOf("async function forgetAccountLocals"),
+      api.indexOf("async function forgetAccountLocals") + 2000,
+    );
 
-    expect(signOut).toContain("clearCache");
+    expect(signOut).toContain("forgetAccountLocals()");
+    expect(locals).toContain("clearCache");
     /* Whoever signs out may not be whoever the pointer names. */
     expect(cache).toContain("getAllKeys");
     expect(cache).toContain("multiRemove");
@@ -135,7 +142,8 @@ describe("painting it", () => {
      * feed appears.
      */
     const home = await readFile("mobile/src/screens/home.tsx", "utf8");
-    expect(home).toContain("{hydrated && feed.length < 3 && (");
+    /* A guest gets its own "How cardflare works" card instead. */
+    expect(home).toContain("{!guest && hydrated && feed.length < 3 && (");
   });
 
   it("keeps what is on screen when a refresh fails", async () => {

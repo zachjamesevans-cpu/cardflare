@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -17,8 +18,10 @@ import {
   signUp,
   type HandleAvailability,
 } from "../api";
+import { API_BASE } from "../config";
+import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
-import { TCG_GAMES, type GameSlug } from "../games";
+import { TCG_GAMES, playersLine, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { SignInScreen } from "./sign-in";
 import {
@@ -141,7 +144,10 @@ export function WelcomeScreen({
       )}
       {step === "signin" && (
         <ScrollView contentContainerStyle={{ paddingTop: spacing(14) }}>
-          <SignInScreen onSignedIn={done} />
+          <SignInScreen
+            onSignedIn={done}
+            onCreateAccount={() => setStep("account")}
+          />
           <Tap onPress={() => setStep("splash")}>
             <Text
               style={{
@@ -234,6 +240,18 @@ function Splash({
         }}
       >
         Find your cards.{"\n"}Meet nearby.{"\n"}Trade in person.
+      </Text>
+      {/* Which cards. "Find your cards" alone read as anything from
+          baseball to a deck of 52; the games say it at a glance. */}
+      <Text
+        style={{
+          color: colors.textSecondary,
+          fontSize: 14,
+          textAlign: "center",
+          lineHeight: 20,
+        }}
+      >
+        {playersLine()}.
       </Text>
 
       <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(4) }}>
@@ -403,6 +421,10 @@ function HandleAvailabilityLine({
 
 function AccountStep({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState("");
+  /* The address twice, as on the website: a typo here is an account
+     whose password reset goes to somebody else, or nowhere. */
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const emailsAgree = emailsMatch(email, confirmEmail);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
@@ -424,6 +446,19 @@ function AccountStep({ onDone }: { onDone: () => void }) {
         keyboardType="email-address"
         autoComplete="email"
       />
+      <Input
+        value={confirmEmail}
+        onChangeText={setConfirmEmail}
+        placeholder="Confirm email"
+        autoCapitalize="none"
+        autoCorrect={false}
+        keyboardType="email-address"
+        autoComplete="off"
+        accessibilityLabel="Confirm email"
+      />
+      {confirmEmail.trim() !== "" && !emailsAgree ? (
+        <Text style={{ color: colors.danger, fontSize: 14 }}>{EMAIL_MISMATCH}</Text>
+      ) : null}
       <Input
         value={password}
         onChangeText={setPassword}
@@ -449,12 +484,39 @@ function AccountStep({ onDone }: { onDone: () => void }) {
         Your name is what people see next to your posts. Your handle is how they look
         you up, and it is yours alone.
       </Muted>
+      {/* Agreement said where the account is made, both documents a tap
+          away: App Review wants the terms, and their zero tolerance for
+          abuse, accepted at sign-up. The website's form says the same. */}
+      <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+        By creating an account you agree to the{" "}
+        <Text
+          style={{ color: colors.accent, fontWeight: "600" }}
+          accessibilityRole="link"
+          onPress={() => void Linking.openURL(`${API_BASE}/terms`)}
+        >
+          Terms of use
+        </Text>{" "}
+        and{" "}
+        <Text
+          style={{ color: colors.accent, fontWeight: "600" }}
+          accessibilityRole="link"
+          onPress={() => void Linking.openURL(`${API_BASE}/privacy`)}
+        >
+          Privacy policy
+        </Text>
+        , including zero tolerance for abusive content.
+      </Text>
       <ErrorLine message={error} />
       <AsyncButton
         label="Create my account"
         pendingLabel="Creating…"
+        disabled={!emailsAgree}
         onPress={async () => {
           setError(null);
+          if (!emailsAgree) {
+            setError(EMAIL_MISMATCH);
+            return;
+          }
           if (password.length < 8) {
             setError("The password needs at least 8 characters.");
             return;
@@ -483,6 +545,8 @@ function AccountStep({ onDone }: { onDone: () => void }) {
 function GamesStep({ onDone }: { onDone: () => void }) {
   const [picked, setPicked] = useState<Set<GameSlug>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  /* A save has failed once: the way past it appears. */
+  const [saveFailed, setSaveFailed] = useState(false);
 
   const toggle = (slug: GameSlug) => {
     setPicked((current) => {
@@ -563,10 +627,22 @@ function GamesStep({ onDone }: { onDone: () => void }) {
         pendingLabel="Saving…"
         onPress={async () => {
           setError(null);
+          /*
+           * A failed save is a note, never a wall. The account already
+           * exists by this step, there is no Back, and nothing else
+           * depends on the games being saved: this button used to stay put
+           * on a network blip, and with nothing else on the screen the
+           * new account was trapped on its last question. A failure
+           * says so, the button stays to try again, and "Continue
+           * without saving" goes in regardless.
+           */
           try {
             await setGames([...picked]);
           } catch (caught) {
-            setError(describeError(caught));
+            setError(
+              `Your games did not save (${describeError(caught)}). Try again, or carry on without them.`,
+            );
+            setSaveFailed(true);
             return;
           }
           // Push becomes worth asking for the moment an account exists.
@@ -574,6 +650,26 @@ function GamesStep({ onDone }: { onDone: () => void }) {
           onDone();
         }}
       />
+      {saveFailed ? (
+        <Tap
+          onPress={() => {
+            void registerForPush();
+            onDone();
+          }}
+          hitSlop={8}
+        >
+          <Text
+            style={{
+              color: colors.accent,
+              fontWeight: "600",
+              textAlign: "center",
+              paddingVertical: spacing(2),
+            }}
+          >
+            Continue without saving
+          </Text>
+        </Tap>
+      ) : null}
     </Card>
   );
 }

@@ -4,6 +4,7 @@ import { badRequest } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
+import { grantRefusal } from "@/lib/auth/grant-refusal";
 import { openSignup } from "@/lib/auth/signup";
 import { starterNameFromEmail } from "@/lib/auth/signup-schema";
 import { handleSeedFrom } from "@/lib/players/handle";
@@ -173,9 +174,13 @@ export async function POST(request: Request): Promise<Response> {
       refresh_token?: string;
     };
 
-    if (!upstream.ok || !result.access_token) {
-      return Response.json({ error: "invalid-credentials" }, { status: 401 });
-    }
+    const refusal = grantRefusal(
+      body.action,
+      upstream.status,
+      Boolean(result.access_token),
+    );
+    if (refusal)
+      return Response.json({ error: refusal.error }, { status: refusal.status });
 
     return Response.json({
       accessToken: result.access_token,

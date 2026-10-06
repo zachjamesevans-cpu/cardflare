@@ -10,7 +10,7 @@ import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { checkSignupHandleAction, signUpWithPassword } from "@/lib/auth/actions";
 import { PASSWORD_SIGN_IN_IDLE } from "@/lib/auth/state";
-import { PASSWORD_MIN } from "@/lib/auth/signup-schema";
+import { EMAIL_MISMATCH, emailsMatch, PASSWORD_MIN } from "@/lib/auth/signup-schema";
 import {
   formatHandle,
   HANDLE_MAX,
@@ -19,11 +19,11 @@ import {
   type HandleAvailability,
 } from "@/lib/players/handle";
 
-function SubmitButton() {
+function SubmitButton({ blocked }: { blocked: boolean }) {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" size="lg" disabled={pending} className="w-full">
+    <Button type="submit" size="lg" disabled={pending || blocked} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Creating your account…" : "Create my account"}
     </Button>
@@ -90,6 +90,13 @@ export function SignupForm({ next }: { next?: string }) {
 
   const [handle, setHandle] = useState("");
   const availability = useHandleAvailability(handle);
+  /* The address twice: see emailsMatch. The button stays off until the
+     two agree, and the mismatch is said only once the second field has
+     something in it, so nobody is scolded before they have typed. */
+  const [email, setEmail] = useState(state.status === "error" ? state.email : "");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const emailsAgree = emailsMatch(email, confirmEmail);
+  const showMismatch = confirmEmail.trim() !== "" && !emailsAgree;
 
   const availabilityLine =
     availability === "checking"
@@ -125,11 +132,33 @@ export function SignupForm({ next }: { next?: string }) {
           type="email"
           inputMode="email"
           autoComplete="username"
-          defaultValue={state.status === "error" ? state.email : ""}
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
           aria-describedby={describedBy("email", false, false)}
           autoFocus
           required
         />
+      </Field>
+
+      <Field name="confirmEmail" label="Confirm email">
+        <TextInput
+          {...fieldIds("confirmEmail")}
+          name="confirmEmail"
+          type="email"
+          inputMode="email"
+          autoComplete="off"
+          value={confirmEmail}
+          onChange={(event) => setConfirmEmail(event.target.value)}
+          aria-describedby={describedBy("confirmEmail", false, false)}
+          aria-invalid={showMismatch || undefined}
+          required
+        />
+        <p
+          aria-live="polite"
+          className={`text-sm ${showMismatch ? "text-danger" : "sr-only"}`}
+        >
+          {showMismatch ? EMAIL_MISMATCH : ""}
+        </p>
       </Field>
 
       <Field
@@ -203,7 +232,23 @@ export function SignupForm({ next }: { next?: string }) {
         </p>
       </Field>
 
-      <SubmitButton />
+      {/* Agreement is said where the account is made, with both
+          documents a tap away: App Review wants the terms, and their
+          zero tolerance for abuse, accepted at sign-up. The app's form
+          carries the same sentence. */}
+      <p className="text-center text-sm text-text-muted">
+        By creating an account you agree to the{" "}
+        <Link href="/terms" className="text-accent hover:underline">
+          Terms of use
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="text-accent hover:underline">
+          Privacy policy
+        </Link>
+        , including zero tolerance for abusive content.
+      </p>
+
+      <SubmitButton blocked={!emailsAgree} />
 
       <p className="text-center text-sm text-text-muted">
         Already have an account?{" "}

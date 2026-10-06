@@ -11,6 +11,7 @@ import { safeNextPath } from "@/lib/auth/redirect";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { SITE } from "@/lib/site";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
+import { playersLine } from "@/lib/players/games-catalog";
 
 export const metadata: Metadata = {
   title: "Create your account",
@@ -54,6 +55,8 @@ export default async function SignupPage(props: {
         <h1 className="text-3xl font-bold text-text-primary">
           Find your cards. Meet nearby. Trade in person.
         </h1>
+        {/* Which cards: the app's welcome says the same line. */}
+        <p className="text-sm font-medium text-text-secondary">{playersLine()}.</p>
         <p className="text-text-secondary">
           Post your wants and cardflare connects you with the people who have them:
           around the corner, at your local store, at a show. Free, and your binder

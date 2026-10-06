@@ -25,6 +25,19 @@ export type GameSlug = (typeof TCG_GAMES)[number]["slug"];
 
 export const GAME_SLUGS = TCG_GAMES.map((game) => game.slug) as GameSlug[];
 
+/**
+ * "For One Piece, Riftbound, ... and Flesh & Blood players": the line
+ * under the sign-up pitch, here and in the app's welcome. "Find your
+ * cards" alone could mean sports cards or a deck of 52; naming the
+ * games says what this is for. Built from the list so a game added
+ * here is named there too.
+ */
+export function playersLine(): string {
+  const names = TCG_GAMES.map((game) => game.shortName as string);
+  const last = names.pop();
+  return `For ${names.join(", ")} and ${last} players`;
+}
+
 export function isGameSlug(value: string): value is GameSlug {
   return (GAME_SLUGS as string[]).includes(value);
 }

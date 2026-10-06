@@ -405,12 +405,22 @@ export function HomeScreen() {
    * to 5s more. Undo takes the id back out before it restores.
    */
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
+  /*
+   * No account on this phone: the Feed is the server's public sample
+   * (guestSampleFeed), drawn read-only under a "How cardflare works"
+   * card. A guest has nothing to filter, so the three tabs go and the
+   * sample shows whole; every action on it is a door to sign-up.
+   */
+  const [guest, setGuest] = useState(false);
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
-  const shown = feed.filter(
-    (item) =>
-      belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
-  );
+  const shown = guest
+    ? feed
+    : feed.filter(
+        (item) =>
+          belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
+      );
+  const toSignUp = () => navigation.navigate("CreateAccount");
   const sectionsShown = new Set(shown.map((item) => item.section)).size;
   /* The Flare being messaged from its paper plane, or null. */
   const [messaging, setMessaging] = useState<MessageTarget | null>(null);
@@ -578,11 +588,20 @@ export function HomeScreen() {
   const load = useCallback(async (alive: () => boolean) => {
     if (!(await storedAccessToken())) {
       if (alive()) {
+        setGuest(true);
         setMe(null);
-        setFeed([]);
+      }
+      /* The public sample, never cached: it is nobody's feed, and the
+         cache is keyed to an account a guest does not have. */
+      try {
+        const fresh = await getFeed(await silentCoords());
+        if (alive()) setFeed(fresh.items);
+      } catch {
+        if (alive()) setFeed([]);
       }
       return;
     }
+    if (alive()) setGuest(false);
 
     /*
      * Last open's feed, painted before this one has loaded.
@@ -877,8 +896,10 @@ export function HomeScreen() {
 
       <CollapsingHeader
         state={header}
-        onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-        onInbox={() => navigation.navigate("Inbox")}
+        /* No + for a guest: posting needs an account, and a button that
+           only says so is a dead end at the top of the first screen. */
+        onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}
+        onInbox={guest ? toSignUp : () => navigation.navigate("Inbox")}
         unread={unread}
       />
       <Animated.ScrollView
@@ -953,7 +974,33 @@ export function HomeScreen() {
          */}
 
         {/* The three filters, first thing under the wordmark. */}
-        <FeedFilterTabs value={tab} onChange={setTab} />
+        {guest ? null : <FeedFilterTabs value={tab} onChange={setTab} />}
+
+        {/*
+         * A guest's first screen says what this is and offers the two
+         * real ways in: an account, or the code at a store's counter
+         * (rooms work without one). The sample below is what people
+         * are posting, read-only.
+         */}
+        {guest ? (
+          <Card>
+            <Title>How cardflare works</Title>
+            <Body>
+              Post the cards you are looking for or have to trade. Players nearby see
+              them, raise a hand, and you meet up to trade in person. At a store, scan
+              the code at the counter to join tonight&rsquo;s room.
+            </Body>
+            <Button label="Create account" onPress={toSignUp} />
+            <Button
+              label="Scan a store code"
+              variant="secondary"
+              onPress={() => navigation.navigate("Scan")}
+            />
+            {shown.length > 0 ? (
+              <Muted>Recently posted on cardflare. Sign up to answer one.</Muted>
+            ) : null}
+          </Card>
+        ) : null}
 
         {/*
          * The Room tab's job, as a banner: gone from the bar, never gone
@@ -1292,7 +1339,32 @@ export function HomeScreen() {
                 ))}
               </Card>
             ) : item.kind === "hunt" ? (
-              view === "compact" ? (
+              guest ? (
+                /*
+                 * The guest's read-only post. `post.yours` is set so the
+                 * card offers no "I have this" anywhere inside it (see
+                 * haveFor), and every door it does draw - heart, comments,
+                 * message, the face, Report - goes to sign-up rather than
+                 * to a call that would only answer 401. The heart's
+                 * promise rejects so it springs back unliked.
+                 */
+                <FlareFeedCard
+                  key={`hunt-${item.postId}`}
+                  item={item}
+                  post={{ ...postRef(item), yours: true }}
+                  onOpenProfile={toSignUp}
+                  onLike={async () => {
+                    toSignUp();
+                    throw new Error("guest");
+                  }}
+                  onOpenThread={toSignUp}
+                  onMessage={toSignUp}
+                  onEnterRoom={toSignUp}
+                  onReport={toSignUp}
+                  picks={NO_PICKS}
+                  onPicks={() => {}}
+                />
+              ) : view === "compact" ? (
                 /* The founder's compact view: art and a needed-count,
                    everything else a tap away. See flare-feed-card-compact. */
                 <FlareFeedCardCompact
@@ -1684,7 +1756,8 @@ export function HomeScreen() {
            * timeline that is meant to read as one. The website draws
            * none there either.
            */
-          const heading = tab === "following" ? null : sectionHeading(item.section);
+          const heading =
+            guest || tab === "following" ? null : sectionHeading(item.section);
           const opensSection =
             heading !== null &&
             sectionsShown > 1 &&
@@ -1734,7 +1807,7 @@ export function HomeScreen() {
          * nothing, briefly, is its own kind of disorienting — which is
          * the complaint this whole change exists to answer.
          */}
-        {hydrated && shown.length === 0 && tab === "following" && (
+        {!guest && hydrated && shown.length === 0 && tab === "following" && (
           <Card>
             <Title>Nothing from people yet</Title>
             <Body>
@@ -1750,7 +1823,7 @@ export function HomeScreen() {
         )}
         {/* The restored filter needs its own words. Without them it
             fell through to Nearby's, which talks about store rooms. */}
-        {hydrated && shown.length === 0 && tab === "mine" && (
+        {!guest && hydrated && shown.length === 0 && tab === "mine" && (
           <Card>
             <Title>You have not posted yet</Title>
             <Body>
@@ -1765,7 +1838,7 @@ export function HomeScreen() {
           </Card>
         )}
 
-        {hydrated && shown.length === 0 && tab === "nearby" && (
+        {!guest && hydrated && shown.length === 0 && tab === "nearby" && (
           <Card>
             <Title>Nothing on right now</Title>
             <Body>
@@ -1805,7 +1878,7 @@ export function HomeScreen() {
         />
         <ReportSheet target={report} onClose={() => setReport(null)} />
 
-        {hydrated && feed.length < 3 && (
+        {!guest && hydrated && feed.length < 3 && (
           <Card>
             <Title>How it works</Title>
             <Body>
