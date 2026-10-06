@@ -8,6 +8,7 @@ import { agoFrom, postActions } from "./flare-feed-card";
 import { shelfFor } from "./flare-deck-pager";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
+import { QuantityBadge } from "./quantity-badge";
 import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap } from "./ui";
 
@@ -218,21 +219,19 @@ export function FlareFeedCardCompact({
 const COMPACT_TILE = 64;
 
 /**
- * "1x", bottom right, in the accent.
+ * How many are still wanted, as the small black ×N tag every other count
+ * of copies wears - the binder's "lowkey black and white box" - top left.
  *
- * The founder asked for exactly this: "a green quantity count of the
- * card they're needing on the card. so if it's a bonney, the bottom
- * right will show a '1x'."
+ * This was a green "1x" chip, bottom right, made half again as big when
+ * the founder asked. With one copy on almost every card it was mostly
+ * noise, sat over the art and covered the OFFERED band ("OFFE 3x"). The
+ * founder, on the Feed: "seems to take up a lot of the screen", then,
+ * after trying stacked copies: "just stick to the black quantity thing
+ * tbh that we have elsewhere". So one copy draws nothing, as everywhere.
  *
  * It says what is STILL wanted, not what was asked for - a card three
  * of four found is a card somebody needs one of, and the number that
- * helps is the one you could answer today. A card fully found says so
- * with a tick instead: zero is not a quantity worth drawing.
- *
- * Half again as big as it started. The founder: "make the '1x'/quanity
- * stuff like 50% bigger when soemone posts a quantity." At nine points
- * it was a mark you noticed rather than a number you read, which is the
- * wrong way round for the one fact this view keeps.
+ * helps is the one you could answer today.
  */
 function NeedBadge({
   card,
@@ -249,26 +248,6 @@ function NeedBadge({
   if (done) return null;
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        right: 3,
-        bottom: 3,
-        borderRadius: 6,
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-        backgroundColor: colors.accent,
-      }}
-    >
-      <Text
-        style={{
-          color: colors.canvas,
-          fontSize: 13,
-          fontWeight: "800",
-        }}
-      >
-        {`${wanted}x`}
-      </Text>
-    </View>
+    <QuantityBadge quantity={wanted} style={{ position: "absolute", top: 4, left: 4 }} />
   );
 }

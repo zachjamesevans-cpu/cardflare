@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { Image as ExpoImage } from "expo-image";
+import { useEffect, useState } from "react";
 import {
   Easing,
   cancelAnimation,
@@ -186,7 +187,54 @@ export const travellingFrame = (slug: string | null): boolean =>
 const evenly = (count: number) =>
   Array.from({ length: count }, (_, i) => i / (count - 1));
 
-function makeKit(S: typeof import("@shopify/react-native-skia")) {
+type SkiaModule = typeof import("@shopify/react-native-skia");
+type SkImage = NonNullable<ReturnType<SkiaModule["Skia"]["Image"]["MakeImageFromEncoded"]>>;
+
+/** Decoded card art by URL, newest last; the oldest go past the cap. */
+const decoded = new Map<string, SkImage>();
+const DECODED_CAP = 120;
+/** One load per URL at a time, however many tiles ask for it. */
+const loading = new Map<string, Promise<SkImage | null>>();
+
+/**
+ * A URL's art, decoded for Skia: from memory, else expo-image's disk
+ * cache (filled first on a miss), else the network as a last resort.
+ * Null when it cannot be had; the canvas then draws nothing, as before.
+ */
+function loadDecoded(S: SkiaModule, url: string): Promise<SkImage | null> {
+  const ready = decoded.get(url);
+  if (ready) return Promise.resolve(ready);
+  const pending = loading.get(url);
+  if (pending) return pending;
+
+  const load = (async () => {
+    try {
+      let path = await ExpoImage.getCachePathAsync(url).catch(() => null);
+      if (!path) {
+        await ExpoImage.prefetch(url, "disk").catch(() => false);
+        path = await ExpoImage.getCachePathAsync(url).catch(() => null);
+      }
+      const source = path ? (path.startsWith("file://") ? path : `file://${path}`) : url;
+      const data = await S.Skia.Data.fromURI(source);
+      const image = S.Skia.Image.MakeImageFromEncoded(data);
+      if (!image) return null;
+      decoded.set(url, image);
+      if (decoded.size > DECODED_CAP) {
+        const oldest = decoded.keys().next().value;
+        if (oldest !== undefined) decoded.delete(oldest);
+      }
+      return image;
+    } catch {
+      return null;
+    } finally {
+      loading.delete(url);
+    }
+  })();
+  loading.set(url, load);
+  return load;
+}
+
+function makeKit(S: SkiaModule) {
   const {
     Canvas,
     Circle,
@@ -198,9 +246,41 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     Rect,
     RoundedRect,
     SweepGradient,
-    useImage,
     vec,
   } = S;
+
+  /**
+   * Card art for a Skia canvas, from the same caches the plain tiles use.
+   *
+   * Skia's own `useImage` downloads the URL every time a canvas mounts,
+   * with no cache at all. A found card is drawn by `Greyed` and a holo by
+   * `Foil`, so every time a Feed tab came back those cards fetched their
+   * art again while the colour cards beside them, on expo-image, were
+   * instant - the founder: "it takes a second or two for some of my
+   * cards to load. is this not being cached?"
+   *
+   * Decoded images are kept in memory by URL, so a remount paints at
+   * once; the bytes come from expo-image's disk cache (prefetched there
+   * on a miss), so a cold start reads a file rather than the network.
+   */
+  function useCachedImage(url: string) {
+    const [image, setImage] = useState(() => decoded.get(url) ?? null);
+    useEffect(() => {
+      const ready = decoded.get(url);
+      if (ready) {
+        setImage(ready);
+        return;
+      }
+      let live = true;
+      void loadDecoded(S, url).then((loaded) => {
+        if (live && loaded) setImage(loaded);
+      });
+      return () => {
+        live = false;
+      };
+    }, [url]);
+    return image;
+  }
 
   /** 0 -> 1 forever. Linear unless told otherwise; loops seamlessly
       because every gradient it drives repeats with a one-period tile. */
@@ -225,7 +305,7 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
   const axis = (w: number, h: number) => ({ dx: w, dy: h * 0.32 });
 
   function Foil({ imageUrl, width, height, holo, onReady }: FoilProps) {
-    const image = useImage(imageUrl);
+    const image = useCachedImage(imageUrl);
 
     /* Before the early return below, like every other hook here. */
     useEffect(() => {
@@ -621,7 +701,7 @@ function makeKit(S: typeof import("@shopify/react-native-skia")) {
     width: number;
     height: number;
   }) {
-    const image = useImage(imageUrl);
+    const image = useCachedImage(imageUrl);
     if (!image) return null;
     return (
       <Canvas style={{ width, height }} pointerEvents="none">

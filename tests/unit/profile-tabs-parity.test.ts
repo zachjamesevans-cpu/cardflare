@@ -303,13 +303,17 @@ describe("the panes' contents, own and theirs", () => {
     expect(web.playerProfile).not.toContain("embers:");
   });
 
-  it("Flares: the grid without its heading, the count as a small line", () => {
+  it("Flares: the grid without its heading, and no count line over it", () => {
     for (const profile of [web.ownProfile, web.playerProfile]) {
       expect(profile).toContain("heading={false}");
     }
     expect(web.flares).toContain("heading = true,");
-    expect(web.flares).toContain('flares.length === 1 ? "Flare" : "Flares"');
-    expect(web.flares).toContain("No Flares up. Post one from the Flare tab.");
+    /* The founder: "notice how the text below flare icon? just delete
+       that entirely" - the header's Flares number already says it. */
+    for (const [name, source] of platforms) {
+      expect(source.flares, name).not.toContain('=== 1 ? "Flare" : "Flares"');
+    }
+    expect(web.flares).toContain("No Flares yet. Post one from the Flare tab.");
     for (const [name, source] of platforms) {
       expect(source.ownProfile, name).toContain("<ProfileFlares");
       expect(source.playerProfile, name).toContain("<ProfileFlares");

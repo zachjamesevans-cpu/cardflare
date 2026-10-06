@@ -56,8 +56,6 @@ export function ProfileFlares({
     direction: flare.direction === "want" ? "want" : "showcase",
   }));
 
-  const count = `${flares.length} ${flares.length === 1 ? "Flare" : "Flares"}`;
-
   return (
     <section
       className="flex flex-col gap-3"
@@ -74,15 +72,13 @@ export function ProfileFlares({
             {flares.length}
           </span>
         </h2>
-      ) : flares.length > 0 ? (
-        <p className={cn("text-xs text-text-muted tabular-nums", INSET)}>{count}</p>
-      ) : null}
+      ) : null /* No "N Flares" line over the grid: the header's number says it. */}
 
       {flares.length === 0 ? (
         <p className={cn("text-sm text-text-muted", !heading && INSET)}>
           {yours ? (
             <>
-              No Flares up. Post one from the Flare tab.{" "}
+              No Flares yet. Post one from the Flare tab.{" "}
               <Link
                 href="/flare"
                 className="font-semibold text-accent underline-offset-4 hover:underline"
@@ -91,7 +87,7 @@ export function ProfileFlares({
               </Link>
             </>
           ) : (
-            "No Flares up."
+            "No Flares yet."
           )}
         </p>
       ) : (
