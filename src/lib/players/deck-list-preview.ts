@@ -19,6 +19,8 @@ import { compactCardNumber, type DeckLine } from "./deck-list";
  * confirmation step.
  */
 export interface DeckPreviewEntry {
+  /** The catalogue's card, or null when the number is not in it (yet). */
+  cardId: string | null;
   cardNumber: string;
   quantity: number;
   /** Null when the number is not in the catalogue (yet). */
@@ -28,6 +30,7 @@ export interface DeckPreviewEntry {
 
 export async function previewDeckList(lines: DeckLine[]): Promise<DeckPreviewEntry[]> {
   const unmatched = lines.map((line) => ({
+    cardId: null,
     cardNumber: line.cardNumber,
     quantity: line.quantity,
     name: null,
@@ -87,6 +90,7 @@ export async function previewDeckList(lines: DeckLine[]): Promise<DeckPreviewEnt
     const card = cardByCompact.get(compactCardNumber(line.cardNumber));
     if (!card) {
       return {
+        cardId: null,
         cardNumber: line.cardNumber,
         quantity: line.quantity,
         name: null,
@@ -96,6 +100,7 @@ export async function previewDeckList(lines: DeckLine[]): Promise<DeckPreviewEnt
 
     const base = pickBasePrinting(byCard.get(card.id) ?? [], card.exact_name);
     return {
+      cardId: card.id,
       cardNumber: line.cardNumber,
       quantity: line.quantity,
       name: card.exact_name,

@@ -1310,9 +1310,9 @@ export function CardImageZoom({
                 <p className="mt-1 text-sm font-medium text-accent">
                   {direction === "showcase" ? (
                     lookingFor === 1 ? (
-                      "Letting this go"
+                      "Offering this"
                     ) : (
-                      `Letting go of ${lookingFor}`
+                      `Offering ${lookingFor}`
                     )
                   ) : (
                     <>

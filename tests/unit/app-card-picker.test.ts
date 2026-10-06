@@ -10,8 +10,12 @@ const read = (path: string) => readFileSync(path, "utf8");
  * and "there should be a green loading icon or something that shows
  * it's searching".
  */
+/* The picker lives in its own file since binder round 3 (the binder's
+   add menu IS the Flare picker); the composer opens it. */
+const pickerFile = read("mobile/src/card-select.tsx");
+
 describe("the app card picker", () => {
-  const composer = read("mobile/src/screens/flare-composer.tsx");
+  const composer = pickerFile;
   const web = read("src/components/cards/card-search.tsx");
 
   it("lists a card's versions under its row with the website's bar and words", () => {
@@ -23,7 +27,7 @@ describe("the app card picker", () => {
     );
     expect(web).toContain("versions, alt arts and promos");
     expect(composer).toContain(
-      "Tap a version to ask for that exact one, or the card above to",
+      "Tap a version to ask for that exact one, or the card above",
     );
     expect(web).toContain(
       "Tap a version to ask for that exact one, or the card above to take any",
@@ -57,22 +61,27 @@ describe("the app card picker", () => {
 
 describe("how many copies, and one fewer", () => {
   it("badges the copies count alone and puts a minus beside it, on both platforms", () => {
-    const composer = read("mobile/src/screens/flare-composer.tsx");
+    const composer = pickerFile;
     expect(composer).toContain("function PickCount({");
     expect(composer).toContain("accessibilityLabel={`One fewer ${name}`}");
     expect(composer).not.toContain("`x${chosen.quantity}`");
     expect(composer).not.toContain("`${index + 1} x${chosen.quantity}`");
 
     const picker = read("src/components/flares/card-picker.tsx");
+    /* Binder round 3: the count is the quantity tag, "×1" included on a
+       picked result, the same mark the binder's picker gives. */
     expect(picker).toContain(
-      "function markText(quantity: number): string {\n  return `${quantity}`;",
+      "function markCount(quantity: number): number {\n  return quantity;",
+    );
+    expect(read("src/components/cards/card-search.tsx")).toContain(
+      '<QuantityBadge quantity={mark} size="md" always className="shrink-0" />',
     );
     expect(picker).toContain("onLess(lineKey(card.id, printing?.id ?? null))");
 
     const search = read("src/components/cards/card-search.tsx");
     expect(search).toContain('aria-label="One fewer"');
     expect(search).toContain(
-      "{mark && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}",
+      "{mark !== null && onUnpick && <UnpickButton onClick={() => onUnpick(card)} />}",
     );
 
     const draft = read("src/components/flares/draft.ts");

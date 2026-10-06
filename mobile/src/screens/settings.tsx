@@ -41,6 +41,7 @@ import {
   Title,
 } from "../ui";
 import { parseDeckList } from "../deck-list";
+import { QuantityBadge } from "../quantity-badge";
 import {
   PUSH_GROUPS,
   PUSH_HEADING,
@@ -848,15 +849,7 @@ function DeckListField() {
                   {entry.cardNumber}
                 </Text>
               </View>
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: "700",
-                }}
-              >
-                ×{entry.quantity}
-              </Text>
+              <QuantityBadge quantity={entry.quantity} size="md" />
             </View>
           ))}
         </View>

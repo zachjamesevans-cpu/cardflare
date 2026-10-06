@@ -2,6 +2,7 @@ import { Package } from "lucide-react";
 
 import { Badge, Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { removeInventoryAction } from "@/lib/shows/actions";
 import type { InventoryLine } from "@/lib/shows/repository";
 import { slabLabel } from "@/lib/shows/schema";
@@ -54,9 +55,7 @@ export function VendorInventoryList({
               {slabLabel(line.form, line.grader, line.grade)}
             </Badge>
 
-            <span className="text-sm text-text-muted tabular-nums">
-              ×{line.quantity}
-            </span>
+            <QuantityBadge quantity={line.quantity} size="md" />
 
             <form action={removeInventoryAction} className="shrink-0">
               <input type="hidden" name="storeId" value={storeId} />

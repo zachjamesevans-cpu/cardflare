@@ -5,15 +5,20 @@ import { z } from "zod";
 
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { previewDeckList } from "@/lib/players/deck-list-preview";
+import { parseDeckList } from "@/lib/players/deck-list";
 import {
   addBinderCard,
+  addBinderCards,
   BINDER_NAME_MAX,
   createBinder,
   deleteBinder,
+  placeBinderCard,
   removeBinderCard,
   saveBinderOrder,
   saveBinderSettings,
 } from "./binder";
+import { binderAddedLine, binderAddSchema, binderPlaceSchema } from "./add-copy";
 import { isBinderCover, type BinderCoverId } from "./covers";
 import {
   BINDER_OFFER_MAX_CARDS,
@@ -132,6 +137,101 @@ export async function removeBinderCardAction(
   if (!result.ok) return { ok: false, message: "That card is not in this binder." };
   repaint(player.id, which);
   return { ok: true };
+}
+
+/**
+ * Cards from the picker's tray (or a confirmed pasted list), into the
+ * binder at once, starting at the pocket that was tapped.
+ */
+export async function addBinderCardsAction(
+  binderId: string,
+  input: unknown,
+): Promise<
+  | { ok: true; message: string; firstPocket: number | null }
+  | { ok: false; message: string }
+> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to keep a binder." };
+  const which = binderIdOf(binderId);
+  if (!which) return { ok: false, message: NO_SUCH };
+  const parsed = binderAddSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Pick a card from the list." };
+  const result = await addBinderCards(
+    player.id,
+    player.name,
+    which,
+    parsed.data.items,
+    parsed.data.pocket,
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === "at-cap"
+          ? "That binder is full. Remove a card to add another."
+          : result.reason === "not-yours"
+            ? NO_SUCH
+            : "Could not add those cards. Try again in a moment.",
+    };
+  }
+  repaint(player.id, which);
+  return {
+    ok: true,
+    message: binderAddedLine(result),
+    firstPocket: result.firstPocket,
+  };
+}
+
+/** One card into one pocket; a full pocket slides the run along. */
+export async function placeBinderCardAction(
+  binderId: string,
+  input: unknown,
+): Promise<Outcome> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to keep a binder." };
+  const which = binderIdOf(binderId);
+  if (!which) return { ok: false, message: NO_SUCH };
+  const parsed = binderPlaceSchema.safeParse(input);
+  if (!parsed.success)
+    return { ok: false, message: "That pocket is not in this binder." };
+  const result = await placeBinderCard(
+    player.id,
+    which,
+    parsed.data.entryId,
+    parsed.data.pocket,
+  );
+  if (!result.ok) {
+    return { ok: false, message: "Could not move that card. Try again in a moment." };
+  }
+  repaint(player.id, which);
+  return { ok: true };
+}
+
+/**
+ * A pasted list, looked up and shown back before anything is added:
+ * the same confirmation the deck-list paste has, names and art per
+ * line, the lines it could not read kept so they can be shown.
+ */
+export async function previewBinderListAction(text: unknown): Promise<
+  | {
+      ok: true;
+      entries: Awaited<ReturnType<typeof previewDeckList>>;
+      unreadable: string[];
+    }
+  | { ok: false; message: string }
+> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to keep a binder." };
+  const parsed = z.string().min(1).max(20_000).safeParse(text);
+  if (!parsed.success) return { ok: false, message: "Paste a list first." };
+  const { lines, unreadable } = parseDeckList(parsed.data);
+  if (lines.length === 0) {
+    return {
+      ok: false,
+      message: "No card numbers in that. One per line, like 2x OP01-001.",
+    };
+  }
+  return { ok: true, entries: await previewDeckList(lines), unreadable };
 }
 
 const orderSchema = z.array(z.guid()).max(400);

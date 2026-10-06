@@ -38,10 +38,16 @@ const local = read("src/components/local/local-screen.tsx");
 describe("Share, at the top of the binder", () => {
   const share = fn(view, "ShareBinder");
 
-  it("hands out the short link, cardflare.gg/b/<id>", () => {
-    expect(share).toContain("const url = `${window.location.origin}/b/${binderId}`;");
+  it("hands out the short link, cardflare.gg/b/<shareCode>, from its own round button", () => {
+    /* Binder round 3: the code when the binder has one, the id before. */
+    expect(share).toContain(
+      "const url = `${window.location.origin}/b/${shareCode ?? binderId}`;",
+    );
+    expect(view).toContain("shareCode={binder.shareCode}");
     expect(share).toContain('<Share2 className="size-4" aria-hidden="true" />');
-    expect(share).toContain('{copied ? "Link copied" : "Share"}');
+    expect(share).toContain('aria-label="Share binder"');
+    expect(share).toContain("flex size-9 shrink-0");
+    expect(share).toContain('{copied ? "Link copied" : ""}');
   });
 
   it("uses the system share sheet, ignores a dismissal, and copies otherwise", () => {

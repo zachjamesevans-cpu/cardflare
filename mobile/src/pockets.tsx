@@ -1,8 +1,9 @@
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
-import { Text, View, type GestureResponderHandlers } from "react-native";
+import { Text, View } from "react-native";
 
 import { BINDER_LAYOUT, POCKETS_PER_PAGE } from "./binder-covers";
+import { QuantityBadge } from "./quantity-badge";
 import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
@@ -117,10 +118,10 @@ export function PageFrame({
  * widen it: the screen tells its picture the width inside the ring
  * (`pocketWidth - 2 * POCKET_RING`) and the pocket clips the rest.
  * Laid out where the page puts it, always; while its own card is in
- * the air (the binder's hold to move) it is the empty dashed outline
- * the card left behind, and under a held card it wears the accent
- * ring. The pan handlers live on this view, so it is the same view in
- * every state and a gesture never loses its responder. `corner` is
+ * the air (the binder's hold and drag) it is the empty dashed outline
+ * of where the card is or will land, and where it will land it wears
+ * the accent ring. The drag itself is the page frame's gesture, not the
+ * pocket's, so a pocket is only ever a picture of a state. `corner` is
  * drawn over the lip: the copies count, a check, a chip.
  */
 export function Pocket({
@@ -129,8 +130,6 @@ export function Pocket({
   placeholder = false,
   targeted = false,
   dimmed = false,
-  handlers,
-  onTouchEnd,
   children,
   corner,
 }: {
@@ -142,8 +141,6 @@ export function Pocket({
   targeted?: boolean;
   /** Nothing left to do with it: half strength. */
   dimmed?: boolean;
-  handlers?: GestureResponderHandlers;
-  onTouchEnd?: () => void;
   children: ReactNode;
   corner?: ReactNode;
 }) {
@@ -151,9 +148,6 @@ export function Pocket({
 
   return (
     <View
-      {...(handlers ?? {})}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={onTouchEnd}
       accessibilityLabel={accessibilityLabel}
       style={{
         width,
@@ -201,8 +195,9 @@ export function EmptyPocket({ width, height }: { width: number; height: number }
 /**
  * An empty pocket on the owner's page is a way in: the founder,
  * "there should be a + on the open card areas in the binder to add a
- * card that way." Under a held card it wears the accent ring like any
- * other pocket; a drop there lands the card after the last one.
+ * card that way." The tap is for THAT pocket: the founder, "Adding a
+ * card in a specific slot should put that exact card there." A held
+ * card dropped on it goes in it.
  */
 export function AddPocket({
   width,
@@ -260,26 +255,13 @@ export function SleeveLip() {
   );
 }
 
-/** The copies, in a corner, when there is more than one. */
+/** The copies, in a corner, when there is more than one: the shared tag. */
 export function Copies({ quantity }: { quantity: number }) {
-  if (quantity <= 1) return null;
   return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        top: 4,
-        left: 4,
-        borderRadius: 999,
-        backgroundColor: "rgba(0,0,0,0.75)",
-        paddingHorizontal: 5,
-        paddingVertical: 1,
-      }}
-    >
-      <Text style={{ color: colors.textPrimary, fontSize: 9, fontWeight: "700" }}>
-        {`×${quantity}`}
-      </Text>
-    </View>
+    <QuantityBadge
+      quantity={quantity}
+      style={{ position: "absolute", top: 4, left: 4 }}
+    />
   );
 }
 

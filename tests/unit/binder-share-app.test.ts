@@ -51,8 +51,11 @@ describe("the share link", () => {
 
   it("is www.cardflare.gg/b/<id>, the host that serves the claim unredirected", () => {
     expect(config).toContain('export const SITE_URL = "https://www.cardflare.gg";');
-    expect(config).toContain("`${SITE_URL}/b/${encodeURIComponent(binderId)}`");
-    expect(binder).toContain("const url = binderShareUrl(binder.id);");
+    /* The short code since binder round 3, the id while it has none. */
+    expect(config).toContain("`${SITE_URL}/b/${encodeURIComponent(code)}`");
+    expect(binder).toContain(
+      "const url = binderShareUrl(binder.shareCode ?? binder.id);",
+    );
   });
 
   it("goes to the share sheet, and a private binder is told how to get one", () => {

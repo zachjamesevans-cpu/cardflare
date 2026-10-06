@@ -18,6 +18,7 @@ import { LOCAL_RADII, MESSAGE_MAX_LENGTH, agoLabel, milesLabel } from "../local-
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { PlayerAvatar } from "../player-avatar";
+import { QuantityBadge } from "../quantity-badge";
 import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 import {
@@ -575,6 +576,9 @@ function FlareRow({
       : flare.acceptsCash
         ? "cash"
         : "trade";
+  /* Only an offer names its direction: a want is what a Flare is, and
+     the founder found the want label on every card redundant. */
+  const terms = flare.intent === "showcase" ? `Offering · ${accepts}` : accepts;
 
   return (
     <Card>
@@ -596,15 +600,15 @@ function FlareRow({
         />
 
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontWeight: "700" }}
-          >
-            {flare.cardName}
-            {flare.quantity > 1 && (
-              <Text style={{ color: colors.accent }}> ×{flare.quantity}</Text>
-            )}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+            <Text
+              numberOfLines={1}
+              style={{ flexShrink: 1, color: colors.textPrimary, fontWeight: "700" }}
+            >
+              {flare.cardName}
+            </Text>
+            <QuantityBadge quantity={flare.quantity} size="md" />
+          </View>
           <Text
             numberOfLines={1}
             style={{ color: colors.textMuted, fontSize: 12, fontFamily: "Menlo" }}
@@ -629,8 +633,7 @@ function FlareRow({
             </Text>
           ) : null}
           <Muted>
-            {flare.intent === "showcase" ? "Offering" : "Looking for"} · {accepts} ·{" "}
-            {agoLabel(flare.postedAt)}
+            {`${terms.charAt(0).toUpperCase()}${terms.slice(1)} · ${agoLabel(flare.postedAt)}`}
           </Muted>
         </View>
       </View>

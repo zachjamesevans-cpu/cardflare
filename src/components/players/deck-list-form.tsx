@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Check, ClipboardList, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Textarea, TextInput } from "@/components/ui/controls";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import {
@@ -228,9 +229,7 @@ export function DeckPreviewList({ entries }: { entries: DeckPreviewEntry[] }) {
             </span>
             <span className="text-xs text-text-muted">{entry.cardNumber}</span>
           </span>
-          <span className="shrink-0 text-sm font-semibold text-text-secondary tabular-nums">
-            ×{entry.quantity}
-          </span>
+          <QuantityBadge quantity={entry.quantity} size="md" className="shrink-0" />
         </li>
       ))}
     </ul>

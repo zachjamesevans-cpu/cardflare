@@ -473,10 +473,17 @@ export function Item({
             ring={item.ring}
             aura={item.aura}
             /* The direction in words, never a texture: PRODUCT.md is
-               explicit that foil means rare, not available. */
-            detail={`${item.direction === "showcase" ? "Offering" : "Looking for"}${
-              item.deckLabel ? ` · ${item.deckLabel}` : ""
-            } · ${item.storeName}`}
+               explicit that foil means rare, not available. Only an
+               offer says so; the founder, on the want label on every
+               card: "Seems kinda redundant when they know it's for
+               flares." */
+            detail={[
+              item.direction === "showcase" ? "Offering" : null,
+              item.deckLabel,
+              item.storeName,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           />
           <p className="shrink-0 text-xs text-text-muted">{agoFrom(item.when)}</p>
         </div>

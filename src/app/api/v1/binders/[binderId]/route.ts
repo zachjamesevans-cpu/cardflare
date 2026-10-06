@@ -2,6 +2,7 @@ import { absoluteImageUrls } from "@/lib/api/absolute";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import {
+  binderIdFromLink,
   binderOwner,
   deleteBinder,
   readBinder,
@@ -22,10 +23,12 @@ type Params = { params: Promise<{ binderId: string }> };
 export async function GET(request: Request, { params }: Params): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
-  const id = binderIdSchema.safeParse((await params).binderId);
-  if (!id.success) return Response.json({ error: "not-found" }, { status: 404 });
-  const owner = (await binderOwner(id.data)) ?? player.playerId;
-  const binder = await readBinder(owner, player.playerId, id.data);
+  /* The share link's short code or the id: cardflare.gg/b/<either>
+     opens the app here with whatever the link carried. */
+  const id = await binderIdFromLink((await params).binderId);
+  if (!id) return Response.json({ error: "not-found" }, { status: 404 });
+  const owner = (await binderOwner(id)) ?? player.playerId;
+  const binder = await readBinder(owner, player.playerId, id);
   if (!binder) return Response.json({ error: "not-found" }, { status: 404 });
   return Response.json(absoluteImageUrls({ binder: forOldBuild(binder) }));
 }

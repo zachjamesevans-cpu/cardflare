@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import type { ProfileFlare } from "@/lib/players/profile";
-import { cn } from "@/lib/cn";
 
 /**
  * A profile's Flares as a grid: the Flares pane, the one a profile
@@ -11,11 +11,15 @@ import { cn } from "@/lib/cn";
  * The count is the same number the header's Flares stat shows, and
  * the grid under it is the whole list, three across, newest first: a
  * profile with sixty Flares scrolls. Each tile is the one card viewer
- * every shelf uses, with a tiny chip at the foot saying which way the
- * Flare points, in the two words the whole product uses for a Flare's
- * direction. Nothing to offer on from here; the Feed and the room are
- * where a Flare is answered. The app's profile-flares.tsx draws the
- * same grid with the same words.
+ * every shelf uses. A want wears no label: the founder, on a grid where
+ * every tile wore the want label, "Delete the 'looking for' part on all
+ * cards. Seems kinda redundant when they know it's for flares." A
+ * showcase is the exception and keeps a small "Offering" chip at the
+ * foot, so a mixed grid still tells the two apart. More than one copy
+ * is the quantity tag in the top-left corner, the binder's. Nothing to
+ * offer on from here; the Feed and the room are where a Flare is
+ * answered. The app's profile-flares.tsx draws the same grid with the
+ * same words.
  *
  * Under the profile's tab strip the tab is the heading, so the grid
  * draws without one and keeps the count as a small line at the top
@@ -86,8 +90,8 @@ export function ProfileFlares({
          * A grid the way a social profile draws one: three across,
          * edge to edge, a hairline between tiles, nothing under them.
          * The founder: "more of a grid like instagram instead of these
-         * random blurry cards." The direction rides the foot of the art
-         * as a small chip, so the tile is the picture and nothing else.
+         * random blurry cards." Only an offer wears a chip at the foot,
+         * so the tile is the picture and nothing else.
          */
         <ul className="grid grid-cols-3 gap-0.5">
           {flares.map((flare, index) => {
@@ -110,16 +114,15 @@ export function ProfileFlares({
                      to twice its size and reads as a blur. */
                   thumbSizes="(max-width: 672px) 33vw, 220px"
                 />
-                <span
-                  className={cn(
-                    "pointer-events-none absolute bottom-1 left-1 rounded-[4px] px-1 py-px text-[9px] font-bold",
-                    want
-                      ? "bg-accent text-accent-contrast"
-                      : "bg-canvas/80 text-text-secondary",
-                  )}
-                >
-                  {want ? "Looking for" : "Offering"}
-                </span>
+                <QuantityBadge
+                  quantity={flare.quantity}
+                  className="pointer-events-none absolute top-1 left-1"
+                />
+                {want ? null : (
+                  <span className="pointer-events-none absolute bottom-1 left-1 rounded-[4px] bg-canvas/80 px-1 py-px text-[9px] font-bold text-text-secondary">
+                    Offering
+                  </span>
+                )}
               </li>
             );
           })}

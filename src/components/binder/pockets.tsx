@@ -1,9 +1,10 @@
 "use client";
 
-import type { DragEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 
@@ -81,10 +82,8 @@ export function PocketTile({
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[6%] bg-[linear-gradient(180deg,rgb(255_255_255/0.22),transparent)]"
       />
-      {card.quantity !== undefined && card.quantity > 1 && (
-        <span className="absolute top-1 left-1 rounded-full bg-canvas/85 px-1.5 py-px text-[9px] font-bold text-text-primary tabular-nums ring-1 ring-border-strong">
-          ×{card.quantity}
-        </span>
+      {card.quantity !== undefined && (
+        <QuantityBadge quantity={card.quantity} className="absolute top-1 left-1" />
       )}
       {card.onYourHunt && (
         <span className="absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[8px] font-bold tracking-wider text-accent-contrast uppercase">
@@ -138,24 +137,21 @@ export function AddPocket({ onClick, href }: { onClick?: () => void; href?: stri
   );
 }
 
-/** The arrow over the page's middle: previous on the left, next on the right. */
+/**
+ * The arrow over the page's middle: previous on the left, next on the
+ * right. On the binder a card held over one turns the page.
+ */
 export function PageArrow({
   side,
   disabled,
   onClick,
   ring = false,
-  onDragOver,
-  onDragLeave,
-  onDrop,
 }: {
   side: "prev" | "next";
   disabled: boolean;
   onClick: () => void;
-  /** Lit as a drop target, while a binder's card is in the air. */
+  /** Lit while a binder's card is held over it: hold on, the page turns. */
   ring?: boolean;
-  onDragOver?: (event: DragEvent) => void;
-  onDragLeave?: () => void;
-  onDrop?: (event: DragEvent) => void;
 }) {
   const Icon = side === "prev" ? ChevronLeft : ChevronRight;
   return (
@@ -164,9 +160,8 @@ export function PageArrow({
       aria-label={side === "prev" ? "Previous page" : "Next page"}
       disabled={disabled}
       onClick={onClick}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
+      /* Read by the binder's drag: a card held here turns the page. */
+      data-drop={side}
       className={cn(
         "absolute top-1/2 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
         side === "prev" ? "left-1" : "right-1",

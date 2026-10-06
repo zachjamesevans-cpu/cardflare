@@ -308,7 +308,9 @@ describe("the website's Add cards sheet", () => {
   it("gives the search a tall body so the game menu opens inside it whole", () => {
     /* The container, not the search: CardSearch is reused as it is. */
     expect(web.add).toContain("min-h-[70dvh]");
-    expect(web.add).toContain("<CardSearch");
+    /* Round 3: the search lives in the binder's picker, inside it. */
+    expect(web.add).toContain("<BinderPicker");
+    expect(read("src/components/binder/binder-picker.tsx")).toContain("<CardSearch");
     expect(web.add).not.toContain("overflow-hidden");
     expect(read("src/components/cards/card-search.tsx")).toContain(
       "absolute top-full left-0 z-20",
@@ -333,13 +335,15 @@ describe("the app's grid and hold to move", () => {
     expect(grid).toContain('overflow: "hidden"');
   });
 
-  it("lifts only the held card, and never turns a page while holding", () => {
-    expect(app.binder).toContain("onLongPress");
-    expect(app.binder).toContain("reorderBinder(");
-    expect(app.binder).not.toContain("watchEdge");
-    expect(app.binder).not.toContain("turnHeld");
-    expect(app.binder).not.toContain("EDGE_HOLD_MS");
-    expect(app.binder).toMatch(/LayoutAnimation|Layout\.duration|withTiming/);
+  it("lifts the held card in one touch, and turns the page at an edge", () => {
+    /* Binder round 3 asked for the page turn back: "holding at a page
+       edge turns the page", and for the hold to become the drag. */
+    expect(app.binder).toContain(".activateAfterLongPress(HOLD_MS)");
+    expect(app.binder).toContain("placeBinderCard(");
+    expect(app.binder).not.toContain("reorderBinder");
+    expect(app.binder).toContain("const watchEdge = ");
+    expect(app.binder).toContain("const EDGE_TURN_MS = 600;");
+    expect(app.binder).toMatch(/LinearTransition|withTiming/);
   });
 });
 

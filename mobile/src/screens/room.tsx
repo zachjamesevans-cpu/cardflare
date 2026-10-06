@@ -89,6 +89,7 @@ import { OpenToTradesTag } from "../open-to-trades-tag";
 import { TournamentHelpModal } from "../tournament-help";
 import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
+import { QuantityBadge } from "../quantity-badge";
 import { useTabBarInset } from "../glass";
 import { colors, gutter, radius, spacing } from "../theme";
 import { refreshTick } from "../refresh-tick";
@@ -1783,11 +1784,7 @@ function RoomScreen({
                       <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
                         {trade.cardName}
                       </Text>
-                      {trade.quantity > 1 && (
-                        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                          {`×${trade.quantity}`}
-                        </Text>
-                      )}
+                      <QuantityBadge quantity={trade.quantity} size="md" />
                       <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                         {trade.youWere === "requester"
                           ? trade.partnerName
@@ -2018,7 +2015,7 @@ function CarouselFlare({
    * cut nudged them downward, every stacked tile grew taller, and the
    * rail's names and buttons fell out of line. Three asked with one
    * pledged is a fan of two; fully pledged collapses to a single
-   * dimmed card at the rail's end. Past four ×N returns. The tile
+   * dimmed card at the rail's end, and the ×N tag says the number. The tile
    * widens by the fan's bleed so neighbours never collide, and the
    * text stays anchored to the tile's left edge like every other.
    */
@@ -2179,11 +2176,10 @@ function CarouselFlare({
           {/* The number, right on the card, the fan draws it, this chip
               says it, and both count down together as pledges land.
               Anchored from the fan's bleed so it sits on the top card. */}
-          {visible > 1 ? (
-            <View style={[styles.countBadge, { right: fan + 2 }]}>
-              <Text style={styles.countBadgeText}>{`×${visible}`}</Text>
-            </View>
-          ) : null}
+          <QuantityBadge
+            quantity={visible}
+            style={{ position: "absolute", bottom: 2, right: fan + 2, zIndex: 6 }}
+          />
         </View>
 
         <Text numberOfLines={1} style={styles.tileName}>
@@ -2320,12 +2316,21 @@ function FlareRow({
             />
           )}
           <View style={{ flex: 1 }}>
-            <Text
-              style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
             >
-              {flare.cardName}
-              {flare.quantity > 1 ? ` ×${flare.quantity}` : ""}
-            </Text>
+              <Text
+                style={{
+                  flexShrink: 1,
+                  color: colors.textPrimary,
+                  fontSize: 16,
+                  fontWeight: "700",
+                }}
+              >
+                {flare.cardName}
+              </Text>
+              <QuantityBadge quantity={flare.quantity} size="md" />
+            </View>
             <Muted>
               {`${flare.cardNumber} · ${flare.printingLabel ?? "Any printing"}`}
             </Muted>
@@ -2562,20 +2567,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.canvas,
     opacity: 0.4,
-  },
-  countBadge: {
-    position: "absolute",
-    bottom: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: `${colors.canvas}D9`,
-    paddingHorizontal: 3,
-  },
-  countBadgeText: {
-    color: colors.textPrimary,
-    fontSize: 9,
-    fontWeight: "700",
   },
   matchBadge: {
     position: "absolute",

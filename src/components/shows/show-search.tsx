@@ -5,6 +5,7 @@ import { Loader2, MapPin, Search, Store } from "lucide-react";
 
 import { TextInput } from "@/components/ui/controls";
 import { Badge, Card } from "@/components/ui/card";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { searchShowCardsAction } from "@/lib/shows/actions";
 import { slabLabel, type VendorAvailability } from "@/lib/shows/schema";
 import {
@@ -46,11 +47,11 @@ function VendorRow({ vendor }: { vendor: VendorAvailability }) {
         {vendor.items.map((item, index) => (
           <span
             key={index}
-            className="rounded-full border border-border bg-elevated px-2 py-0.5 text-text-secondary"
+            className="inline-flex items-center gap-1 rounded-full border border-border bg-elevated px-2 py-0.5 text-text-secondary"
           >
             {slabLabel(item.form, item.grader, item.grade)}
-            {item.quantity > 1 && ` ×${item.quantity}`}
             {item.printingLabel && ` · ${item.printingLabel}`}
+            <QuantityBadge quantity={item.quantity} />
           </span>
         ))}
       </span>

@@ -2134,6 +2134,11 @@ export const BINDER_NAME_MAX = 40;
 
 export interface BinderCard {
   entryId: string;
+  /**
+   * The pocket it sits in: page 1 is 0 to 8, page 2 is 9 to 17. Gaps
+   * are real and kept; src/pocket-math.ts draws and moves them.
+   */
+  pocket: number;
   cardId: string;
   name: string;
   number: string;
@@ -2160,12 +2165,14 @@ export interface Binder {
   /** Every page is three by three. */
   layout: 3;
   cover: BinderCoverId;
-  /**
-   * In the owner's order. A card the owner has never placed has no
-   * position and arrives first, so a new card lands in pocket 1 and
-   * everything else keeps its place.
-   */
+  /** By pocket, gaps and all. */
   cards: BinderCard[];
+  /**
+   * The short link's code: www.cardflare.gg/b/<shareCode>. Null before
+   * it has one, absent from an older server; the link falls back to
+   * the binder's id, which opens the same binder.
+   */
+  shareCode?: string | null;
   count: number;
   onYourHunts: number;
 }
@@ -2236,30 +2243,67 @@ export const deleteBinder = (binderId: string) =>
 export const saveBinder = (patch: BinderSettingsPatch, binderId: string) =>
   call<{ binder: Binder }>("PATCH", binderPath(binderId), patch);
 
-/** A 409 whose code is "at-cap" when the binder holds 200 already. */
-export const addBinderCard = (
-  cardId: string,
-  printingId: string | null,
-  quantity: number,
+/** One card of a batch: the card, its printing (null is any), how many copies. */
+export interface BinderAddItem {
+  cardId: string;
+  printingId: string | null;
+  quantity: number;
+}
+
+/**
+ * Cards into a binder at once: the picker's tray, or a confirmed
+ * pasted list. The first new card goes in `pocket` (the "+" tapped)
+ * or the next empty one after it, the rest into the empty pockets
+ * that follow; null puts them after the last card. A card already in
+ * the binder counts up instead. Answers the binder whole, the sentence
+ * to say ("Added 3 cards.") and the pocket the first card went into.
+ * A 409 whose code is "at-cap" when the binder holds 200 already.
+ */
+export const addBinderCards = (
   binderId: string,
+  items: BinderAddItem[],
+  pocket: number | null,
 ) =>
-  call<{ binder: Binder }>("POST", `${binderPath(binderId)}/cards`, {
-    cardId,
-    printingId,
-    quantity,
+  call<{ binder: Binder; message: string; firstPocket: number | null }>(
+    "POST",
+    `${binderPath(binderId)}/cards`,
+    { items, pocket },
+  );
+
+/**
+ * One card to one pocket, the drop at the end of a drag: an empty
+ * pocket takes it, a full one slides the run along to the next gap
+ * (src/pocket-math.ts's placeInPockets, which the screen paints first).
+ */
+export const placeBinderCard = (binderId: string, entryId: string, pocket: number) =>
+  call<{ binder: Binder }>("PATCH", `${binderPath(binderId)}/cards`, {
+    entryId,
+    pocket,
   });
 
 export const removeBinderCard = (entryId: string, binderId: string) =>
   call<{ binder: Binder }>("DELETE", `${binderPath(binderId)}/cards`, { entryId });
 
+/** One pasted line, looked up: its card, or null when the number is not known. */
+export interface BinderListEntry {
+  cardId: string | null;
+  cardNumber: string;
+  quantity: number;
+  name: string | null;
+  imageUrl: string | null;
+}
+
 /**
- * The whole binder's entry ids in their new order, after a card is
- * held and moved. Ids that are not the owner's are ignored and cards
- * left out keep a place after the ones listed, so sending every id is
- * the only way to be sure of the order.
+ * "Paste a list" for a binder, looked up before anything goes in: one
+ * entry per line, matched or not, and the lines that could not be
+ * read. Writes nothing; the confirmed cards go to addBinderCards.
  */
-export const reorderBinder = (entryIds: string[], binderId: string) =>
-  call<{ binder: Binder }>("PUT", `${binderPath(binderId)}/order`, { entryIds });
+export const previewBinderList = (list: string) =>
+  call<{ ok: true; entries: BinderListEntry[]; unreadable: string[] }>(
+    "POST",
+    "/api/v1/binders/list-preview",
+    { list },
+  );
 
 /** One card of an offer on a binder: its entry, and how many copies. */
 export interface BinderOfferItem {

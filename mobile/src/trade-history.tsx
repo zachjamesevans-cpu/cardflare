@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 
 import { DotsButton } from "./action-menu";
 import type { TradeHistoryEntry, TradeHistoryTotals } from "./api";
+import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
 import { colors, radius, spacing } from "./theme";
 import { Button } from "./ui";
@@ -123,6 +124,12 @@ export function TradeHistoryRow({
         {trade.imageUrl ? (
           <RemoteImage uri={trade.imageUrl} style={{ width: "100%", height: "100%" }} />
         ) : null}
+        {/* How many changed hands: the binder's tag, on the card's
+            corner, rather than a "×2" in the middle of the sentence. */}
+        <QuantityBadge
+          quantity={trade.quantity}
+          style={{ position: "absolute", top: 2, left: 2 }}
+        />
       </View>
       <View style={{ flex: 1, gap: 2 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
@@ -137,9 +144,6 @@ export function TradeHistoryRow({
           >
             {trade.got ? "Got " : "Gave "}
             <Text style={{ fontWeight: "700" }}>{trade.cardName}</Text>
-            {trade.quantity > 1 ? (
-              <Text style={{ color: colors.textMuted }}>{` ×${trade.quantity}`}</Text>
-            ) : null}
             {trade.partnerName ? (
               <>
                 {trade.got ? " from " : " to "}

@@ -12,6 +12,7 @@ import type { AddEntryInput } from "@/lib/lists/schema";
 import { afterHolderChanged } from "@/lib/nearby/matching";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import type { BinderCardRow, BinderRow } from "@/lib/supabase/types";
+import { LAST_POCKET, nextFreePocket } from "./pocket-math";
 import {
   DEFAULT_BINDER_COVER,
   DEFAULT_BINDER_LAYOUT,
@@ -50,6 +51,12 @@ export const FIRST_BINDER_NAME = "Trade binder";
 
 export interface BinderCard {
   entryId: string;
+  /**
+   * The pocket it sits in: page 1 is 0 to 8, page 2 is 9 to 17. Gaps are
+   * real and kept, the way a binder keeps a slot open for a card you are
+   * still chasing.
+   */
+  pocket: number;
   cardId: string;
   name: string;
   number: string;
@@ -75,8 +82,10 @@ export interface Binder {
   /** Always 3: pages are three by three. */
   layout: BinderLayout;
   cover: BinderCoverId;
-  /** In the owner's order: placed cards by pocket, unplaced ones first. */
+  /** By pocket. */
   cards: BinderCard[];
+  /** The short link's code: cardflare.gg/b/<shareCode>. Null before it has one. */
+  shareCode: string | null;
   count: number;
   onYourHunts: number;
 }
@@ -156,6 +165,31 @@ function inOwnerOrder<T extends { position: number | null; created_at: string }>
     if (b.position === null) return 1;
     return a.position - b.position;
   });
+}
+
+/**
+ * Every row's pocket. A row with a position has it; one without (only
+ * before the pockets migration ran) takes the first free pocket, in the
+ * order the binder used to draw them, so nothing shifts on the day.
+ */
+function pocketsFor(
+  rows: { id: string; position: number | null }[],
+): Map<string, number> {
+  const taken = new Set(
+    rows.flatMap((row) => (row.position === null ? [] : [row.position])),
+  );
+  const pockets = new Map<string, number>();
+  let free = 0;
+  for (const row of rows) {
+    if (row.position !== null) {
+      pockets.set(row.id, row.position);
+      continue;
+    }
+    while (taken.has(free)) free += 1;
+    taken.add(free);
+    pockets.set(row.id, free);
+  }
+  return pockets;
 }
 
 interface Facts {
@@ -291,10 +325,13 @@ async function assemble(
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
   ]);
   const facts = await factsFor(rows);
-  const cards: BinderCard[] = inOwnerOrder(rows).map((card) => {
+  const ordered = inOwnerOrder(rows);
+  const pocketOf = pocketsFor(ordered);
+  const cards: BinderCard[] = ordered.map((card) => {
     const fact = facts.get(card.id);
     return {
       entryId: card.id,
+      pocket: pocketOf.get(card.id) ?? 0,
       cardId: card.card_id,
       name: fact?.name ?? "Unknown card",
       number: fact?.number ?? "",
@@ -315,7 +352,8 @@ async function assemble(
     yours,
     layout: DEFAULT_BINDER_LAYOUT,
     cover: coverOf(row),
-    cards,
+    cards: [...cards].sort((a, b) => a.pocket - b.pocket),
+    shareCode: row.share_code ?? null,
     count: cards.length,
     onYourHunts: cards.filter((card) => card.onYourHunt).length,
   };
@@ -350,6 +388,38 @@ export async function readBinder(
   ]);
   if (!name || !row) return null;
   return assemble(row, name, viewerId);
+}
+
+/** Letters and digits nobody misreads: no 0/o, 1/l/i. */
+const SHARE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+const SHARE_CODE = /^[a-z0-9]{6,12}$/;
+
+/** A fresh short-link code, eight characters. */
+export function newShareCode(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return Array.from(bytes, (byte) => SHARE_ALPHABET[byte % SHARE_ALPHABET.length]).join(
+    "",
+  );
+}
+
+/**
+ * The binder a share link names: its short code (cardflare.gg/b/k7qm2xpa)
+ * or, for the links shared before codes, its id. Null when neither
+ * matches a binder.
+ */
+export async function binderIdFromLink(raw: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  const value = raw.trim().toLowerCase();
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(value)) {
+    return value;
+  }
+  if (!SHARE_CODE.test(value)) return null;
+  const { data } = await getSupabaseAdmin()
+    .from("binders")
+    .select("id")
+    .eq("share_code", value)
+    .maybeSingle();
+  return data?.id ?? null;
 }
 
 /**
@@ -504,20 +574,27 @@ export async function createBinder(
     .eq("player_id", playerId);
   if ((count ?? 0) >= MAX_BINDERS) return { ok: false, reason: "at-cap" };
   const forTrade = input.forTrade === true;
-  const { data, error } = await admin
-    .from("binders")
-    .insert({
-      player_id: playerId,
-      name,
-      cover:
-        input.cover && isBinderCover(input.cover) ? input.cover : DEFAULT_BINDER_COVER,
-      layout: DEFAULT_BINDER_LAYOUT,
-      is_public: forTrade,
-      for_trade: forTrade,
-      position: count ?? 0,
-    })
-    .select("id")
-    .single();
+  const insert = () =>
+    admin
+      .from("binders")
+      .insert({
+        player_id: playerId,
+        name,
+        cover:
+          input.cover && isBinderCover(input.cover)
+            ? input.cover
+            : DEFAULT_BINDER_COVER,
+        layout: DEFAULT_BINDER_LAYOUT,
+        is_public: forTrade,
+        for_trade: forTrade,
+        position: count ?? 0,
+        share_code: newShareCode(),
+      })
+      .select("id")
+      .single();
+  let { data, error } = await insert();
+  /* A share code that happened to exist already: draw another. */
+  if (error?.code === "23505") ({ data, error } = await insert());
   if (error || !data) {
     console.error("Could not create the binder", error);
     return { ok: false, reason: "unavailable" };
@@ -584,35 +661,185 @@ export async function saveBinderSettings(
   return { ok: true };
 }
 
-/** Adds a card. In a binder up for trade, the Have list follows at once. */
+/** One card to put in a binder, from the picker or a pasted list. */
+export interface BinderAddItem {
+  cardId: string;
+  printingId: string | null;
+  quantity: number;
+}
+
+export type BinderAddResult =
+  | {
+      ok: true;
+      /** New pockets filled. */
+      added: number;
+      /** Cards already in the binder whose count went up instead. */
+      merged: number;
+      /** Left out because the binder was full. */
+      skipped: number;
+      /** The pocket the first new card went into, or null when none did. */
+      firstPocket: number | null;
+    }
+  | { ok: false; reason: "at-cap" | "unavailable" | "not-yours" };
+
+/**
+ * Puts cards in a binder at once, the way the Flare picker posts them.
+ *
+ * The first new card goes in the pocket the owner tapped, or the first
+ * empty one after it; the rest follow into the next empty pockets.
+ * Without a pocket they go after the last card, the way you would slide
+ * new cards into the back of a binder. A card already in the binder
+ * (same card, same printing) counts up instead of taking a second
+ * pocket. In a binder up for trade, the Have list follows at once.
+ */
+export async function addBinderCards(
+  playerId: string,
+  displayName: string,
+  binderId: string,
+  items: BinderAddItem[],
+  startPocket: number | null = null,
+): Promise<BinderAddResult> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const row = await binderRow(playerId, binderId);
+  if (!row) return { ok: false, reason: "not-yours" };
+  const admin = getSupabaseAdmin();
+
+  const rows = await cardRows(binderId);
+  const pockets = pocketsFor(inOwnerOrder(rows));
+  const taken = new Set(pockets.values());
+  const keyOf = (cardId: string, printingId: string | null) =>
+    `${cardId}:${printingId ?? ""}`;
+  const existing = new Map(
+    rows.map((card) => [keyOf(card.card_id, card.printing_id), card]),
+  );
+
+  /* The same card twice in one batch is one line with both counts. */
+  const lines = new Map<string, BinderAddItem>();
+  for (const item of items) {
+    const key = keyOf(item.cardId, item.printingId);
+    const before = lines.get(key);
+    lines.set(key, {
+      ...item,
+      quantity: Math.min(
+        99,
+        (before?.quantity ?? 0) + Math.max(1, Math.round(item.quantity)),
+      ),
+    });
+  }
+
+  const last = taken.size > 0 ? Math.max(...taken) : -1;
+  let cursor = startPocket ?? last + 1;
+  let room = MAX_BINDER_CARDS - rows.length;
+  let merged = 0;
+  let skipped = 0;
+  let firstPocket: number | null = null;
+  const inserts: {
+    binder_id: string;
+    card_id: string;
+    printing_id: string | null;
+    quantity: number;
+    position: number;
+  }[] = [];
+  const touched: BinderAddItem[] = [];
+
+  for (const [key, item] of lines) {
+    const had = existing.get(key);
+    if (had) {
+      const quantity = Math.min(99, had.quantity + item.quantity);
+      if (quantity !== had.quantity) {
+        const { error } = await admin
+          .from("binder_cards")
+          .update({ quantity })
+          .eq("id", had.id)
+          .eq("binder_id", binderId);
+        if (error) console.error("Could not count up a binder card", error);
+      }
+      merged += 1;
+      touched.push(item);
+      continue;
+    }
+    const pocket = room > 0 ? nextFreePocket(taken, cursor) : null;
+    if (pocket === null) {
+      skipped += 1;
+      continue;
+    }
+    taken.add(pocket);
+    cursor = pocket + 1;
+    room -= 1;
+    if (firstPocket === null) firstPocket = pocket;
+    inserts.push({
+      binder_id: binderId,
+      card_id: item.cardId,
+      printing_id: item.printingId,
+      quantity: item.quantity,
+      position: pocket,
+    });
+    touched.push(item);
+  }
+
+  if (inserts.length > 0) {
+    const { error } = await admin.from("binder_cards").insert(inserts);
+    if (error) {
+      console.error("Could not add to the binder", error);
+      return { ok: false, reason: "unavailable" };
+    }
+  }
+
+  if (row.for_trade) {
+    for (const item of touched) {
+      await syncTradeCard(playerId, displayName, item.cardId, item.printingId);
+    }
+  }
+
+  if (inserts.length === 0 && merged === 0 && skipped > 0) {
+    return { ok: false, reason: "at-cap" };
+  }
+  return { ok: true, added: inserts.length, merged, skipped, firstPocket };
+}
+
+/** Adds one card, after the last one: what the builds before pockets send. */
 export async function addBinderCard(
   playerId: string,
   displayName: string,
   input: Pick<AddEntryInput, "cardId" | "printingId" | "quantity">,
   binderId: string,
 ): Promise<BinderWriteResult> {
+  const result = await addBinderCards(playerId, displayName, binderId, [
+    {
+      cardId: input.cardId,
+      printingId: input.printingId ?? null,
+      quantity: input.quantity ?? 1,
+    },
+  ]);
+  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+}
+
+/**
+ * Moves one card to a pocket, in one database call: an empty pocket
+ * takes it, a full one slides the run of cards from there along to the
+ * next gap (`binder_place_card`). Never a swap, never a lost card.
+ */
+export async function placeBinderCard(
+  playerId: string,
+  binderId: string,
+  entryId: string,
+  pocket: number,
+): Promise<BinderWriteResult> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  if (!Number.isInteger(pocket) || pocket < 0 || pocket > LAST_POCKET) {
+    return { ok: false, reason: "invalid" };
+  }
   const row = await binderRow(playerId, binderId);
   if (!row) return { ok: false, reason: "not-yours" };
-  const admin = getSupabaseAdmin();
-  const { count } = await admin
-    .from("binder_cards")
-    .select("id", { count: "exact", head: true })
-    .eq("binder_id", binderId);
-  if ((count ?? 0) >= MAX_BINDER_CARDS) return { ok: false, reason: "at-cap" };
-  const { error } = await admin.from("binder_cards").insert({
-    binder_id: binderId,
-    card_id: input.cardId,
-    printing_id: input.printingId,
-    quantity: input.quantity,
+  const { error } = await getSupabaseAdmin().rpc("binder_place_card", {
+    p_binder: binderId,
+    p_entry: entryId,
+    p_pocket: pocket,
   });
-  /* Already in this binder: the unique index says so, and that is fine. */
-  if (error && error.code !== "23505") {
-    console.error("Could not add to the binder", error);
-    return { ok: false, reason: "unavailable" };
+  if (error) {
+    console.error("Could not move the binder card", error);
+    return { ok: false, reason: "not-yours" };
   }
-  if (row.for_trade)
-    await syncTradeCard(playerId, displayName, input.cardId, input.printingId);
   return { ok: true };
 }
 
@@ -670,24 +897,13 @@ export async function saveBinderOrder(
   const placed = entryIds.filter(
     (id, index) => ownIds.has(id) && entryIds.indexOf(id) === index,
   );
-  const rest = own
-    .filter((entry) => !placed.includes(entry.id))
-    .sort((a, b) => (a.position ?? -1) - (b.position ?? -1))
-    .map((entry) => entry.id);
-  const order = [...placed, ...rest];
-  const admin = getSupabaseAdmin();
-  const results = await Promise.all(
-    order.map((id, position) =>
-      admin
-        .from("binder_cards")
-        .update({ position })
-        .eq("id", id)
-        .eq("binder_id", binderId),
-    ),
-  );
-  const failed = results.find((result) => result.error);
-  if (failed?.error) {
-    console.error("Could not save the binder order", failed.error);
+  /* One statement, so the one-card-per-pocket rule is checked once. */
+  const { error } = await getSupabaseAdmin().rpc("binder_save_order", {
+    p_binder: binderId,
+    p_ids: placed,
+  });
+  if (error) {
+    console.error("Could not save the binder order", error);
     return { ok: false, reason: "unavailable" };
   }
   return { ok: true };

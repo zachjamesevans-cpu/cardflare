@@ -1432,9 +1432,13 @@ export function HomeScreen() {
                     ring={item.ring}
                     aura={item.aura}
                     size={36}
-                    detail={`${
-                      item.direction === "showcase" ? "Offering" : "Looking for"
-                    }${item.deckLabel ? ` · ${item.deckLabel}` : ""} · ${item.storeName}`}
+                    detail={[
+                      item.direction === "showcase" ? "Offering" : null,
+                      item.deckLabel,
+                      item.storeName,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                     onOpen={(id) =>
                       navigation.navigate("PlayerProfile", { playerId: id })
                     }

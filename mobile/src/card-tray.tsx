@@ -22,6 +22,7 @@ import Animated, {
   type SharedValue,
 } from "react-native-reanimated";
 
+import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
 import { colors, spacing } from "./theme";
 import { Tap } from "./ui";
@@ -414,23 +415,11 @@ function TileFace({
           {index + 1}
         </Text>
       </View>
-      {item.quantity > 1 ? (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 3,
-            right: 3,
-            borderRadius: 999,
-            paddingHorizontal: 5,
-            paddingVertical: 1,
-            backgroundColor: colors.canvas,
-          }}
-        >
-          <Text style={{ color: colors.textPrimary, fontSize: 10, fontWeight: "700" }}>
-            {`x${item.quantity}`}
-          </Text>
-        </View>
-      ) : null}
+      {/* The copies: the one quantity tag, in the corner the count always had. */}
+      <QuantityBadge
+        quantity={item.quantity}
+        style={{ position: "absolute", bottom: 3, right: 3 }}
+      />
     </View>
   );
 }

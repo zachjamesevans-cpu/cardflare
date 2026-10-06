@@ -32,6 +32,7 @@ import {
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, Textarea, TextInput } from "@/components/ui/controls";
+import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
 import { printingLabel, type CardResult } from "@/lib/cards/schema";
@@ -457,10 +458,13 @@ function ComposerBody({
                     />
                   )}
                 </button>
-                <span className="pointer-events-none absolute top-1 left-1 rounded-full bg-accent px-1.5 text-[10px] font-bold text-accent-contrast tabular-nums">
-                  {index + 1}
-                  {item.quantity > 1 && ` · ${item.quantity}`}
-                </span>
+                {/* The binder's quantity tag, the one every count of
+                    copies wears; the order is the row itself, and the
+                    first wears Cover. */}
+                <QuantityBadge
+                  quantity={item.quantity}
+                  className="pointer-events-none absolute top-1 left-1"
+                />
                 {index === 0 && (
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-surface/90 py-0.5 text-center text-[9px] font-bold tracking-wider text-text-secondary uppercase">
                     Cover

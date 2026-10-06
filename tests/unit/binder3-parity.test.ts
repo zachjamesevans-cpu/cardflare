@@ -99,26 +99,35 @@ describe("the binder page without its buttons", () => {
   });
 
   it("keeps the + pockets as the way in", () => {
-    expect(web.view).toMatch(/<AddPocket\s+onClick=\{\(\) => setAdding\(true\)\}/);
-    expect(web.view).toContain("onOpenChange={setAdding}");
-    expect(web.view).toContain("Math.floor(list.length / perPage) + 1");
-    expect(app.binder).toMatch(/onAdd=\{\(\) => setAdding\(true\)\}/);
+    /* Binder round 3: each "+" opens the sheet for its own pocket, and
+       the page count comes from the shared pocket maths. */
+    expect(web.view).toMatch(
+      /<AddPocket\s+onClick=\{\(\) => setAdding\(\{ pocket: slot \}\)\}/,
+    );
+    expect(web.view).toContain("open={adding !== null}");
+    expect(web.view).toContain("const pages = pagesFor(list, binder.yours);");
+    expect(app.binder).toContain("onPress={() => onAdd(pocket)}");
+    expect(app.binder).toContain("setAddAt(pocket);");
+    expect(app.binder).toContain("visible={addAt !== null}");
+    expect(app.binder).toContain(
+      "const pageCount = Math.max(pagesFor(cards, yours), pagesFor(shown, yours));",
+    );
   });
 });
 
 describe("removing a card is a drop", () => {
   it("draws the Remove zone under the page only while a card is held, on the web", () => {
-    /* One more drop target, with the same preventDefault dance as the
-       pockets and the arrows, in the danger colour, dashed. */
-    expect(web.view).toContain('type DropSpot = number | "prev" | "next" | "remove";');
+    /* One more drop target, in the danger colour, dashed. Binder
+       round 3: the pointer drag finds it by its data-drop mark. */
+    expect(read("src/components/binder/pocket-drag.ts")).toContain(
+      'export type DropSpot = number | "prev" | "next" | "remove";',
+    );
     expect(web.view).toMatch(/\{binder\.yours && dragging && \(\s*<div/);
     expect(web.view).toContain('aria-label="Remove from binder"');
-    expect(web.view).toContain('onDragOver={dragOver("remove", false)}');
-    expect(web.view).toContain('onDragLeave={dragLeave("remove")}');
-    expect(web.view).toContain('onDrop={dropAt("remove")}');
+    expect(web.view).toContain('data-drop="remove"');
     expect(web.view).toMatch(/border-2 border-dashed border-danger[^"]*text-danger/);
     expect(web.view).toMatch(/>\s*Remove\s*</);
-    expect(web.view).toMatch(/if \(spot === "remove"\) \{\s*remove\(dragging\);/);
+    expect(web.view).toContain('if (spot === "remove") remove(entryId);');
     expect(web.view).toContain("removeBinderCardAction(card.entryId, binder.id)");
     /* The old remove cross is gone with the Edit mode. */
     expect(web.view).not.toContain("aria-label={`Remove ${card.name}`}");

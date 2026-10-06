@@ -17,6 +17,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -717,7 +718,21 @@ function openNotificationLink(response: Notifications.NotificationResponse | nul
   void followHref(navigationRef, url).catch(() => {});
 }
 
+/**
+ * The app's root: everything inside GestureHandlerRootView, which
+ * react-native-gesture-handler needs above any view that uses one of
+ * its gestures (the binder's hold-and-drag). Flex 1, so it is the
+ * whole screen and lays nothing out of its own.
+ */
 export default function App() {
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppGates />
+    </GestureHandlerRootView>
+  );
+}
+
+function AppGates() {
   /*
    * The front door. A fresh install (no session, welcome never seen)
    * gets the splash and the whole sign-up before the tabs; everyone
