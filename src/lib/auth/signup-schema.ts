@@ -43,6 +43,22 @@ export const signupSchema = z.object({
   handle: handleSchema.shape.handle,
 });
 
+/**
+ * The address, typed twice.
+ *
+ * A typo in the email at sign-up is an account nobody can ever reset the
+ * password of: the reset goes to the typo. Typing it twice catches the
+ * slip before the account is made. Compared the way the account is
+ * stored (trimmed, lowercase), so "Zach@x.com" matches "zach@x.com ".
+ * Kept here, free of server imports, so the form and the action share it.
+ */
+export function emailsMatch(email: string, confirm: string): boolean {
+  const shape = (value: string) => value.trim().toLowerCase();
+  return shape(email) !== "" && shape(email) === shape(confirm);
+}
+
+export const EMAIL_MISMATCH = "The two email addresses do not match.";
+
 export type SignupState = { status: "idle" } | { status: "error"; message: string };
 
 export const SIGNUP_IDLE: SignupState = { status: "idle" };

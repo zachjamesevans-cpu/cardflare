@@ -65,6 +65,7 @@ import { ProScreen } from "./src/screens/pro";
 import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, forgetWelcome, hasSeenWelcome } from "./src/screens/welcome";
 import { onSignedOut, storedAccessToken } from "./src/api";
+import { startProSync } from "./src/pro";
 import { firstBootError } from "./src/boot-errors";
 import { colors } from "./src/theme";
 import { Tap } from "./src/ui";
@@ -585,17 +586,27 @@ function Tabs() {
 }
 
 /**
- * The last line of defence at startup.
+ * The last line of defence, at startup and after.
  *
  * A release build has no red error screen: if anything throws while the
  * first frame is being built, the native splash simply never goes away
  * and the app reads as dead. This boundary sits above everything, so a
- * startup failure renders as a screen that names the error instead - a
- * tester can screenshot it, and the splash still hides because content
- * (this content) appeared.
+ * failure renders as a screen that says so instead, and the splash still
+ * hides because content (this content) appeared.
+ *
+ * It wraps the WHOLE app, so it also catches a screen that throws an
+ * hour in. Its words used to say "while starting" either way, which was
+ * wrong half the time, and its only content was a raw error string,
+ * which reads as broken to anybody but a developer (App Review among
+ * them). So: plain words, a Try again that resets the boundary and
+ * redraws the app, and the error itself behind a small Details toggle,
+ * still there for a tester's screenshot.
  */
-class StartupGuard extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state: { error: Error | null } = { error: null };
+class StartupGuard extends Component<
+  { children: ReactNode },
+  { error: Error | null; details: boolean }
+> {
+  state: { error: Error | null; details: boolean } = { error: null, details: false };
 
   static getDerivedStateFromError(error: Error) {
     return { error };
@@ -609,18 +620,47 @@ class StartupGuard extends Component<{ children: ReactNode }, { error: Error | n
           contentContainerStyle={{ padding: 24, paddingTop: 96, gap: 12 }}
         >
           <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
-            cardflare hit a problem while starting
+            Something went wrong
           </Text>
           <Text style={{ color: colors.textSecondary, lineHeight: 21 }}>
-            This is not supposed to happen. A screenshot of this screen is the fastest
-            way to get it fixed.
+            cardflare hit a problem it could not recover from on its own. Try again, and
+            if it keeps happening, a screenshot of the details is the fastest way to get
+            it fixed.
           </Text>
-          <Text
-            style={{ color: colors.textMuted, fontFamily: "Courier", fontSize: 12 }}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => this.setState({ error: null, details: false })}
+            style={{
+              backgroundColor: colors.accent,
+              borderRadius: 12,
+              paddingVertical: 14,
+              alignItems: "center",
+              marginTop: 8,
+            }}
           >
-            {String(this.state.error)}
-          </Text>
-          {(() => {
+            <Text style={{ color: colors.accentContrast, fontWeight: "700", fontSize: 16 }}>
+              Try again
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => this.setState({ details: !this.state.details })}
+            hitSlop={8}
+            style={{ alignSelf: "center", paddingVertical: 8 }}
+          >
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              {this.state.details ? "Hide details" : "Details"}
+            </Text>
+          </Pressable>
+          {this.state.details ? (
+            <Text
+              selectable
+              style={{ color: colors.textMuted, fontFamily: "Courier", fontSize: 12 }}
+            >
+              {String(this.state.error)}
+            </Text>
+          ) : null}
+          {this.state.details && (() => {
             /* The boundary often catches a symptom (a module that failed
                to load reads as undefined); the trap in boot-errors.ts
                holds the error that actually started it. Show both. */
@@ -761,6 +801,11 @@ function AppGates() {
     () =>
       onSignedOut(() => {
         void forgetWelcome();
+        /* The last push tap is remembered by the OS and replayed by the
+           navigator's onReady below each time it mounts, so without this
+           the next account to sign in on the phone was carried to
+           wherever the previous account's last notice pointed. */
+        void Notifications.clearLastNotificationResponseAsync().catch(() => {});
         setGate("welcome");
       }),
     [],
@@ -771,6 +816,21 @@ function AppGates() {
     const subscription =
       Notifications.addNotificationResponseReceivedListener(openNotificationLink);
     return () => subscription.remove();
+  }, [gate]);
+
+  /*
+   * In-app purchases, once the tabs open with an account: finish what
+   * the phone owns and listen for renewals and late approvals (see
+   * startProSync). It used to happen only on the Pro screen, so a
+   * player who paid stayed free until they went looking for it. Runs
+   * again after a sign-in, because that also opens the gate; the
+   * listener itself is only ever added once.
+   */
+  useEffect(() => {
+    if (gate !== "open") return;
+    void storedAccessToken().then((token) => {
+      if (token) void startProSync().catch(() => {});
+    });
   }, [gate]);
 
   /*
@@ -886,7 +946,10 @@ function AppGates() {
           />
           <Stack.Screen name="SignIn" options={{ title: "Sign in" }}>
             {({ navigation }) => (
-              <SignInScreen onSignedIn={() => navigation.goBack()} />
+              <SignInScreen
+                onSignedIn={() => navigation.goBack()}
+                onCreateAccount={() => navigation.replace("CreateAccount")}
+              />
             )}
           </Stack.Screen>
           <Stack.Screen name="CreateAccount" options={{ title: "Create account" }}>

@@ -88,20 +88,39 @@ export function onSignedOut(listener: () => void): () => void {
 export async function signOut(): Promise<void> {
   await forgetDevice();
   await forgetAuth();
+  await forgetAccountLocals();
+  for (const listener of signedOut) listener();
+}
+
+/**
+ * Everything on this phone that belonged to the account, apart from the
+ * tokens and the push registration, which each caller drops its own
+ * way (a refused refresh has no live token to unregister with).
+ */
+async function forgetAccountLocals(): Promise<void> {
   /* The guest room identity goes too: it was joined under this
      account's name and would follow the next sign-in into the room. */
   await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
+
+  /*
+   * The last room, its game scope and the search game chip. Small
+   * things, but together they reopened the previous person's Room tab,
+   * narrowed to their game, the moment somebody else signed in on the
+   * same phone.
+   */
+  await SecureStore.deleteItemAsync(LAST_ROOM_KEY).catch(() => {});
+  await SecureStore.deleteItemAsync(LAST_ROOM_GAME_KEY).catch(() => {});
+  await SecureStore.deleteItemAsync(SEARCH_GAME_KEY).catch(() => {});
 
   /*
    * And the cached feed, which is the part that is easy to forget.
    * Tokens are what stop the app talking to the server; the cache is
    * what the NEXT person to open this phone would see painted on the
    * screen before it ever tries — a feed, a profile, a wardrobe.
-   * Signing out has to take both.
+   * Signing out has to take both. Recent searches are kept under the
+   * cache's prefix (recent-search-list.ts), so this sweeps them too.
    */
   await clearCache();
-
-  for (const listener of signedOut) listener();
 }
 
 /**
@@ -233,6 +252,15 @@ export async function signUp(
     };
   }
 
+  /* The account was made and only the sign-in after it stumbled
+     upstream: "try again" would hit "already has an account". */
+  if (result.errorCode === "upstream") {
+    return {
+      ok: false,
+      message: "Your account is ready, but signing in did not finish. Sign in to continue.",
+    };
+  }
+
   return { ok: false, message: "Could not create the account. Try again." };
 }
 
@@ -312,19 +340,65 @@ async function refreshOnce(): Promise<boolean> {
   }
 
   /*
-   * The server answered and said no: the refresh token is dead
+   * Only a refusal of the refresh token itself signs the phone out: the
+   * server answers 401 "invalid-refresh" when Supabase rejected it
    * (password changed on the website, session revoked, long expiry).
-   * The tokens stay in the keychain otherwise, every call 401s, and the
-   * profile shows "could not load" with no Sign out in reach. So a
-   * refusal signs the phone out properly, back to the front door. A
-   * network failure (status 0) is not a refusal and changes nothing.
+   * The tokens would otherwise stay in the keychain, every call 401s,
+   * and the profile shows "could not load" with no Sign out in reach,
+   * so that case goes back to the front door properly.
+   *
+   * Everything else is weather, not a verdict: no network (status 0),
+   * a rate limit (429), Supabase having a bad minute (503 "upstream").
+   * Signing somebody out because the auth server hiccuped once cost
+   * them their session for nothing. The tokens stay, this call fails
+   * honestly, and the next call tries the refresh again.
    */
-  if (result.status !== 0) {
+  if (isRefreshRefusal(result.status, result.errorCode)) {
+    await forgetDeviceWithoutRefresh();
     await forgetAuth();
-    await clearCache();
+    await forgetAccountLocals();
     for (const listener of signedOut) listener();
   }
   return false;
+}
+
+/** The one refresh answer that means "this session is over". */
+export function isRefreshRefusal(status: number, errorCode: string | null): boolean {
+  return status === 401 && errorCode === "invalid-refresh";
+}
+
+/**
+ * forgetDevice, for the one caller already inside a refresh.
+ *
+ * `call()` refreshes a stale token first, and a refresh in flight is
+ * shared, so unregistering through it from here would wait on itself
+ * forever. This asks once with whatever access token is left (it can
+ * still be good for a few minutes) and, either way, drops the push
+ * token from the phone the same as signing out does.
+ */
+async function forgetDeviceWithoutRefresh(): Promise<void> {
+  try {
+    const pushToken = await SecureStore.getItemAsync(PUSH_KEY);
+    const access = await storedAccessToken();
+    if (pushToken && access) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5_000);
+      await fetch(`${API_BASE}/api/v1/devices`, {
+        method: "DELETE",
+        headers: {
+          authorization: `Bearer ${access}`,
+          "x-cf-access-token": access,
+          "x-cf-payload": encodeURIComponent(JSON.stringify({ pushToken })),
+        },
+        signal: controller.signal,
+      })
+        .catch(() => {})
+        .finally(() => clearTimeout(timer));
+    }
+    await SecureStore.deleteItemAsync(PUSH_KEY);
+  } catch {
+    /* Nothing to unregister, or nowhere to say so. */
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -358,10 +432,12 @@ export function serverMessage(caught: unknown): string | null {
  * "unauthorized (401)" point at different bugs from the same couch.
  */
 export function describeError(caught: unknown): string {
-  /* Not a bug to diagnose but a plan to start: said in words, the same
-     words the web console uses. */
+  /* Not a bug to diagnose but a plan to start: said in words. No URL
+     and no price, though: a store's plan is bought on the web, and an
+     app that points players at an outside purchase is an App Store
+     3.1.1 rejection. The owner knows where their console is. */
   if (caught instanceof ApiError && caught.code === "ultra-required") {
-    return "FlareCast is part of cardflare Ultra. The store's owner can start the 14-day free trial from the store console at cardflare.gg/store.";
+    return "FlareCast is not switched on for this store yet. The store's owner can start it from their store console.";
   }
   if (caught instanceof ApiError) {
     if (caught.status === 0) return caught.code;
@@ -1702,6 +1778,17 @@ export interface Profile {
    */
   tier?: string;
   pro?: boolean;
+  /**
+   * The player's own subscription, for the Pro screen's renewal line and
+   * its Manage subscription door. Null with none; absent (undefined)
+   * from a server older than this field, which the screen treats as
+   * "do not know" and draws no date.
+   */
+  subscription?: {
+    source: "stripe" | "apple";
+    renewsAt: string | null;
+    cancelAtPeriodEnd: boolean;
+  } | null;
   /**
    * Private. The founder's two-number rule: this is what is left to
    * spend, it never appears on anybody else's screen, and the server

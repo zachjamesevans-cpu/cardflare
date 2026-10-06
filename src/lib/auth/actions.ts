@@ -6,7 +6,7 @@ import { z } from "zod";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { openSignup } from "@/lib/auth/signup";
-import { signupSchema } from "@/lib/auth/signup-schema";
+import { EMAIL_MISMATCH, emailsMatch, signupSchema } from "@/lib/auth/signup-schema";
 import { siteUrl } from "@/lib/site";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { clientKey } from "@/lib/request-context";
@@ -235,6 +235,12 @@ export async function signUpWithPassword(
       fieldErrors: {},
       email,
     };
+  }
+
+  /* The form blocks a mismatch already; this is the server's own word,
+     because a Server Action is a public endpoint. */
+  if (!emailsMatch(email, text(formData, "confirmEmail"))) {
+    return { status: "error", message: EMAIL_MISMATCH, fieldErrors: {}, email };
   }
 
   const failure = (message: string): PasswordSignInState => ({

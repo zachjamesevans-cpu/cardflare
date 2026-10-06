@@ -15,6 +15,7 @@ import {
   deleteAccount,
   friendlyError,
   getMe,
+  getProfile,
   getPostalCode,
   getPushPrefs,
   listBlockedPlayers,
@@ -24,6 +25,7 @@ import {
   setFeedView,
   setPushPref,
   signOut,
+  storedAccessToken,
   unblockPlayer,
 } from "../api";
 import { GiftBar } from "../gift-bar";
@@ -42,6 +44,7 @@ import {
 } from "../ui";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { restorePro } from "../pro";
+import { APPLE_SUBSCRIPTIONS_URL, CLAIMED_MESSAGE } from "../pro-copy";
 import {
   PUSH_GROUPS,
   PUSH_HEADING,
@@ -84,6 +87,11 @@ interface SettingsData {
 export function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
+  /* Set when /me failed with nothing cached but the phone is signed
+     in: what Delete account knows of the handle (null for nothing). */
+  const [deleteFallback, setDeleteFallback] = useState<{ handle: string | null } | null>(
+    null,
+  );
   /* Seeded from the account on focus, so the radio matches what the
      Feed is actually drawing. */
   const [view, setView] = useState<FeedView>("classic");
@@ -171,6 +179,19 @@ export function SettingsScreen() {
         if (account.status !== "fulfilled") {
           /* Draw what can be drawn rather than spin forever. */
           setReady(true);
+          /*
+           * And Delete account must still be here: App Review's
+           * 5.1.1(v) does not care that /me had a bad moment. The
+           * handle comes from a profile read instead, and failing that
+           * the card asks for it typed with nothing to compare against
+           * on the phone; the server checks it either way.
+           */
+          if (await storedAccessToken()) {
+            const handle = await getProfile()
+              .then((result) => result.profile.handle || null)
+              .catch(() => null);
+            if (live) setDeleteFallback({ handle });
+          }
           return;
         }
         const data: SettingsData = {
@@ -398,7 +419,11 @@ export function SettingsScreen() {
       {/* Always here when the account is: App Review's 5.1.1(v). It used
           to wait on a separate profile read and vanished when that one
           failed. */}
-      {me?.player.handle ? <DeleteAccount handle={me.player.handle} /> : null}
+      {me?.player.handle ? (
+        <DeleteAccount handle={me.player.handle} />
+      ) : deleteFallback ? (
+        <DeleteAccount handle={deleteFallback.handle} />
+      ) : null}
     </ScrollView>
   );
 }
@@ -627,11 +652,15 @@ function BlockedPlayers({ initial }: { initial: BlockedPlayer[] | null }) {
  * the same thing. The website's settings page carries the same card in
  * the same words.
  */
-function DeleteAccount({ handle }: { handle: string }) {
+function DeleteAccount({ handle }: { handle: string | null }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [said, setSaid] = useState<string | null>(null);
-  const matches = typed.trim().replace(/^@/, "").toLowerCase() === handle.toLowerCase();
+  /* With no handle to hand (the account reads all failed), anything
+     typed may be sent: the server compares it with the real one and
+     answers "handle-mismatch" otherwise. */
+  const bare = typed.trim().replace(/^@/, "").toLowerCase();
+  const matches = handle === null ? bare.length > 0 : bare === handle.toLowerCase();
 
   return (
     <Card>
@@ -645,11 +674,13 @@ function DeleteAccount({ handle }: { handle: string }) {
       </Muted>
       {open ? (
         <>
-          <Body>Type your handle, @{handle}, to confirm.</Body>
+          <Body>
+            {handle ? `Type your handle, @${handle}, to confirm.` : "Type your handle to confirm."}
+          </Body>
           <Input
             value={typed}
             onChangeText={setTyped}
-            placeholder={`@${handle}`}
+            placeholder={handle ? `@${handle}` : "@your_handle"}
             autoCapitalize="none"
             autoCorrect={false}
             accessibilityLabel="Type your handle to confirm"
@@ -852,7 +883,7 @@ function ProCard() {
       <Button
         label="Manage subscription"
         variant="secondary"
-        onPress={() => void Linking.openURL("https://apps.apple.com/account/subscriptions")}
+        onPress={() => void Linking.openURL(APPLE_SUBSCRIPTIONS_URL)}
       />
       <AsyncButton
         label="Restore purchases"
@@ -866,7 +897,9 @@ function ProCard() {
               ? "Pro restored. Welcome back."
               : outcome.kind === "none"
                 ? "No Pro subscription found on this Apple ID."
-                : outcome.kind === "unavailable"
+                : outcome.kind === "claimed"
+                  ? CLAIMED_MESSAGE
+                  : outcome.kind === "unavailable"
                   ? "The App Store is not available right now. Try again later."
                   : `Restore did not finish: ${outcome.message}`,
           );

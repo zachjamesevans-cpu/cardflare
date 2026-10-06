@@ -5,9 +5,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
-import { getProfile } from "../api";
+import { getProfile, storedAccessToken } from "../api";
 import { API_BASE } from "../config";
 import { PRO_PRICE_FALLBACK, buyPro, proPrice, restorePro, syncOwnedPro } from "../pro";
+import {
+  APPLE_SUBSCRIPTIONS_URL,
+  CLAIMED_MESSAGE,
+  renewalLine,
+  type SubscriptionFacts as ProfileSubscription,
+} from "../pro-copy";
 import { AsyncButton, Card, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
 
@@ -50,6 +56,8 @@ export function ProScreen() {
   const [pro, setPro] = useState(false);
   const [price, setPrice] = useState(PRO_PRICE_FALLBACK);
   const [message, setMessage] = useState<string | null>(null);
+  /* The renewal facts, when the server sent them. */
+  const [subscription, setSubscription] = useState<ProfileSubscription | null>(null);
 
   const alive = useRef(true);
   useEffect(
@@ -61,24 +69,32 @@ export function ProScreen() {
 
   /* Who is buying, and whether they already did. Refreshed on focus so
      coming back after a purchase elsewhere shows the truth. */
+  const loadProfile = useCallback(async (): Promise<string | null> => {
+    try {
+      const result = await getProfile();
+      if (!alive.current) return null;
+      setPlayerId(result.profile.playerId);
+      setPro(result.profile.pro ?? false);
+      setSubscription(result.profile.subscription ?? null);
+      /* Not Pro on the server, but maybe Pro on the phone: a paid
+         transaction the confirm step dropped. Finish it here. */
+      if (!result.profile.pro) {
+        const synced = await syncOwnedPro();
+        if (!alive.current) return result.profile.playerId;
+        if (synced === "pro") setPro(true);
+        if (synced === "claimed") setMessage(CLAIMED_MESSAGE);
+      }
+      return result.profile.playerId;
+    } catch {
+      /* The screen still pitches; Subscribe says what went wrong. */
+      return null;
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      void (async () => {
-        try {
-          const result = await getProfile();
-          if (!alive.current) return;
-          setPlayerId(result.profile.playerId);
-          setPro(result.profile.pro ?? false);
-          /* Not Pro on the server, but maybe Pro on the phone: a paid
-             transaction the confirm step dropped. Finish it here. */
-          if (!result.profile.pro && (await syncOwnedPro()) && alive.current) {
-            setPro(true);
-          }
-        } catch {
-          /* The screen still pitches; the button will say sign in. */
-        }
-      })();
-    }, []),
+      void loadProfile();
+    }, [loadProfile]),
   );
 
   useEffect(() => {
@@ -88,12 +104,24 @@ export function ProScreen() {
   }, []);
 
   const subscribe = async () => {
-    if (!playerId) {
-      setMessage("Sign in first, so Pro knows whose look to unlock.");
+    /*
+     * No profile yet. That used to say "Sign in first" whatever the
+     * reason, which told a signed-in player on a bad connection to do
+     * something they had already done. Ask once more, then say which
+     * of the two it really is.
+     */
+    const buyer = playerId ?? (await loadProfile());
+    if (!alive.current) return;
+    if (!buyer) {
+      setMessage(
+        (await storedAccessToken())
+          ? "Could not reach cardflare to check your account. Check your connection and try again."
+          : "Sign in first, so Pro knows whose look to unlock.",
+      );
       return;
     }
     setMessage(null);
-    const outcome = await buyPro(playerId);
+    const outcome = await buyPro(buyer);
     if (!alive.current) return;
 
     if (outcome.kind === "pro") {
@@ -120,6 +148,10 @@ export function ProScreen() {
       );
       return;
     }
+    if (outcome.kind === "claimed") {
+      setMessage(CLAIMED_MESSAGE);
+      return;
+    }
     setMessage(`That purchase did not go through: ${outcome.message}`);
   };
 
@@ -135,6 +167,10 @@ export function ProScreen() {
     }
     if (outcome.kind === "none") {
       setMessage("No Pro subscription found on this Apple ID.");
+      return;
+    }
+    if (outcome.kind === "claimed") {
+      setMessage(CLAIMED_MESSAGE);
       return;
     }
     if (outcome.kind === "unavailable") {
@@ -245,6 +281,27 @@ export function ProScreen() {
               }
             />
           )}
+
+          {/*
+           * Somebody who is Pro needs the way out as much as the way in:
+           * App Review checks for it, and a subscriber who cannot find
+           * where to cancel is a refund request. The renewal (or end)
+           * date when the server knows it. A website subscription is
+           * managed where it was bought, so it is named, not linked.
+           */}
+          {pro && renewalLine(subscription) ? (
+            <Muted>{renewalLine(subscription)}</Muted>
+          ) : null}
+          {pro && subscription?.source === "stripe" ? (
+            <Muted>Billed through cardflare.gg. Manage it from the Pro page there.</Muted>
+          ) : pro ? (
+            <AsyncButton
+              label="Manage subscription"
+              pendingLabel="Opening…"
+              variant="secondary"
+              onPress={() => Linking.openURL(APPLE_SUBSCRIPTIONS_URL)}
+            />
+          ) : null}
         </View>
       </Card>
 

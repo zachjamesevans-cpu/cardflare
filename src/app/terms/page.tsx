@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/terms" },
 };
 
-const LAST_UPDATED = "9 September 2026";
+const LAST_UPDATED = "6 October 2026";
 
 export default function TermsPage() {
   return (
@@ -71,6 +71,26 @@ export default function TermsPage() {
           Do not attempt to break, overload, scrape or gain unauthorised access to the
           site, and do not use it to harass anyone or to break the law or a
           venue&rsquo;s rules.
+        </p>
+      </LegalSection>
+
+      {/* Said in so many words because App Review guideline 1.2 asks for
+          exactly this from any app where people post: terms that rule out
+          objectionable content, a way to report it, a way to block, and
+          action on reports within a day. Reporting and blocking already
+          exist on every post, profile and message. */}
+      <LegalSection heading="Zero tolerance for objectionable content">
+        <p>
+          {SITE.name} has zero tolerance for objectionable or abusive content and for
+          abusive users. That includes harassment, hate, threats, sexual content, and
+          scams. Do not post it in Flares, comments, messages, names or profile
+          pictures.
+        </p>
+        <p>
+          You can report any post, profile or message, and block anyone, from the menu
+          next to it. We review reported content and act on it within 24 hours, removing
+          the content and closing the account of anyone who posted it where it breaks
+          these terms.
         </p>
       </LegalSection>
 

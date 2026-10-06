@@ -14,9 +14,9 @@
       "infoPlist": {
         "NSCameraUsageDescription": "cardflare uses the camera only to scan the QR code on a store's counter.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
-        "NSLocationAlwaysUsageDescription": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+        "NSLocationWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
+        "NSLocationAlwaysUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
         "NSUserActivityTypes": ["INSendMessageIntent"]
       },
       "appleTeamId": "J2N92N3SMA",
@@ -59,7 +59,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "cardflare uses your location only to show game stores and Flares near you. It is never stored and never shared.",
+          "locationWhenInUsePermission": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }

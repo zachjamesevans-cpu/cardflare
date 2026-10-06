@@ -80,8 +80,9 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     expect(header).toContain(
       '<HeaderButton icon="add" label="Post a Flare" onPress={onPost} />',
     );
+    /* A guest has no account to post with, so no + at all. */
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      'onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}',
+      'onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}',
     );
   });
 
@@ -120,7 +121,10 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
 
 describe("the Feed's bell", () => {
   it("sits alone top right, opens the Inbox, and wears the dot when unread", () => {
-    expect(home).toContain('onInbox={() => navigation.navigate("Inbox")}');
+    /* A guest's bell is a door to sign-up: there is no Inbox without an account. */
+    expect(home).toContain(
+      'onInbox={guest ? toSignUp : () => navigation.navigate("Inbox")}',
+    );
     expect(home).toContain("const unread = useUnread();");
     /* Search is a tab now, so the header has no search icon. */
     expect(header).not.toContain('accessibilityLabel="Search"');

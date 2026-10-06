@@ -1,5 +1,5 @@
 import { apiPlayer, apiSession } from "@/lib/api/auth";
-import { listFeed } from "@/lib/feed/repository";
+import { guestSampleFeed, listFeed } from "@/lib/feed/repository";
 import { sessionForPlayer } from "@/lib/players/accounts";
 import { absoluteAvatars } from "@/lib/api/absolute-avatars";
 import { pointFromCoords } from "@/lib/geo/zip";
@@ -17,9 +17,25 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
   const account = await apiPlayer(request);
 
-  /* A guest has no follows and no locals, so there is nothing to derive.
-     An empty feed is the honest answer, not an error. */
-  if (!account) return Response.json({ items: [] });
+  const url = new URL(request.url);
+  const device = pointFromCoords(
+    url.searchParams.get("lat"),
+    url.searchParams.get("lng"),
+  );
+
+  /*
+   * A guest has no follows and no locals, so there is nothing to derive
+   * FOR them, and an empty list was the honest answer. It was also the
+   * whole first screen for anybody looking before signing up, App Review
+   * included: an app that appears to do nothing. So a guest gets a
+   * public, read-only sample of recent area Flares - see
+   * guestSampleFeed for what is and is not in it. `guest: true` lets
+   * the app draw it as a sample rather than as somebody's feed.
+   */
+  if (!account) {
+    const items = await guestSampleFeed(device).catch(() => []);
+    return Response.json({ items: items.map(absoluteAvatars), guest: true });
+  }
 
   /*
    * The account's room identity, and only as a fallback the token this
@@ -38,12 +54,6 @@ export async function GET(request: Request): Promise<Response> {
    * refuses falls back to the ZIP on their profile, which the server
    * reads itself - see originForPlayer.
    */
-  const url = new URL(request.url);
-  const device = pointFromCoords(
-    url.searchParams.get("lat"),
-    url.searchParams.get("lng"),
-  );
-
   const items = await listFeed(account.playerId, session?.id ?? null, device);
 
   return Response.json({ items: items.map(absoluteAvatars) });
