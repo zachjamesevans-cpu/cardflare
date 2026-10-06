@@ -35,8 +35,10 @@ export const APPLE_PRO_PRODUCT_ID =
 
 const BUNDLE_ID = process.env.APPLE_BUNDLE_ID ?? "gg.cardflare.app";
 
+export type AppleEnvironment = "production" | "sandbox";
+
 export type AppleLookup =
-  | { outcome: "found"; facts: AppleFacts }
+  | { outcome: "found"; facts: AppleFacts; environment: AppleEnvironment }
   | { outcome: "not-found" }
   | { outcome: "not-configured" }
   | { outcome: "error" };
@@ -130,7 +132,13 @@ export async function lookUpAppleSubscription(
       }
 
       const facts = parseStatusResponse(await response.json(), APPLE_PRO_PRODUCT_ID);
-      return facts ? { outcome: "found", facts } : { outcome: "not-found" };
+      return facts
+        ? {
+            outcome: "found",
+            facts,
+            environment: host === PRODUCTION_HOST ? "production" : "sandbox",
+          }
+        : { outcome: "not-found" };
     } catch (caught) {
       console.error("Could not reach the App Store Server API", caught);
       return { outcome: "error" };
@@ -138,4 +146,35 @@ export async function lookUpAppleSubscription(
   }
 
   return { outcome: "not-found" };
+}
+
+/**
+ * Whether a SANDBOX subscription may make this player Pro.
+ *
+ * A sandbox purchase costs nothing: any Apple ID can be a sandbox
+ * tester, and the production-then-sandbox fallback above will happily
+ * find one. Honoured everywhere, that is free Pro for anyone who can
+ * put a sandbox transaction id in front of us. So on the production
+ * deployment a sandbox subscription entitles only:
+ *
+ *   - everyone, while APPLE_ALLOW_SANDBOX=1 - the switch to flip for
+ *     App Review, whose reviewers buy in the sandbox against the live
+ *     server and must see Pro unlock, and for TestFlight rounds;
+ *   - the player ids listed in APPLE_SANDBOX_PLAYER_IDS (comma
+ *     separated), for the founder's own test accounts.
+ *
+ * Preview and local deployments accept sandbox as before; on
+ * production the default is to refuse.
+ */
+export function sandboxMayEntitle(
+  playerId: string,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if (env.VERCEL_ENV !== "production") return true;
+  if (env.APPLE_ALLOW_SANDBOX === "1") return true;
+  return (env.APPLE_SANDBOX_PLAYER_IDS ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .includes(playerId);
 }

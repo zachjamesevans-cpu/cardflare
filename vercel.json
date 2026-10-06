@@ -19,6 +19,14 @@
     {
       "path": "/api/cron/gifts",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/subscriptions",
+      "schedule": "15 10 * * *"
+    },
+    {
+      "path": "/api/cron/avatar-chunks",
+      "schedule": "45 10 * * *"
     }
   ]
 }
