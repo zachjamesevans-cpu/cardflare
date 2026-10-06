@@ -84,7 +84,11 @@ describe("the Room tile answers a card through the zoom sheet only", () => {
   it("reserves the action rows only under the viewer's own tiles", () => {
     /* Two exits now, stacked: "Found it" (the old Remove) and "Take
        down" (withdrawn, nothing announced, undo for a minute). */
-    expect(tile).toMatch(/\{mine && \(\s*<View style=\{\{ height: 44, gap: 2 \}\}>/);
+    expect(tile).toMatch(/\{mine && \(\s*<View style=\{\{ gap: 4 \}\}>/);
+    /* Each exit its own 44pt target, with words of 12pt or more. */
+    expect(room).toMatch(/removeButton: \{\s*minHeight: 44,/);
+    expect(room).toMatch(/takeDownButton: \{\s*minHeight: 44,/);
+    expect(room).toMatch(/tileAction: \{\s*fontSize: 12,/);
     expect(tile).toContain("Found it");
     expect(tile).toContain("Take down");
     expect(tile).not.toContain(">Remove<");

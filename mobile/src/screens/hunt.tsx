@@ -7,7 +7,7 @@ import type { StackParams } from "../../App";
 import { describeError, getHunt, type HuntView } from "../api";
 import { HuntBinder } from "../hunt-binder";
 import { colors, gutter, spacing } from "../theme";
-import { Loading, Muted } from "../ui";
+import { AsyncButton, Loading, Muted } from "../ui";
 
 /**
  * One hunt on its own screen: the website's /hunts/[huntId].
@@ -53,9 +53,16 @@ export function HuntScreen({ huntId }: { huntId: string }) {
         }}
       >
         {error ? (
-          <Muted>
-            {`This hunt could not be opened (${error}). It may be private, or gone.`}
-          </Muted>
+          <View style={{ gap: spacing(3) }}>
+            <Muted>
+              {`This hunt could not be opened (${error}). It may be private, or gone.`}
+            </Muted>
+            <AsyncButton
+              label="Try again"
+              pendingLabel="Retrying…"
+              onPress={() => load()}
+            />
+          </View>
         ) : (
           <Loading />
         )}

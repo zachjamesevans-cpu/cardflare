@@ -265,7 +265,9 @@ describe("the night's page", () => {
     expect(room).toContain(
       "options?.matches || Date.now() - matchesAt.current >= MATCHES_REFRESH_MS",
     );
-    expect(room).toContain("setMatches(await getNightMatches(eventId));");
+    expect(room).toContain("const read = await getNightMatches(eventId);");
+    /* Only the newest read paints: a slow poll cannot undo an action. */
+    expect(room).toContain("if (current()) setMatches(read);");
     expect(room).toContain("onSettled={() => void refresh({ matches: true })}");
     expect(room).toMatch(
       /onRefresh=\{\(\) => \{[\s\S]*?refresh\(\{ matches: true \}\)/,

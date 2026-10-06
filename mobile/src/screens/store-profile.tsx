@@ -150,6 +150,11 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         <Card>
           <Title>We could not open that store</Title>
           <Muted>It may not be listed any more. Try again in a moment.</Muted>
+          <AsyncButton
+            label="Try again"
+            pendingLabel="Retrying…"
+            onPress={() => load(() => true)}
+          />
         </Card>
       </ScrollView>
     );
