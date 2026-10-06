@@ -482,9 +482,9 @@ describe("the Flares grid", () => {
       expect(source.flares, name).toContain("Offering");
       expect(source.flares, name).not.toContain("Letting go");
       expect(source.flares, name).toContain(
-        "No Flares up. Post one from the Flare tab.",
+        "No Flares yet. Post one from the Flare tab.",
       );
-      expect(source.flares, name).toMatch(/"No Flares up\."|>\s*No Flares up\.\s*</);
+      expect(source.flares, name).toMatch(/"No Flares yet\."|>\s*No Flares yet\.\s*</);
       expect(source.flares, name).toContain("flares.length");
     }
     expect(web.flares).toContain("grid-cols-3");
