@@ -54,7 +54,7 @@ describe("the tab bar", () => {
        nights - messages - search - profile". */
     inOrder(web.tabs, [
       'label: "Feed"',
-      'label: "Nights"',
+      'label: "Rooms"',
       'label: "Messages"',
       'label: "Search"',
       'label: "Profile"',

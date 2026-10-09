@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { CancelEventForm, EditEventForm } from "@/components/events/edit-event-form";
 import { EventStatsCard } from "@/components/events/event-stats";
+import { DAY_EVENT_LABEL } from "@/components/events/event-list";
 import { EventStatusControls } from "@/components/events/event-status-controls";
 import { JoinPoster } from "@/components/events/join-poster";
 import { RoomRoster } from "@/components/events/room-roster";
@@ -235,6 +236,15 @@ export default async function EventPage({
         <Card>
           {event.kind === "walk_in" ? (
             <WalkInSession eventId={event.id} status={event.status} />
+          ) : event.kind === "day" ? (
+            /* A day room opens and closes on the store's hours, so it
+               has no controls: nothing to open, edit or call off. */
+            <div className="flex flex-col gap-1">
+              <p className="font-semibold text-text-primary">{DAY_EVENT_LABEL}</p>
+              <p className="text-sm text-text-secondary">
+                It opens and closes with your hours on its own.
+              </p>
+            </div>
           ) : (
             <EventStatusControls
               eventId={event.id}

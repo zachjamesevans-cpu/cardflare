@@ -1006,15 +1006,12 @@ function RoomScreen({
   }
 
   /*
-   * Attendance, for the header's one line. People, not seats: an
-   * account in from two devices is one face and one in the count. See
-   * dedupeParticipants. The server's presence count when it sends one, the
-   * present seats it can see otherwise; the players count is the
-   * roster's, and the roster is whoever the answer carries.
+   * Attendance, for the header's one line: the players count is the
+   * roster's, and the roster is whoever the answer carries. No "here
+   * now" any more (the founder, 2026-10-09): it counted people looking
+   * at the room from home. The server still sends `hereNow`.
    */
-  const people = dedupeParticipants(participants);
   const roster = rosterOf(state);
-  const hereNow = room.hereNow ?? people.filter((p) => p.present).length;
   const playersCount = going?.goingCount ?? roster.length;
   const matchesByPlayer = matches?.perPlayer ?? {};
   const bring = matches?.bring ?? [];
@@ -1062,7 +1059,6 @@ function RoomScreen({
           eventId={eventId}
           going={going}
           playersCount={playersCount}
-          hereNow={hereNow}
           onSettled={() => void refresh({ matches: true })}
           right={
             <>

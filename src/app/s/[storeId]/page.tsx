@@ -6,6 +6,7 @@ import { CalendarClock, CalendarDays, Clock, Globe, MapPin, Phone } from "lucide
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { GoingButton } from "@/components/nights/going-button";
+import { PlanVisitButton } from "@/components/nights/plan-visit-sheet";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { StorePageHeader } from "@/components/stores/store-page-header";
@@ -14,6 +15,7 @@ import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { goingLine } from "@/lib/events/going-copy";
+import { PLAN_VISIT } from "@/lib/events/store-day-rules";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { hasLocal, storeBoard } from "@/lib/players/locals";
 import { hoursLines, openNow } from "@/lib/stores/hours";
@@ -148,7 +150,8 @@ export default async function StoreProfilePage({
         )}
 
         {/* Follow, for a signed-in player; the same word as a door to an
-            account for anyone else, the way a player's page does it. */}
+            account for anyone else, the way a player's page does it.
+            Plan a visit beside it opens the sheet at this store's days. */}
         <div className="flex flex-wrap items-center gap-3">
           {playerId ? (
             <FollowStoreButton storeId={store.storeId} initial={following} />
@@ -160,6 +163,12 @@ export default async function StoreProfilePage({
               Follow
             </Link>
           )}
+          <PlanVisitButton
+            label={PLAN_VISIT}
+            signedIn={Boolean(playerId)}
+            storeId={store.storeId}
+            variant="secondary"
+          />
           <p className="text-xs text-text-muted">
             Following puts this store&rsquo;s nights in your Feed and on your Following
             list.

@@ -3,6 +3,7 @@ import { CalendarClock } from "lucide-react";
 
 import { CodeSheet } from "@/components/nights/code-sheet";
 import { NightCard } from "@/components/nights/night-card";
+import { PlanVisitCard } from "@/components/nights/plan-visit-card";
 import { NightsTabs } from "@/components/nights/nights-tabs";
 import { buttonStyles } from "@/components/ui/button";
 import { NO_NIGHTS } from "@/lib/events/going-copy";
@@ -10,13 +11,20 @@ import { GOING_EMPTY, PAST_EMPTY } from "@/lib/events/night-copy";
 import type { NightItem } from "@/lib/events/nights";
 
 /**
- * The Nights tab: "Nights", the QR icon, and three lists behind a strip.
+ * The Rooms tab: "Rooms", the QR icon, Plan a visit, and three lists
+ * behind a strip.
  *
  * The founder (2026-10-03): "The current Nights landing page is too
  * large and sparse... Redesign to be much denser and more useful."
  * So the heading is one line with the small code door at its right,
  * the strip under it is Going | Nearby | Past with Going first, and
  * each tab is a column of short cards.
+ *
+ * The founder (2026-10-09): "I miss the simplicity of just getting into
+ * a room." So the tab is Rooms, and the first thing on it is the card
+ * that plans a visit: a store and a day, and you are in that day's
+ * room. A day room a player opened is a row like any night, named
+ * Open trading by the server, with the store's name under it.
  *
  * Going is every night you said yes to that has not ended, Nearby is
  * everything else coming up at the stores you follow or that are near
@@ -72,9 +80,11 @@ export function NightList({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-bold text-text-primary">Nights</h2>
+        <h2 className="text-xl font-bold text-text-primary">Rooms</h2>
         <CodeSheet />
       </div>
+
+      <PlanVisitCard signedIn={signedIn} />
 
       <NightsTabs
         /* Remounted on a new ?tab=, so "See what's nearby" lands there. */

@@ -19,7 +19,7 @@ describe("Flares follow you onto the nights you are going to", () => {
     expect(helper).toContain("if (!(await autoPostFor(input.playerId))) return NONE;");
     expect(helper).toContain("if (seat.event_id === input.skipEventId) continue;");
     expect(helper).toContain("if (!boardWritable(phase)) continue;");
-    expect(helper).toContain('.eq("kind", "scheduled")');
+    expect(helper).toContain('.in("kind", ["scheduled", "day"])');
     expect(helper).toContain('.is("cancelled_at", null)');
     expect(helper).toContain("addFlareBatch(");
   });

@@ -22,6 +22,7 @@ import {
   updateEvent,
 } from "./repository";
 import { endWalkInRoomWhenLastUsed, settleClosedOccurrences } from "./rooms";
+import { saveStoreLocation } from "./store-days";
 import {
   createEventSchema,
   editEventSchema,
@@ -400,6 +401,28 @@ export async function setWalkInAction(formData: FormData): Promise<void> {
 
   revalidatePath("/store");
   revalidatePath("/admin");
+}
+
+/**
+ * The store's pin, set by someone standing in it: the console's "Use my
+ * current location". It is what tells a player who opens cardflare in
+ * the store which room to offer them (store-days.ts `storeHere`), and a
+ * store imported without coordinates has no other way to get one. Staff
+ * only, like every setting here.
+ */
+export async function saveStoreLocationAction(
+  storeId: string,
+  latitude: number,
+  longitude: number,
+): Promise<{ ok: boolean }> {
+  const actor = await authorizeStore(storeId);
+  if (!actor) return { ok: false };
+  const saved = await saveStoreLocation(storeId, latitude, longitude);
+  if (saved) {
+    revalidatePath("/store");
+    revalidatePath("/store/settings");
+  }
+  return { ok: saved };
 }
 
 /**

@@ -7,7 +7,7 @@ import { NIGHT_TABS } from "@/lib/events/night-copy";
 import { DEFAULT_NIGHT_TAB, NIGHT_TAB_ORDER, type NightTab } from "./night-list";
 
 /**
- * Going | Nearby | Past: the strip under the Nights heading.
+ * Going | Nearby | Past: the strip under the Rooms heading.
  *
  * The founder (2026-10-03): "FILTER/TABS: Going | Nearby | Past.
  * Default to Going." A segmented strip, the three lists rendered on
@@ -56,7 +56,7 @@ export function NightsTabs({
     <div className="flex flex-col gap-3">
       <div
         role="tablist"
-        aria-label="Nights"
+        aria-label="Rooms"
         onKeyDown={onKeyDown}
         className="flex w-full rounded-full border border-border bg-surface p-0.5"
       >

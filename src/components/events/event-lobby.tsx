@@ -16,9 +16,11 @@ const FACES = 3;
 /**
  * Who is here: the door card's meta line, and the dialog behind it.
  *
- * The line reads "2 here now · 10 coming · 3 Flares" with up to three
- * faces in front of it, the present ones first, and the whole line is
- * one button named "Who's here". The names themselves are reference
+ * The line reads "10 coming · 3 Flares" with up to three faces in
+ * front of it, the present ones first, and the whole line is one
+ * button named "Who's here". It led with "2 here now" until the
+ * founder (2026-10-09) took the count off player screens: it counted
+ * people looking at the room from home. The names themselves are reference
  * material, not a decision anyone makes on arrival, so they live in a
  * sheet over the room rather than in a card of their own: the
  * founder's call, after a roster that pushed the board below the fold
@@ -51,7 +53,6 @@ export function EventLobby({
     ...participants.filter((participant) => participant.present),
     ...participants.filter((participant) => !participant.present),
   ];
-  const present = participants.filter((participant) => participant.present).length;
   const faces = ordered.slice(0, FACES);
 
   return (
@@ -86,11 +87,10 @@ export function EventLobby({
           </span>
         )}
         <span className="font-semibold text-text-secondary tabular-nums">
-          {present} here now
+          {participants.length} coming
         </span>
         <span className="text-text-muted tabular-nums">
-          · {participants.length} coming · {flareCount}{" "}
-          {flareCount === 1 ? "Flare" : "Flares"}
+          · {flareCount} {flareCount === 1 ? "Flare" : "Flares"}
         </span>
       </button>
 

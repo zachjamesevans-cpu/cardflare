@@ -221,10 +221,10 @@ describe("the night's page", () => {
     expect([...at].sort((a, b) => a - b)).toEqual(at);
   });
 
-  it("puts attendance on the header once, with here now only live or early and above zero", () => {
-    expect(header).toContain(
-      'const showHereNow = hereNow > 0 && (phase === "live" || phase === "early");',
-    );
+  it("puts attendance on the header once, with no here now", () => {
+    /* The founder (2026-10-09) took "here now" off player screens: it
+       counted people looking at the room from home. */
+    expect(header).not.toContain("hereNow");
     expect(header).toContain("{playersLine(playersCount)}");
     expect(room).not.toContain("Who&rsquo;s going");
     expect(room).not.toContain("tonight ·");

@@ -15,6 +15,7 @@ import type { FeedView } from "@/lib/feed/views";
 import { CardRail, FeedTile, tileWidth } from "@/components/feed/feed-tile";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { GoingButton } from "@/components/nights/going-button";
+import { PlanVisitButton } from "@/components/nights/plan-visit-sheet";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -86,8 +87,10 @@ const STARTERS = {
     variant: "primary",
     headline: "Where do you play?",
     body: "Join your store's room once and it saves itself here, with its next board and who is looking for what. The code is on the counter.",
-    label: "Enter a store code",
-    href: "/room",
+    /* The plan-a-visit sheet at its first step, not the code door: a
+       store picked there is a day away from its room (2026-10-09). */
+    label: "Find your store",
+    href: null,
   },
   deck: {
     icon: ClipboardList,
@@ -151,9 +154,14 @@ export function Item({
 
         <p className="text-sm text-text-secondary">{starter.body}</p>
 
-        <Link href={starter.href} className={buttonStyles(starter.variant, "sm")}>
-          {starter.label}
-        </Link>
+        {starter.href ? (
+          <Link href={starter.href} className={buttonStyles(starter.variant, "sm")}>
+            {starter.label}
+          </Link>
+        ) : (
+          /* The Feed is a signed-in page, so the sheet's Going is live. */
+          <PlanVisitButton label={starter.label} variant={starter.variant} signedIn />
+        )}
       </Card>
     );
   }

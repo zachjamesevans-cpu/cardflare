@@ -37,14 +37,27 @@ import {
   matchesLine,
   playersLine,
 } from "../night-copy";
+import { haveLocationPermission } from "../location";
 import { openRoom } from "../open-room";
+import { openPlanVisit } from "../plan-visit-sheet";
 import { refreshTick } from "../refresh-tick";
+import { PLAN_VISIT, PLAN_VISIT_HINT } from "../store-day-copy";
 import { colors, gutter, radius, spacing } from "../theme";
 import { Body, Button, Card, Loading, Tap, Title } from "../ui";
 import { VerifiedMark } from "../verified-mark";
+import { FindMyStore, YoureHereBanner } from "../youre-here";
 
 /**
- * The Nights tab: the website's /nights, round 2.
+ * The Rooms tab (the Nights route, renamed 2026-10-09): the website's
+ * /nights, round 2.
+ *
+ * The founder (2026-10-09): "I miss the simplicity of just getting into
+ * a room." So the store is the room and a day is the time: the screen
+ * opens on "Plan a visit" (src/plan-visit-sheet.tsx), with the
+ * You're-here banner above it when the phone is standing in a store
+ * and, for a phone that never shared its position, the one button that
+ * asks (src/youre-here.tsx). A day room in the list is a row like any
+ * night, named "Open trading" by the server.
  *
  * The founder (2026-10-03): "The current Nights landing page is too
  * large and sparse ... Redesign to be much denser and more useful."
@@ -230,6 +243,9 @@ export function NightsScreen() {
   /* Null until the keychain has answered, so a guest's empty state is
      never drawn over a signed-in player's list still on its way. */
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  /* Whether location was granted before: without it, Find the store
+     I'm in is offered, and asks on its tap. */
+  const [located, setLocated] = useState<boolean | null>(null);
   const inFlight = useRef(false);
   /* Whether a list has ever landed, read where state would be a render
      late: a failed reload keeps what is on screen, and only a screen
@@ -294,6 +310,9 @@ export function NightsScreen() {
     useCallback(() => {
       let live = true;
       void load(() => live);
+      void haveLocationPermission().then((granted) => {
+        if (live) setLocated(granted);
+      });
       return () => {
         live = false;
       };
@@ -374,6 +393,15 @@ export function NightsScreen() {
           paddingBottom: spacing(4) + tabInset,
         }}
       >
+        <YoureHereBanner />
+
+        {/* Plan a visit: a store and a day, and that is the room. */}
+        <Card>
+          <Body>{PLAN_VISIT_HINT}</Body>
+          <Button label={PLAN_VISIT} onPress={() => openPlanVisit()} />
+          {located === false ? <FindMyStore /> : null}
+        </Card>
+
         <NightTabs value={tab} onChange={setTab} />
 
         {loadFailed ? (

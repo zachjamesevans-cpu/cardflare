@@ -14,7 +14,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "cardflare uses the camera only to scan the QR code on a store's counter.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
+        "NSLocationWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you, and to offer the room of the store you are standing in. Your exact position is never saved; only your approximate area (ZIP code) is kept, with posts you make.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
         "NSLocationAlwaysUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
         "NSUserActivityTypes": ["INSendMessageIntent"]

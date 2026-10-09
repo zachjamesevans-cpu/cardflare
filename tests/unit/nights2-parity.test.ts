@@ -251,9 +251,9 @@ describe("the words on a Night", () => {
 
 describe("the Nights landing", () => {
   it("is Nights with the small QR icon at its right, on both", () => {
-    expect(web.nightList).toContain(">Nights</h2>");
+    expect(web.nightList).toContain(">Rooms</h2>");
     expect(web.nightList).toContain("<CodeSheet />");
-    expect(web.nightsPage).toContain('title="Nights"');
+    expect(web.nightsPage).toContain('title="Rooms"');
     /* The icon is lucide QrCode / Ionicons qr-code-outline, labelled
        "Scan or enter a code" on both. */
     expect(web.codeSheet).toMatch(
@@ -360,14 +360,16 @@ describe("the night page", () => {
   });
 
   it("says attendance once, on the header line, and nowhere else", () => {
+    /* Store days (2026-10-09): no "here now" on either header; it
+       counted people looking at the room from home. */
     for (const source of [web.header, app.header]) {
       expect(source).toContain("playersLine(");
-      expect(source).toContain("hereNowLine(");
       expect(source).toContain("<GoingButton");
+      expect(source).not.toContain("hereNowLine(");
     }
-    /* "here now" only while it can be true. */
-    expect(web.room).toContain('hereNow: phase === "upcoming" ? 0 : hereNow');
-    expect(web.header).toContain("{line.hereNow > 0 && (");
+    expect(web.header).not.toContain("hereNowLine(");
+    expect(web.header).not.toContain("hereNow");
+    expect(web.room).not.toContain("hereNow");
     /* The round-1 repeats are gone from both. */
     for (const source of [web.room, web.header, web.playersGoing, web.preStart].map(
       code,

@@ -7,6 +7,7 @@ import { TimeZonePicker } from "@/components/events/timezone-picker";
 import { AppShell } from "@/components/layout/app-shell";
 import { BillingCard, billingNotice } from "@/components/stores/billing-card";
 import { StoreBannerForm } from "@/components/stores/store-banner-form";
+import { StoreLocationButton } from "@/components/stores/store-location-button";
 import { StoreLogoForm } from "@/components/stores/store-logo-form";
 import { StorePageForm } from "@/components/stores/store-page-form";
 import { StoreTabs } from "@/components/stores/store-tabs";
@@ -54,7 +55,7 @@ export default async function StoreSettingsPage({
       area="Store"
       email={viewer.user.email ?? ""}
       title="Settings"
-      description="Your page, your time zone, when your boards open, and your plan."
+      description="Your page, where you are, your time zone, when your boards open, and your plan."
       areas={areas}
       currentArea={currentArea}
     >
@@ -106,6 +107,15 @@ export default async function StoreSettingsPage({
           </Card>
         </section>
       )}
+
+      {/* The pin "you're here" measures from: a player who opens
+          cardflare inside the shop is offered its room. */}
+      <section className="flex flex-col gap-5" aria-labelledby="location-heading">
+        <h2 id="location-heading" className="text-xl font-bold text-text-primary">
+          Where you are
+        </h2>
+        <StoreLocationButton storeId={store.id} />
+      </section>
 
       <section className="flex flex-col gap-5" aria-labelledby="timezone-heading">
         <h2 id="timezone-heading" className="text-xl font-bold text-text-primary">

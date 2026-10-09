@@ -31,6 +31,12 @@ export type NightPhase = "live" | "early" | "upcoming" | "finished";
 
 export interface NightItem {
   eventId: string;
+  /**
+   * "scheduled" for a night the store posted, "day" for a store's day
+   * players opened by saying they were going, "walk_in" for a room
+   * opened at the counter.
+   */
+  kind: EventKind;
   code: string | null;
   name: string;
   startsAt: string;
@@ -254,6 +260,7 @@ export async function listNights(
 
     candidates.push({
       eventId: row.id,
+      kind: row.kind,
       code: row.join_code,
       name: row.name,
       startsAt: row.starts_at,

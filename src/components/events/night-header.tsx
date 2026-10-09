@@ -7,7 +7,7 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { cn } from "@/lib/cn";
-import { hereNowLine, playersLine } from "@/lib/events/night-copy";
+import { playersLine } from "@/lib/events/night-copy";
 import { SITE } from "@/lib/site";
 import { instantToLocal } from "@/lib/time/zone";
 
@@ -22,9 +22,10 @@ import { instantToLocal } from "@/lib/time/zone";
  *
  * So: the store (its page behind it, the Verified glyph, the Follow
  * chip for an account), the night's name in capitals (CSS, never the
- * data), when, and one line that says the RSVP, how many players, and
- * how many are here now while that is true. Attendance appears here
- * and nowhere else on the page. The Going chip is the one tap: the
+ * data), when, and one line that says the RSVP and how many players.
+ * Attendance appears here and nowhere else on the page. It said how
+ * many were here now as well until the founder (2026-10-09) took it
+ * off: it counted people looking at the room from home. The Going chip is the one tap: the
  * check and "Going" once pressed, which presses off again. The timer
  * remote and the help page stay as the two small round controls on
  * the name's line, as the walk-in door draws them.
@@ -103,8 +104,6 @@ export function NightHeader({
     youGoing: boolean;
     goingCount: number;
     signedIn: boolean;
-    /** Players seen in the last fifteen minutes; drawn only when > 0. */
-    hereNow: number;
   } | null;
 }) {
   return (
@@ -157,11 +156,6 @@ export function NightHeader({
           <span className="text-text-secondary tabular-nums">
             {playersLine(line.goingCount)}
           </span>
-          {line.hereNow > 0 && (
-            <span className="text-text-muted tabular-nums">
-              {hereNowLine(line.hereNow)}
-            </span>
-          )}
         </p>
       )}
     </header>

@@ -79,7 +79,7 @@ export async function followOntoNights(input: {
       .from("events")
       .select("id, store_id, kind, status, starts_at, ends_at, cancelled_at")
       .in("id", [...seatOf.keys()])
-      .eq("kind", "scheduled")
+      .in("kind", ["scheduled", "day"])
       .is("cancelled_at", null);
     if (eventError || !events || events.length === 0) return NONE;
 

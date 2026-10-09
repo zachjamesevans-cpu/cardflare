@@ -67,13 +67,17 @@ describe("goingLine", () => {
 });
 
 describe("the dock", () => {
-  it("gives Room's slot to Nights, with the calendar glyphs and the QR icon", () => {
+  it("gives Room's slot to Nights, labelled Rooms, with the storefront glyphs and the QR icon", () => {
+    /* Store days (2026-10-09): the route keeps its name, the label and
+       the glyph say Rooms. */
     expect(app).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
     expect(app).toContain('<Tab.Screen\n          name="Nights"');
     expect(app).toMatch(
-      /options=\{\{\s*title: "Nights",\s*tabBarLabel: "Nights",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*\}\}/,
+      /options=\{\{\s*title: "Rooms",\s*tabBarLabel: "Rooms",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*\}\}/,
     );
-    expect(app).toContain('Nights: { idle: "calendar-outline", focused: "calendar" }');
+    expect(app).toContain(
+      'Nights: { idle: "storefront-outline", focused: "storefront" }',
+    );
     expect(app).not.toContain('<Tab.Screen name="Room"');
   });
 

@@ -56,7 +56,8 @@ describe("the Feed and the room say what the audit asked", () => {
   });
 
   it('counts the lobby as "coming"', () => {
-    expect(src.people).toContain("`${hereNow} here now · ${people.length} coming`");
+    expect(src.people).toContain("`${people.length} coming`");
+    expect(src.people).not.toContain("} here now");
     expect(src.people).not.toContain("${people.length} tonight");
   });
 

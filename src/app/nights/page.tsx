@@ -9,14 +9,14 @@ import { NO_ORIGIN, originForPlayer } from "@/lib/players/location";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
-  title: "Nights",
+  title: "Rooms",
   robots: { index: false, follow: false },
 };
 
 export const dynamic = "force-dynamic";
 
 /**
- * The Nights tab, on the website.
+ * The Rooms tab, on the website, at /nights so old links still land.
  *
  * Room's slot in the dock. The founder: "Trying to keep our tabs to
  * our 'hero's'," and a night is the hero now that rooms open the
@@ -50,7 +50,7 @@ export default async function NightsPage({
   const nights = isSupabaseConfigured() ? await listNights(playerId, origin.point) : [];
 
   return (
-    <TabPageShell title="Nights">
+    <TabPageShell title="Rooms">
       <NightList nights={nights} signedIn={Boolean(playerId)} tab={nightTabFrom(tab)} />
     </TabPageShell>
   );

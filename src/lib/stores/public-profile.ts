@@ -102,9 +102,11 @@ async function upcomingFor(
   const since = new Date(now - 4 * 60 * 60 * 1000).toISOString();
   const { data } = await getSupabaseAdmin()
     .from("events")
-    .select("id, name, starts_at, ends_at, join_code, status, cancelled_at")
+    .select("id, name, kind, starts_at, ends_at, join_code, status, cancelled_at")
     .eq("store_id", storeId)
-    .eq("kind", "scheduled")
+    /* The store's own nights and the days players opened there: both
+       are rooms you can say Going to from the store's page. */
+    .in("kind", ["scheduled", "day"])
     .neq("status", "closed")
     .gte("starts_at", since)
     .order("starts_at")
@@ -119,7 +121,7 @@ async function upcomingFor(
   return rows.map((row) => {
     const phase = roomPhase(
       {
-        kind: "scheduled",
+        kind: row.kind,
         status: row.status,
         startsAt: row.starts_at,
         endsAt: row.ends_at,
