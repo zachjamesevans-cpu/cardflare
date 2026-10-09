@@ -4,8 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus } from "lucide-react";
 
-import { BinderPicker } from "@/components/binder/binder-picker";
+import { BinderPicker, BinderTray } from "@/components/binder/binder-picker";
 import { PasteList, type ListPreview } from "@/components/binder/paste-list";
+import { ScanCard, ScanWithPro } from "@/components/cards/scan-card";
 import {
   addCard,
   keyOf,
@@ -16,6 +17,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { addBinderCardsAction, previewBinderListAction } from "@/lib/binder/actions";
+import type { CardPrinting, CardResult } from "@/lib/cards/schema";
+import { SCAN_CARD } from "@/lib/cards/scan-rules";
 import { cn } from "@/lib/cn";
 
 /**
@@ -28,6 +31,12 @@ import { cn } from "@/lib/cn";
  * tray in the binder, "Add 5 cards to binder". Beside the search, a
  * second way in for somebody with the list already written: "Paste a
  * list", looked up and shown back before anything is added.
+ *
+ * And a third, for a Pro player: "Scan a card", a photo read into the
+ * same tray, one card after another, so a stack of scans goes in with
+ * the same one button. Whether it is drawn is the server's answer,
+ * `scanAccess`, read with the page: the scanner, the door to Pro, or
+ * nothing, never a button that appears and then goes.
  *
  * Opened from an empty pocket, the batch starts AT that pocket: "Adding
  * a card in a specific slot should put that exact card there." The
@@ -55,6 +64,7 @@ export function AddBinderCard({
   inBinder = [],
   onAdded,
   trigger = false,
+  scanAccess = null,
 }: {
   /** The binder the cards land in. */
   binderId: string;
@@ -71,11 +81,15 @@ export function AddBinderCard({
   onAdded?: (message: string, firstPocket: number | null) => void;
   /** Draw an "Add cards" button that opens the sheet. Off by default. */
   trigger?: boolean;
+  /** "on" draws the scanner, "pro-door" the way to Pro, null nothing. */
+  scanAccess?: "on" | "pro-door" | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"search" | "paste">("search");
+  const [tab, setTab] = useState<"search" | "paste" | "scan">("search");
   const [picks, setPicks] = useState<DraftCard[]>([]);
   const [focus, setFocus] = useState<string | null>(null);
+  /* A name the scanner read but could not find, waiting in the search. */
+  const [lookFor, setLookFor] = useState("");
   const [text, setText] = useState("");
   const [preview, setPreview] = useState<ListPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +102,7 @@ export function AddBinderCard({
       setTab("search");
       setPicks([]);
       setFocus(null);
+      setLookFor("");
       setText("");
       setPreview(null);
       setError(null);
@@ -102,9 +117,10 @@ export function AddBinderCard({
     return copies;
   }, [inBinder]);
 
-  /* What the one button would add: the tray, or the list's found cards. */
+  /* What the one button would add: the tray (searched or scanned into
+     it), or the list's found cards. */
   const items =
-    tab === "search"
+    tab !== "paste"
       ? picks.map((item) => ({
           cardId: item.card.id,
           printingId: item.printingId,
@@ -145,6 +161,21 @@ export function AddBinderCard({
     });
   };
 
+  /* The tray's three moves, shared by the search and the scanner: a
+     scanned card lands exactly as a tapped one does, one copy, or one
+     more of a line already there. */
+  const pick = (card: CardResult, printing?: CardPrinting) => {
+    setError(null);
+    setPicks((current) => addCard(current, card, printing));
+    setFocus(lineKey(card.id, printing?.id ?? null));
+  };
+  const quantityOf = (key: string, quantity: number) =>
+    setPicks((current) =>
+      current.map((item) => (keyOf(item) === key ? { ...item, quantity } : item)),
+    );
+  const removeLine = (key: string) =>
+    setPicks((current) => current.filter((item) => keyOf(item) !== key));
+
   return (
     <>
       {trigger && (
@@ -175,7 +206,7 @@ export function AddBinderCard({
                 )}
               </div>
             )}
-            {tab === "search" || preview ? (
+            {tab !== "paste" || preview ? (
               <Button
                 type="button"
                 className="w-full"
@@ -205,12 +236,16 @@ export function AddBinderCard({
           <div
             role="tablist"
             aria-label="How to add"
-            className="grid grid-cols-2 gap-1 rounded-full border border-border bg-canvas p-1"
+            className={cn(
+              "grid gap-1 rounded-full border border-border bg-canvas p-1",
+              scanAccess === "on" ? "grid-cols-3" : "grid-cols-2",
+            )}
           >
             {(
               [
                 ["search", "Search"],
                 ["paste", "Paste a list"],
+                ...(scanAccess === "on" ? ([["scan", SCAN_CARD]] as const) : []),
               ] as const
             ).map(([id, label]) => (
               <button
@@ -219,11 +254,14 @@ export function AddBinderCard({
                 role="tab"
                 aria-selected={tab === id}
                 onClick={() => {
+                  /* The scanner's name goes in the search once, not
+                     every time the search tab is opened again. */
+                  if (tab === "search" && id !== "search") setLookFor("");
                   setTab(id);
                   setError(null);
                 }}
                 className={cn(
-                  "cursor-pointer rounded-full px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                  "cursor-pointer rounded-full px-2 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
                   tab === id
                     ? "bg-accent text-accent-contrast"
                     : "text-text-secondary hover:text-text-primary",
@@ -234,6 +272,9 @@ export function AddBinderCard({
             ))}
           </div>
 
+          {/* Not Pro, while the scanner is open to Pro: the way there. */}
+          {scanAccess === "pro-door" && <ScanWithPro />}
+
           {tab === "search" ? (
             <BinderPicker
               imagesEnabled={imagesEnabled}
@@ -241,24 +282,29 @@ export function AddBinderCard({
               picks={picks}
               focus={focus}
               inBinder={copiesHere}
-              onAdd={(card, printing) => {
-                setError(null);
-                setPicks((current) => addCard(current, card, printing));
-                setFocus(lineKey(card.id, printing?.id ?? null));
-              }}
+              initialQuery={lookFor}
+              onAdd={pick}
               onLess={(key) => setPicks((current) => lessCard(current, key))}
-              onQuantity={(key, quantity) =>
-                setPicks((current) =>
-                  current.map((item) =>
-                    keyOf(item) === key ? { ...item, quantity } : item,
-                  ),
-                )
-              }
-              onRemove={(key) =>
-                setPicks((current) => current.filter((item) => keyOf(item) !== key))
-              }
+              onQuantity={quantityOf}
+              onRemove={removeLine}
               onFocus={setFocus}
             />
+          ) : tab === "scan" ? (
+            <div className="flex flex-col gap-4">
+              <BinderTray
+                imagesEnabled={imagesEnabled}
+                picks={picks}
+                focus={focus}
+                onQuantity={quantityOf}
+                onRemove={removeLine}
+                onFocus={setFocus}
+              />
+              <ScanCard
+                imagesEnabled={imagesEnabled}
+                onAdd={pick}
+                onNotFound={setLookFor}
+              />
+            </div>
           ) : (
             <PasteList
               imagesEnabled={imagesEnabled}

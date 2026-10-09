@@ -19,6 +19,7 @@ import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
 import { goingStates } from "@/lib/events/going";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
+import { heldFirst } from "@/lib/matching/held-first";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { listCosmetics, ownedCosmetics, ownsCosmetic } from "@/lib/players/cosmetics";
 import { listWants } from "@/lib/players/wants";
@@ -1444,9 +1445,11 @@ async function boardWithHunts(
     if (!person) continue;
 
     /* The ones they can act on first: a friend's list is worth
-       reading, and the card in your binder is worth reading first. */
-    const ordered = [...group].sort(
-      (a, b) => Number(Boolean(b.match)) - Number(Boolean(a.match)),
+       reading, and the card in your binder is worth reading first.
+       Your own post is left as you posted it. */
+    const ordered = heldFirst(
+      group,
+      (entry) => key.split("::")[0] !== viewerId && entry.match !== null,
     );
 
     /*
@@ -1726,23 +1729,31 @@ async function areaHuntsFor(
     const posted = pointForPostalCode(group[0]?.posted_postal_code);
     const milesAway =
       origin && posted ? Math.round(milesApart(origin, posted) * 10) / 10 : null;
-    const cards = firstPerCard(group, (flare) => flare.card_id).map((flare) => {
-      const fact = facts.get(flare.card_id);
-      return {
-        cardId: flare.card_id,
-        cardName: fact?.cardName ?? "Unknown card",
-        cardNumber: fact?.cardNumber ?? "",
-        imageUrl: fact?.imageUrl ?? null,
-        match: matchFor({ cardId: flare.card_id, printingId: flare.printing_id }, held),
-        flareId: flare.id,
-        state: "open" as const,
-        youOffered: false,
-        printingId: flare.printing_id,
-        quantity: flare.quantity,
-        remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
-        huntRequestId: flare.hunt_request_id ?? null,
-      };
-    });
+    /* Cards you hold first, ordered BEFORE the cap below so a card in
+       your binder is never the one the cap cuts. */
+    const cards = heldFirst(
+      firstPerCard(group, (flare) => flare.card_id).map((flare) => {
+        const fact = facts.get(flare.card_id);
+        return {
+          cardId: flare.card_id,
+          cardName: fact?.cardName ?? "Unknown card",
+          cardNumber: fact?.cardNumber ?? "",
+          imageUrl: fact?.imageUrl ?? null,
+          match: matchFor(
+            { cardId: flare.card_id, printingId: flare.printing_id },
+            held,
+          ),
+          flareId: flare.id,
+          state: "open" as const,
+          youOffered: false,
+          printingId: flare.printing_id,
+          quantity: flare.quantity,
+          remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
+          huntRequestId: flare.hunt_request_id ?? null,
+        };
+      }),
+      (card) => authorId !== viewerId && card.match !== null,
+    );
 
     return [
       {
@@ -2383,9 +2394,7 @@ async function recentItems(
   /*
    * The cards each group has already drawn, so the same card posted
    * twice in one act is one tile - see the hunt builder above for why.
-   * Held beside the group rather than derived from `cards`, because a
-   * group past CARD_RAIL_CAP has stopped collecting them and a duplicate
-   * must not quietly become "+1 more" either.
+   * A duplicate must not quietly become "+1 more" either.
    */
   const seen = new Map<string, Set<string>>();
 
@@ -2419,14 +2428,14 @@ async function recentItems(
       huntRequestId: flare.hunt_request_id ?? null,
     };
 
+    /* Every card is collected; the cap is applied once the group is
+       whole, below, so it can never cut a card you hold. */
     const existing = groups.get(key);
     if (existing) {
       const drawn = seen.get(key);
       if (drawn?.has(flare.card_id)) continue;
       drawn?.add(flare.card_id);
-
-      if (existing.cards.length < CARD_RAIL_CAP) existing.cards.push(card);
-      else existing.more += 1;
+      existing.cards.push(card);
       continue;
     }
 
@@ -2458,6 +2467,17 @@ async function recentItems(
       acceptsTrade: flare.accepts_trade ?? true,
       acceptsCash: flare.accepts_cash ?? false,
     });
+  }
+
+  /*
+   * Cards you hold first, then the cap. In that order: capping while
+   * collecting kept the first twenty POSTED, and a card in your binder
+   * posted twenty-first was the one the row never drew.
+   */
+  for (const group of groups.values()) {
+    const ordered = heldFirst(group.cards, (card) => card.match !== null);
+    group.cards = ordered.slice(0, CARD_RAIL_CAP);
+    group.more = Math.max(0, ordered.length - CARD_RAIL_CAP);
   }
 
   return [...groups.values()];

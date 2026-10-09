@@ -12,6 +12,7 @@ import {
   type PrintingRow,
 } from "@/lib/lists/repository";
 import { offerTrade } from "@/lib/matching/repository";
+import { heldFirst } from "@/lib/matching/held-first";
 import { heldByCard, MAX_OFFER_MESSAGE, matchFor } from "@/lib/matching/schema";
 import { afterResponse } from "@/lib/after-response";
 import { offeredLine } from "@/lib/feed/offer-copy";
@@ -684,7 +685,7 @@ export async function postDetail(
   );
 
   const seen = new Set<string>();
-  const postCards: PostCard[] = [];
+  const drawn: PostCard[] = [];
   for (const flare of shown) {
     if (seen.has(flare.cardId)) continue;
     seen.add(flare.cardId);
@@ -692,7 +693,7 @@ export async function postDetail(
     const answer = answers.get(flare.id);
     const printing = flare.printingId ? printingById.get(flare.printingId) : undefined;
     const name = card?.exact_name ?? "Unknown card";
-    postCards.push({
+    drawn.push({
       cardId: flare.cardId,
       cardName: name,
       cardNumber: card?.canonical_card_number ?? "",
@@ -713,6 +714,13 @@ export async function postDetail(
       huntRequestId: flare.huntRequestId,
     });
   }
+  /* Cards you hold first, the order the found ones are then moved
+     past below; the sort is stable, so this order survives it. Your
+     own post is left as you posted it. */
+  const postCards = heldFirst(
+    drawn,
+    (card) => context.ownerPlayerId !== viewerId && card.match !== null,
+  );
   const remainingCopies = postCards.reduce((sum, card) => sum + card.remaining, 0);
 
   const author = context.ownerPlayerId ? faces.get(context.ownerPlayerId) : undefined;

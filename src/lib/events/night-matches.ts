@@ -19,6 +19,7 @@ import {
   type ListEntry,
   type PrintingRow,
 } from "@/lib/lists/repository";
+import { heldFirst } from "@/lib/matching/held-first";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import {
   notifyNightMatchForGoer,
@@ -1161,8 +1162,14 @@ export interface NightPlayerView {
    * Their Flares at this night, from listRoomFlares filtered by their
    * session(s). Without the session id: a room session is a credential
    * of sorts, and nobody but its owner needs it.
+   *
+   * `match` is the viewer's: whether their Have list answers the want,
+   * graded the way the They want row is, so a card in that row wears
+   * the same ring here. Null on an offer, and for anybody with no
+   * lists to match (a guest, or the player looking at themselves).
+   * The ones you hold come first.
    */
-  flares: Omit<ListEntry, "playerSessionId">[];
+  flares: (Omit<ListEntry, "playerSessionId"> & { match: MatchKind | null })[];
   /** for_trade only (listBinders with the viewer). */
   binders: BinderSummary[];
   /**
@@ -1263,19 +1270,42 @@ export async function nightPlayer(
         : Promise.resolve(new Map<string, BroughtBinder[]>()),
     ]);
 
-    const theirSessions = new Set(sessions.keys());
-    const flares = roomFlares
-      .filter((entry) => theirSessions.has(entry.playerSessionId))
-      .map((entry) => {
-        const shown: Omit<ListEntry, "playerSessionId"> & { playerSessionId?: string } =
-          {
-            ...entry,
-          };
-        delete shown.playerSessionId;
-        return shown;
-      });
-
     const night = lists.get(eventId);
+    const viewer = night?.viewer;
+    /* Your Have list against one of their wants: the They want row's
+       own grading, so the two never disagree on the same card. */
+    const youHold = (entry: ListEntry): MatchKind | null => {
+      if (!viewer || entry.intent !== "want") return null;
+      if (
+        !viewer.binderHaves.has(entry.cardId) &&
+        !viewer.flareHaves.has(entry.cardId)
+      ) {
+        return null;
+      }
+      return printingMatch(
+        entry.printingId ? new Set([entry.printingId]) : undefined,
+        viewer.havePrintings.get(entry.cardId),
+      );
+    };
+
+    const theirSessions = new Set(sessions.keys());
+    const flares = heldFirst(
+      roomFlares
+        .filter((entry) => theirSessions.has(entry.playerSessionId))
+        .map((entry) => {
+          const shown: Omit<ListEntry, "playerSessionId"> & {
+            playerSessionId?: string;
+            match: MatchKind | null;
+          } = {
+            ...entry,
+            match: youHold(entry),
+          };
+          delete shown.playerSessionId;
+          return shown;
+        }),
+      (entry) => entry.match !== null,
+    );
+
     const matched = night
       ? matchAttendees(night.viewer, night.attendees).find(
           (row) => row.playerId === playerId,

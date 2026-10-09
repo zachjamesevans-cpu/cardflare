@@ -26,6 +26,7 @@
     "cards:import": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/import-catalogue.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
     "@rive-app/canvas": "^2.40.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.111.0",

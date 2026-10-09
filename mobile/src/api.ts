@@ -10,6 +10,8 @@ import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
+import type { ScanRefusal } from "./scan-copy";
+import type { ScanCard } from "./scan-hit";
 
 /**
  * The whole client for cardflare.gg's `/api/v1`.
@@ -1949,6 +1951,8 @@ export interface ProfileFlare {
   quantity: number;
   direction: "want" | "offering";
   deckLabel: string | null;
+  /** On someone else's want, whether you hold it; absent on your own. */
+  match?: "exact" | "other-printing" | null;
 }
 
 /** The Instagram row: Flares where posts would be, then followers, following. */
@@ -2609,6 +2613,88 @@ export async function uploadAvatar(
     count: total,
     kind,
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* The card scanner                                                    */
+/* ------------------------------------------------------------------ */
+
+/** What the reader saw on the card. Empty strings for what it could not read. */
+export interface ScanRead {
+  found: boolean;
+  game: string;
+  name: string;
+  englishName: string;
+  number: string;
+  setCode: string;
+}
+
+/** One guess: the card, and the printing its set code points at. */
+export interface ScanMatch {
+  card: ScanCard;
+  printingId: string | null;
+}
+
+/** The website's ScanOutcome (src/lib/cards/scan.ts), as the route sends it. */
+export type ScanOutcome =
+  | { ok: true; read: ScanRead; matches: ScanMatch[] }
+  | { ok: false; reason: ScanRefusal; read?: ScanRead };
+
+/** "on" scans, "pro-door" is the way to Pro, null draws nothing. */
+export type ScanAccess = "on" | "pro-door" | null;
+
+export const getScanAccess = () =>
+  call<{ access?: ScanAccess }>("GET", "/api/v1/cards/scan").then(
+    (result) => result.access ?? null,
+  );
+
+/**
+ * One photo of one card, read on the server: the avatar's road (begin,
+ * numbered base64 pieces in the payload header one after another, then
+ * "read"), because a body does not survive every network this app
+ * meets. The photo is already cropped and small by the time it gets
+ * here. A phone the server will not let scan hears it at "begin",
+ * before a single piece is sent.
+ */
+export async function scanCardPhoto(
+  base64: string,
+  onProgress?: (sent: number, total: number) => void,
+): Promise<ScanOutcome> {
+  const CHUNK = 6000;
+  const total = Math.ceil(base64.length / CHUNK);
+  const path = "/api/v1/cards/scan";
+
+  let uploadId: string;
+  try {
+    ({ uploadId } = await call<{ uploadId: string }>("POST", path, {
+      action: "begin",
+    }));
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.code === "not-allowed") {
+      return { ok: false, reason: "not-allowed" };
+    }
+    throw caught;
+  }
+
+  for (let index = 0; index < total; index += 1) {
+    await call<{ ok: true }>("POST", path, {
+      action: "chunk",
+      uploadId,
+      index,
+      data: base64.slice(index * CHUNK, (index + 1) * CHUNK),
+    });
+    onProgress?.(index + 1, total);
+  }
+
+  /* The read is a model looking at a photo, with one retry on the
+     server: longer than the usual fifteen seconds is not a hang. */
+  return call<ScanOutcome>(
+    "POST",
+    path,
+    { action: "read", uploadId, count: total },
+    false,
+    60_000,
+  );
 }
 
 export const removeFromShowcase = (entryId: string) =>

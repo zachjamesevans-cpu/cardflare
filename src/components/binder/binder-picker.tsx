@@ -41,32 +41,93 @@ export function BinderPicker({
   picks,
   focus,
   inBinder,
+  initialQuery = "",
   onAdd,
   onLess,
   onQuantity,
   onRemove,
   onFocus,
-}: {
-  imagesEnabled: boolean;
+}: TrayProps & {
   playerGames: readonly string[];
+  /** Copies already in this binder, by card id. */
+  inBinder: ReadonlyMap<string, number>;
+  /** The search's opening words: a scanned name the catalogue missed. */
+  initialQuery?: string;
+  onAdd: (card: CardResult, printing?: CardPrinting) => void;
+  /** One fewer copy of a line; gone at none. */
+  onLess: (key: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <BinderTray
+        imagesEnabled={imagesEnabled}
+        picks={picks}
+        focus={focus}
+        onQuantity={onQuantity}
+        onRemove={onRemove}
+        onFocus={onFocus}
+      />
+
+      <CardSearch
+        imagesEnabled={imagesEnabled}
+        playerGames={playerGames}
+        autoFocus
+        initialQuery={initialQuery}
+        onSelect={onAdd}
+        onUnpick={(card, printing) => onLess(lineKey(card.id, printing?.id ?? null))}
+        /* The Flare picker's rule: the tag goes where the tap went, on
+           the card for any printing, on the version for that version. */
+        markFor={(card) => {
+          const line = picks.find((item) => keyOf(item) === lineKey(card.id, null));
+          return line ? line.quantity : null;
+        }}
+        markForPrintingFor={(card) => {
+          if (!picks.some((item) => item.card.id === card.id && item.printingId)) {
+            return undefined;
+          }
+          return (printing) => {
+            const line = picks.find(
+              (item) => keyOf(item) === lineKey(card.id, printing.id),
+            );
+            return line ? line.quantity : null;
+          };
+        }}
+        noteFor={(card) => <InThisBinder copies={inBinder.get(card.id) ?? 0} />}
+      />
+    </div>
+  );
+}
+
+interface TrayProps {
+  imagesEnabled: boolean;
   /** The tray, in the order picked. */
   picks: DraftCard[];
   /** The line key whose stepper is open, the last one touched. */
   focus: string | null;
-  /** Copies already in this binder, by card id. */
-  inBinder: ReadonlyMap<string, number>;
-  onAdd: (card: CardResult, printing?: CardPrinting) => void;
-  /** One fewer copy of a line; gone at none. */
-  onLess: (key: string) => void;
   onQuantity: (key: string, quantity: number) => void;
   onRemove: (key: string) => void;
   onFocus: (key: string) => void;
-}) {
+}
+
+/**
+ * The tray: what is picked so far, each card on its quantity tag, and
+ * the stepper for the one last touched. Its own part because the
+ * scanner fills the same tray and shows it over the camera step, so a
+ * run of scans is seen building up before one button adds it all.
+ */
+export function BinderTray({
+  imagesEnabled,
+  picks,
+  focus,
+  onQuantity,
+  onRemove,
+  onFocus,
+}: TrayProps) {
   const focused = picks.find((item) => keyOf(item) === focus) ?? null;
   const focusedPrinting = focused ? chosenPrinting(focused) : null;
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
       <p className="text-xs text-text-muted tabular-nums">
         {picks.length === 0 ? "Nothing picked yet" : draftSummary(picks)}
       </p>
@@ -150,33 +211,7 @@ export function BinderPicker({
           />
         </div>
       )}
-
-      <CardSearch
-        imagesEnabled={imagesEnabled}
-        playerGames={playerGames}
-        autoFocus
-        onSelect={onAdd}
-        onUnpick={(card, printing) => onLess(lineKey(card.id, printing?.id ?? null))}
-        /* The Flare picker's rule: the tag goes where the tap went, on
-           the card for any printing, on the version for that version. */
-        markFor={(card) => {
-          const line = picks.find((item) => keyOf(item) === lineKey(card.id, null));
-          return line ? line.quantity : null;
-        }}
-        markForPrintingFor={(card) => {
-          if (!picks.some((item) => item.card.id === card.id && item.printingId)) {
-            return undefined;
-          }
-          return (printing) => {
-            const line = picks.find(
-              (item) => keyOf(item) === lineKey(card.id, printing.id),
-            );
-            return line ? line.quantity : null;
-          };
-        }}
-        noteFor={(card) => <InThisBinder copies={inBinder.get(card.id) ?? 0} />}
-      />
-    </div>
+    </>
   );
 }
 

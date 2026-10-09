@@ -37,4 +37,11 @@ export const manifest = {
   /* Every card of theirs in the wall's rotation; a free account brings
      ten. The board is never gated, only the television's share. */
   wholeListOnWall: true,
+  /*
+   * Scanning a card into a binder with the camera. The founder: "We can
+   * make that a pro feature to cover the cost." Every scan is a paid
+   * call to a vision model. Admins try it first; it opens to Pro when
+   * CARD_SCANNER_FOR_PRO is "on" (lib/cards/scan.ts).
+   */
+  cardScanner: true,
 } as const;

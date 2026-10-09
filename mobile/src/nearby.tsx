@@ -9,6 +9,7 @@ import {
   type NearbyMatch,
   type NearbySettings,
 } from "./api";
+import { HeldRing } from "./held-ring";
 import { NearbyLocationAsk } from "./nearby-location-ask";
 import { haveThisMessage, messageOpener } from "./nearby-shared";
 import { PlayerAvatar } from "./player-avatar";
@@ -132,13 +133,18 @@ export function MatchRow({
   return (
     <View style={{ gap: spacing(2.5) }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}>
-        <CardImage
-          imageUrl={match.card.imageUrl}
-          width={44}
-          name={match.card.cardName}
-          cardNumber={match.card.cardNumber}
-          youHave={{ kind: match.card.match, count: 0 }}
-        />
+        {/* Every nearby match is a card you hold: the ring, as the
+            website's tile draws it. */}
+        <View>
+          <CardImage
+            imageUrl={match.card.imageUrl}
+            width={44}
+            name={match.card.cardName}
+            cardNumber={match.card.cardNumber}
+            youHave={{ kind: match.card.match, count: 0 }}
+          />
+          <HeldRing match={match.card.match} />
+        </View>
         <View
           style={{
             flex: 1,

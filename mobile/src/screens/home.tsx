@@ -50,6 +50,7 @@ import {
   type Me,
 } from "../api";
 import { CardRail, tileWidth } from "../card-rail";
+import { HeldRing } from "../held-ring";
 import { FlareFeedCard } from "../flare-feed-card";
 import { FlareFeedCardCompact } from "../flare-feed-card-compact";
 import { feedViewFrom } from "../feed-views";
@@ -301,13 +302,18 @@ function WantedRow({
   return (
     <View style={{ gap: spacing(1.5) }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}>
-        <CardImage
-          imageUrl={entry.card.imageUrl}
-          width={44}
-          name={entry.card.cardName}
-          cardNumber={entry.card.cardNumber}
-          youHave={entry.card.match ? { kind: entry.card.match, count: 0 } : undefined}
-        />
+        <View>
+          <CardImage
+            imageUrl={entry.card.imageUrl}
+            width={44}
+            name={entry.card.cardName}
+            cardNumber={entry.card.cardNumber}
+            youHave={
+              entry.card.match ? { kind: entry.card.match, count: 0 } : undefined
+            }
+          />
+          <HeldRing match={entry.card.match} />
+        </View>
         {/* Whose it is. "Who do I walk over to" is half the question,
             and a name without a face is the half of it nobody
             recognises across a shop. */}
@@ -1782,16 +1788,18 @@ export function HomeScreen() {
                     </Text>
                     <View style={{ flexDirection: "row", gap: spacing(2) }}>
                       {item.sample.map((card) => (
-                        <CardImage
-                          key={card.cardId}
-                          imageUrl={card.imageUrl}
-                          width={48}
-                          name={card.cardName}
-                          cardNumber={card.cardNumber}
-                          youHave={
-                            card.match ? { kind: card.match, count: 0 } : undefined
-                          }
-                        />
+                        <View key={card.cardId}>
+                          <CardImage
+                            imageUrl={card.imageUrl}
+                            width={48}
+                            name={card.cardName}
+                            cardNumber={card.cardNumber}
+                            youHave={
+                              card.match ? { kind: card.match, count: 0 } : undefined
+                            }
+                          />
+                          <HeldRing match={card.match} />
+                        </View>
                       ))}
                     </View>
                   </>

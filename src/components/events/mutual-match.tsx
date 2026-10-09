@@ -24,18 +24,26 @@ import type { MatchCard, MutualMatch } from "@/lib/events/night-matches";
  * the tile: "They have another printing" on their side, "You have
  * another printing" on yours. The caption on the card keeps the
  * printing the wanter named.
+ *
+ * The They want row is cards YOU hold, every one of them, so it wears
+ * the green ring the rest of the product puts on a card you have. The
+ * other row is cards you do not hold, and a card's `match` there says
+ * how well THEY hold it, which is not the ring's fact: no ring.
  */
 export function MatchThumbs({
   cards,
   imagesEnabled,
   direction,
   label,
+  held = false,
 }: {
   cards: MatchCard[];
   imagesEnabled: boolean;
   direction: "want" | "showcase";
   /** The row's name for a screen reader. */
   label: string;
+  /** True on the They want row: the viewer holds every card in it. */
+  held?: boolean;
 }) {
   const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: imagesEnabled ? card.imageUrl : null,
@@ -44,17 +52,18 @@ export function MatchThumbs({
     caption: card.printingLabel ?? "Any printing",
     anyPrinting: !card.printingLabel,
     direction,
+    youHave: held ? { kind: card.match, count: 0 } : null,
   }));
 
   return (
-    <ul aria-label={label} className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+    <ul aria-label={label} className="-mx-1 flex gap-2 overflow-x-auto px-1 pt-1 pb-1">
       {cards.map((card, index) => (
         <li key={card.cardId} className="flex w-14 shrink-0 flex-col gap-1">
           <FeedTile
             imageUrl={imagesEnabled ? card.imageUrl : null}
             name={card.name}
             cardNumber={card.number}
-            match={null}
+            match={held ? card.match : null}
             size="sm"
             siblings={shelf}
             position={index}
@@ -144,6 +153,7 @@ export function MutualMatchBlock({
             imagesEnabled={imagesEnabled}
             direction="want"
             label={`${THEY_WANT}, from you`}
+            held
           />
         </div>
       </div>

@@ -16,6 +16,14 @@ import {
 import { avatarWearFor } from "./equips";
 import { SHOWCASE_NOTE_MAX } from "./showcase-note";
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
+import { heldFirst } from "@/lib/matching/held-first";
+import {
+  heldByCard,
+  matchFor,
+  type HeldByCard,
+  type MatchKind,
+} from "@/lib/matching/schema";
+import { sessionsForPlayers } from "./accounts";
 import { doneWantKeys, listOfferings, listWants, wantKey } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import { wornFrame } from "./worn-frame";
@@ -119,8 +127,9 @@ export interface PublicProfile {
    */
   binders: BinderSummary[];
   /**
-   * Their Flares, newest first: what the profile shows below the
-   * binders, and what the Flares number counts.
+   * Their Flares, newest first, the wants in the viewer's binder ahead
+   * of the rest: what the profile shows below the binders, and what the
+   * Flares number counts.
    */
   flares: ProfileFlare[];
   joinedAt: string;
@@ -137,6 +146,11 @@ export interface ProfileFlare {
   quantity: number;
   direction: "want" | "offering";
   deckLabel: string | null;
+  /**
+   * Whether the viewer's binder answers this want: the green ring. Null
+   * on an offer, on your own profile, and for a viewer with no binder.
+   */
+  match: MatchKind | null;
 }
 
 export interface OwnProfile extends PublicProfile {
@@ -172,28 +186,51 @@ async function loadProfile(
    * another they were four round trips to the database for every
    * profile opened, which is most of why a profile felt slow to open.
    */
-  const [hunts, avatarUrl, showcase, organizerAt, binders, wants, offerings, done] =
-    await Promise.all([
-      huntsFor(playerId, viewerId),
-      /*
-       * Resolved to a src here rather than at every render point, and
-       * VERIFIED against storage — see `verifiedAvatar`. This is the page
-       * where a row pointing at a missing object turns into "your picture
-       * saved but could not be loaded", which is the worst state the
-       * profile has: a message with nothing anybody can do about it.
-       */
-      verifiedAvatar(playerId, avatarPathFor(player)),
-      listShowcase(playerId),
-      organizerStoresFor(playerId),
-      listBinders(playerId, viewerId),
-      listWants(playerId),
-      listOfferings(playerId),
-      doneWantKeys(playerId),
-    ]);
+  const [
+    hunts,
+    avatarUrl,
+    showcase,
+    organizerAt,
+    binders,
+    wants,
+    offerings,
+    done,
+    viewerHeld,
+  ] = await Promise.all([
+    huntsFor(playerId, viewerId),
+    /*
+     * Resolved to a src here rather than at every render point, and
+     * VERIFIED against storage — see `verifiedAvatar`. This is the page
+     * where a row pointing at a missing object turns into "your picture
+     * saved but could not be loaded", which is the worst state the
+     * profile has: a message with nothing anybody can do about it.
+     */
+    verifiedAvatar(playerId, avatarPathFor(player)),
+    listShowcase(playerId),
+    organizerStoresFor(playerId),
+    listBinders(playerId, viewerId),
+    listWants(playerId),
+    listOfferings(playerId),
+    doneWantKeys(playerId),
+    heldByViewer(viewerId, playerId),
+  ]);
 
-  /* What the player is still looking for, not what they already found -
-     ticked off in a hunt or on a Flare. See `doneWantKeys`. */
-  const open = wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId)));
+  /* Whether the viewer's binder answers one of their wants. */
+  const matchOf = (row: { cardId: string; printingId: string | null }) =>
+    viewerHeld ? matchFor(row, viewerHeld) : null;
+
+  /*
+   * What the player is still looking for, not what they already found -
+   * ticked off in a hunt or on a Flare. See `doneWantKeys`. The ones in
+   * the viewer's binder first (the founder, 2026-10-09: "those cards
+   * should show all the way to the left if that user has the card"),
+   * then what they are offering. Only the wants move, and only past each
+   * other: an offer is not a card anybody holds for them.
+   */
+  const open = heldFirst(
+    wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId))),
+    (row) => matchOf(row) !== null,
+  );
 
   const flares: ProfileFlare[] = [...open, ...offerings].map((row) => ({
     id: row.id,
@@ -205,6 +242,7 @@ async function loadProfile(
     quantity: row.quantity,
     direction: row.direction ?? "want",
     deckLabel: row.deckLabel,
+    match: (row.direction ?? "want") === "want" ? matchOf(row) : null,
   }));
 
   const dresses = tierAllows(player.tier, "cosmetics");
@@ -248,6 +286,36 @@ async function loadProfile(
     flares,
     joinedAt: player.created_at,
   };
+}
+
+/**
+ * The viewer's binder, shaped for matching, when they are looking at
+ * somebody else. The binder the Feed and a post match against: the
+ * account's room session's cards, read as the two columns matching
+ * needs and nothing else.
+ */
+async function heldByViewer(
+  viewerId: string | null,
+  playerId: string,
+): Promise<HeldByCard | null> {
+  if (!viewerId || viewerId === playerId) return null;
+
+  const sessionIds = [...(await sessionsForPlayers([viewerId])).keys()];
+  if (sessionIds.length === 0) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("player_cards")
+    .select("card_id, printing_id")
+    .in("player_session_id", sessionIds);
+
+  if (error) {
+    console.error("Could not read the viewer's binder for a profile", error);
+    return null;
+  }
+
+  return heldByCard(
+    (data ?? []).map((row) => ({ cardId: row.card_id, printingId: row.printing_id })),
+  );
 }
 
 /** The signed-in player's own profile, balance included. */

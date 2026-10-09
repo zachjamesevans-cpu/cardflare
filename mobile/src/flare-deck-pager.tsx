@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
+import { HeldRing } from "./held-ring";
 import { haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap, type ZoomCard, type ZoomHave, type ZoomPicks } from "./ui";
@@ -126,20 +127,24 @@ export function FlareCardSlide({
         gap: spacing(3),
       }}
     >
-      <CardImage
-        imageUrl={card.imageUrl}
-        width={cardWidth}
-        name={card.cardName}
-        cardNumber={card.cardNumber}
-        caption={card.printingLabel ?? null}
-        youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-        state={card.state}
-        have={haveWithCap(card, post)}
-        siblings={siblings}
-        position={position}
-        picks={picks}
-        onPicks={onPicks}
-      />
+      <View>
+        <CardImage
+          imageUrl={card.imageUrl}
+          width={cardWidth}
+          name={card.cardName}
+          cardNumber={card.cardNumber}
+          caption={card.printingLabel ?? null}
+          youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+          state={card.state}
+          have={haveWithCap(card, post)}
+          siblings={siblings}
+          position={position}
+          picks={picks}
+          onPicks={onPicks}
+        />
+        {/* Inset: the pager clips anything outside the slide. */}
+        <HeldRing match={card.match} inset />
+      </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text
           numberOfLines={2}

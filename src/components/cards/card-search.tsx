@@ -644,6 +644,12 @@ export interface CardSearchProps {
    * already in the binder. Null for nothing.
    */
   noteFor?: (card: CardResult) => React.ReactNode;
+  /**
+   * What the field starts with, searched straight away: the name the
+   * card scanner read off a card it could not find, so the player
+   * finds it by hand without typing it again. Read once, on mount.
+   */
+  initialQuery?: string;
 }
 
 /**
@@ -666,8 +672,9 @@ export function CardSearch({
   markForPrintingFor,
   onUnpick,
   noteFor,
+  initialQuery = "",
 }: CardSearchProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [active, setActive] = useState(0);
 
   /*

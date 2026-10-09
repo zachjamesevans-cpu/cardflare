@@ -57,4 +57,6 @@ export const LIMITS = {
   billing: { limit: 10, windowMs: 60 * MINUTE },
   /** Presses on the timer remote, per account: two a second is a jittery thumb. */
   remoteControl: { limit: 120, windowMs: MINUTE },
+  /* Photo pieces for the card scanner, per account: a scan is a dozen. */
+  scanChunk: { limit: 1500, windowMs: 10 * MINUTE },
 } as const;

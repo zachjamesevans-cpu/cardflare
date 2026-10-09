@@ -170,6 +170,7 @@ export function BinderView({
   footer = null,
   offerAs = null,
   nightId = null,
+  scanAccess = null,
 }: {
   binder: Binder;
   imagesEnabled: boolean;
@@ -187,6 +188,8 @@ export function BinderView({
   offerAs?: "player" | "guest" | null;
   /** Opened from a night, for a binder brought there: the offer carries it. */
   nightId?: string | null;
+  /** The owner's card scanner in the Add cards sheet: see `scannerAccess`. */
+  scanAccess?: "on" | "pro-door" | null;
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
@@ -684,6 +687,7 @@ export function BinderView({
             }}
             pocket={adding?.pocket ?? null}
             inBinder={cards}
+            scanAccess={scanAccess}
             onAdded={(message, firstPocket) => {
               setError(null);
               setAdded(message);

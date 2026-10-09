@@ -9,6 +9,7 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { scannerAccess } from "@/lib/cards/scan";
 import { playerForUser } from "@/lib/players/accounts";
 import { listPlayerGames } from "@/lib/players/games";
 import { needsSetup } from "@/lib/players/profile";
@@ -29,6 +30,9 @@ export const dynamic = "force-dynamic";
  * pencil, because `readBinder` knows it is you looking. The line under the title (up for trade, or
  * private) is the page's own, following the switch as it is flipped.
  * The app's Binder screen with no playerId draws the same.
+ *
+ * The card scanner's door is read here, with the binder, so the Add
+ * cards sheet opens already knowing whether to draw it.
  */
 export default async function OwnBinderPage({
   params,
@@ -48,10 +52,11 @@ export default async function OwnBinderPage({
   if (!playerId) redirect("/profile/settings");
   if (await needsSetup(playerId)) redirect("/welcome");
 
-  const [binder, games, areas] = await Promise.all([
+  const [binder, games, areas, scanAccess] = await Promise.all([
     readBinder(playerId, playerId, binderId),
     listPlayerGames(playerId),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
+    scannerAccess({ playerId, userId: viewer.user.id }),
   ]);
   if (!binder) notFound();
 
@@ -75,6 +80,7 @@ export default async function OwnBinderPage({
             imagesEnabled={cardImagesEnabled()}
             playerGames={games}
             title={null}
+            scanAccess={scanAccess}
           />
 
           <TabBarSpacer />
