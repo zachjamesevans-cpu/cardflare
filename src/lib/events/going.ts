@@ -5,6 +5,7 @@ import {
   isBinderCover,
   type BinderCoverId,
 } from "@/lib/binder/covers";
+import { afterResponse } from "@/lib/after-response";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
 import {
   afterGoing,
@@ -269,8 +270,10 @@ export async function setGoing(
   const posting = await postFlaresOnJoin(eventId, session, playerId);
 
   /* Who on the roster wants what you hold, and who holds what you want.
-     Fire and forget: the seat is taken whatever the matcher does. */
-  void afterGoing(eventId, playerId);
+     After the response: the seat is taken whatever the matcher does,
+     and `afterResponse` keeps the function alive until every push is
+     out, where a bare `void` could be frozen part way through. */
+  afterResponse(() => afterGoing(eventId, playerId));
 
   const state = await goingState(eventId, playerId);
   return {

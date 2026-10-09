@@ -956,6 +956,153 @@ export async function addBinderCards(
   return { ok: true, added: inserts.length, merged, skipped, firstPocket };
 }
 
+/** One scanned card for one exact pocket. */
+export interface BinderPlacement {
+  pocket: number;
+  cardId: string;
+  printingId: string | null;
+}
+
+export type BinderPlaceResult =
+  | {
+      ok: true;
+      /** Cards put in their own pocket. */
+      added: number;
+      /** Cards already in the binder, or twice on the pages: counted up. */
+      merged: number;
+      /** Left out because their pocket already held a card. */
+      occupied: number;
+      /** Left out because the binder was full. */
+      skipped: number;
+      /** The first pocket filled, or null when none was. */
+      firstPocket: number | null;
+    }
+  | { ok: false; reason: "unavailable" | "not-yours" };
+
+/**
+ * Scanned pages into a binder, each card in the very pocket it sat in.
+ *
+ * The founder: "it auto fills in an actual binder, with the exact same
+ * location the cards were in in their binder." So a card goes in its
+ * pocket and nowhere else: never slid along, never on top of a card
+ * that is already there (that one is left out and counted, and the
+ * player is told). A binder keeps one pocket per card and printing, as
+ * it always has, so a card already in the binder, or two copies on the
+ * pages, counts up in the first pocket instead of taking a second.
+ */
+export async function placeBinderPages(
+  playerId: string,
+  displayName: string,
+  binderId: string,
+  placements: BinderPlacement[],
+): Promise<BinderPlaceResult> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  const row = await binderRow(playerId, binderId);
+  if (!row) return { ok: false, reason: "not-yours" };
+  const admin = getSupabaseAdmin();
+
+  const rows = await cardRows(binderId);
+  const taken = new Set(pocketsFor(inOwnerOrder(rows)).values());
+  const keyOf = (cardId: string, printingId: string | null) =>
+    `${cardId}:${printingId ?? ""}`;
+  const existing = new Map(
+    rows.map((card) => [keyOf(card.card_id, card.printing_id), card]),
+  );
+
+  let room = MAX_BINDER_CARDS - rows.length;
+  let occupied = 0;
+  let skipped = 0;
+  let firstPocket: number | null = null;
+  /* Counts going up on cards already in the binder, by row id. */
+  const countUps = new Map<string, number>();
+  /* New pockets, by key, so a second copy on the pages counts up here. */
+  const inserts = new Map<
+    string,
+    {
+      binder_id: string;
+      card_id: string;
+      printing_id: string | null;
+      quantity: number;
+      position: number;
+    }
+  >();
+  const touched: BinderAddItem[] = [];
+  let merged = 0;
+
+  const ordered = [...placements].sort((a, b) => a.pocket - b.pocket);
+  for (const placement of ordered) {
+    const key = keyOf(placement.cardId, placement.printingId);
+    const had = existing.get(key);
+    if (had) {
+      countUps.set(had.id, (countUps.get(had.id) ?? had.quantity) + 1);
+      merged += 1;
+      continue;
+    }
+    const fresh = inserts.get(key);
+    if (fresh) {
+      fresh.quantity = Math.min(99, fresh.quantity + 1);
+      merged += 1;
+      continue;
+    }
+    if (taken.has(placement.pocket)) {
+      occupied += 1;
+      continue;
+    }
+    if (room <= 0) {
+      skipped += 1;
+      continue;
+    }
+    taken.add(placement.pocket);
+    room -= 1;
+    if (firstPocket === null || placement.pocket < firstPocket) {
+      firstPocket = placement.pocket;
+    }
+    inserts.set(key, {
+      binder_id: binderId,
+      card_id: placement.cardId,
+      printing_id: placement.printingId,
+      quantity: 1,
+      position: placement.pocket,
+    });
+    touched.push({
+      cardId: placement.cardId,
+      printingId: placement.printingId,
+      quantity: 1,
+    });
+  }
+
+  for (const [id, quantity] of countUps) {
+    const { error } = await admin
+      .from("binder_cards")
+      .update({ quantity: Math.min(99, quantity) })
+      .eq("id", id)
+      .eq("binder_id", binderId);
+    if (error) console.error("Could not count up a binder card", error);
+  }
+
+  if (inserts.size > 0) {
+    const { error } = await admin.from("binder_cards").insert([...inserts.values()]);
+    if (error) {
+      console.error("Could not place scanned pages", error);
+      return { ok: false, reason: "unavailable" };
+    }
+  }
+
+  if (row.for_trade) {
+    for (const [id] of countUps) {
+      const card = rows.find((each) => each.id === id);
+      if (card) {
+        await syncTradeCard(playerId, displayName, card.card_id, card.printing_id);
+      }
+    }
+    for (const item of touched) {
+      await syncTradeCard(playerId, displayName, item.cardId, item.printingId);
+    }
+  }
+
+  return { ok: true, added: inserts.size, merged, occupied, skipped, firstPocket };
+}
+
 /** Adds one card, after the last one: what the builds before pockets send. */
 export async function addBinderCard(
   playerId: string,

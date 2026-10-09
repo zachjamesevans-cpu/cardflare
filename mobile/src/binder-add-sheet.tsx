@@ -31,9 +31,10 @@ import {
 import { CardScanner } from "./card-scanner";
 import { CardSelectSheet, lineKey, type PickedLine } from "./card-select";
 import { leadArt } from "./flare-bits";
+import { PageScanner } from "./page-scanner";
 import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
-import { SCAN_CARD, SCAN_WITH_PRO } from "./scan-copy";
+import { SCAN_CARD, SCAN_ONE, SCAN_PAGES, SCAN_WITH_PRO } from "./scan-copy";
 import { Stepper } from "./stepper";
 import { colors, gutter, radius, spacing } from "./theme";
 import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
@@ -63,6 +64,11 @@ import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
  *   tried by admins first. A player who could have it with Pro sees
  *   "Scan cards with Pro" instead, to the Pro screen; anybody else
  *   sees nothing, so there is never a button that cannot work.
+ * - On that tab, "One card" or "Whole pages" (src/page-scanner.tsx):
+ *   pages of a real binder photographed into a queue, checked, and
+ *   placed pocket for pocket. The founder (2026-10-09): "let's keep the
+ *   single scan which should be fast and quick", and "scan, let's say 5
+ *   pages of their binder into a queue". Pages never touch the tray.
  *
  * Opened from a tapped "+" pocket, the batch starts AT that pocket:
  * the first card goes there, the rest into the next empty ones, which
@@ -78,6 +84,9 @@ export interface BinderAdded {
 }
 
 type Mode = "search" | "paste" | "scan";
+
+/** On the scan tab: one card into the tray, or whole pages into their pockets. */
+type ScanKind = "one" | "pages";
 
 /** A pasted line, looked up, with the copies the owner settled on. */
 type PastedLine = BinderListEntry & { key: string };
@@ -126,6 +135,7 @@ export function BinderAddSheet({
      drawn until the server has said, and nothing drawn then vanishes. */
   const [scanAccess, setScanAccess] = useState<ScanAccess>(null);
   const [searchFor, setSearchFor] = useState<{ text: string } | null>(null);
+  const [scanKind, setScanKind] = useState<ScanKind>("one");
 
   useEffect(() => {
     let live = true;
@@ -166,6 +176,7 @@ export function BinderAddSheet({
     setText("");
     setPasted(null);
     setMode("search");
+    setScanKind("one");
     setError(null);
   };
 
@@ -359,8 +370,71 @@ export function BinderAddSheet({
     </View>
   );
 
+  /* Pages placed: the tray's ending, the same refresh and sentence. */
+  const placed = (result: BinderAdded) => {
+    reset();
+    onAdded(result);
+  };
+
+  /* One card or whole pages, a switch at the top of the scan tab. One
+     card is today's scanner, unchanged; it is the default. */
+  const pages = mode === "scan" && scanKind === "pages";
   const scanBody = (
-    <CardScanner onAdd={addScanned} onNotFound={(text) => setSearchFor({ text })} />
+    <View style={{ flex: 1, gap: spacing(3) }}>
+      <View
+        style={{
+          flexDirection: "row",
+          alignSelf: "center",
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.border,
+          padding: 2,
+          gap: 2,
+        }}
+      >
+        {(
+          [
+            ["one", SCAN_ONE],
+            ["pages", SCAN_PAGES],
+          ] as const
+        ).map(([value, label]) => {
+          const on = scanKind === value;
+          return (
+            <Tap
+              key={value}
+              onPress={() => setScanKind(value)}
+              accessibilityLabel={label}
+              accessibilityState={{ selected: on }}
+              style={{
+                paddingHorizontal: spacing(3.5),
+                paddingVertical: spacing(1.5),
+                borderRadius: 999,
+                backgroundColor: on ? colors.elevated : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  color: on ? colors.textPrimary : colors.textMuted,
+                  fontWeight: "700",
+                  fontSize: 12,
+                }}
+              >
+                {label}
+              </Text>
+            </Tap>
+          );
+        })}
+      </View>
+      {scanKind === "pages" ? (
+        <PageScanner
+          binderId={binderId}
+          occupied={cards.map((card) => card.pocket)}
+          onPlaced={placed}
+        />
+      ) : (
+        <CardScanner onAdd={addScanned} onNotFound={(text) => setSearchFor({ text })} />
+      )}
+    </View>
   );
 
   /* The pasted list's confirmation grid: three across, measured off the window. */
@@ -500,8 +574,11 @@ export function BinderAddSheet({
     </ScrollView>
   );
 
-  /* The foot: the tray of picked cards (search), then the one button. */
-  const footer = (
+  /* The foot: the tray of picked cards (search), then the one button.
+     Whole pages have their own button and no tray: only the safe area. */
+  const footer = pages ? (
+    <View style={{ paddingBottom: insets.bottom }} />
+  ) : (
     <View
       style={{
         paddingTop: spacing(2),

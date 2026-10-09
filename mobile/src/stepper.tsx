@@ -18,6 +18,8 @@ export function Stepper({
   max = 99,
   onChange,
   label,
+  lessLabel,
+  moreLabel,
   disabled = false,
 }: {
   value: number;
@@ -26,6 +28,9 @@ export function Stepper({
   onChange: (next: number) => void;
   /** What the number is, for screen readers. */
   label: string;
+  /** The buttons' own words, when "Fewer" and "More" would not read right. */
+  lessLabel?: string;
+  moreLabel?: string;
   disabled?: boolean;
 }) {
   const atMin = value <= min;
@@ -43,7 +48,7 @@ export function Stepper({
         onPress={() => onChange(Math.max(min, value - 1))}
         disabled={disabled || atMin}
         hitSlop={6}
-        accessibilityLabel={`Fewer ${label}`}
+        accessibilityLabel={lessLabel ?? `Fewer ${label}`}
         style={[step, atMin && { opacity: 0.4 }]}
       >
         <Text style={glyph}>−</Text>
@@ -63,7 +68,7 @@ export function Stepper({
         onPress={() => onChange(Math.min(max, value + 1))}
         disabled={disabled || atMax}
         hitSlop={6}
-        accessibilityLabel={`More ${label}`}
+        accessibilityLabel={moreLabel ?? `More ${label}`}
         style={[step, atMax && { opacity: 0.4 }]}
       >
         <Text style={glyph}>+</Text>

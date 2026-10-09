@@ -2,9 +2,11 @@
 
 import { getViewer } from "@/lib/auth/session";
 import {
+  type PageOutcome,
   type ScanAccess,
   type ScanOutcome,
   scanCard,
+  scanPage,
   scannerAccess,
 } from "@/lib/cards/scan";
 import { playerForUser } from "@/lib/players/accounts";
@@ -35,4 +37,17 @@ export async function scanCardAction(form: FormData): Promise<ScanOutcome> {
   const photo = form.get("photo");
   if (!(photo instanceof Blob)) return { ok: false, reason: "no-card" };
   return scanCard(who, new Uint8Array(await photo.arrayBuffer()));
+}
+
+/** A page: the nine pockets the browser cut out of one photo, "cell0" to "cell8". */
+export async function scanPageAction(form: FormData): Promise<PageOutcome> {
+  const who = await scanner();
+  if (!who) return { ok: false, reason: "not-allowed" };
+  const cells = await Promise.all(
+    Array.from({ length: 9 }, async (_, slot) => {
+      const cell = form.get(`cell${slot}`);
+      return cell instanceof Blob ? new Uint8Array(await cell.arrayBuffer()) : null;
+    }),
+  );
+  return scanPage(who, cells);
 }

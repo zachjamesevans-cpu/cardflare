@@ -183,7 +183,9 @@ describe("every word is scan-rules.ts", () => {
     }
     expect(scan).toContain("{SCAN_REFUSALS[step.reason]}");
     expect(scan).toContain("const line = scanReadLine(step.read);");
-    expect(add).toContain('import { SCAN_CARD } from "@/lib/cards/scan-rules";');
+    expect(add).toContain(
+      'import { SCAN_CARD, SCAN_ONE, SCAN_PAGES } from "@/lib/cards/scan-rules";',
+    );
     for (const [name, word] of WORDS) {
       for (const source of [code(scan), code(add)]) {
         expect(source, name).not.toContain(`"${word}"`);

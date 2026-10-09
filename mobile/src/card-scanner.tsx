@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import {
@@ -100,8 +100,6 @@ export function CardScanner({
   /** A card read but not found: what to put in the menu's search. */
   onNotFound: (query: string) => void;
 }) {
-  const [permission, requestPermission] = useCameraPermissions();
-  const asked = useRef(false);
   const camera = useRef<CameraView>(null);
   const [view, setView] = useState<{ width: number; height: number } | null>(null);
   const [step, setStep] = useState<Step>({ kind: "camera" });
@@ -118,15 +116,6 @@ export function CardScanner({
     },
     [],
   );
-
-  /* Asked once, the moment the scanner opens: the tap on "Scan a card"
-     is the reason, so the system's sheet arrives with its context. */
-  useEffect(() => {
-    if (!permission || permission.granted || asked.current) return;
-    if (!permission.canAskAgain) return;
-    asked.current = true;
-    void requestPermission();
-  }, [permission, requestPermission]);
 
   /* The progress line only once the wait is a wait. */
   useEffect(() => {
@@ -262,46 +251,11 @@ export function CardScanner({
             named one, "Any printing" otherwise. Gone once it is in the
             tray, as on the website. */}
         {!step.added && hit.printings.length > 1 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            accessibilityLabel="Printing"
-            contentContainerStyle={{ gap: spacing(2) }}
-          >
-            {[null, ...hit.printings].map((printing) => {
-              const id = printing?.id ?? null;
-              const on = id === step.printingId;
-              const label = printing
-                ? (printing.label ?? "Standard printing")
-                : "Any printing";
-              return (
-                <Tap
-                  key={id ?? "any"}
-                  onPress={() => setStep({ ...step, printingId: id })}
-                  accessibilityLabel={label}
-                  accessibilityState={{ selected: on }}
-                  style={{
-                    borderWidth: 1,
-                    borderColor: on ? colors.accent : colors.border,
-                    backgroundColor: on ? colors.accent : "transparent",
-                    borderRadius: 999,
-                    paddingHorizontal: spacing(3),
-                    paddingVertical: spacing(1.5),
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: on ? colors.accentContrast : colors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: "600",
-                    }}
-                  >
-                    {label}
-                  </Text>
-                </Tap>
-              );
-            })}
-          </ScrollView>
+          <PrintingChips
+            printings={hit.printings}
+            value={step.printingId}
+            onChange={(printingId) => setStep({ ...step, printingId })}
+          />
         ) : null}
 
         {!step.added && others.length > 0 ? (
@@ -368,6 +322,62 @@ export function CardScanner({
   }
 
   /* Step a: the camera, once it may be used. */
+  const frame = view ? guideFrame(view.width, view.height) : null;
+  return (
+    <CameraAllowed>
+      <View style={{ flex: 1, gap: spacing(3), paddingBottom: spacing(3) }}>
+        <View
+          style={styles.viewfinder}
+          onLayout={(event) => {
+            const { width, height } = event.nativeEvent.layout;
+            setView({ width, height });
+          }}
+        >
+          <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
+          {frame ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.frame,
+                {
+                  left: frame.x,
+                  top: frame.y,
+                  width: frame.width,
+                  height: frame.height,
+                },
+              ]}
+            />
+          ) : null}
+        </View>
+        <Muted>{SCAN_HINT}</Muted>
+        <Button
+          label={TAKE_PHOTO}
+          busy={capturing}
+          disabled={!view}
+          onPress={() => void shoot()}
+        />
+      </View>
+    </CameraAllowed>
+  );
+}
+
+/**
+ * The camera, once it may be used; asked for once, the moment the scan
+ * tab opens. The tap on "Scan a card" is the reason, so the system's
+ * sheet arrives with its context. One card or a whole page, the camera
+ * is asked for here and nowhere else.
+ */
+export function CameraAllowed({ children }: { children: ReactNode }) {
+  const [permission, requestPermission] = useCameraPermissions();
+  const asked = useRef(false);
+
+  useEffect(() => {
+    if (!permission || permission.granted || asked.current) return;
+    if (!permission.canAskAgain) return;
+    asked.current = true;
+    void requestPermission();
+  }, [permission, requestPermission]);
+
   if (!permission) return <Loading />;
   if (!permission.granted) {
     return (
@@ -391,36 +401,64 @@ export function CardScanner({
       </View>
     );
   }
+  return <>{children}</>;
+}
 
-  const frame = view ? guideFrame(view.width, view.height) : null;
+/**
+ * Which printing: "Any printing" and every version as a chip, the one
+ * the set code named already on. The single scan's and a scanned
+ * pocket's, the same chips.
+ */
+export function PrintingChips({
+  printings,
+  value,
+  onChange,
+}: {
+  printings: { id: string; label: string | null }[];
+  value: string | null;
+  onChange: (printingId: string | null) => void;
+}) {
   return (
-    <View style={{ flex: 1, gap: spacing(3), paddingBottom: spacing(3) }}>
-      <View
-        style={styles.viewfinder}
-        onLayout={(event) => {
-          const { width, height } = event.nativeEvent.layout;
-          setView({ width, height });
-        }}
-      >
-        <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
-        {frame ? (
-          <View
-            pointerEvents="none"
-            style={[
-              styles.frame,
-              { left: frame.x, top: frame.y, width: frame.width, height: frame.height },
-            ]}
-          />
-        ) : null}
-      </View>
-      <Muted>{SCAN_HINT}</Muted>
-      <Button
-        label={TAKE_PHOTO}
-        busy={capturing}
-        disabled={!view}
-        onPress={() => void shoot()}
-      />
-    </View>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      accessibilityLabel="Printing"
+      contentContainerStyle={{ gap: spacing(2) }}
+    >
+      {[null, ...printings].map((printing) => {
+        const id = printing?.id ?? null;
+        const on = id === value;
+        const label = printing
+          ? (printing.label ?? "Standard printing")
+          : "Any printing";
+        return (
+          <Tap
+            key={id ?? "any"}
+            onPress={() => onChange(id)}
+            accessibilityLabel={label}
+            accessibilityState={{ selected: on }}
+            style={{
+              borderWidth: 1,
+              borderColor: on ? colors.accent : colors.border,
+              backgroundColor: on ? colors.accent : "transparent",
+              borderRadius: 999,
+              paddingHorizontal: spacing(3),
+              paddingVertical: spacing(1.5),
+            }}
+          >
+            <Text
+              style={{
+                color: on ? colors.accentContrast : colors.textSecondary,
+                fontSize: 12,
+                fontWeight: "600",
+              }}
+            >
+              {label}
+            </Text>
+          </Tap>
+        );
+      })}
+    </ScrollView>
   );
 }
 

@@ -115,16 +115,25 @@ export async function shrinkPhoto(file: Blob): Promise<Blob | null> {
     const context = canvas.getContext("2d");
     if (!context) return null;
     context.drawImage(image, 0, 0, size.width, size.height);
-    for (const quality of QUALITIES) {
-      const blob = await new Promise<Blob | null>((done) =>
-        canvas.toBlob(done, "image/jpeg", quality),
-      );
-      if (blob && blob.size <= SCAN_MAX_BYTES) return blob;
-    }
-    return null;
+    return await fitJpeg(canvas);
   } finally {
     URL.revokeObjectURL(url);
   }
+}
+
+/**
+ * A drawn canvas as a JPEG under SCAN_MAX_BYTES, stepping the quality
+ * down until it fits; null when it never does. The page scanner cuts
+ * each pocket through this too.
+ */
+export async function fitJpeg(canvas: HTMLCanvasElement): Promise<Blob | null> {
+  for (const quality of QUALITIES) {
+    const blob = await new Promise<Blob | null>((done) =>
+      canvas.toBlob(done, "image/jpeg", quality),
+    );
+    if (blob && blob.size <= SCAN_MAX_BYTES) return blob;
+  }
+  return null;
 }
 
 export function ScanCard({
@@ -286,8 +295,6 @@ function Found({
   const match = step.matches[step.at];
   if (!match) return null;
   const { card } = match;
-  const chosen = card.printings.find((each) => each.id === step.printingId) ?? null;
-  const art = cardArt(chosen?.imageUrl, card.printings, card.exactName);
   const line = scanReadLine(step.read);
   const others = step.matches
     .map((each, at) => ({ each, at }))
@@ -300,54 +307,15 @@ function Found({
 
       <h3 className="text-base font-semibold text-text-primary">{IS_THIS_IT}</h3>
 
-      <div className="flex flex-col items-center gap-1 text-center">
-        <div className="aspect-[63/88] w-44 overflow-hidden rounded-[6px] bg-black ring-2 ring-black/80">
-          {imagesEnabled && isRenderableImageUrl(art) ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img
-              src={art}
-              alt={cardImageAlt(card.exactName, card.canonicalCardNumber)}
-              className="size-full object-cover"
-            />
-          ) : (
-            <span className="flex size-full items-center justify-center bg-elevated px-2 text-center text-xs font-semibold text-text-primary">
-              {card.exactName}
-            </span>
-          )}
-        </div>
-        <span className="mt-1 text-lg font-semibold text-text-primary">
-          {card.exactName}
-        </span>
-        <span className="font-mono text-sm text-text-muted">
-          {card.canonicalCardNumber}
-        </span>
-      </div>
+      <ScannedCard
+        card={card}
+        printingId={step.printingId}
+        imagesEnabled={imagesEnabled}
+      />
 
       {/* The versions, as the picker names them: the one the set code
           pointed at already chosen, tapped again for any printing. */}
-      {card.printings.length > 1 && (
-        <div role="group" aria-label="Printing" className="flex flex-wrap gap-2">
-          {card.printings.map((printing) => {
-            const on = printing.id === step.printingId;
-            return (
-              <button
-                key={printing.id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => onPrinting(on ? null : printing.id)}
-                className={cn(
-                  "cursor-pointer rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition-colors",
-                  on
-                    ? "border-accent bg-accent/15 text-text-primary"
-                    : "border-border bg-surface text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {printingLabel(printing, card.exactName) ?? "Standard printing"}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      <PrintingChips card={card} printingId={step.printingId} onPrinting={onPrinting} />
 
       {others.length > 0 && (
         <div className="flex flex-col gap-2">
@@ -385,8 +353,99 @@ function Found({
   );
 }
 
+/**
+ * The guess, large: the chosen printing's art (or the card's own when
+ * any printing will do), its name and its number. The page scanner's
+ * pockets show their card the same way.
+ */
+export function ScannedCard({
+  card,
+  printingId,
+  imagesEnabled,
+  className = "w-44",
+}: {
+  card: CardResult;
+  printingId: string | null;
+  imagesEnabled: boolean;
+  /** The art's width; the height follows the card. */
+  className?: string;
+}) {
+  const chosen = card.printings.find((each) => each.id === printingId) ?? null;
+  const art = cardArt(chosen?.imageUrl, card.printings, card.exactName);
+  return (
+    <div className="flex flex-col items-center gap-1 text-center">
+      <div
+        className={cn(
+          "aspect-[63/88] overflow-hidden rounded-[6px] bg-black ring-2 ring-black/80",
+          className,
+        )}
+      >
+        {imagesEnabled && isRenderableImageUrl(art) ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={art}
+            alt={cardImageAlt(card.exactName, card.canonicalCardNumber)}
+            className="size-full object-cover"
+          />
+        ) : (
+          <span className="flex size-full items-center justify-center bg-elevated px-2 text-center text-xs font-semibold text-text-primary">
+            {card.exactName}
+          </span>
+        )}
+      </div>
+      <span className="mt-1 text-lg font-semibold text-text-primary">
+        {card.exactName}
+      </span>
+      <span className="font-mono text-sm text-text-muted">
+        {card.canonicalCardNumber}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A card's printings as chips, the chosen one lit; tapped again, it lets
+ * go, for any printing. Nothing when the card has one printing. The page
+ * scanner's pockets use the same chips.
+ */
+export function PrintingChips({
+  card,
+  printingId,
+  onPrinting,
+}: {
+  card: CardResult;
+  /** Null is any printing. */
+  printingId: string | null;
+  onPrinting: (printingId: string | null) => void;
+}) {
+  if (card.printings.length <= 1) return null;
+  return (
+    <div role="group" aria-label="Printing" className="flex flex-wrap gap-2">
+      {card.printings.map((printing) => {
+        const on = printing.id === printingId;
+        return (
+          <button
+            key={printing.id}
+            type="button"
+            aria-pressed={on}
+            onClick={() => onPrinting(on ? null : printing.id)}
+            className={cn(
+              "cursor-pointer rounded-[var(--radius-control)] border px-3 py-1.5 text-xs font-semibold transition-colors",
+              on
+                ? "border-accent bg-accent/15 text-text-primary"
+                : "border-border bg-surface text-text-secondary hover:text-text-primary",
+            )}
+          >
+            {printingLabel(printing, card.exactName) ?? "Standard printing"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 /** One of the other guesses: a small tile that swaps in as the top one. */
-function OtherMatch({
+export function OtherMatch({
   card,
   imagesEnabled,
   onPick,

@@ -6,6 +6,7 @@ import { Loader2, Plus } from "lucide-react";
 
 import { BinderPicker, BinderTray } from "@/components/binder/binder-picker";
 import { PasteList, type ListPreview } from "@/components/binder/paste-list";
+import { PageScan } from "@/components/cards/page-scan";
 import { ScanCard, ScanWithPro } from "@/components/cards/scan-card";
 import {
   addCard,
@@ -18,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { addBinderCardsAction, previewBinderListAction } from "@/lib/binder/actions";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
-import { SCAN_CARD } from "@/lib/cards/scan-rules";
+import { SCAN_CARD, SCAN_ONE, SCAN_PAGES } from "@/lib/cards/scan-rules";
 import { cn } from "@/lib/cn";
 
 /**
@@ -36,7 +37,10 @@ import { cn } from "@/lib/cn";
  * same tray, one card after another, so a stack of scans goes in with
  * the same one button. Whether it is drawn is the server's answer,
  * `scanAccess`, read with the page: the scanner, the door to Pro, or
- * nothing, never a button that appears and then goes.
+ * nothing, never a button that appears and then goes. Its switch has a
+ * second way to scan, "Whole pages": photos of real binder pages, read
+ * in a queue, checked as grids, and placed pocket for pocket by their
+ * own action (`PageScan`), never through the tray.
  *
  * Opened from an empty pocket, the batch starts AT that pocket: "Adding
  * a card in a specific slot should put that exact card there." The
@@ -75,8 +79,8 @@ export function AddBinderCard({
   onOpenChange: (open: boolean) => void;
   /** The empty pocket that was tapped: the batch starts there. */
   pocket?: number | null;
-  /** The binder's cards, for "×2 in this binder" on the results. */
-  inBinder?: readonly { cardId: string; quantity: number }[];
+  /** The binder's cards, for "×2 in this binder" on the results and the pockets a scanned page would land on. */
+  inBinder?: readonly { cardId: string; quantity: number; pocket: number }[];
   /** The action's sentence, and the pocket the first new card took. */
   onAdded?: (message: string, firstPocket: number | null) => void;
   /** Draw an "Add cards" button that opens the sheet. Off by default. */
@@ -86,6 +90,8 @@ export function AddBinderCard({
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"search" | "paste" | "scan">("search");
+  /* The scan tab's switch: one card into the tray, or whole pages. */
+  const [scanMode, setScanMode] = useState<"one" | "pages">("one");
   const [picks, setPicks] = useState<DraftCard[]>([]);
   const [focus, setFocus] = useState<string | null>(null);
   /* A name the scanner read but could not find, waiting in the search. */
@@ -100,6 +106,7 @@ export function AddBinderCard({
     setWasOpen(open);
     if (open) {
       setTab("search");
+      setScanMode("one");
       setPicks([]);
       setFocus(null);
       setLookFor("");
@@ -108,6 +115,11 @@ export function AddBinderCard({
       setError(null);
     }
   }
+
+  /* Pages bring their own button and their own action: the sheet's
+     footer, the tray's Add, is not theirs. */
+  const pageMode = tab === "scan" && scanMode === "pages";
+  const filled = useMemo(() => inBinder.map((card) => card.pocket), [inBinder]);
 
   const copiesHere = useMemo(() => {
     const copies = new Map<string, number>();
@@ -190,37 +202,39 @@ export function AddBinderCard({
         onClose={() => onOpenChange(false)}
         title="Add cards"
         footer={
-          <div className="flex flex-col gap-2">
-            {(error || pending) && (
-              <div className="flex min-h-5 items-center gap-2 text-sm">
-                {pending && (
-                  <Loader2
-                    className="size-4 animate-spin text-accent"
-                    aria-hidden="true"
-                  />
-                )}
-                {error && (
-                  <span role="alert" className="text-danger">
-                    {error}
-                  </span>
-                )}
-              </div>
-            )}
-            {tab !== "paste" || preview ? (
-              <Button
-                type="button"
-                className="w-full"
-                disabled={pending || count === 0}
-                onClick={submit}
-              >
-                {addLabel(count)}
-              </Button>
-            ) : (
-              <p className="text-sm text-text-muted">
-                Look the list up to check it before anything is added.
-              </p>
-            )}
-          </div>
+          !pageMode && (
+            <div className="flex flex-col gap-2">
+              {(error || pending) && (
+                <div className="flex min-h-5 items-center gap-2 text-sm">
+                  {pending && (
+                    <Loader2
+                      className="size-4 animate-spin text-accent"
+                      aria-hidden="true"
+                    />
+                  )}
+                  {error && (
+                    <span role="alert" className="text-danger">
+                      {error}
+                    </span>
+                  )}
+                </div>
+              )}
+              {tab !== "paste" || preview ? (
+                <Button
+                  type="button"
+                  className="w-full"
+                  disabled={pending || count === 0}
+                  onClick={submit}
+                >
+                  {addLabel(count)}
+                </Button>
+              ) : (
+                <p className="text-sm text-text-muted">
+                  Look the list up to check it before anything is added.
+                </p>
+              )}
+            </div>
+          )
         }
       >
         {/*
@@ -290,20 +304,69 @@ export function AddBinderCard({
               onFocus={setFocus}
             />
           ) : tab === "scan" ? (
-            <div className="flex flex-col gap-4">
-              <BinderTray
-                imagesEnabled={imagesEnabled}
-                picks={picks}
-                focus={focus}
-                onQuantity={quantityOf}
-                onRemove={removeLine}
-                onFocus={setFocus}
-              />
-              <ScanCard
-                imagesEnabled={imagesEnabled}
-                onAdd={pick}
-                onNotFound={setLookFor}
-              />
+            <div className="flex flex-1 flex-col gap-4">
+              <div
+                role="radiogroup"
+                aria-label="How to scan"
+                className="grid grid-cols-2 gap-1 self-center rounded-full border border-border bg-canvas p-1"
+              >
+                {(
+                  [
+                    ["one", SCAN_ONE],
+                    ["pages", SCAN_PAGES],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={scanMode === id}
+                    onClick={() => {
+                      setScanMode(id);
+                      setError(null);
+                    }}
+                    className={cn(
+                      "cursor-pointer rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
+                      scanMode === id
+                        ? "bg-elevated text-text-primary"
+                        : "text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {scanMode === "one" ? (
+                <>
+                  <BinderTray
+                    imagesEnabled={imagesEnabled}
+                    picks={picks}
+                    focus={focus}
+                    onQuantity={quantityOf}
+                    onRemove={removeLine}
+                    onFocus={setFocus}
+                  />
+                  <ScanCard
+                    imagesEnabled={imagesEnabled}
+                    onAdd={pick}
+                    onNotFound={setLookFor}
+                  />
+                </>
+              ) : (
+                /* Placed the way the tray's Add lands: the page says
+                   what happened, the sheet closes, the binder redraws. */
+                <PageScan
+                  binderId={binderId}
+                  imagesEnabled={imagesEnabled}
+                  playerGames={playerGames}
+                  pockets={filled}
+                  onPlaced={(message, firstPocket) => {
+                    onAdded?.(message, firstPocket);
+                    onOpenChange(false);
+                    router.refresh();
+                  }}
+                />
+              )}
             </div>
           ) : (
             <PasteList
