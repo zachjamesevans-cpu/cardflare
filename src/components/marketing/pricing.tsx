@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MaxMark, ProMark, UltraMark } from "@/components/stores/ultra-mark";
@@ -19,7 +21,7 @@ interface Tier {
   price: string;
   cadence: string | null;
   line: string;
-  cta: { label: string; href: string };
+  cta: { label: ReactNode; href: string };
   featured?: boolean;
 }
 
@@ -39,7 +41,14 @@ const TIERS: Tier[] = [
     price: "$7.99",
     cadence: "/mo",
     line: "Cosmetics, animated profiles, and your look everywhere you play.",
-    cta: { label: "See Pro", href: "/pro" },
+    cta: {
+      label: (
+        <>
+          See <ProMark />
+        </>
+      ),
+      href: "/pro",
+    },
   },
   {
     name: "Ultra",

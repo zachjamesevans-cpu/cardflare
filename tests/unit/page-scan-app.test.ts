@@ -5,15 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   canTakeAnother,
   nextToSend,
-  pageCells,
-  pageFrame,
   pagePlacements,
   pagesWithCards,
   pocketBox,
   pocketInPhoto,
 } from "../../mobile/src/page-scan";
 import * as app from "../../mobile/src/scan-copy";
-import { CARD_ASPECT, scanResize } from "../../mobile/src/scan-frame";
+import { CARD_ASPECT, guideFrame, scanResize } from "../../mobile/src/scan-frame";
 import * as site from "@/lib/cards/scan-rules";
 
 /**
@@ -56,6 +54,7 @@ const src = {
   sheet: read("mobile/src/binder-add-sheet.tsx"),
   pages: read("mobile/src/page-scanner.tsx"),
   scanner: read("mobile/src/card-scanner.tsx"),
+  viewer: read("mobile/src/card-viewer.tsx"),
   api: read("mobile/src/api.ts"),
 };
 
@@ -99,106 +98,102 @@ describe("the words and the rules", () => {
   });
 
   it("come from scan-copy on the screen, never typed in again", () => {
-    expect(src.pages).toContain('} from "./scan-copy";');
-    for (const word of [
-      "{startingAtLine(start)}",
-      "{PAGES_HINT}",
-      "label={takePageLabel(nextNumber)}",
-      "<Title>{CHECK_PAGES}</Title>",
-      "{IS_THIS_IT}",
-      "{OTHER_MATCHES}",
-      "label={FIND_THE_CARD}",
-      "label={LEAVE_EMPTY}",
-      "{POCKET_TAKEN}",
-      "{POCKET_UNREAD}",
-      "{POCKET_EMPTY}",
-      "{RETAKE}",
-      "{REMOVE_PAGE}",
-      "label={addPagesLabel(chosenPages)}",
-      "sendRefusalLine(result.reason)",
-      "PAGE_FAILED",
-      "READING_PAGE",
-      "label={BACK_TO_PAGES}",
-      "lessLabel={START_EARLIER}",
-      "moreLabel={START_LATER}",
-    ]) {
-      expect(src.pages, word).toContain(word);
+    for (const [name, text] of [
+      ["pages", src.pages],
+      ["scanner", src.scanner],
+      ["viewer", src.viewer],
+    ] as const) {
+      expect(text, name).toContain('} from "./scan-copy";');
     }
-    const code = src.pages.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
-    for (const value of [
-      site.PAGES_HINT,
-      site.CHECK_PAGES,
-      site.POCKET_TAKEN,
-      site.POCKET_UNREAD,
-      site.PAGE_FAILED,
-      site.FIND_THE_CARD,
-      site.LEAVE_EMPTY,
-    ]) {
-      expect(code).not.toContain(value);
+    for (const [text, word] of [
+      [src.scanner, "{startingAtLine(start)}"],
+      [src.scanner, "label={retake ? takePageLabel(retake.page) : TAKE_PHOTO}"],
+      [src.scanner, "lessLabel={START_EARLIER}"],
+      [src.scanner, "moreLabel={START_LATER}"],
+      [src.scanner, "failure: sendRefusalLine(result.reason),"],
+      [src.pages, "<Title>{CHECK_PAGES}</Title>"],
+      [src.pages, "label={addPagesLabel(chosenPages)}"],
+      [src.pages, "label={RETAKE}"],
+      [src.pages, "PAGE_FAILED"],
+      [src.pages, "READING_PAGE"],
+      [src.pages, "{POCKET_EMPTY}"],
+      [src.pages, "POCKET_UNREAD"],
+      [src.viewer, "{OTHER_MATCHES}"],
+      [src.viewer, "label={FIND_THE_CARD}"],
+      [src.viewer, "label={LEAVE_EMPTY}"],
+      [src.viewer, "{POCKET_TAKEN}"],
+      [src.viewer, "{POCKET_UNREAD}"],
+      [src.viewer, "{POCKET_EMPTY}"],
+    ] as const) {
+      expect(text, word).toContain(word);
+    }
+    for (const text of [src.pages, src.scanner, src.viewer]) {
+      const code = text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      for (const value of [
+        site.CHECK_PAGES,
+        site.POCKET_TAKEN,
+        site.POCKET_UNREAD,
+        site.PAGE_FAILED,
+        site.FIND_THE_CARD,
+        site.LEAVE_EMPTY,
+      ]) {
+        expect(code).not.toContain(value);
+      }
     }
   });
 });
 
-describe("the switch on the scan tab", () => {
-  it("is One card (today's scanner, the default) or Whole pages", () => {
-    expect(src.sheet).toContain(
-      'const [scanKind, setScanKind] = useState<ScanKind>("one");',
-    );
-    expect(flat(src.sheet)).toContain('["one", SCAN_ONE], ["pages", SCAN_PAGES],');
-    const body = src.sheet.slice(src.sheet.indexOf("const scanBody = ("));
-    expect(body.indexOf('scanKind === "pages" ? (')).toBeGreaterThan(-1);
-    expect(body.indexOf("<PageScanner")).toBeLessThan(body.indexOf("<CardScanner"));
-    /* The switch sits on the scan tab, under the same gate as before. */
-    expect(flat(src.sheet)).toContain(
-      '...(scanAccess === "on" ? [["scan", SCAN_CARD] as const] : [])',
-    );
-    expect(src.sheet).toContain(
-      'body={mode === "paste" ? pasteBody : mode === "scan" ? scanBody : undefined}',
-    );
+describe("pages from the one scanner", () => {
+  it("has no switch: a photo the reader calls a page is sent as one", () => {
+    expect(src.sheet).not.toContain("ScanKind");
+    expect(src.sheet).not.toContain("SCAN_ONE");
+    expect(src.sheet).not.toContain("<PageScanner");
+    expect(src.pages).not.toContain("export function PageScanner(");
+    expect(src.scanner).toContain('if (next.kind === "send-page") {');
+    expect(src.scanner).toContain("await queuePage(photo, view);");
   });
 
   it("puts nothing in the tray from pages, and ends with the pages sent, not placed", () => {
-    expect(src.pages).not.toContain("onAdd");
-    expect(src.pages).not.toContain("addBinderCards");
-    expect(src.sheet).toContain("onDone={pagesSent}");
-    const sent = src.sheet.slice(
-      src.sheet.indexOf("const pagesSent ="),
-      src.sheet.indexOf("const pages ="),
+    const queue = src.scanner.slice(
+      src.scanner.indexOf("const queuePage = async"),
+      src.scanner.indexOf("const shoot = async"),
     );
-    expect(sent).toContain("reset();");
-    expect(sent).toContain("onPagesSent();");
-    expect(sent).not.toContain("onAdded");
-    /* No tray and no tray button under the pages. */
-    expect(src.sheet).toContain("const footer = pages ? (");
+    expect(queue).not.toContain("onAdd");
+    expect(src.scanner).not.toContain("addBinderCards");
+    expect(src.pages).not.toContain("addBinderCards");
+    /* Done says whether pages went; the menu keeps its tray. */
+    expect(src.scanner).toContain(
+      'onClose(queue.some((page) => page.status === "sent"));',
+    );
+    const closed = src.sheet.slice(src.sheet.indexOf("onClose={(sent) => {"));
+    expect(closed.slice(0, 200)).toContain("onPagesSent();");
+    expect(closed.slice(0, 200)).not.toContain("onAdded");
+    expect(closed.slice(0, 200)).not.toContain("reset()");
   });
 
   it("starts at the first empty page of this binder", () => {
     expect(src.sheet).toContain("occupied={cards.map((card) => card.pocket)}");
-    expect(src.pages).toContain(
+    expect(src.scanner).toContain(
       "useState(() => retake?.page ?? firstEmptyPage(occupied))",
     );
-    expect(src.pages).toContain("max={BINDER_PAGES}");
-    expect(src.pages).toContain("min={1}");
-    /* The first page moves only before anything is shot. */
-    expect(src.pages).toContain("{!retake && queue.length === 0 ? (");
+    expect(src.scanner).toContain("max={BINDER_PAGES}");
+    expect(src.scanner).toContain("min={1}");
+    /* The chip comes once a page has been shot. */
+    expect(src.scanner).toContain("{!retake && pagesOut ? (");
   });
 });
 
 describe("the photo of a page", () => {
-  it("is guided as nine card-shaped cells, three by three", () => {
-    const frame = pageFrame(360, 520);
+  it("is guided by the one card-shaped outline: a nine-pocket page is a card's shape too", () => {
+    const frame = guideFrame(360, 520);
     expect(frame.width / frame.height).toBeCloseTo(CARD_ASPECT, 5);
-    const cells = pageCells(frame);
-    expect(cells).toHaveLength(9);
-    for (const cell of cells) {
-      expect(cell.width / cell.height).toBeCloseTo(2.5 / 3.5, 5);
-    }
-    expect(cells[8].x + cells[8].width).toBeCloseTo(frame.x + frame.width, 5);
-    expect(cells[8].y + cells[8].height).toBeCloseTo(frame.y + frame.height, 5);
-    expect(src.pages).toContain("pageCells(frame).map((cell, slot) => (");
+    expect(src.scanner).toContain(
+      "const frame = view ? guideFrame(view.width, view.height) : null;",
+    );
+    expect(src.scanner.match(/styles\.frame,/g)).toHaveLength(1);
   });
 
-  it("is cut to the guide, then into pockets with the website's pocketCrop", () => {
+  it("is cut to the outline, then into pockets with the website's pocketCrop", () => {
     const region = { originX: 120, originY: 300, width: 1500, height: 2100 };
     for (let slot = 0; slot < 9; slot += 1) {
       const cut = site.pocketCrop(slot, region.width, region.height);
@@ -215,25 +210,25 @@ describe("the photo of a page", () => {
         height: cut.height,
       });
     }
-    /* The guide exactly: each pocket carries its own margin. */
-    expect(src.pages).toContain(
-      "const region = frameInPhoto(pageFrame(view.width, view.height), view, photo, 0);",
+    /* The outline exactly: each pocket carries its own margin. */
+    expect(src.scanner).toContain(
+      "const region = frameInPhoto(guideFrame(view.width, view.height), view, photo, 0);",
     );
-    expect(src.pages).toContain("cutPocket(photo.uri, pocketInPhoto(slot, region))");
+    expect(src.scanner).toContain("cutPocket(photo.uri, pocketInPhoto(slot, region))");
   });
 
   it("sends each pocket shrunk to SCAN_LONG_EDGE, never enlarged, as JPEG at 0.6", () => {
-    expect(src.pages).toContain("cutJpeg(uri, crop, scanResize(crop))");
-    expect(src.pages).toContain("[{ crop }, { resize }]");
-    expect(src.pages).toContain("let quality = 0.6;");
-    expect(src.pages).toContain("format: SaveFormat.JPEG,");
-    expect(src.pages).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
+    expect(src.scanner).toContain("cutJpeg(uri, crop, scanResize(crop))");
+    expect(src.scanner).toContain("[{ crop }, { resize }]");
+    expect(src.scanner).toContain("let quality = 0.6;");
+    expect(src.scanner).toContain("format: SaveFormat.JPEG,");
+    expect(src.scanner).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
     expect(scanResize({ width: 700, height: 980 })).toEqual({ height: 980 });
     expect(scanResize({ width: 1500, height: 2100 })).toEqual({
       height: site.SCAN_LONG_EDGE,
     });
-    /* The check grid shows the server's photos of each pocket. */
-    expect(src.pages).toContain("photo={page.photos.pockets[pocket.slot] ?? null}");
+    /* The check shows the server's photos of each pocket. */
+    expect(src.pages).toContain("photo: page.photos.pockets[pocket.slot] ?? null,");
   });
 });
 
@@ -247,11 +242,13 @@ describe("the queue", () => {
     expect(nextToSend([page("sending"), page("waiting")])).toBe(-1);
     expect(nextToSend([page("waiting"), page("sending")])).toBe(-1);
     /* And the screen holds one in flight whatever the queue does. */
-    const round = src.pages.slice(src.pages.indexOf("if (sending.current) return;"));
+    const round = src.scanner.slice(
+      src.scanner.indexOf("if (sending.current) return;"),
+    );
     expect(round).toContain("const at = nextToSend(queue);");
     expect(round).toContain("sending.current = page.id;");
     expect(round).toContain("sending.current = null;");
-    expect(src.pages).not.toContain("Promise.all(queue");
+    expect(src.scanner).not.toContain("Promise.all(queue");
   });
 
   it("holds at most MAX_SCAN_PAGES, inside the binder's pages", () => {
@@ -259,7 +256,7 @@ describe("the queue", () => {
     expect(canTakeAnother(11, site.MAX_SCAN_PAGES)).toBe(false);
     expect(canTakeAnother(site.BINDER_PAGES, 0)).toBe(true);
     expect(canTakeAnother(site.BINDER_PAGES + 1, 1)).toBe(false);
-    expect(src.pages).toContain("canTakeAnother(nextNumber, queue.length)");
+    expect(src.scanner).toContain("!canTakeAnother(number, queue.length)");
   });
 });
 
@@ -284,64 +281,44 @@ describe("checking and placing", () => {
   });
 
   it("checks the grid before anything is placed, in the check, not the camera", () => {
-    const check = src.pages.indexOf("function PageCheck(");
-    const shoot = src.pages.indexOf("label={takePageLabel(nextNumber)}");
-    const add = src.pages.indexOf("label={addPagesLabel(chosenPages)}");
-    expect(check).toBeGreaterThan(-1);
-    expect(add).toBeGreaterThan(check);
-    expect(shoot).toBeLessThan(check);
+    expect(src.pages).toContain("function PageCheck(");
+    expect(src.pages).toContain("label={addPagesLabel(chosenPages)}");
+    expect(src.scanner).not.toContain("placePageQueue");
     expect(src.pages.match(/placePageQueue\(/g)).toHaveLength(1);
     expect(src.pages).toContain("const placements = pagePlacements(choices);");
   });
 
-  it("goes back to the check from a retake with the queue as it was", () => {
-    const back = src.pages.slice(src.pages.indexOf("label={BACK_TO_PAGES}"));
-    expect(back.slice(0, 200)).toContain("setRetaking(null)");
-    expect(back.slice(0, 200)).not.toContain("setPages");
-    expect(src.pages.indexOf("label={BACK_TO_PAGES}")).toBeGreaterThan(
-      src.pages.indexOf("function PageCheck("),
-    );
-  });
-
-  it("opens a pocket in the website's order", () => {
-    const detail = src.pages.slice(src.pages.indexOf("function PocketDetail("));
-    const order = [
-      "source={{ uri: photo }}",
-      "{IS_THIS_IT}",
-      "{OTHER_MATCHES}",
-      "<PrintingChips",
-      "label={FIND_THE_CARD}",
-      "label={LEAVE_EMPTY}",
-    ].map((mark) => detail.indexOf(mark));
-    expect(order.every((at) => at > -1)).toBe(true);
-    expect([...order].sort((x, y) => x - y)).toEqual(order);
+  it("retakes a failed page in the scanner, into the same queue, and reads the queue again", () => {
+    const retake = src.pages.slice(src.pages.indexOf("<CardScanner"));
+    expect(retake).toContain("visible={retaking !== null}");
+    expect(retake).toContain("retake={{ batchId, page: retaking ?? 1 }}");
+    expect(retake).toContain("setRetaking(null);");
+    expect(retake).toContain("if (sent) void load();");
   });
 
   it("leaves a pocket empty when asked, and it is not sent", () => {
-    expect(src.pages).toContain("choose(page.scanId, openSlot, null);");
+    expect(src.pages).toContain("choose(shown[index].key, null);");
     expect(src.pages).toContain(
       "pick ? { cardId: pick.hit.id, printingId: pick.printingId } : null,",
     );
   });
 
   it("marks a pocket already full in this binder", () => {
-    expect(src.pages).toContain("taken={taken.has(pocketAt(number, pocket.slot))}");
-    expect(src.pages).toContain("const number = page.page;");
+    expect(src.pages).toContain("taken: taken.has(pocketAt(page.page, pocket.slot)),");
     expect(src.pages).toContain("const taken = new Set(occupied);");
+    expect(src.viewer).toContain("{pocket.taken ? (");
   });
 
   it("finds a pocket's card with the picker's own search, the read name typed", () => {
-    expect(src.pages).toContain(
-      'const lookFor = read ? read.englishName || read.name : "";',
-    );
-    expect(src.pages).toContain('const search = useCardSearch({ kind: "list" });');
-    /* The single scan's printing chips, the one component. */
-    expect(src.pages).toContain("<PrintingChips");
-    expect(src.scanner).toContain("export function PrintingChips(");
+    expect(src.pages).toContain('lookFor: read ? read.englishName || read.name : "",');
+    expect(src.viewer).toContain('const search = useCardSearch({ kind: "list" });');
+    expect(src.viewer).toContain("initial={pocket.lookFor}");
+    expect(src.viewer).toContain("<PrintingChips");
+    expect(src.viewer).toContain("export function PrintingChips(");
   });
 
-  it("asks for the camera through the single scanner's gate", () => {
-    expect(src.pages).toContain("<CameraAllowed>");
+  it("asks for the camera through the one scanner's gate", () => {
+    expect(src.scanner).toContain("<CameraAllowed>");
     expect(src.pages).not.toMatch(/useCameraPermissions|requestCameraPermissionsAsync/);
     expect(src.scanner).toContain("export function CameraAllowed(");
   });

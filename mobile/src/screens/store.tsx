@@ -18,6 +18,7 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
+import { ProMark } from "../pro-mark";
 import { FRAME_COLOR, RING_COLOR } from "../player-avatar";
 import { Body, Card, Muted, Tap, Title } from "../ui";
 import { colors, gutter, spacing } from "../theme";
@@ -369,7 +370,7 @@ function Shelf({
               ) : item.owned ? (
                 !canWear ? (
                   <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11 }}>
-                    Pro to wear
+                    <ProMark size={11} /> to wear
                   </Text>
                 ) : (
                   <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11 }}>

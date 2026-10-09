@@ -79,8 +79,9 @@ describe("three sentences the audit missed, on both platforms", () => {
   });
 
   it("tells a free player that wearing is Pro, instead of 'Tap to wear'", () => {
-    expect(web.shop).toContain("Pro to wear");
-    expect(app.shop).toContain("Pro to wear");
+    /* The tier wears the PRO mark on the website (2026-10-09). */
+    expect(web.shop).toMatch(/<ProMark \/>\s*to wear/);
+    expect(app.shop).toContain("<ProMark size={11} /> to wear");
     expect(read("src/app/profile/store/page.tsx")).toContain(
       'tierAllows(profile.tier, "cosmetics")',
     );

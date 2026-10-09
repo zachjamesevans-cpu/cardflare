@@ -8,45 +8,18 @@ import {
   pocketCrop,
   type ScanRefusal,
 } from "./scan-copy";
-import { CARD_ASPECT, type Box } from "./scan-frame";
 
 /**
- * Whole binder pages, as arithmetic: where the page guide sits, where
- * each pocket is in the photo, which page is sent next, and what goes to
- * the binder at the end. Kept apart from the screen (src/page-scanner.tsx)
- * and from ./api, so tests/unit/page-scan-app.test.ts can run it in node.
+ * Whole binder pages, as arithmetic: where each pocket is in the photo,
+ * which page is sent next, which pockets the check walks through, and
+ * what goes to the binder at the end. Kept apart from the screens
+ * (src/card-scanner.tsx, src/page-scanner.tsx) and from ./api, so
+ * tests/unit/page-scan-app.test.ts can run it in node.
  *
  * The founder (2026-10-09): "scan, let's say 5 pages of their binder into
  * a queue and it auto fills in an actual binder, with the exact same
  * location the cards were in in their binder."
  */
-
-/**
- * The page guide: three card-shaped cells across and three down, so the
- * page is a card's shape too, as large as the preview allows.
- */
-export function pageFrame(viewWidth: number, viewHeight: number): Box {
-  const width = Math.min(viewWidth * 0.92, viewHeight * 0.92 * CARD_ASPECT);
-  const height = width / CARD_ASPECT;
-  return {
-    x: (viewWidth - width) / 2,
-    y: (viewHeight - height) / 2,
-    width,
-    height,
-  };
-}
-
-/** The guide's nine cells, slot order (left to right, top to bottom), each 2.5 by 3.5. */
-export function pageCells(frame: Box): Box[] {
-  const width = frame.width / 3;
-  const height = frame.height / 3;
-  return Array.from({ length: POCKETS_PER_PAGE }, (_, slot) => ({
-    x: frame.x + (slot % 3) * width,
-    y: frame.y + Math.floor(slot / 3) * height,
-    width,
-    height,
-  }));
-}
 
 /**
  * One pocket of the page's photo (already cut to the guide), for the
@@ -224,4 +197,19 @@ export function placementParts<T>(
 /** The pages the button counts: those with at least one card chosen. */
 export function pagesWithCards(pages: readonly (readonly PocketChoice[])[]): number {
   return pages.filter((choices) => choices.some((choice) => choice !== null)).length;
+}
+
+/**
+ * A pocket "Check 2 unsure" walks through: a guess the reader was not
+ * sure of, or one it could not read, until the player has looked at it
+ * in the viewer (confirmed it, chose another, or left it empty).
+ */
+export function needsLook(
+  pocket: { state: string; sure?: boolean },
+  looked: boolean,
+): boolean {
+  if (looked) return false;
+  return (
+    pocket.state === "unread" || (pocket.state === "found" && pocket.sure === false)
+  );
 }

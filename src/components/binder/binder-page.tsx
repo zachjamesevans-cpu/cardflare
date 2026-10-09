@@ -69,6 +69,7 @@ import {
   placeInPockets,
 } from "@/lib/binder/pocket-math";
 import { isRenderableImageUrl } from "@/lib/cards/images";
+import type { ScanRights } from "@/lib/cards/scan";
 import { cn } from "@/lib/cn";
 
 /**
@@ -135,7 +136,7 @@ import { cn } from "@/lib/cn";
  * check" and Check now, which opens the check (`QueueCheck`). The
  * notice opens the same check by its link, `?scan=<batchId>`
  * (`openScan`). A page that did not read is retaken from the check,
- * back in the Add cards sheet for that page of that queue.
+ * in the scanner, for that page of that queue.
  *
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the
@@ -185,7 +186,7 @@ export function BinderView({
   footer = null,
   offerAs = null,
   nightId = null,
-  scanAccess = null,
+  scanRights = null,
   pageQueues = null,
   openScan = null,
 }: {
@@ -205,8 +206,8 @@ export function BinderView({
   offerAs?: "player" | "guest" | null;
   /** Opened from a night, for a binder brought there: the offer carries it. */
   nightId?: string | null;
-  /** The owner's card scanner in the Add cards sheet: see `scannerAccess`. */
-  scanAccess?: "on" | "pro-door" | null;
+  /** What the owner may scan from the Add cards sheet: see `scanRights`. */
+  scanRights?: ScanRights | null;
   /** The owner's page queues, read with the page; null reads them here. */
   pageQueues?: PageQueues | null;
   /** A queue to check as the page opens: the notice's `?scan=<batchId>`. */
@@ -733,7 +734,7 @@ export function BinderView({
             }}
             pocket={adding?.pocket ?? null}
             inBinder={cards}
-            scanAccess={scanAccess}
+            rights={scanRights}
             pagesLeft={queues.known ? queues.left : undefined}
             retake={adding?.retake ?? null}
             onAdded={(message, firstPocket) => {
@@ -757,7 +758,7 @@ export function BinderView({
               router.refresh();
             }}
             onRetake={
-              scanAccess === "on" && checking
+              scanRights?.pages === "on" && checking
                 ? (page) => {
                     const batchId = checking;
                     closeCheck();

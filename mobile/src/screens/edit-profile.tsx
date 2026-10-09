@@ -24,6 +24,7 @@ import {
 import { CropSheet, type CropSubject } from "../crop-picture";
 import { HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
+import { ProMark } from "../pro-mark";
 import { colors, gutter, spacing } from "../theme";
 import {
   Body,
@@ -245,7 +246,8 @@ export function EditProfileScreen() {
              * of walking them through picking a GIF that then bounces.
              */}
             <Button
-              label="Use a GIF (Pro)"
+              label="Use a GIF"
+              mark={<ProMark size={15} />}
               variant="secondary"
               disabled={busy !== null}
               onPress={() =>

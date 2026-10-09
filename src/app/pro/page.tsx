@@ -242,8 +242,8 @@ function ProDoor({
             Start with a free account
           </h3>
           <p className="text-sm text-text-secondary">
-            Pro goes on top of it. Create the account, then come back here or open the
-            app.
+            <ProMark /> goes on top of it. Create the account, then come back here or
+            open the app.
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
@@ -260,7 +260,7 @@ function ProDoor({
     return (
       <>
         <h3 className="text-xl font-bold text-text-primary">
-          Pro is for player accounts
+          <ProMark /> is for player accounts
         </h3>
         <p className="text-sm text-text-secondary">
           This account runs a store. Your console is at{" "}
@@ -281,7 +281,9 @@ function ProDoor({
     return (
       <>
         <div className="flex flex-col gap-1">
-          <h3 className="text-xl font-bold text-text-primary">You are on Pro</h3>
+          <h3 className="text-xl font-bold text-text-primary">
+            You are on <ProMark />
+          </h3>
           <p className="text-sm text-text-secondary">
             {plan.state === "on"
               ? when
@@ -333,7 +335,7 @@ function ProDoor({
       <div className="flex flex-col gap-1">
         <h3 className="text-xl font-bold text-text-primary">Subscribe in the app</h3>
         <p className="text-sm text-text-secondary">
-          Open the cardflare app, go to Profile, then cardflare Pro. It is{" "}
+          Open the cardflare app, go to Profile, then cardflare <ProMark />. It is{" "}
           {PRO_PRICE_LABEL} a month through your Apple ID, and it counts here the moment
           it goes through.
         </p>

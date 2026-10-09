@@ -62,10 +62,10 @@ const src = {
   scanner: read("mobile/src/card-scanner.tsx"),
 };
 
-/** The shooting step alone, and the check alone. */
-const shooting = src.pages.slice(
-  src.pages.indexOf("export function PageScanner("),
-  src.pages.indexOf("export function PageCheckSheet("),
+/** The shooting step alone (the one scanner), and the check alone. */
+const shooting = src.scanner.slice(
+  src.scanner.indexOf("function Scanner("),
+  src.scanner.indexOf("export function CameraAllowed("),
 );
 const checking = src.pages.slice(
   src.pages.indexOf("function PageCheck("),
@@ -140,8 +140,8 @@ describe("the words", () => {
 describe("the shooting step sends, and never waits for a read", () => {
   it("sends each page to be read on the server, one at a time", () => {
     expect(shooting).toContain("void sendPage(binderId, batchId, page)");
-    expect(src.pages).toContain("const result = await sendScanPage({");
-    expect(src.pages).toContain("pageNumber: page.number,");
+    expect(src.scanner).toContain("const result = await sendScanPage({");
+    expect(src.scanner).toContain("pageNumber: page.number,");
     expect(src.pages).not.toMatch(/scanPagePhotos|read-page/);
     expect(src.api).not.toMatch(/scanPagePhotos|read-page/);
     /* Nothing in the shooting step asks for a read page. */
@@ -150,12 +150,12 @@ describe("the shooting step sends, and never waits for a read", () => {
   });
 
   it("sends the whole page beside its nine pockets, cut to the guide", () => {
-    expect(src.pages).toContain("cutJpeg(photo.uri, region, pageResize(region))");
+    expect(src.scanner).toContain("cutJpeg(photo.uri, region, pageResize(region))");
     expect(pageResize({ width: 3000, height: 4200 })).toEqual({ height: 1568 });
     expect(pageResize({ width: 4200, height: 3000 })).toEqual({ width: 1568 });
     expect(pageResize({ width: 900, height: 1260 })).toEqual({ height: 1260 });
     /* Under the same ceiling as a pocket. */
-    expect(src.pages).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
+    expect(src.scanner).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
   });
 
   it("makes the queue's id once, and sends every page under it", () => {
@@ -176,40 +176,33 @@ describe("the shooting step sends, and never waits for a read", () => {
     }
   });
 
-  it("says Sending..., then Sent, or the refusal with Retake", () => {
-    const row = src.pages.slice(src.pages.indexOf("function rowLine("));
-    expect(row.slice(0, 300)).toContain(
-      'return page.status === "sent" ? PAGE_SENT : SENDING_PAGE;',
+  it("says Sending..., then Page 4 added, or the refusal, and the next photo fills a refused page again", () => {
+    expect(shooting).toContain("{SENDING_PAGE}");
+    expect(shooting).toContain(
+      "setToast({ line: pageAddedLine(page.number), alert: false });",
     );
-    expect(row.slice(0, 300)).toContain(
-      'if (page.status === "refused") return page.failure',
+    expect(src.scanner).toContain("failure: sendRefusalLine(result.reason),");
+    expect(shooting).toContain(
+      "if (result.failure) setToast({ line: result.failure, alert: true });",
     );
-    expect(src.pages).toContain("failure: sendRefusalLine(result.reason),");
-    expect(shooting).toContain('{page.status === "refused" && !finishing ? (');
-    expect(shooting).toContain("{`Page ${page.number}`}");
-    expect(shooting).toContain("<Text style={styles.action}>{RETAKE}</Text>");
+    expect(shooting).toContain(
+      "setStart((current) => (current === page.number + 1 ? page.number : current));",
+    );
+    expect(shooting).toContain("{`Page ${start}`}");
   });
 
-  it("counts the day under the shutter, and gives way to the refusal at none", () => {
+  it("counts the day once a page has gone, and gives way to the refusal at none", () => {
     expect(shooting).toContain("{pagesLeftLine(leftNow)}");
-    expect(shooting).toContain('{SCAN_REFUSALS["daily-pages"]}');
-    const out = shooting.indexOf("{outForToday ? (");
-    expect(out).toBeGreaterThan(-1);
-    expect(shooting.indexOf('{SCAN_REFUSALS["daily-pages"]}')).toBeGreaterThan(out);
-    expect(shooting.indexOf("label={takePageLabel(nextNumber)}")).toBeGreaterThan(
-      shooting.indexOf('{SCAN_REFUSALS["daily-pages"]}'),
+    expect(shooting).toContain(
+      '{!retake && anySent && typeof leftNow === "number" ? (',
     );
-    expect(shooting).toContain("const outForToday = !retake && leftNow === 0;");
-    expect(src.pages).toContain("void getPageQueues(binderId)");
+    const queue = shooting.slice(shooting.indexOf("const queuePage = async"));
+    expect(queue.slice(0, 400)).toContain("if (!retake && leftNow === 0) {");
+    expect(queue.slice(0, 400)).toContain('line: SCAN_REFUSALS["daily-pages"]');
   });
 
-  it("once a page has gone, says it is read in the background, and Done closes after the sends", () => {
-    const sent = shooting.slice(shooting.indexOf("{anySent ? ("));
-    expect(sent).toContain("{READING_IN_BACKGROUND}");
-    expect(sent).toContain("label={DONE_SCANNING}");
-    expect(sent.indexOf("{READING_IN_BACKGROUND}")).toBeLessThan(
-      sent.indexOf("label={DONE_SCANNING}"),
-    );
+  it("closes on Done once the sends in flight have gone, and the menu says the pages are being read", () => {
+    expect(shooting).toContain("label={DONE_SCANNING}");
     expect(shooting).toContain(
       'const anySent = queue.some((page) => page.status === "sent");',
     );
@@ -220,8 +213,10 @@ describe("the shooting step sends, and never waits for a read", () => {
     expect(stillSending([{ status: "sent" }, { status: "refused" }])).toBe(false);
     expect(stillSending([{ status: "sent" }, { status: "sending" }])).toBe(true);
     expect(stillSending([{ status: "waiting" }])).toBe(true);
-    /* And the menu closes into the binder's banner. */
-    expect(src.sheet).toContain("onDone={pagesSent}");
+    /* And the menu, open on its tray, says so; the binder shows the banner. */
+    expect(src.sheet).toContain(
+      "above={pagesOut ? <Muted>{READING_IN_BACKGROUND}</Muted> : undefined}",
+    );
     expect(src.binder).toContain("onPagesSent={() => {");
   });
 });
@@ -281,8 +276,7 @@ describe("the check", () => {
   });
 
   it("draws a read page with the player's photos from the server's links", () => {
-    expect(checking).toContain("photo={page.photos.pockets[pocket.slot] ?? null}");
-    expect(checking).toContain("photo={page.photos.pockets[openSlot] ?? null}");
+    expect(checking).toContain("photo: page.photos.pockets[pocket.slot] ?? null,");
     expect(checking).toContain('{page.status === "ready" ? (');
     expect(src.pages).not.toContain("cells[pocket.slot]");
   });
@@ -290,18 +284,17 @@ describe("the check", () => {
   it("marks a guess the reader was not sure of, and shows its note", () => {
     const tile = src.pages.slice(src.pages.indexOf("function PocketTile("));
     expect(tile).toContain(
-      'const unsure = pocket.state === "found" && pocket.sure === false;',
+      'const unsure = pocket.state === "found" && pocket.sure === false && !looked;',
     );
     expect(tile).toContain("{unsure ? (");
-    const detail = src.pages.slice(src.pages.indexOf("function PocketDetail("));
-    expect(detail).toContain("{NOT_SURE}");
-    /* The note under the guess, and under an unread pocket's line. */
-    const guess = detail.indexOf(
-      "<Text style={styles.number}>{pick.hit.cardNumber}</Text>",
+    /* The viewer says it, with the note (tests/unit/card-scan-app.test.ts). */
+    expect(read("mobile/src/card-viewer.tsx")).toContain("{NOT_SURE}");
+    expect(checking).toContain(
+      'sure: pocket.state === "found" ? pocket.sure : undefined,',
     );
-    const note = detail.indexOf('{pocket.state === "found" && note ? (');
-    expect(note).toBeGreaterThan(guess);
-    expect(detail).toContain('{pocket.state === "unread" && note ? (');
+    expect(checking).toContain(
+      'note: pocket.state === "empty" ? undefined : pocket.note,',
+    );
     expect(src.api).toMatch(
       /state: "found";[\s\S]*?sure\?: boolean;[\s\S]*?note\?: string;/,
     );
@@ -311,8 +304,8 @@ describe("the check", () => {
     expect(checking).toContain(
       '{page.error === "timeout" ? PAGE_TOOK_TOO_LONG : PAGE_FAILED}',
     );
-    expect(checking).toContain("setRetaking(number);");
-    expect(checking).toContain("retake={{ batchId, page: retaking }}");
+    expect(checking).toContain("onPress={() => setRetaking(number)}");
+    expect(checking).toContain("retake={{ batchId, page: retaking ?? 1 }}");
     expect(shooting).toContain(
       "const [start, setStart] = useState(() => retake?.page ?? firstEmptyPage(occupied));",
     );

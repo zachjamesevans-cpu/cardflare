@@ -3,7 +3,7 @@ import { z } from "zod";
 import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
-import { scanCard, scanPage, scannerAccess } from "@/lib/cards/scan";
+import { scanCard, scanPage, scanRights } from "@/lib/cards/scan";
 import { POCKETS_PER_PAGE, SCAN_MAX_BYTES } from "@/lib/cards/scan-rules";
 import {
   removeUploads,
@@ -18,8 +18,9 @@ export const dynamic = "force-dynamic";
 /**
  * The card scanner for the app.
  *
- * GET says whether this player sees the scan button ("on"), the door to
- * Pro ("pro-door"), or nothing (null).
+ * GET says what this player may scan: `rights` (single cards, free ones
+ * left today, whole pages), and `access`, the one switch builds from
+ * before free singles read.
  *
  * POST takes a photo two ways. The quick way is the photo in the body,
  * one request: "read-direct" for a card, "read-page-direct" for the nine
@@ -84,7 +85,9 @@ const decode = (text: string) => new Uint8Array(Buffer.from(text, "base64"));
 export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
-  return Response.json({ access: await scannerAccess(player) });
+  /* `access` for builds from before free singles; `rights` for the rest. */
+  const rights = await scanRights(player);
+  return Response.json({ access: rights.pages, rights });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -101,8 +104,9 @@ export async function POST(request: Request): Promise<Response> {
 
   if (body.action === "begin") {
     /* The gate is asked before a single piece is sent, so a phone that
-       may not scan learns it in one request, not after a dozen. */
-    if ((await scannerAccess(player)) !== "on") {
+       may not scan learns it in one request, not after a dozen. A free
+       player may send a single; what it may read is decided at "read". */
+    if ((await scanRights(player)).singles === null) {
       return Response.json({ error: "not-allowed" }, { status: 403 });
     }
     return Response.json({ uploadId: crypto.randomUUID() });

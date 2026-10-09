@@ -118,10 +118,12 @@ describe("the add menu is the Flare picker, adapted", () => {
 });
 
 describe("Paste a list, in the same menu", () => {
-  it("is a tab beside the search", () => {
-    expect(add).toContain('["search", "Search"]');
-    expect(add).toContain('["paste", "Paste a list"]');
-    expect(add).toContain('role="tablist"');
+  it("is a small link under the search's field, with a way back to the search", () => {
+    /* No tabs since 2026-10-09: "all the tabs of 'scan' etc having 3
+       tabs seems redundant." */
+    expect(add).not.toContain('role="tablist"');
+    expect(add).toMatch(/setView\("paste"\);[\s\S]*?>\s*Paste a list\s*</);
+    expect(add).toMatch(/setView\("search"\);[\s\S]*?<ArrowLeft[^>]*\/>\s*Search\s*</);
     expect(add).toContain("<PasteList");
   });
 

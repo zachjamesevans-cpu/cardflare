@@ -8,6 +8,7 @@ import { normalizeName } from "@/lib/cards/domain";
 import {
   type ScanRead,
   type ScanRefusal,
+  FREE_SCANS_PER_DAY,
   SCAN_GAMES,
   SCAN_MATCHES,
   SCAN_MAX_BYTES,
@@ -64,19 +65,63 @@ export function withoutKeys(text: string): string {
 }
 
 /**
- * Open to Pro, or admins only. The founder agreed admins try it first;
- * setting CARD_SCANNER_FOR_PRO to "on" in Vercel opens it to Pro with
- * no code change.
+ * Open to everyone, or admins only. Admins tried it first; setting
+ * CARD_SCANNER_OPEN (or the older CARD_SCANNER_FOR_PRO) to "on" in Vercel
+ * opens it with no code change: single cards free up to ten a day,
+ * unlimited and whole pages for Pro.
  */
-function openToPro(): boolean {
-  return process.env.CARD_SCANNER_FOR_PRO === "on";
+function scannerOpen(): boolean {
+  return (
+    process.env.CARD_SCANNER_OPEN === "on" || process.env.CARD_SCANNER_FOR_PRO === "on"
+  );
 }
 
 /**
- * What a player sees: "on" scans, "pro-door" shows the button that
- * leads to Pro, and null shows nothing at all (an unconfigured
- * deployment, or a free player during the admin trial), so there is
- * never a button that cannot work.
+ * What a player may scan. `singles` is "on", "used-up" (the day's free
+ * scans are gone) or null (nothing drawn); `singlesLeft` is the free
+ * scans left today, null when there is no limit; `pages` is "on", the
+ * door to Pro, or null. Never a button that cannot work.
+ */
+export interface ScanRights {
+  singles: "on" | "used-up" | null;
+  singlesLeft: number | null;
+  pages: "on" | "pro-door" | null;
+}
+
+const NO_RIGHTS: ScanRights = { singles: null, singlesLeft: null, pages: null };
+const ALL_RIGHTS: ScanRights = { singles: "on", singlesLeft: null, pages: "on" };
+
+/** Free scans this account has used in the last day. */
+async function freeScansToday(playerId: string): Promise<number> {
+  const { count } = await getSupabaseAdmin()
+    .from("card_scans")
+    .select("id", { count: "exact", head: true })
+    .eq("player_id", playerId)
+    .gte("created_at", new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+  return count ?? 0;
+}
+
+export async function scanRights(who: {
+  playerId: string;
+  userId: string;
+}): Promise<ScanRights> {
+  if (!scannerConfigured()) return NO_RIGHTS;
+  const admin = getSupabaseAdmin();
+  const [{ data: adminRow }, { data: player }] = await Promise.all([
+    admin.from("admin_users").select("user_id").eq("user_id", who.userId).maybeSingle(),
+    admin.from("players").select("tier").eq("id", who.playerId).maybeSingle(),
+  ]);
+  if (adminRow) return ALL_RIGHTS;
+  if (!scannerOpen()) return NO_RIGHTS;
+  if (tierAllows(player?.tier ?? null, "cardScanner")) return ALL_RIGHTS;
+  const left = Math.max(0, FREE_SCANS_PER_DAY - (await freeScansToday(who.playerId)));
+  return { singles: left > 0 ? "on" : "used-up", singlesLeft: left, pages: "pro-door" };
+}
+
+/**
+ * The older builds' single switch for the whole scanner: "on" for those
+ * who may scan pages (Pro, admins), the door for everyone else once it is
+ * open. Kept so an app from before free singles still behaves.
  */
 export type ScanAccess = "on" | "pro-door" | null;
 
@@ -84,15 +129,7 @@ export async function scannerAccess(who: {
   playerId: string;
   userId: string;
 }): Promise<ScanAccess> {
-  if (!scannerConfigured()) return null;
-  const admin = getSupabaseAdmin();
-  const [{ data: adminRow }, { data: player }] = await Promise.all([
-    admin.from("admin_users").select("user_id").eq("user_id", who.userId).maybeSingle(),
-    admin.from("players").select("tier").eq("id", who.playerId).maybeSingle(),
-  ]);
-  if (adminRow) return "on";
-  if (!openToPro()) return null;
-  return tierAllows(player?.tier ?? null, "cardScanner") ? "on" : "pro-door";
+  return (await scanRights(who)).pages;
 }
 
 /** One guess: the card, and the printing the set code points at. */
@@ -167,7 +204,9 @@ export async function scanCard(
   who: { playerId: string; userId: string },
   bytes: Uint8Array,
 ): Promise<ScanOutcome> {
-  if ((await scannerAccess(who)) !== "on") return { ok: false, reason: "not-allowed" };
+  const rights = await scanRights(who);
+  if (rights.singles === null) return { ok: false, reason: "not-allowed" };
+  if (rights.singles === "used-up") return { ok: false, reason: "daily-singles" };
 
   if (bytes.length === 0 || bytes.length > SCAN_MAX_BYTES) {
     return { ok: false, reason: "too-big" };
@@ -177,8 +216,21 @@ export async function scanCard(
 
   if (!allowReads(who.playerId, 1)) return { ok: false, reason: "limit" };
 
-  const read = await readCard(bytes, mediaType);
-  if (!read) return { ok: false, reason: "unavailable" };
+  const looked = await readCard(bytes, mediaType);
+  if (!looked) return { ok: false, reason: "unavailable" };
+  /* A whole page: the client sends it as a page when the player may scan
+     pages, and shows the door to Pro when not. Not counted as a free
+     scan: no card was read. */
+  if (looked.layout === "binder-page") {
+    return { ok: false, reason: "is-page", read: looked.read };
+  }
+  if (rights.singlesLeft !== null) {
+    const { error } = await getSupabaseAdmin()
+      .from("card_scans")
+      .insert({ player_id: who.playerId });
+    if (error) console.error("Could not count a free scan", error.message);
+  }
+  const read = looked.read;
   if (!read.found) return { ok: false, reason: "no-card", read };
   if (read.game === "other") return { ok: false, reason: "not-carried", read };
 
@@ -295,8 +347,9 @@ export async function scanPage(
   const pockets = await Promise.all(
     typed.map(async (cell, slot): Promise<PocketOutcome> => {
       if (cell === null || cell === "too-big") return { slot, state: "empty" };
-      const read = await readCard(cell.bytes, cell.mediaType, true);
-      if (!read) return { slot, state: "unread", read: null };
+      const looked = await readCard(cell.bytes, cell.mediaType, true);
+      if (!looked) return { slot, state: "unread", read: null };
+      const read = looked.read;
       if (!read.found) return { slot, state: "empty" };
       if (read.game === "other") return { slot, state: "unread", read };
       const matches = await findScanned(read);
@@ -313,6 +366,7 @@ export async function scanPage(
 }
 
 const readSchema = z.object({
+  layout: z.enum(["one-card", "binder-page", "no-card"]),
   found: z.boolean(),
   game: z.enum([...SCAN_GAMES, "other"]),
   name: z.string(),
@@ -323,6 +377,7 @@ const readSchema = z.object({
 
 const READ_PROMPT = [
   "This photo should show one trading card. Read what is printed on it.",
+  "layout: binder-page if the photo shows a binder page or a grid holding several cards; one-card if it shows one card (other cards only at the edges); no-card if there is no card.",
   "found: false if there is no trading card in the photo.",
   "game: one-piece, riftbound, lorcana, mtg (Magic: The Gathering), pokemon, flesh-and-blood, or other.",
   "name: the card's own name exactly as printed. Not the set, the artist or the card type.",
@@ -355,7 +410,7 @@ async function readCard(
   bytes: Uint8Array,
   mediaType: "image/jpeg" | "image/png" | "image/webp",
   pocket = false,
-): Promise<ScanRead | null> {
+): Promise<{ layout: "one-card" | "binder-page" | "no-card"; read: ScanRead } | null> {
   try {
     const response = await anthropic().messages.parse({
       model: SCAN_MODEL,
@@ -384,7 +439,8 @@ async function readCard(
     if (response.stop_reason === "refusal") return null;
     const parsed = readSchema.safeParse(response.parsed_output);
     if (!parsed.success) return null;
-    return parsed.data;
+    const { layout, ...read } = parsed.data;
+    return { layout, read };
   } catch (error) {
     /*
      * Logged with the status and the API's own sentence ("Your credit

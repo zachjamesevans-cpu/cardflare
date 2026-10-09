@@ -36,6 +36,7 @@ import { PostalAsk } from "@/components/feed/postal-ask";
 import { BlockedList } from "@/components/players/blocked-list";
 import { DeckListForm } from "@/components/players/deck-list-form";
 import { DeleteAccountForm } from "@/components/players/delete-account-form";
+import { ProMark } from "@/components/stores/ultra-mark";
 import { formatHandle } from "@/lib/players/handle";
 import { ownProfile } from "@/lib/players/profile";
 import { listBlocked } from "@/lib/players/safety";
@@ -323,8 +324,8 @@ export default async function ProfileSettingsPage() {
           history, Embers and unlocks. There is no undo.
         </p>
         <p className="text-sm text-text-muted">
-          Pro through the App Store is billed by Apple: cancel it in your Apple ID
-          subscriptions too, or it keeps renewing.
+          <ProMark /> through the App Store is billed by Apple: cancel it in your Apple
+          ID subscriptions too, or it keeps renewing.
         </p>
       </div>
       <DeleteAccountForm handle={handle} />

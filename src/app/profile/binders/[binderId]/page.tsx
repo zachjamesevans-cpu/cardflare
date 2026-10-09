@@ -10,7 +10,7 @@ import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { pagesLeftToday, queuesFor } from "@/lib/cards/page-jobs";
-import { scannerAccess } from "@/lib/cards/scan";
+import { scanRights } from "@/lib/cards/scan";
 import { playerForUser } from "@/lib/players/accounts";
 import { listPlayerGames } from "@/lib/players/games";
 import { needsSetup } from "@/lib/players/profile";
@@ -68,16 +68,16 @@ export default async function OwnBinderPage({
   if (await needsSetup(playerId)) redirect("/welcome");
 
   const who = { playerId, userId: viewer.user.id };
-  const [binder, games, areas, scanAccess, queues] = await Promise.all([
+  const [binder, games, areas, rights, queues] = await Promise.all([
     readBinder(playerId, playerId, binderId),
     listPlayerGames(playerId),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
-    scannerAccess({ playerId, userId: viewer.user.id }),
+    scanRights({ playerId, userId: viewer.user.id }),
     queuesFor(who, binderId),
   ]);
   if (!binder) notFound();
   /* Only somebody who can scan has pages to count. */
-  const left = scanAccess === "on" ? await pagesLeftToday(who) : 0;
+  const left = rights.pages === "on" ? await pagesLeftToday(who) : 0;
 
   return (
     <>
@@ -99,7 +99,7 @@ export default async function OwnBinderPage({
             imagesEnabled={cardImagesEnabled()}
             playerGames={games}
             title={null}
-            scanAccess={scanAccess}
+            scanRights={rights}
             pageQueues={{ queues, left }}
             openScan={openScan}
           />

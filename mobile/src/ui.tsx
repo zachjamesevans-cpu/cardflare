@@ -1553,6 +1553,7 @@ export function Button({
   busy = false,
   disabled = false,
   variant = "primary",
+  mark,
 }: {
   label: string;
   onPress: () => void;
@@ -1560,6 +1561,8 @@ export function Button({
   /** Inert without the spinner — e.g. while "Posted ✓" is on display. */
   disabled?: boolean;
   variant?: "primary" | "secondary";
+  /** Drawn after the label, in its line: the PRO mark on a door to Pro. */
+  mark?: ReactNode;
 }) {
   return (
     <Tap
@@ -1584,6 +1587,7 @@ export function Button({
         ]}
       >
         {label}
+        {mark ? <> {mark}</> : null}
       </Text>
     </Tap>
   );

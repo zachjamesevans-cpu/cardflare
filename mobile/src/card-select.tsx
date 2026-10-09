@@ -30,8 +30,9 @@ import { Button, CardImage, Loading, Muted, SheetClose, Tap, Title } from "./ui"
  * flare menu for grabbing a flare but adapt it to adding to a binder."
  *
  * The Flare composer passes nothing but the lines and draws exactly
- * what it drew before. The binder adds what is its own through four
- * doors and nothing else: a switch above the search (Paste a list), a
+ * what it drew before. The binder adds what is its own through five
+ * doors and nothing else: a line under the heading (pages being read),
+ * a row under the search field (Scan, and the Paste a list link), a
  * body in place of the search (the pasted list), a note under a result
  * ("×2 in this binder"), and a footer in place of Done (its tray and
  * "Add 3 cards to binder").
@@ -221,6 +222,7 @@ export function CardSelectSheet({
   title = "Select cards",
   above,
   body,
+  belowSearch,
   hitNote,
   footer,
   searchFor = null,
@@ -232,10 +234,12 @@ export function CardSelectSheet({
   onClose: () => void;
   /** The heading; the Flare's "Select cards" unless told otherwise. */
   title?: string;
-  /** Drawn under the heading: the binder's Search / Paste a list switch. */
+  /** Drawn under the heading: the binder's line that pages are being read. */
   above?: ReactNode;
   /** Drawn instead of the search and its results: the binder's pasted list. */
   body?: ReactNode;
+  /** Drawn between the search field and its results: the binder's Scan and Paste a list. */
+  belowSearch?: ReactNode;
   /** A line under a result's stats: the binder's "×2 in this binder". */
   hitNote?: (hit: CardHit) => ReactNode;
   /** Drawn instead of the summary and Done: the binder's tray and Add button. */
@@ -343,6 +347,7 @@ export function CardSelectSheet({
               placeholder={searchPlaceholder(search.scopedGame)}
               autoFocus
             />
+            {belowSearch}
             <ScrollView
               style={{ flex: 1 }}
               contentContainerStyle={{ gap: spacing(2), paddingBottom: spacing(4) }}

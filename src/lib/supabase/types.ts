@@ -1952,6 +1952,16 @@ type PageScanDefaults =
 export type PageScanInsert = Omit<PageScanRow, PageScanDefaults> &
   Partial<Pick<PageScanRow, PageScanDefaults>>;
 
+/** One free single-card scan, for the ten-a-day count. */
+export type CardScanRow = {
+  id: number;
+  player_id: string;
+  created_at: string;
+};
+
+export type CardScanInsert = Pick<CardScanRow, "player_id"> &
+  Partial<Pick<CardScanRow, "created_at">>;
+
 export type NotificationRow = {
   id: string;
   created_at: string;
@@ -2186,6 +2196,7 @@ export type Database = {
       event_hub_timer_log: Table<EventHubTimerLogRow, EventHubTimerLogInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
       page_scans: Table<PageScanRow, PageScanInsert>;
+      card_scans: Table<CardScanRow, CardScanInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       push_tickets: Table<PushTicketRow, PushTicketInsert>;

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Wand2 } from "lucide-react";
 
 import { CustomizeHub } from "@/components/players/customize-hub";
+import { ProMark } from "@/components/stores/ultra-mark";
 import { BackLink } from "@/components/ui/back-link";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
@@ -74,9 +75,9 @@ export default async function CustomizePage({
               is Pro. The door is /pro, which sells it where it can. */}
           {!customizationAllowed && (
             <p className="rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
-              Wearing cosmetics is a cardflare Pro feature.{" "}
+              Wearing cosmetics is a cardflare <ProMark /> feature.{" "}
               <Link href="/pro" className="underline underline-offset-4">
-                Get Pro
+                Get <ProMark />
               </Link>
               , and everything you equip shows here too.
             </p>

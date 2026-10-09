@@ -8,6 +8,7 @@ import { cn } from "@/lib/cn";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { FRAME_CLASS } from "@/components/players/player-avatar";
 import { Rail } from "@/components/lists/rail";
+import { ProMark } from "@/components/stores/ultra-mark";
 import { buyCosmeticAction } from "@/lib/players/profile-actions";
 import type { CosmeticItem, EquipSlot } from "@/lib/players/cosmetics";
 import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
@@ -212,7 +213,9 @@ function Tile({
           canWear ? (
             <span className="text-text-secondary">Tap to wear</span>
           ) : (
-            <span className="text-text-muted">Pro to wear</span>
+            <span className="text-text-muted">
+              <ProMark /> to wear
+            </span>
           )
         ) : locked ? (
           <span className="text-text-muted">

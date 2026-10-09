@@ -57,7 +57,8 @@ describe("Edit profile, the app's screen", () => {
     /* The cover stays reachable from that same door. */
     expect(screen).toContain('"Change cover"');
     expect(screen).toContain('"Change picture"');
-    expect(screen).toContain('"Use a GIF (Pro)"');
+    expect(screen).toContain('label="Use a GIF"');
+    expect(screen).toContain("mark={<ProMark size={15} />}");
   });
 
   it("writes through the same endpoints the website's forms use", () => {

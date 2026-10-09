@@ -52,6 +52,7 @@ import {
   type PushGroup,
   type PushPrefs,
 } from "../push-copy";
+import { ProMark } from "../pro-mark";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
   FEED_VIEWS,
@@ -878,7 +879,9 @@ function ProCard() {
   const [said, setSaid] = useState<string | null>(null);
   return (
     <Card>
-      <Title>Pro</Title>
+      <Title>
+        <ProMark size={18} />
+      </Title>
       {/* The same button as Restore under it: two actions, one shape. */}
       <Button
         label="Manage subscription"

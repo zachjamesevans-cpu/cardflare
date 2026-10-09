@@ -131,10 +131,9 @@ describe("the add menu is the Flare picker", () => {
     expect(src.sheet).toContain("{unreadableLine(line)}");
     expect(src.sheet).toContain("<Stepper");
     expect(src.sheet).toContain("label={addToBinderLabel(matched.length)}");
-    /* The scanner is the third body (tests/unit/card-scan-app.test.ts). */
-    expect(src.sheet).toContain(
-      'body={mode === "paste" ? pasteBody : mode === "scan" ? scanBody : undefined}',
-    );
+    /* The list is a link under the search, with Scan; no tabs
+       (tests/unit/scan-ux-app.test.ts). */
+    expect(src.sheet).toContain('body={mode === "paste" ? pasteBody : undefined}');
   });
 
   it("talks to the routes the server has", () => {
