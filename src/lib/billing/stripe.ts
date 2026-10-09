@@ -163,7 +163,10 @@ export async function cancelStripeSubscription(
       error?: { message?: string };
     };
     if (!response.ok) {
-      console.error("Stripe refused the cancel", data.error?.message ?? response.status);
+      console.error(
+        "Stripe refused the cancel",
+        data.error?.message ?? response.status,
+      );
       return { ok: false, reason: "stripe-error" };
     }
     return { ok: true, data };

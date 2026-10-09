@@ -33,7 +33,10 @@ describe("cardArt", () => {
   });
 
   it("borrows an imaged sibling's art when the printing has none", () => {
-    const unscanned = printing({ printingName: "Perona (Alternate Art)", imageUrl: null });
+    const unscanned = printing({
+      printingName: "Perona (Alternate Art)",
+      imageUrl: null,
+    });
     const base = printing();
 
     expect(cardArt(null, [unscanned, base], "Perona")).toBe(BASE);

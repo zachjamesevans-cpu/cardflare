@@ -125,7 +125,9 @@ describe("the logged half of the history", () => {
 
   it("keeps the Have list in step unless told not to", () => {
     expect(lib).toContain("if (input.updateHaveList)");
-    expect(lib).toContain("planGave(holdings, input.cardId, input.printingId, input.quantity)");
+    expect(lib).toContain(
+      "planGave(holdings, input.cardId, input.printingId, input.quantity)",
+    );
     expect(lib).toContain("delta: input.quantity");
   });
 
@@ -135,7 +137,9 @@ describe("the logged half of the history", () => {
     const counts = read("supabase/migrations/20261109090500_in_person_play_counts.sql");
     expect(counts).toContain("create or replace function public.binder_card_adjust(");
     expect(counts).toContain("security definer");
-    expect(counts).toMatch(/revoke all on function public\.binder_card_adjust[^;]+from anon/);
+    expect(counts).toMatch(
+      /revoke all on function public\.binder_card_adjust[^;]+from anon/,
+    );
     expect(counts).toMatch(
       /revoke all on function public\.binder_card_adjust[^;]+from authenticated/,
     );

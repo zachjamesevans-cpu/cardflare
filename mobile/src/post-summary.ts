@@ -30,7 +30,8 @@ export function postSummary(counts: PostCounts): string | null {
   if (counts.posted >= counts.total) return null;
 
   const parts = [`Posted ${counts.posted} of ${counts.total}`];
-  if (alreadyUp > 0) parts.push(`${alreadyUp} ${alreadyUp === 1 ? "was" : "were"} already up`);
+  if (alreadyUp > 0)
+    parts.push(`${alreadyUp} ${alreadyUp === 1 ? "was" : "were"} already up`);
   if (failed > 0) parts.push(`${failed} could not be posted`);
   if (untried > 0)
     parts.push(

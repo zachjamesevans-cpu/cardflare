@@ -45,7 +45,9 @@ describe("a thread with no card", () => {
 
   it("is reachable from the app's API by player id, with no first message", () => {
     expect(route).toContain("playerId: z.string().uuid().optional()");
-    expect(route).toContain("openDirectThread(player.playerId, playerId, { mayCreate })");
+    expect(route).toContain(
+      "openDirectThread(player.playerId, playerId, { mayCreate })",
+    );
   });
 });
 

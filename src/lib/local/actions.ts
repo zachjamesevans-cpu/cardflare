@@ -124,14 +124,14 @@ async function openAnyThread(
     outcome.reason === "rate-limited"
       ? TOO_MANY
       : outcome.reason === "no-account"
-      ? "This player posted as a guest, so there is nowhere to send a message."
-      : outcome.reason === "yourself"
-        ? "playerId" in on
-          ? "That is you."
-          : "That one is yours."
-        : outcome.reason === "closed"
-          ? "You can't message this player."
-          : GENERIC;
+        ? "This player posted as a guest, so there is nowhere to send a message."
+        : outcome.reason === "yourself"
+          ? "playerId" in on
+            ? "That is you."
+            : "That one is yours."
+          : outcome.reason === "closed"
+            ? "You can't message this player."
+            : GENERIC;
   return { ok: false, message };
 }
 

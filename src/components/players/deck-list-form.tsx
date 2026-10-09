@@ -173,7 +173,8 @@ export function DeckListForm() {
               posted: state.saved,
               alreadyUp: state.alreadyUp,
               failed: state.failed,
-            }) ?? `Posted ${state.saved} ${state.saved === 1 ? "card" : "cards"} as one Flare.`}
+            }) ??
+              `Posted ${state.saved} ${state.saved === 1 ? "card" : "cards"} as one Flare.`}
           </p>
           {state.unknown.length > 0 && (
             /* Named, not counted. A number tells you something went

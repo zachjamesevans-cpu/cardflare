@@ -80,11 +80,15 @@ describe("the reminder on the day", () => {
   it("rides a daily cron (Hobby plan) with a day's horizon, bounded by time, fail-closed", () => {
     const route = read("src/app/api/cron/night-reminder/route.ts");
     expect(route).toContain("process.env.CRON_SECRET");
-    expect(route).toContain("(Number(process.env.NIGHT_REMINDER_HORIZON_HOURS) || 24) * 60 * 60 * 1000");
+    expect(route).toContain(
+      "(Number(process.env.NIGHT_REMINDER_HORIZON_HOURS) || 24) * 60 * 60 * 1000",
+    );
     expect(route).toContain("const TIME_BUDGET_MS = 45 * 1000;");
     expect(route).not.toContain("NOTICE_CAP");
     /* The sent-marker: whoever already has the reminder is skipped. */
-    expect(route).toContain("const reminded = await alreadyReminded(event.id, players);");
+    expect(route).toContain(
+      "const reminded = await alreadyReminded(event.id, players);",
+    );
     expect(route).toContain("if (reminded.has(playerId)) continue;");
     expect(route).toContain("if (!boardReadable(phase)) continue;");
     expect(route).toContain("nightMatches(event.id, playerId)");
@@ -105,7 +109,9 @@ describe("nights that have ended", () => {
     const route = read("src/app/api/cron/close-nights/route.ts");
     expect(route).toContain("process.env.CRON_SECRET");
     expect(route).toContain("if (!secret ||");
-    expect(route).toContain("await sweepEndedScheduledEvents(new Date().toISOString());");
+    expect(route).toContain(
+      "await sweepEndedScheduledEvents(new Date().toISOString());",
+    );
     const vercel = JSON.parse(read("vercel.json")) as {
       crons: { path: string; schedule: string }[];
     };

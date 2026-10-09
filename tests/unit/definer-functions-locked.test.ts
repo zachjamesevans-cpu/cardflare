@@ -12,7 +12,9 @@ import { describe, expect, it } from "vitest";
  */
 
 const dir = join(process.cwd(), "supabase/migrations");
-const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+const files = readdirSync(dir)
+  .filter((f) => f.endsWith(".sql"))
+  .sort();
 const sql = files.map((f) => readFileSync(join(dir, f), "utf8")).join("\n");
 const lock = readFileSync(
   join(dir, "20261109093100_lock_definer_functions.sql"),
@@ -24,8 +26,7 @@ const CLIENT_CALLABLE = new Set(["is_admin", "is_store_member"]);
 
 function definerFunctions(): string[] {
   const names = new Set<string>();
-  const re =
-    /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(([\s\S]*?)\$/gi;
+  const re = /create\s+(?:or\s+replace\s+)?function\s+public\.(\w+)\s*\(([\s\S]*?)\$/gi;
   for (const m of sql.matchAll(re)) {
     if (/security\s+definer/i.test(m[2])) names.add(m[1]);
   }

@@ -102,10 +102,7 @@ async function loggedEntries(playerId: string): Promise<TradeHistoryEntry[]> {
       .from("cards")
       .select("id, exact_name, canonical_card_number")
       .in("id", cardIds),
-    admin
-      .from("card_printings")
-      .select(PRINTING_COLUMNS)
-      .in("card_id", cardIds),
+    admin.from("card_printings").select(PRINTING_COLUMNS).in("card_id", cardIds),
     partnerIds.length > 0
       ? admin.from("players").select("id, display_name").in("id", partnerIds)
       : Promise.resolve({ data: [] as { id: string; display_name: string }[] }),
@@ -295,10 +292,7 @@ export async function listTradeHistory(
       .from("cards")
       .select("id, exact_name, canonical_card_number")
       .in("id", cardIds),
-    admin
-      .from("card_printings")
-      .select(PRINTING_COLUMNS)
-      .in("card_id", cardIds),
+    admin.from("card_printings").select(PRINTING_COLUMNS).in("card_id", cardIds),
     partnerIds.length > 0
       ? admin
           .from("player_sessions")

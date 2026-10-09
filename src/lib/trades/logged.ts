@@ -91,7 +91,8 @@ export async function logTrade(
         .update({ binder_changes: changes })
         .eq("id", data.id)
         .eq("player_id", playerId);
-      if (noteError) console.error("Could not note the trade's binder moves", noteError);
+      if (noteError)
+        console.error("Could not note the trade's binder moves", noteError);
     }
   }
 
@@ -183,8 +184,8 @@ export async function deleteLoggedTrade(
 
   for (const row of removed ?? []) {
     const changes = Array.isArray(row.binder_changes) ? row.binder_changes : [];
-    await applyChanges(playerId, displayName, reverseChanges(changes)).catch(
-      (caught) => console.error("Could not undo a logged trade's binder moves", caught),
+    await applyChanges(playerId, displayName, reverseChanges(changes)).catch((caught) =>
+      console.error("Could not undo a logged trade's binder moves", caught),
     );
   }
   return true;

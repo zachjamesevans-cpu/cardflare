@@ -321,7 +321,9 @@ export async function insertAreaFlares(
         const flareId = byKey.get(
           rowKey(input.cardId, input.printingId, input.intent ?? "want"),
         );
-        outcomes[index] = flareId ? { status: "posted", flareId } : { status: "failed" };
+        outcomes[index] = flareId
+          ? { status: "posted", flareId }
+          : { status: "failed" };
       }
     } else {
       if (error.code !== "23505") console.error("Could not post the batch", error);

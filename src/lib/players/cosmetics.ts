@@ -268,12 +268,7 @@ export type BuyOutcome =
   | {
       ok: false;
       reason:
-        | "unknown"
-        | "owned"
-        | "locked"
-        | "too-expensive"
-        | "not-pro"
-        | "unavailable";
+        "unknown" | "owned" | "locked" | "too-expensive" | "not-pro" | "unavailable";
     };
 
 /**

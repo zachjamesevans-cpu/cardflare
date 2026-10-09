@@ -156,7 +156,10 @@ describe("POST /api/v1/avatar", () => {
       .mockImplementationOnce(
         () =>
           new Promise((resolve) =>
-            setTimeout(() => resolve({ data: { text: async () => pieces[0] }, error: null }), 5),
+            setTimeout(
+              () => resolve({ data: { text: async () => pieces[0] }, error: null }),
+              5,
+            ),
           ),
       )
       .mockResolvedValueOnce({ data: { text: async () => pieces[1] }, error: null });
@@ -170,7 +173,10 @@ describe("POST /api/v1/avatar", () => {
     );
 
     expect(response.status).toBe(200);
-    const [, file] = setAvatar.mock.calls[0] as [string, { arrayBuffer(): Promise<ArrayBuffer> }];
+    const [, file] = setAvatar.mock.calls[0] as [
+      string,
+      { arrayBuffer(): Promise<ArrayBuffer> },
+    ];
     expect(Buffer.from(await file.arrayBuffer()).toString()).toBe("hello world");
   });
 

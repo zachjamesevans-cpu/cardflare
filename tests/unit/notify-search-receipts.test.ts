@@ -33,7 +33,9 @@ describe("a comment notice", () => {
   it("opens the post, on both platforms", () => {
     expect(postHref("abc")).toBe("/feed?post=abc");
     const notify = read("src/lib/notifications/notify.ts");
-    const comment = notify.slice(notify.indexOf("export async function notifyPostComment"));
+    const comment = notify.slice(
+      notify.indexOf("export async function notifyPostComment"),
+    );
     expect(comment.slice(0, 1200)).toContain("const path = postHref(postId);");
 
     const follow = read("mobile/src/follow-href.ts");
