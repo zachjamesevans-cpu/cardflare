@@ -25,6 +25,7 @@ import { RoomDoor } from "@/components/events/room-door";
 import { RoomTicker } from "@/components/events/room-ticker";
 import { RoomTimers } from "@/components/event-hub/room-timers";
 import { WhatToBring } from "@/components/events/what-to-bring";
+import { YourBinders } from "@/components/nights/your-binders";
 import { ShowSearch } from "@/components/shows/show-search";
 import { RoomLoading } from "@/components/events/room-loading";
 import { StoreLobby, StoreQuiet } from "@/components/events/store-code-screens";
@@ -62,6 +63,7 @@ import {
 import { boardReadable, boardWritable, roomPhase } from "@/lib/events/schema";
 import { goingState, nightRoster } from "@/lib/events/going";
 import { EMPTY_MATCHES, nightMatches } from "@/lib/events/night-matches";
+import { nightBinderState } from "@/lib/events/night-binders";
 import { gameProfile } from "@/lib/event-hub/game-profiles";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
@@ -410,15 +412,25 @@ async function RoomBody({
    * and what to pack. Read after the link above, so an account that
    * just signed in mid-night counts as going the moment its seat is
    * its own. A guest gets no matches: matching runs on an account's
-   * wants and binder, and a finished night matches nobody.
+   * wants and binder, and a finished night matches nobody. The
+   * binders an account is bringing are read once the roster says it
+   * is going, and only then.
    */
-  const [night, rawRoster, matches, store] = await Promise.all([
-    readable ? goingState(event.id, accountPlayerId) : Promise.resolve(null),
+  const goingRead = readable
+    ? goingState(event.id, accountPlayerId)
+    : Promise.resolve(null);
+  const [night, rawRoster, matches, store, binderState] = await Promise.all([
+    goingRead,
     readable || finished ? nightRoster(event.id, accountPlayerId) : Promise.resolve([]),
     readable && accountPlayerId
       ? nightMatches(event.id, accountPlayerId)
       : Promise.resolve(EMPTY_MATCHES),
     scheduled ? publicStore(event.storeId, accountPlayerId) : Promise.resolve(null),
+    accountPlayerId
+      ? goingRead.then((going) =>
+          going?.youGoing ? nightBinderState(event.id, accountPlayerId) : null,
+        )
+      : Promise.resolve(null),
   ]);
   const roster = dedupeRoster(rawRoster);
   const hereNow = roster.filter((player) => player.present).length;
@@ -761,6 +773,12 @@ async function RoomBody({
                 />
               }
             />
+          )}
+
+          {/* The binders they are bringing, just above the matches
+              those binders feed, while the night takes changes. */}
+          {accountPlayerId && night?.youGoing && binderState?.editable && (
+            <YourBinders eventId={event.id} code={normalized} state={binderState} />
           )}
 
           {/* Matches for you: the first section, for an account. A

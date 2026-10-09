@@ -13,6 +13,7 @@ import {
   THEY_WANT,
   TRADE_BINDERS,
 } from "@/lib/events/night-copy";
+import { BINDERS_THEYRE_BRINGING } from "@/lib/events/night-binder-rules";
 import type { NightPlayerView } from "@/lib/events/night-matches";
 
 /**
@@ -28,16 +29,28 @@ import type { NightPlayerView } from "@/lib/events/night-matches";
  * thumbnails, Message, then their Flares at this night on the board's
  * own tiles and the binders they have up for trade as the profile's
  * own rows. The server hands over only for_trade binders, so a private
- * one cannot be drawn here. The app's night-player.tsx draws the same
+ * one cannot be drawn here.
+ *
+ * Above those, apart from them, the binders they said they are
+ * bringing to this night (founder, 2026-10-09: "show a section called
+ * Binders They're Bringing, separate from their full public binder
+ * collection"). The server decides which the viewer may see: a private
+ * one only when its owner chose this night, and only for someone
+ * going. Its rows carry the night, the one way such a binder opens,
+ * and the section is left out when there is nothing in it. The app's
+ * night-player.tsx draws the same
  * sections in the same order with the same words; tests/unit/nights2
  * -parity.test.ts holds the two together.
  */
 export function NightPlayer({
   view,
+  eventId,
   imagesEnabled,
   canMessage,
 }: {
   view: NightPlayerView;
+  /** The night, for the brought binders' links. */
+  eventId: string;
   imagesEnabled: boolean;
   /** Message needs an account on both ends and not your own page. */
   canMessage: boolean;
@@ -124,6 +137,29 @@ export function NightPlayer({
           <p className="text-sm text-text-secondary">No Flares at this Night yet.</p>
         )}
       </section>
+
+      {view.bringing.length > 0 && (
+        <section
+          className="flex flex-col gap-2 border-t border-border pt-4"
+          aria-labelledby="binders-bringing"
+        >
+          <SectionLabel id="binders-bringing">{BINDERS_THEYRE_BRINGING}</SectionLabel>
+          <BinderList
+            binders={view.bringing.map((binder) => ({
+              ...binder,
+              forTrade: !binder.eventOnly,
+            }))}
+            yours={false}
+            base={`/p/${player.playerId}`}
+            query={`?night=${eventId}`}
+            eventOnly={
+              new Set(
+                view.bringing.filter((binder) => binder.eventOnly).map((b) => b.id),
+              )
+            }
+          />
+        </section>
+      )}
 
       <section
         className="flex flex-col gap-2 border-t border-border pt-4"

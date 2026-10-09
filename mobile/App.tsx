@@ -39,6 +39,7 @@ import { TradeHistoryScreen } from "./src/screens/trade-history";
 import { LogTradeScreen } from "./src/screens/log-trade";
 import { ProfileScreen } from "./src/screens/profile";
 import { EditProfileScreen } from "./src/screens/edit-profile";
+import { BringingHost } from "./src/bringing-sheet";
 import { BinderScreen } from "./src/screens/binder";
 import { BindersScreen } from "./src/screens/binders";
 import { HuntsScreen } from "./src/screens/hunts";
@@ -194,9 +195,12 @@ export type StackParams = {
    * One binder, open: the website's /profile/binders/[binderId] with
    * no playerId, /p/[playerId]/binders/[binderId] with one. No
    * binderId means the Trade binder. Reached from the highlights row
-   * on either profile and from the Binders list.
+   * on either profile and from the Binders list. `nightId` is a binder
+   * opened from a night's "Binders they're bringing": the website's
+   * ?night=, the one door a private binder shown to that night opens
+   * through.
    */
-  Binder: { playerId?: string; binderId: string } | undefined;
+  Binder: { playerId?: string; binderId: string; nightId?: string } | undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
@@ -999,6 +1003,7 @@ function AppGates() {
               <BinderScreen
                 playerId={route.params?.playerId}
                 binderId={route.params?.binderId}
+                nightId={route.params?.nightId}
               />
             )}
           </Stack.Screen>
@@ -1065,6 +1070,9 @@ function AppGates() {
             )}
           </Stack.Screen>
         </Stack.Navigator>
+        {/* The binders picker after Going, over whatever screen is up
+            (src/bringing-sheet.tsx says why it lives here). */}
+        <BringingHost />
       </NavigationContainer>
     </StartupGuard>
   );

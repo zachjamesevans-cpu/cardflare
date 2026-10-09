@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import type { StackParams } from "../App";
 import { ApiError, setGoing, storedAccessToken, type GoingAnswer } from "./api";
+import { offerBringingAfterGoing } from "./bringing-sheet";
 import { markFeedStale } from "./feed-refresh";
 import { GOING, YOURE_GOING, goingLine } from "./going-copy";
 import { Tap } from "./ui";
@@ -34,6 +35,14 @@ import { colors, radius, spacing } from "./theme";
  *
  * `goingCount` beside it is the "{n} going" line, drawn through
  * `goingLine` so the three forms cannot drift from the website's.
+ *
+ * Once the server has said Going, the binders picker follows: the
+ * founder (2026-10-09), "When someone RSVPs 'Going' to a Night, they
+ * should have the option to select which of their existing digital
+ * binders they're bringing." Only on turning Going on, only for a
+ * player with binders and none picked yet, so it never nags. The sheet
+ * is drawn by the root's host (src/bringing-sheet.tsx), because this
+ * button can be swapped out under it the moment the night re-reads.
  */
 export function GoingButton({
   eventId,
@@ -60,6 +69,9 @@ export function GoingButton({
   const [count, setCount] = useState(goingCount);
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
+  /* The latest onSettled, for a picker saved after this button has gone. */
+  const settled = useRef(onSettled);
+  settled.current = onSettled;
 
   useEffect(
     () => () => {
@@ -97,6 +109,10 @@ export function GoingButton({
       /* A night you are going to is a Feed item from then on. */
       markFeedStale();
       onSettled?.(answer);
+      /* Saved picks change the night's matches: the same re-read. */
+      if (next && answer.youGoing) {
+        void offerBringingAfterGoing(eventId, () => settled.current?.(answer));
+      }
     } catch (caught) {
       if (!alive.current) return;
       setGoingState(before.going);

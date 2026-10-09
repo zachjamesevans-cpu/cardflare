@@ -315,6 +315,8 @@ const offerSchema = z.object({
 export async function offerOnBinderAction(
   binderId: string,
   input: unknown,
+  /** The night it was opened from, for a binder brought there. */
+  nightId: string | null = null,
 ): Promise<
   { ok: true; threadId: string; message: string } | { ok: false; message: string }
 > {
@@ -324,7 +326,13 @@ export async function offerOnBinderAction(
   const parsed = offerSchema.safeParse(input);
   if (!id || !parsed.success) return { ok: false, message: "Pick a card first." };
 
-  const sent = await offerOnBinder(id, player.id, parsed.data.items, parsed.data.note);
+  const sent = await offerOnBinder(
+    id,
+    player.id,
+    parsed.data.items,
+    parsed.data.note,
+    nightId ? binderIdOf(nightId) : null,
+  );
   if (!sent.ok) {
     return {
       ok: false,

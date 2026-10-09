@@ -257,7 +257,8 @@ export async function signUp(
   if (result.errorCode === "upstream") {
     return {
       ok: false,
-      message: "Your account is ready, but signing in did not finish. Sign in to continue.",
+      message:
+        "Your account is ready, but signing in did not finish. Sign in to continue.",
     };
   }
 
@@ -460,7 +461,12 @@ export function friendlyError(caught: unknown): string {
     if (caught.code === "ultra-required") return describeError(caught);
     if (caught.detail) return caught.detail;
     const { status, code } = caught;
-    if (status === 0 || code === "bad-json" || code === "network" || code === "timeout") {
+    if (
+      status === 0 ||
+      code === "bad-json" ||
+      code === "network" ||
+      code === "timeout"
+    ) {
       return "Couldn't reach cardflare. Check your connection and try again.";
     }
     if (status === 401) return "You've been signed out. Sign in again and retry.";
@@ -469,8 +475,10 @@ export function friendlyError(caught: unknown): string {
     if (status === 409) return "That changed in the meantime. Refresh and try again.";
     if (status === 413) return "That file is too big. Try a smaller one.";
     if (status === 429) return "That's a lot at once. Wait a moment and try again.";
-    if (status === 400 || status === 422) return "That didn't look right. Check it and try again.";
-    if (status >= 500) return "Something went wrong on our side. Try again in a moment.";
+    if (status === 400 || status === 422)
+      return "That didn't look right. Check it and try again.";
+    if (status >= 500)
+      return "Something went wrong on our side. Try again in a moment.";
   }
   return "Something went wrong. Try again.";
 }
@@ -819,6 +827,11 @@ export interface RosterPlayer {
   /** Up to three binders up for trade; empty for a guest. */
   binders: RosterBinder[];
   /**
+   * The binders they said they are bringing to this night, as the
+   * viewer may see them. Absent from an older server.
+   */
+  bringing?: RosterBinder[];
+  /**
    * How many cards are on their Have list, and how many of those and
    * the viewer's cross: the "42 trade cards" and "2 matches" on a
    * Players going row. Absent from an older server, which draws the
@@ -1158,6 +1171,13 @@ export interface NightPlayerView {
   flares: NightPlayerFlare[];
   /** Up for trade only. */
   binders: BinderSummary[];
+  /**
+   * The binders they said they are bringing to this night, as the
+   * viewer may see them: a private one only with its owner's "Show to
+   * this Night only", and only for players going. Absent from an
+   * older server.
+   */
+  bringing?: BroughtBinder[];
   flaresCount: number;
   /** The size of their Have list. */
   tradeCards: number;
@@ -1168,6 +1188,72 @@ export const getNightPlayer = (eventId: string, playerId: string) =>
   call<NightPlayerView>(
     "GET",
     `/api/v1/nights/${encodeURIComponent(eventId)}/players/${encodeURIComponent(playerId)}`,
+  );
+
+/* ------------------------------------------------------------------ */
+/* Binders I'm Bringing                                                */
+/* ------------------------------------------------------------------ */
+
+/** One binder on the picker: the website's `NightBinderChoice`. */
+export interface NightBinderChoice extends BinderSummary {
+  /** Picked for this night. */
+  selected: boolean;
+  /** Picked and private: the owner chose to show it to this night only. */
+  eventOnly: boolean;
+}
+
+/**
+ * The picker's state for the signed-in player at one night: every
+ * binder they own, which are picked, and whether the night still takes
+ * changes. The website's `NightBinderState`.
+ */
+export interface NightBinderState {
+  /** The night can still take changes: upcoming, early or live. */
+  editable: boolean;
+  /** The player is on this night's roster. */
+  going: boolean;
+  /** "tonight", "Friday" or "Oct 24": for "Your binders for tonight". */
+  dayWord: string;
+  binders: NightBinderChoice[];
+  selectedCount: number;
+  selectedCards: number;
+}
+
+/** One brought binder as another player sees it: the website's `BroughtBinder`. */
+export interface BroughtBinder {
+  id: string;
+  name: string;
+  cover: BinderCoverId;
+  count: number;
+  /** Private, shown to this night's attendees by the owner's choice. */
+  eventOnly: boolean;
+}
+
+/** One pick as the picker sends it back. */
+export interface NightBinderPick {
+  binderId: string;
+  /** The owner's explicit choice to show a PRIVATE binder to this night. */
+  eventOnly: boolean;
+}
+
+/** The picker's state. A 404 when there is no such night. */
+export const getNightBinders = (eventId: string) =>
+  call<{ state: NightBinderState }>(
+    "GET",
+    `/api/v1/nights/${encodeURIComponent(eventId)}/binders`,
+  );
+
+/**
+ * Replaces the player's picks at one night; an empty list is "Not
+ * bringing any". Refused with the code of one of BRINGING_REFUSALS in
+ * src/night-binder-copy.ts: `needs-consent` (400), `not-yours` (404),
+ * `not-going` and `not-open` (409), `unavailable` (503).
+ */
+export const saveNightBinders = (eventId: string, picks: NightBinderPick[]) =>
+  call<{ state: NightBinderState }>(
+    "PUT",
+    `/api/v1/nights/${encodeURIComponent(eventId)}/binders`,
+    { picks },
   );
 
 /** What saying Going, or Not going, comes back with. */
@@ -2346,6 +2432,25 @@ export const listBinders = (playerId?: string) =>
 export const getBinder = (playerId: string | undefined, binderId: string) =>
   call<{ binder: Binder }>("GET", binderPath(binderId, playerId));
 
+/**
+ * A binder opened from a night's "Binders they're bringing": through
+ * /api/v1/binders/<id>?night=, the one door a private binder its owner
+ * showed to that night opens through, and only for a signed-in player
+ * going. A guest has no such door and reads it the plain way, where a
+ * binder up for trade still answers.
+ */
+export const getBroughtBinder = async (
+  playerId: string | undefined,
+  binderId: string,
+  nightId: string,
+) =>
+  (await storedAccessToken())
+    ? call<{ binder: Binder }>(
+        "GET",
+        `${binderPath(binderId)}?night=${encodeURIComponent(nightId)}`,
+      )
+    : getBinder(playerId, binderId);
+
 /** A new binder, private unless `forTrade`. A 409 whose code is "at-cap" at twenty. */
 export const createBinder = (input: {
   name: string;
@@ -2441,10 +2546,14 @@ export const offerOnBinder = (
   binderId: string,
   items: BinderOfferItem[],
   note: string | null,
+  /** The night it was opened from, for a binder brought there. */
+  nightId: string | null = null,
 ) =>
   call<{ ok: true; threadId: string; message: string }>(
     "POST",
-    `/api/v1/binders/${encodeURIComponent(binderId)}/offer`,
+    `/api/v1/binders/${encodeURIComponent(binderId)}/offer${
+      nightId ? `?night=${encodeURIComponent(nightId)}` : ""
+    }`,
     { items, note },
   );
 
@@ -2768,7 +2877,8 @@ export function offerErrorMessage(caught: unknown): string {
       : "";
   /* The diagnosis goes to the console, not the screen: a player can do
      nothing with "http-500", and a bug report still has it. */
-  if (!OFFER_REASONS.has(reason)) console.warn("[cardflare] offer", describeError(caught));
+  if (!OFFER_REASONS.has(reason))
+    console.warn("[cardflare] offer", describeError(caught));
   return offerFailureMessage(reason);
 }
 

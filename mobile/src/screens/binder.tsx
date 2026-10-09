@@ -44,6 +44,7 @@ import {
   deleteBinder,
   friendlyError,
   getBinder,
+  getBroughtBinder,
   type OfferItem,
   offerOnBinder,
   type OfferOutcome,
@@ -57,6 +58,7 @@ import { BinderAddSheet } from "../binder-add-sheet";
 import { BinderCover } from "../binder-cover";
 import { BINDER_COVERS, BINDER_LAYOUT } from "../binder-covers";
 import { BINDER_OFFER_COPY, binderOfferSentLine } from "../binder-offer-copy";
+import { nightSharedLine } from "../night-binder-copy";
 import { binderShareUrl } from "../config";
 import { inYourOfferLine } from "../offer-copy";
 import { OfferReviewSheet } from "../offer-review-sheet";
@@ -202,10 +204,13 @@ const clamp = (value: number, low: number, high: number) =>
 export function BinderScreen({
   playerId,
   binderId,
+  nightId,
 }: {
   playerId?: string;
   /** The binder's uuid. */
   binderId?: string;
+  /** Opened from a night's "Binders they're bringing": read through that night. */
+  nightId?: string;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const id = binderId || "";
@@ -243,7 +248,9 @@ export function BinderScreen({
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const { binder: fresh } = await getBinder(playerId, id);
+      const { binder: fresh } = nightId
+        ? await getBroughtBinder(playerId, id, nightId)
+        : await getBinder(playerId, id);
       setBinder(fresh);
       setError(null);
     } catch (caught) {
@@ -256,7 +263,7 @@ export function BinderScreen({
           : friendlyError(caught),
       );
     }
-  }, [id, playerId]);
+  }, [id, playerId, nightId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -338,7 +345,9 @@ export function BinderScreen({
   const yours = binder?.yours ?? false;
   /* An offer is somebody else's binder, up for trade. The server
      answers only a signed-in player, so anyone looking is one. */
-  const offering = Boolean(binder && !binder.yours && binder.forTrade);
+  /* A binder brought to a night takes offers there too, whatever its
+     own setting: its owner chose to show it to the night's players. */
+  const offering = Boolean(binder && !binder.yours && (binder.forTrade || nightId));
   const allCards = useMemo(
     () => [...(binder?.cards ?? [])].sort((a, b) => a.pocket - b.pocket),
     [binder?.cards],
@@ -505,6 +514,7 @@ export function BinderScreen({
       writeId,
       items.map((item) => ({ entryId: item.flareId, quantity: item.quantity })),
       note.trim() || null,
+      nightId ?? null,
     );
     lastSent.current = { threadId: result.threadId };
     return { offered: items.length, refused: [] };
@@ -866,7 +876,11 @@ function binderLine(binder: Binder): string {
       ? "Up for trade. Somebody nearby hunting one of these hears about it."
       : `Cards ${binder.ownerName} will trade.`;
   }
-  return "Private. Only you can open it.";
+  /* A visitor sees a private binder only when its owner brought it to
+     a night and showed it to that night's attendees. */
+  return binder.yours
+    ? "Private. Only you can open it."
+    : nightSharedLine(binder.ownerName);
 }
 
 /* ------------------------------------------------------------------ */

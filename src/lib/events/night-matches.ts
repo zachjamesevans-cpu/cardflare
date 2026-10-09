@@ -3,6 +3,12 @@ import "server-only";
 import { listBinders, type BinderSummary } from "@/lib/binder/binder";
 import { pickBasePrinting, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import { formatEventMoment } from "@/lib/events/format";
+import {
+  broughtBindersFor,
+  broughtCardsAt,
+  nightPhase,
+  type BroughtBinder,
+} from "@/lib/events/night-binders";
 import { listParticipants } from "@/lib/events/participants";
 import { findEventById, findStoreById } from "@/lib/events/repository";
 import { boardReadable, roomPhase } from "@/lib/events/schema";
@@ -193,12 +199,18 @@ export async function afterGoing(eventId: string, playerId: string): Promise<voi
  *   haves(P) = P's Have list (player_cards marked local_trade) + P's
  *              "showcase" Flares at E
  *
- * THE HAVE LIST IS THE ONLY SOURCE OF BINDER CARDS. Since binders
- * round 2 it is derived from the binders that are up for trade and
- * nothing else, so "public Trade Binder cards" and "the Have list" are
- * one set by construction, and a private binder's cards are never read
- * here: there is no query against binder_cards in this file, and there
- * must not be. The founder: "private binders should never be exposed."
+ * BINDER CARDS COME FROM TWO PLACES, AND ONLY TWO. The Have list,
+ * derived from the binders that are up for trade, so "public Trade
+ * Binder cards" and "the Have list" are one set by construction. And
+ * the binders a player said they are bringing to THIS night
+ * (`broughtCardsAt` in night-binders.ts), which may include a private
+ * binder only when its owner ticked "Show to this Night only" for it,
+ * and then only for viewers on this night's roster. There is still no
+ * query against binder_cards in this file, and there must not be: the
+ * privacy rule lives in one place. The founder: "private binders should
+ * never be exposed", and (2026-10-09) "Do not automatically expose
+ * private binders... require an explicit, clearly explained event-only
+ * visibility choice."
  *
  * Matching is on the card, then graded by printing the way the board
  * grades an offer (`matchFor`): a want that takes any printing is an
@@ -220,6 +232,12 @@ export interface MatchCard {
   printingLabel: string | null;
   /** Whether the holder's copy is the printing asked for. */
   match: MatchKind;
+  /**
+   * The binder the holder said they are bringing to this night with
+   * the card in it, or null when it is only on their Have list or a
+   * Flare. Why the match is worth a trip: it is coming in a bag.
+   */
+  bringingFrom?: string | null;
 }
 
 export interface MatchPlayer {
@@ -303,6 +321,12 @@ export interface CardLists {
    * of unknown printing. A card absent here is held in unknown printing.
    */
   havePrintings: Map<string, Set<string | null>>;
+  /**
+   * Cards in the binders this player said they are bringing to this
+   * night, by card, with the binder's name. Part of `binderHaves`
+   * already; this says which of those are coming in a bag.
+   */
+  brought?: Map<string, string>;
 }
 
 export function emptyLists(): CardLists {
@@ -382,6 +406,8 @@ export interface MatchedCard {
   match: MatchKind;
   /** The printing the wanter named, or null for any. */
   printingId: string | null;
+  /** The binder they are bringing with it in, or null. */
+  bringingFrom: string | null;
 }
 
 export interface WantedCard {
@@ -389,6 +415,8 @@ export interface WantedCard {
   match: MatchKind;
   /** The printing the wanter named, or null for any. */
   printingId: string | null;
+  /** The viewer's own binder they are bringing with it in, or null. */
+  bringingFrom: string | null;
 }
 
 /** One attendee who matches the viewer in at least one direction. */
@@ -423,6 +451,7 @@ export function matchAttendees(
         fromYourFlare: viewer.flareWants.has(cardId),
         match: printingMatch(wanted, held),
         printingId: wantedPrinting(wanted, held),
+        bringingFrom: lists.brought?.get(cardId) ?? null,
       });
     }
     const theyWant: WantedCard[] = [];
@@ -434,6 +463,7 @@ export function matchAttendees(
           cardId,
           match: printingMatch(wanted, held),
           printingId: wantedPrinting(wanted, held),
+          bringingFrom: viewer.brought?.get(cardId) ?? null,
         });
       }
     }
@@ -587,9 +617,13 @@ async function readLists(
   const attendeesOf = new Map<string, string[]>();
   const seatOfAt = new Map<string, Map<string, string>>();
   const nameOf = new Map<string, string>();
+  /* Whether the viewer is on each night's roster: a private binder
+     brought with "this Night only" counts for its attendees alone. */
+  const viewerAttendingAt = new Map<string, boolean>();
   for (const seat of seats ?? []) {
     const session = seatSession.get(seat.player_session_id);
     const playerId = session?.player_id;
+    if (session && playerId === viewerId) viewerAttendingAt.set(seat.event_id, true);
     if (!session || !playerId || playerId === viewerId) continue;
     if (only && !only.includes(playerId)) continue;
     const seatOf = seatOfAt.get(seat.event_id) ?? new Map<string, string>();
@@ -680,6 +714,23 @@ async function readLists(
     }
   }
 
+  /* The binders each player said they are bringing to each night, read
+     through their pointers: other players' narrowed to what the viewer
+     wants, the viewer's own whole, so their cards narrow the wants read
+     below as the Have list does. See night-binders.ts for who may count. */
+  const broughtAt = await broughtCardsAt(
+    eventIds,
+    [viewerId, ...others],
+    viewerId,
+    viewerAttendingAt,
+    viewerWantsAll,
+  );
+  for (const byPlayer of broughtAt.values()) {
+    for (const cardId of byPlayer.get(viewerId)?.printings.keys() ?? []) {
+      viewerHavesAll.add(cardId);
+    }
+  }
+
   const otherSessions = others.flatMap((playerId) => sessionsOf.get(playerId) ?? []);
   const haveReads =
     otherSessions.length > 0 && viewerWantsAll.size > 0
@@ -765,13 +816,22 @@ async function readLists(
       []) {
       for (const printingId of set) notePrinting(havePrintings, cardId, printingId);
     }
+    /* A brought binder's cards join the Have list for this night only,
+       printings and all; the Have list's own entries win on printing. */
+    const bringing = broughtAt.get(eventId)?.get(playerId);
+    const binderHaves = new Set(binder);
+    for (const [cardId, set] of bringing?.printings ?? []) {
+      binderHaves.add(cardId);
+      for (const printingId of set) notePrinting(havePrintings, cardId, printingId);
+    }
     return {
       wants: new Set([...saved, ...flareWants]),
       flareWants,
-      binderHaves: binder,
+      binderHaves,
       flareHaves,
       wantPrintings,
       havePrintings,
+      brought: bringing?.binderOf ?? new Map(),
     };
   };
 
@@ -989,8 +1049,11 @@ export async function nightMatches(
       cardId: string;
       printingId: string | null;
       match: MatchKind;
-    }) =>
-      matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match);
+      bringingFrom?: string | null;
+    }) => ({
+      ...matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match),
+      bringingFrom: card.bringingFrom ?? null,
+    });
     /* The checklist is the viewer's own copies, so nothing is in question. */
     const ownCard = (cardId: string) =>
       matchCardFor(cards.get(cardId), cardId, null, "exact");
@@ -1102,6 +1165,12 @@ export interface NightPlayerView {
   flares: Omit<ListEntry, "playerSessionId">[];
   /** for_trade only (listBinders with the viewer). */
   binders: BinderSummary[];
+  /**
+   * The binders they said they are bringing to this night, as the
+   * viewer may see them (night-binders.ts): a private one only for an
+   * attendee, and only when they chose to show it to this night.
+   */
+  bringing: BroughtBinder[];
   flaresCount: number;
   /** Size of their Have list. */
   tradeCards: number;
@@ -1178,7 +1247,10 @@ export async function nightPlayer(
     const seat = participants.find((row) => row.playerId === playerId);
     if (!seat) return null;
 
-    const [sessions, roomFlares, binders, counts, lists] = await Promise.all([
+    const viewerAttending =
+      viewerId !== null && participants.some((row) => row.playerId === viewerId);
+    const phase = await nightPhase(eventId);
+    const [sessions, roomFlares, binders, counts, lists, brought] = await Promise.all([
       sessionsForPlayers([playerId]),
       listRoomFlares(eventId),
       listBinders(playerId, viewerId),
@@ -1186,6 +1258,9 @@ export async function nightPlayer(
       viewerId && viewerId !== playerId
         ? readLists([eventId], viewerId, [playerId])
         : Promise.resolve(new Map<string, NightLists>()),
+      phase
+        ? broughtBindersFor(eventId, [playerId], viewerId, viewerAttending, phase)
+        : Promise.resolve(new Map<string, BroughtBinder[]>()),
     ]);
 
     const theirSessions = new Set(sessions.keys());
@@ -1214,8 +1289,11 @@ export async function nightPlayer(
       cardId: string;
       printingId: string | null;
       match: MatchKind;
-    }) =>
-      matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match);
+      bringingFrom?: string | null;
+    }) => ({
+      ...matchCardFor(cards.get(card.cardId), card.cardId, card.printingId, card.match),
+      bringingFrom: card.bringingFrom ?? null,
+    });
 
     return {
       player: {
@@ -1233,6 +1311,7 @@ export async function nightPlayer(
       theyWant: matched?.theyWant.map(cardFor) ?? [],
       flares,
       binders: binders.filter((binder) => binder.forTrade),
+      bringing: brought.get(playerId) ?? [],
       flaresCount: flares.length,
       tradeCards: counts.get(playerId) ?? 0,
     };

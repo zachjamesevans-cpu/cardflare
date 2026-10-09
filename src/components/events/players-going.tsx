@@ -24,7 +24,9 @@ import {
  * Flares · {n} trade cards", and "{n} matches" in the accent when
  * there are any. A guest on the roster has no account, so no profile
  * to open, no trade binder to count and no matches: their row is the
- * face, the name and their Flares. The count of people is on the
+ * face, the name and their Flares. Someone who has picked the binders
+ * they are bringing says so at the end of the line, "Bringing 2
+ * binders", as quietly as the rest. The count of people is on the
  * header line and is not repeated here. The app's players-going.tsx
  * draws the same rows with the same words; tests/unit/nights2-parity
  * .test.ts holds the two together.
@@ -89,6 +91,8 @@ export function PlayersGoing({
                 {player.playerId
                   ? `${flaresLine(player.flares)} · ${tradeCardsLine(player.tradeCards)}`
                   : flaresLine(player.flares)}
+                {player.bringing.length > 0 &&
+                  ` · ${bringingCountLine(player.bringing.length)}`}
               </span>
             </span>
             {player.matches > 0 && (
@@ -102,4 +106,9 @@ export function PlayersGoing({
       </ul>
     </section>
   );
+}
+
+/** "Bringing 1 binder", "Bringing 2 binders": the roster line's tail, the same on both platforms. */
+export function bringingCountLine(n: number): string {
+  return `Bringing ${n} ${n === 1 ? "binder" : "binders"}`;
 }

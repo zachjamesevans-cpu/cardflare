@@ -11,6 +11,11 @@ import {
   perPlayerMatches,
   tradeCardCounts,
 } from "@/lib/events/night-matches";
+import {
+  broughtBindersFor,
+  nightPhase,
+  type BroughtBinder,
+} from "@/lib/events/night-binders";
 import { joinEvent, leaveEvent, listParticipants } from "@/lib/events/participants";
 import { findEventById, findStoreById } from "@/lib/events/repository";
 import { boardWritable, roomPhase } from "@/lib/events/schema";
@@ -306,6 +311,11 @@ export interface RosterPlayer {
   matches: number;
   /** Up to three binders up for trade; empty for a guest. */
   binders: RosterBinder[];
+  /**
+   * The binders they said they are bringing to this night, as the
+   * viewer may see them; empty when none are picked or visible.
+   */
+  bringing: RosterBinder[];
 }
 
 const ROSTER_BINDERS = 3;
@@ -406,10 +416,15 @@ export async function nightRoster(
     const accounts = participants.flatMap((row) =>
       row.playerId ? [row.playerId] : [],
     );
-    const [binders, tradeCards, matches] = await Promise.all([
+    const viewerAttending = viewerId !== null && accounts.includes(viewerId);
+    const phase = await nightPhase(eventId);
+    const [binders, tradeCards, matches, brought] = await Promise.all([
       tradeBindersFor(accounts),
       tradeCardCounts(accounts),
       perPlayerMatches(eventId, viewerId),
+      phase
+        ? broughtBindersFor(eventId, accounts, viewerId, viewerAttending, phase)
+        : Promise.resolve(new Map<string, BroughtBinder[]>()),
     ]);
 
     return participants.map((row) => ({
@@ -425,6 +440,14 @@ export async function nightRoster(
       tradeCards: row.playerId ? (tradeCards.get(row.playerId) ?? 0) : 0,
       matches: row.playerId ? (matches[row.playerId] ?? 0) : 0,
       binders: row.playerId ? (binders.get(row.playerId) ?? []) : [],
+      bringing: row.playerId
+        ? (brought.get(row.playerId) ?? []).map((binder) => ({
+            id: binder.id,
+            name: binder.name,
+            cover: binder.cover,
+            count: binder.count,
+          }))
+        : [],
     }));
   } catch (error) {
     console.error(

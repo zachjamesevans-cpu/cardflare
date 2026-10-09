@@ -3,6 +3,7 @@ import "server-only";
 import { sendCardsMessage } from "@/lib/local/threads";
 import { blockedBetween } from "@/lib/players/safety";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
+import { readNightBinder } from "@/lib/events/night-binders";
 import { binderOwner, readBinder } from "./binder";
 import { BINDER_OFFER_MAX_CARDS, binderOfferBody } from "./offer-copy";
 
@@ -30,6 +31,12 @@ export async function offerOnBinder(
   viewerId: string,
   items: BinderOfferItem[],
   note: string | null,
+  /**
+   * Offered from a night: a binder its owner is bringing there and chose
+   * to show to that night's attendees, although it is private. Opened
+   * under the night's rules (night-binders.ts) and nothing looser.
+   */
+  nightId: string | null = null,
 ): Promise<
   | { ok: true; threadId: string; count: number; ownerName: string }
   | { ok: false; reason: BinderOfferFailure }
@@ -40,8 +47,13 @@ export async function offerOnBinder(
   if (!ownerId) return { ok: false, reason: "not-found" };
   if (ownerId === viewerId) return { ok: false, reason: "yours" };
 
-  const binder = await readBinder(ownerId, viewerId, binderId);
-  if (!binder || !binder.forTrade) return { ok: false, reason: "not-found" };
+  const open = await readBinder(ownerId, viewerId, binderId);
+  const brought =
+    !open?.forTrade && nightId
+      ? await readNightBinder(nightId, ownerId, binderId, viewerId)
+      : null;
+  const binder = open?.forTrade ? open : brought;
+  if (!binder) return { ok: false, reason: "not-found" };
   if (await blockedBetween(viewerId, ownerId)) return { ok: false, reason: "blocked" };
 
   /* The binder's own entries, once each, at most what it holds. */

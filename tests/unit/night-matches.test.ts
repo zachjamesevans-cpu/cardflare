@@ -90,6 +90,7 @@ describe("matching", () => {
         fromYourFlare: true,
         match: "exact",
         printingId: null,
+        bringingFrom: null,
       },
     ]);
     expect(byId.get("jamie")?.theyHave).toEqual([
@@ -99,6 +100,7 @@ describe("matching", () => {
         fromYourFlare: false,
         match: "exact",
         printingId: null,
+        bringingFrom: null,
       },
     ]);
   });
@@ -312,11 +314,14 @@ describe("the words", () => {
 });
 
 describe("the privacy rule", () => {
-  it("only the Have list feeds a match: binder_cards is never read here", () => {
+  it("binder cards come from the Have list and brought binders only: binder_cards is never read here", () => {
     const matches = read("src/lib/events/night-matches.ts");
     expect(matches).not.toContain('from("binder_cards")');
     expect(matches).not.toContain('from("binders")');
-    expect(matches).toContain("THE HAVE LIST IS THE ONLY SOURCE OF BINDER CARDS");
+    expect(matches).toContain("BINDER CARDS COME FROM TWO PLACES, AND ONLY TWO.");
+    /* The second place is the binders brought to this night, read
+       through night-binders.ts, where the privacy rule lives. */
+    expect(matches).toContain("broughtCardsAt(");
     /* Graded by printing the way the board grades an offer, said in so many words. */
     expect(matches).toContain("graded by printing");
     expect(matches).toContain("printingMatch(wanted, held)");

@@ -8,6 +8,7 @@ import {
   readBinder,
   saveBinderSettings,
 } from "@/lib/binder/binder";
+import { readNightBinder } from "@/lib/events/night-binders";
 import { binderIdSchema, forOldBuild, settingsSchema } from "../_shared";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,17 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
   const id = await binderIdFromLink((await params).binderId);
   if (!id) return Response.json({ error: "not-found" }, { status: 404 });
   const owner = (await binderOwner(id)) ?? player.playerId;
-  const binder = await readBinder(owner, player.playerId, id);
+  /* Opened from a night: a binder its owner is bringing there may be
+     private and shown to that night's attendees by their choice.
+     night-binders.ts decides; the plain read decides everything else. */
+  const night = binderIdSchema.safeParse(
+    new URL(request.url).searchParams.get("night"),
+  );
+  const binder =
+    (await readBinder(owner, player.playerId, id)) ??
+    (night.success
+      ? await readNightBinder(night.data, owner, id, player.playerId)
+      : null);
   if (!binder) return Response.json({ error: "not-found" }, { status: 404 });
   return Response.json(absoluteImageUrls({ binder: forOldBuild(binder) }));
 }

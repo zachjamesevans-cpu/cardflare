@@ -9,6 +9,7 @@ import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { readNightBinder } from "@/lib/events/night-binders";
 import { playerForUser } from "@/lib/players/accounts";
 import { listPlayerGames } from "@/lib/players/games";
 import { blockState } from "@/lib/players/safety";
@@ -29,9 +30,16 @@ import { blockState } from "@/lib/players/safety";
 export async function PublicBinder({
   playerId,
   binderId,
+  nightId = null,
 }: {
   playerId: string;
   binderId: string;
+  /**
+   * Opened from a night's attendee page: a binder the owner is bringing
+   * there, which may be private and shown to that night's attendees by
+   * their choice. night-binders.ts decides; nothing else changes.
+   */
+  nightId?: string | null;
 }) {
   const viewer = await getViewer();
 
@@ -42,7 +50,9 @@ export async function PublicBinder({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
-  const binder = await readBinder(playerId, me, binderId);
+  const binder =
+    (await readBinder(playerId, me, binderId)) ??
+    (nightId ? await readNightBinder(nightId, playerId, binderId, me) : null);
   if (!binder) notFound();
 
   const other = Boolean(me && me !== playerId);
@@ -86,6 +96,7 @@ export async function PublicBinder({
         playerGames={games}
         title={name}
         offerAs={offerAs}
+        nightId={nightId}
         footer={
           other ? (
             /* The message door, under the same block rule as the

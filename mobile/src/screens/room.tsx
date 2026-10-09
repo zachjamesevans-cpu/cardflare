@@ -69,6 +69,7 @@ import { NightHeader } from "../night-header";
 import { NightSection } from "../night-section";
 import { PlayersGoing } from "../players-going";
 import { WhatToBring } from "../what-to-bring";
+import { YourBinders } from "../your-binders";
 import {
   AsyncButton,
   Body,
@@ -1132,6 +1133,21 @@ function RoomScreen({
               busy={busy}
             />
           </Card>
+        ) : null}
+
+        {/*
+         * YOUR BINDERS FOR TONIGHT: what the viewer said they are
+         * bringing, just above their matches, for a player who is
+         * going. The row itself steps aside once the night takes no
+         * changes. A save re-reads the matches, which take the
+         * binders in.
+         */}
+        {!guest && eventId && going?.youGoing && !finished ? (
+          <YourBinders
+            eventId={eventId}
+            reloadOn={matches}
+            onChanged={() => void refresh({ matches: true })}
+          />
         ) : null}
 
         {/*

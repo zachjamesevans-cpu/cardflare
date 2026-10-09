@@ -48,6 +48,7 @@ import {
   placeBinderCardAction,
   removeBinderCardAction,
 } from "@/lib/binder/actions";
+import { nightSharedLine } from "@/lib/events/night-binder-rules";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import type { BinderCoverId } from "@/lib/binder/covers";
 import {
@@ -156,7 +157,9 @@ function binderLine(
       ? "Up for trade. Somebody nearby hunting one of these hears about it."
       : `Cards ${ownerName} will trade.`;
   }
-  return yours ? "Private. Only you can open it." : null;
+  /* A visitor sees a private binder only when its owner brought it to
+     a night and showed it to that night's attendees. */
+  return yours ? "Private. Only you can open it." : nightSharedLine(ownerName);
 }
 
 export function BinderView({
@@ -166,6 +169,7 @@ export function BinderView({
   title,
   footer = null,
   offerAs = null,
+  nightId = null,
 }: {
   binder: Binder;
   imagesEnabled: boolean;
@@ -181,6 +185,8 @@ export function BinderView({
    * who is shown the way in. Null for everyone else.
    */
   offerAs?: "player" | "guest" | null;
+  /** Opened from a night, for a binder brought there: the offer carries it. */
+  nightId?: string | null;
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
@@ -270,7 +276,10 @@ export function BinderView({
    * opened from another. Keyed by the pocket's entry id, capped at the
    * copies in the pocket. The send is the binder's: one message.
    */
-  const asking = !binder.yours && settings.forTrade && offerAs !== null;
+  /* A binder brought to a night takes offers there too, whatever its
+     own setting: its owner chose to show it to the night's players. */
+  const asking =
+    !binder.yours && (settings.forTrade || nightId !== null) && offerAs !== null;
   const picking = asking && offerAs === "player";
   const offerable = useMemo<OfferableCard[]>(
     () =>
@@ -288,10 +297,14 @@ export function BinderView({
   /** What the last send said, and the conversation it went to. */
   const [sent, setSent] = useState<{ message: string; threadId: string } | null>(null);
   const sendOffer: OfferSend = async (lines, message) => {
-    const result = await offerOnBinderAction(binder.id, {
-      items: lines.map((line) => ({ entryId: line.key, quantity: line.quantity })),
-      note: message.trim() || null,
-    });
+    const result = await offerOnBinderAction(
+      binder.id,
+      {
+        items: lines.map((line) => ({ entryId: line.key, quantity: line.quantity })),
+        note: message.trim() || null,
+      },
+      nightId,
+    );
     if (!result.ok) return { ok: false, message: result.message, refused: [] };
     setSent({ message: result.message, threadId: result.threadId });
     return { ok: true, offered: lines.length, refused: [] };

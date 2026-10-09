@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { z } from "zod";
 
 import { PublicBinder } from "@/components/binder/public-binder";
 import { publicProfile } from "@/lib/players/profile";
@@ -20,11 +21,23 @@ export async function generateMetadata({
 export const dynamic = "force-dynamic";
 
 /** Somebody's binder, open, by owner and id. See `PublicBinder`. */
+const nightSchema = z.guid();
+
 export default async function PlayerBinderPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ playerId: string; binderId: string }>;
+  searchParams: Promise<{ night?: string | string[] }>;
 }) {
-  const { playerId, binderId } = await params;
-  return <PublicBinder playerId={playerId} binderId={binderId} />;
+  const [{ playerId, binderId }, { night }] = await Promise.all([params, searchParams]);
+  /* ?night=<event id>: opened from a night's "Binders they're bringing". */
+  const nightId = nightSchema.safeParse(night);
+  return (
+    <PublicBinder
+      playerId={playerId}
+      binderId={binderId}
+      nightId={nightId.success ? nightId.data : null}
+    />
+  );
 }

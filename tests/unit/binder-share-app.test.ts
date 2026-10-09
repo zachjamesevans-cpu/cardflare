@@ -83,7 +83,8 @@ describe("the link opens the app", () => {
     const binder = flat(read("mobile/src/screens/binder.tsx"));
     expect(binder).toContain("const yours = binder?.yours ?? false;");
     expect(binder).toContain(
-      "const offering = Boolean(binder && !binder.yours && binder.forTrade);",
+      /* A binder brought to a night takes offers there too (night-binders.ts). */
+      "const offering = Boolean(binder && !binder.yours && (binder.forTrade || nightId));",
     );
     expect(binder).not.toMatch(/yours\s*=\s*!playerId/);
     /* With no playerId, getBinder asks /api/v1/binders/<id>, which now
@@ -102,8 +103,9 @@ describe("the offer stack on somebody's trade binder", () => {
   it("posts to the binder's offer route", () => {
     expect(api).toContain("export const offerOnBinder = (");
     expect(api).toContain(
-      '"POST", `/api/v1/binders/${encodeURIComponent(binderId)}/offer`, { items, note },',
+      '"POST", `/api/v1/binders/${encodeURIComponent(binderId)}/offer${',
     );
+    expect(api).toContain('nightId ? `?night=${encodeURIComponent(nightId)}` : ""');
     expect(binder).toContain(
       "items.map((item) => ({ entryId: item.flareId, quantity: item.quantity }))",
     );

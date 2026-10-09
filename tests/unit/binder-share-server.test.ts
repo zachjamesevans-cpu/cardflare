@@ -21,7 +21,7 @@ describe("the share link", () => {
     );
     expect(page).toContain("<PublicBinder playerId={owner} binderId={id} />");
     expect(flat(read("src/app/p/[playerId]/binders/[binderId]/page.tsx"))).toContain(
-      "<PublicBinder playerId={playerId} binderId={binderId} />",
+      "<PublicBinder playerId={playerId} binderId={binderId} nightId={nightId.success ? nightId.data : null} />",
     );
   });
 
@@ -56,9 +56,10 @@ describe("the share link", () => {
     expect(route).toContain(
       "const owner = (await binderOwner(id)) ?? player.playerId;",
     );
-    expect(route).toContain(
-      "const binder = await readBinder(owner, player.playerId, id);",
-    );
+    /* The plain read first; a night's rules only for a binder brought
+       to that night (night-binders.ts), never a looser read. */
+    expect(route).toContain("(await readBinder(owner, player.playerId, id)) ??");
+    expect(route).toContain("readNightBinder(night.data, owner, id, player.playerId)");
   });
 });
 
@@ -69,9 +70,13 @@ describe("an offer on a trade binder", () => {
     expect(offers).toContain(
       'if (ownerId === viewerId) return { ok: false, reason: "yours" };',
     );
+    /* Private stays refused unless it was brought to the night the
+       offer comes from and the night's rules let this player in. */
     expect(offers).toContain(
-      'if (!binder || !binder.forTrade) return { ok: false, reason: "not-found" };',
+      "const brought = !open?.forTrade && nightId ? await readNightBinder(nightId, ownerId, binderId, viewerId) : null;",
     );
+    expect(offers).toContain("const binder = open?.forTrade ? open : brought;");
+    expect(offers).toContain('if (!binder) return { ok: false, reason: "not-found" };');
     expect(offers).toContain(
       'if (await blockedBetween(viewerId, ownerId)) return { ok: false, reason: "blocked" };',
     );
