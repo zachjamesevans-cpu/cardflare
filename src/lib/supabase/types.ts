@@ -1874,6 +1874,21 @@ export type NightPackingInsert = Omit<NightPackingRow, "packed_at"> & {
   packed_at?: string;
 };
 
+/** A binder a player says they are bringing to one Night: a pointer, not a copy. */
+export type NightBinderRow = {
+  event_id: string;
+  binder_id: string;
+  player_id: string;
+  /** Shown to this Night's attendees although the binder is private. */
+  event_only: boolean;
+  created_at: string;
+};
+
+export type NightBinderInsert = Omit<NightBinderRow, "created_at" | "event_only"> & {
+  event_only?: boolean;
+  created_at?: string;
+};
+
 export type PlayerCollectionRow = {
   id: string;
   created_at: string;
@@ -2111,6 +2126,7 @@ export type Database = {
       player_invites: Table<PlayerInviteRow, PlayerInviteInsert>;
       player_wants: Table<PlayerWantRow, PlayerWantInsert>;
       night_packing: Table<NightPackingRow, NightPackingInsert>;
+      night_binders: Table<NightBinderRow, NightBinderInsert>;
       player_locals: Table<PlayerLocalRow, PlayerLocalInsert>;
       announcements: Table<AnnouncementRow, AnnouncementInsert>;
       event_hub_displays: Table<EventHubDisplayRow, EventHubDisplayInsert>;

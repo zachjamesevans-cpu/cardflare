@@ -66,6 +66,7 @@ export default async function NightPlayerPage({
 
       <NightPlayer
         view={view}
+        eventId={event.id}
         imagesEnabled={cardImagesEnabled()}
         canMessage={Boolean(me) && me !== playerId}
       />

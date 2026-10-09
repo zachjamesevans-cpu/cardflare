@@ -8,8 +8,12 @@ const read = (path: string) => readFileSync(path, "utf8");
 
 describe("displayCardName", () => {
   it("drops a trailing bracket that repeats the card number", () => {
-    expect(displayCardName("Monkey.D.Luffy (EB04-061)", "EB04-061")).toBe("Monkey.D.Luffy");
-    expect(displayCardName("Monkey.D.Luffy (eb04-061)", "EB04-061")).toBe("Monkey.D.Luffy");
+    expect(displayCardName("Monkey.D.Luffy (EB04-061)", "EB04-061")).toBe(
+      "Monkey.D.Luffy",
+    );
+    expect(displayCardName("Monkey.D.Luffy (eb04-061)", "EB04-061")).toBe(
+      "Monkey.D.Luffy",
+    );
   });
 
   it("drops a bracket holding the number's numeric part", () => {
@@ -19,7 +23,9 @@ describe("displayCardName", () => {
   });
 
   it("keeps any other bracket, and names without one", () => {
-    expect(displayCardName("Pikachu (Alternate Art)", "010")).toBe("Pikachu (Alternate Art)");
+    expect(displayCardName("Pikachu (Alternate Art)", "010")).toBe(
+      "Pikachu (Alternate Art)",
+    );
     expect(displayCardName("Pikachu (011)", "010")).toBe("Pikachu (011)");
     expect(displayCardName("Pikachu", "010")).toBe("Pikachu");
     expect(displayCardName("(010)", "010")).toBe("(010)");

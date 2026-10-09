@@ -137,12 +137,12 @@ describe("sandbox purchases", () => {
     const strict = { VERCEL_ENV: "production", APPLE_REJECT_SANDBOX: "1" };
     expect(sandboxMayEntitle("p1", strict)).toBe(false);
     expect(sandboxMayEntitle("p1", { ...strict, APPLE_ALLOW_SANDBOX: "1" })).toBe(true);
-    expect(sandboxMayEntitle("p1", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" })).toBe(
-      true,
-    );
-    expect(sandboxMayEntitle("p2", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" })).toBe(
-      false,
-    );
+    expect(
+      sandboxMayEntitle("p1", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" }),
+    ).toBe(true);
+    expect(
+      sandboxMayEntitle("p2", { ...strict, APPLE_SANDBOX_PLAYER_IDS: "p0, p1" }),
+    ).toBe(false);
   });
 
   it("are checked on both doors: the app's sync and Apple's webhook", () => {
@@ -151,7 +151,9 @@ describe("sandbox purchases", () => {
       "src/app/api/webhooks/apple/route.ts",
     ]) {
       const source = readFileSync(join(process.cwd(), file), "utf8");
-      expect(source, file).toContain('lookup.environment === "sandbox" && !sandboxMayEntitle(');
+      expect(source, file).toContain(
+        'lookup.environment === "sandbox" && !sandboxMayEntitle(',
+      );
     }
   });
 });

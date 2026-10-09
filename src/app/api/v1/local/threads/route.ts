@@ -99,7 +99,10 @@ export async function POST(request: Request): Promise<Response> {
     return (
       refused ??
       Response.json(
-        { error: "rate-limited", message: "That is a lot at once. Try again in a moment." },
+        {
+          error: "rate-limited",
+          message: "That is a lot at once. Try again in a moment.",
+        },
         { status: 429 },
       )
     );

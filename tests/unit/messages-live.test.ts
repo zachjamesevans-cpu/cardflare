@@ -62,7 +62,9 @@ describe("the open conversation (src/active-thread.ts)", () => {
 describe("the thread screen keeps itself current", () => {
   it("polls while focused and in front, and stops otherwise", () => {
     expect(thread).toContain("const THREAD_POLL_MS = 5000;");
-    expect(thread).toContain("setInterval(() => void load(isCurrent, true), THREAD_POLL_MS)");
+    expect(thread).toContain(
+      "setInterval(() => void load(isCurrent, true), THREAD_POLL_MS)",
+    );
     expect(thread).toContain('AppState.addEventListener("change"');
     expect(thread).toContain("stop();");
   });
@@ -111,7 +113,9 @@ describe("the Messages list", () => {
 
   it("does not let empty conversations take a slot", () => {
     expect(list).toContain("if (!message || rows.length >= LIST_SIZE) return;");
-    expect(list).toContain(".range(page * LIST_PAGE, page * LIST_PAGE + LIST_PAGE - 1)");
+    expect(list).toContain(
+      ".range(page * LIST_PAGE, page * LIST_PAGE + LIST_PAGE - 1)",
+    );
   });
 
   it("counts unread from the unread messages alone", () => {
@@ -119,7 +123,9 @@ describe("the Messages list", () => {
   });
 
   it("is read once on a visit to Messages, not twice", () => {
-    expect(app).toContain('if (route.name !== "Messages") void refreshUnreadMessages();');
+    expect(app).toContain(
+      'if (route.name !== "Messages") void refreshUnreadMessages();',
+    );
     expect(local).toContain("setUnreadMessages(totalUnread(nextThreads.threads));");
   });
 });
@@ -130,9 +136,9 @@ describe("only a new conversation counts against the ceiling", () => {
       'if (options.mayCreate && !options.mayCreate()) { return { ok: false, reason: "rate-limited" }; }',
     );
     const direct = lib.slice(lib.indexOf("export async function openDirectThread("));
-    expect(direct.indexOf("if (existing) return { ok: true, threadId: existing.id };")).toBeLessThan(
-      direct.indexOf("options.mayCreate"),
-    );
+    expect(
+      direct.indexOf("if (existing) return { ok: true, threadId: existing.id };"),
+    ).toBeLessThan(direct.indexOf("options.mayCreate"));
   });
 
   it("the app's route charges thread-open only through mayCreate", () => {

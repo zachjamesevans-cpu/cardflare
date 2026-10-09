@@ -54,7 +54,10 @@ describe("every binder is one of the player's own", () => {
   });
 
   it("is listed in the owner's order; a visitor sees only those up for trade", () => {
-    expect(lib).toContain("if (!yours && !row.for_trade) return null;");
+    /* The one door past that is a night's, opened only by night-binders.ts. */
+    expect(lib).toContain(
+      "if (!yours && !row.for_trade && !sharedForNight) return null;",
+    );
     expect(lib).toContain('.order("position")');
     expect(lib).not.toContain("[trade, ...customs]");
   });

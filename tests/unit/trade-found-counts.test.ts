@@ -64,16 +64,22 @@ describe("the trade remembers whether it counted", () => {
   const hunts = read("src/lib/players/hunts.ts");
   const repo = read("src/lib/trades/repository.ts");
   const thread = read("src/lib/trades/thread-trades.ts");
-  const migration = read("supabase/migrations/20261109090500_in_person_play_counts.sql");
+  const migration = read(
+    "supabase/migrations/20261109090500_in_person_play_counts.sql",
+  );
 
   it("claims the count once and reverses only a count it made", () => {
     const record = hunts.slice(hunts.indexOf("export async function recordTradeFound"));
     expect(record).toContain('.is("found_applied_at", null)');
     expect(record).toContain("update({ found_copies: applied })");
-    const reverse = hunts.slice(hunts.indexOf("export async function reverseTradeFound"));
+    const reverse = hunts.slice(
+      hunts.indexOf("export async function reverseTradeFound"),
+    );
     expect(reverse).toContain('.not("found_applied_at", "is", null)');
     expect(reverse).toContain("claimed.found_copies");
-    expect(migration).toContain("add column if not exists found_applied_at timestamptz");
+    expect(migration).toContain(
+      "add column if not exists found_applied_at timestamptz",
+    );
   });
 
   it("keeps sibling Flares in step when a trade moves the request", () => {

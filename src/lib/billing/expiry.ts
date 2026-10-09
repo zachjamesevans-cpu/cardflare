@@ -57,9 +57,11 @@ export async function syncLapsedSubscriptions(
 
   for (let start = 0; start < jobs.length; start += CONCURRENCY) {
     await Promise.all(
-      jobs.slice(start, start + CONCURRENCY).map((job) =>
-        job().catch((cause) => console.error("Could not sync a lapsed tier", cause)),
-      ),
+      jobs
+        .slice(start, start + CONCURRENCY)
+        .map((job) =>
+          job().catch((cause) => console.error("Could not sync a lapsed tier", cause)),
+        ),
     );
   }
 

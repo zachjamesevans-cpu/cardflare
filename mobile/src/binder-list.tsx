@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 
 import type { BinderSummary } from "./api";
 import { BinderCover } from "./binder-cover";
+import { EVENT_ONLY_TAG } from "./night-binder-copy";
 import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
@@ -15,15 +16,25 @@ import { Tap } from "./ui";
  * visitor is handed only the binders up for trade, so their rows
  * carry no chip. The owner's order, as the server gives it. A tap
  * opens the binder.
+ *
+ * A night's "Binders they're bringing" uses the same rows, with
+ * "This Night only" on the private ones a player showed to that night;
+ * the caller's `onOpen` carries the night along, because a private
+ * binder brought to a night opens only through it.
  */
 export function BinderList({
   binders,
   yours,
   onOpen,
+  eventOnly,
 }: {
-  binders: BinderSummary[];
+  binders: (Pick<BinderSummary, "id" | "name" | "cover" | "count"> & {
+    forTrade?: boolean;
+  })[];
   yours: boolean;
   onOpen: (binderId: string) => void;
+  /** Binders shown by their owner's choice to one night only. */
+  eventOnly?: ReadonlySet<string>;
 }) {
   return (
     <View style={{ gap: spacing(2) }}>
@@ -58,7 +69,29 @@ export function BinderList({
               <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                 {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
               </Text>
-              {yours ? (
+              {eventOnly?.has(binder.id) ? (
+                <View
+                  style={{
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    backgroundColor: colors.elevated,
+                    paddingHorizontal: spacing(2),
+                    paddingVertical: 2,
+                  }}
+                >
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {EVENT_ONLY_TAG}
+                  </Text>
+                </View>
+              ) : yours ? (
                 binder.forTrade ? (
                   <View
                     style={{

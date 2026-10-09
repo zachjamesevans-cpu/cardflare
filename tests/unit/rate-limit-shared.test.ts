@@ -33,7 +33,10 @@ afterEach(() => {
 
 describe("the shared count", () => {
   it("counts every allowed hit in Postgres", async () => {
-    rpc.mockResolvedValue({ data: [{ hits: 1, resets_at: new Date().toISOString() }], error: null });
+    rpc.mockResolvedValue({
+      data: [{ hits: 1, resets_at: new Date().toISOString() }],
+      error: null,
+    });
     checkRateLimit("msg:p1", 3, 60_000);
     await settle();
     expect(rpc).toHaveBeenCalledWith("rate_limit_hit", {
@@ -97,13 +100,21 @@ describe("the counter's migration", () => {
   );
 
   it("is an atomic upsert behind a service-role-only definer function", () => {
-    expect(sql).toContain("create or replace function public.rate_limit_hit(p_key text, p_window_ms integer)");
+    expect(sql).toContain(
+      "create or replace function public.rate_limit_hit(p_key text, p_window_ms integer)",
+    );
     expect(sql).toContain("security definer");
-    expect(sql).toContain("on conflict (key, window_start) do update set hits = r.hits + 1");
-    expect(sql).toContain("revoke all on function public.rate_limit_hit(text, integer) from anon;");
+    expect(sql).toContain(
+      "on conflict (key, window_start) do update set hits = r.hits + 1",
+    );
+    expect(sql).toContain(
+      "revoke all on function public.rate_limit_hit(text, integer) from anon;",
+    );
     expect(sql).toContain(
       "revoke all on function public.rate_limit_hit(text, integer) from authenticated;",
     );
-    expect(sql).toContain("alter table public.rate_limit_hits enable row level security;");
+    expect(sql).toContain(
+      "alter table public.rate_limit_hits enable row level security;",
+    );
   });
 });

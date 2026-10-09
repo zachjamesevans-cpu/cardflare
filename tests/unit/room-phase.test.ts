@@ -51,7 +51,11 @@ describe("roomPhase", () => {
   it("a walk-in room has no clock end and stays live while open", () => {
     expect(
       roomPhase(
-        { ...draftEvent(-5 * HOUR, 0, now), kind: "walk_in" as const, status: "open" as const },
+        {
+          ...draftEvent(-5 * HOUR, 0, now),
+          kind: "walk_in" as const,
+          status: "open" as const,
+        },
         now,
       ),
     ).toBe("live");

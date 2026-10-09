@@ -22,7 +22,9 @@ const PAGE = 1000;
 type Admin = ReturnType<typeof getSupabaseAdmin>;
 
 async function list(admin: Admin, prefix: string) {
-  const { data, error } = await admin.storage.from(BUCKET).list(prefix, { limit: PAGE });
+  const { data, error } = await admin.storage
+    .from(BUCKET)
+    .list(prefix, { limit: PAGE });
   if (error) throw error;
   return data ?? [];
 }

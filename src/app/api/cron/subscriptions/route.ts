@@ -25,7 +25,10 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const result = await syncLapsedSubscriptions();
-  return Response.json({ ok: !result.failed, ...result }, {
-    status: result.failed ? 500 : 200,
-  });
+  return Response.json(
+    { ok: !result.failed, ...result },
+    {
+      status: result.failed ? 500 : 200,
+    },
+  );
 }

@@ -17,7 +17,9 @@ import { Tap } from "./ui";
  * row is the face, the name, "{n} Flares · {n} trade cards", and
  * "{n} matches" in the accent when there are any. A tap opens the
  * event-facing profile. Nothing to draw means no section, the same
- * rule as every section on the page.
+ * rule as every section on the page. Someone who has picked the
+ * binders they are bringing says so at the end of the line, "Bringing
+ * 2 binders", as quietly as the rest.
  */
 export function PlayersGoing({
   roster,
@@ -44,6 +46,9 @@ export function PlayersGoing({
           const line = [
             flaresLine(p.flares),
             p.tradeCards !== undefined ? tradeCardsLine(p.tradeCards) : null,
+            p.bringing && p.bringing.length > 0
+              ? bringingCountLine(p.bringing.length)
+              : null,
           ]
             .filter(Boolean)
             .join(" · ");
@@ -107,4 +112,9 @@ export function PlayersGoing({
       </View>
     </NightSection>
   );
+}
+
+/** "Bringing 1 binder", "Bringing 2 binders": the roster line's tail, the same on both platforms. */
+export function bringingCountLine(n: number): string {
+  return `Bringing ${n} ${n === 1 ? "binder" : "binders"}`;
 }

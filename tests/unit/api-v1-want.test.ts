@@ -61,10 +61,11 @@ beforeEach(() => {
   }
   getUser.mockResolvedValue({ data: { user: { id: "u1" } }, error: null });
   playerForUser.mockResolvedValue({ id: "player-1", display_name: "Kaito" });
-  adjustWantQuantity.mockImplementation(async (id: string, _p: string, delta: number) =>
-    id === "w1"
-      ? { ok: true, quantity: 2 + delta, cardId: "card-1" }
-      : { ok: false, reason: "not-found" },
+  adjustWantQuantity.mockImplementation(
+    async (id: string, _p: string, delta: number) =>
+      id === "w1"
+        ? { ok: true, quantity: 2 + delta, cardId: "card-1" }
+        : { ok: false, reason: "not-found" },
   );
 });
 

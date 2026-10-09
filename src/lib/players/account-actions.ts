@@ -28,12 +28,7 @@ import { invitePlayer, playerForUser } from "./accounts";
 import { invitePlayerSchema, type InvitePlayerState } from "./account-schema";
 import { removeLocal, saveLocal } from "./locals";
 import { markCardFound, syncCardQuantity } from "@/lib/players/found";
-import {
-  adjustWantQuantity,
-  listOfferings,
-  listWants,
-  removeWant,
-} from "./wants";
+import { adjustWantQuantity, listOfferings, listWants, removeWant } from "./wants";
 
 const GENERIC_ERROR = "Something went wrong. Please try again in a moment.";
 

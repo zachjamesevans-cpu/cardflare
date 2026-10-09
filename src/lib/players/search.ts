@@ -47,7 +47,10 @@ export interface FoundPlayer {
 const SEARCH_LIMIT = 12;
 
 /** Lists in priority order, flattened, each id kept at its first place. */
-export function mergeBestFirst<T>(lists: readonly (readonly T[])[], id: (item: T) => string): T[] {
+export function mergeBestFirst<T>(
+  lists: readonly (readonly T[])[],
+  id: (item: T) => string,
+): T[] {
   const seen = new Set<string>();
   const merged: T[] = [];
   for (const list of lists)

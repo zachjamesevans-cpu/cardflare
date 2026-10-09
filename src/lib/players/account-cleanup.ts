@@ -36,7 +36,11 @@ export function playerStoragePrefixes(playerId: string): string[] {
 
 /** Lists every object under a prefix, walking one level of folders deep
     at a time (Storage lists are not recursive). */
-async function objectsUnder(admin: Admin, prefix: string, depth = 0): Promise<string[]> {
+async function objectsUnder(
+  admin: Admin,
+  prefix: string,
+  depth = 0,
+): Promise<string[]> {
   const { data, error } = await admin.storage
     .from(BUCKET)
     .list(prefix, { limit: PAGE });
@@ -56,7 +60,10 @@ async function objectsUnder(admin: Admin, prefix: string, depth = 0): Promise<st
   return paths;
 }
 
-export async function removePlayerStorage(playerId: string, admin: Admin): Promise<void> {
+export async function removePlayerStorage(
+  playerId: string,
+  admin: Admin,
+): Promise<void> {
   for (const prefix of playerStoragePrefixes(playerId)) {
     try {
       const paths = await objectsUnder(admin, prefix);
@@ -67,7 +74,10 @@ export async function removePlayerStorage(playerId: string, admin: Admin): Promi
         if (error) throw error;
       }
     } catch (error) {
-      console.error(`Could not remove ${prefix}/ for deleted player ${playerId}`, error);
+      console.error(
+        `Could not remove ${prefix}/ for deleted player ${playerId}`,
+        error,
+      );
     }
   }
 }

@@ -129,11 +129,7 @@ describe("the rules that make it safe", () => {
 
 describe("what a deleted account leaves outside the cascade", () => {
   it("knows every prefix a player's pictures live under", () => {
-    expect(cleanup.playerStoragePrefixes("p1")).toEqual([
-      "p1",
-      "covers/p1",
-      "tmp/p1",
-    ]);
+    expect(cleanup.playerStoragePrefixes("p1")).toEqual(["p1", "covers/p1", "tmp/p1"]);
   });
 
   it("removes avatars, covers and half-uploaded chunks, and survives a failure", async () => {

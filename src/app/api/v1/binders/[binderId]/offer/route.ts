@@ -44,11 +44,16 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const parsed = offerSchema.safeParse(await readJsonPayload(request));
   if (!parsed.success) return badRequest("items: [{ entryId, quantity }], note");
 
+  /* ?night=<event id>: an offer on a binder brought to that night. */
+  const night = binderIdSchema.safeParse(
+    new URL(request.url).searchParams.get("night"),
+  );
   const sent = await offerOnBinder(
     id.data,
     player.playerId,
     parsed.data.items,
     parsed.data.note ?? null,
+    night.success ? night.data : null,
   );
   if (!sent.ok) {
     const status =

@@ -284,7 +284,8 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     }
   }
 
-  const count = (kind: Outcome) => outcomes.filter((outcome) => outcome === kind).length;
+  const count = (kind: Outcome) =>
+    outcomes.filter((outcome) => outcome === kind).length;
   const posted = count("posted");
   const alreadyUp = count("already-up");
 

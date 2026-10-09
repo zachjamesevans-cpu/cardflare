@@ -28,14 +28,18 @@ describe("the doors that put something on", () => {
   const cosmetics = read("src/lib/players/cosmetics.ts");
 
   it("equipCosmetic checks the tier after ownership", () => {
-    const body = cosmetics.slice(cosmetics.indexOf("export async function equipCosmetic"));
+    const body = cosmetics.slice(
+      cosmetics.indexOf("export async function equipCosmetic"),
+    );
     expect(body.slice(0, body.indexOf("slotUpdate("))).toContain(
       "wearingNeedsPro(item) && !(await tierMayWear(playerId))",
     );
   });
 
   it("buyCosmetic refuses before the Embers move, not after", () => {
-    const body = cosmetics.slice(cosmetics.indexOf("export async function buyCosmetic"));
+    const body = cosmetics.slice(
+      cosmetics.indexOf("export async function buyCosmetic"),
+    );
     const gate = body.indexOf('reason: "not-pro"');
     expect(gate).toBeGreaterThan(-1);
     expect(gate).toBeLessThan(body.indexOf("spendEmbers("));
@@ -70,7 +74,9 @@ describe("what a profile shows", () => {
     expect(profile).toContain(
       ": { avatarFrame: null, frame: null, holo: null, effect: null },",
     );
-    expect(profile).toContain("showcase.map((entry) => ({ ...entry, frame: null, holo: null }))");
+    expect(profile).toContain(
+      "showcase.map((entry) => ({ ...entry, frame: null, holo: null }))",
+    );
   });
 
   it("every list that draws a face reads the frame through wornFrame", () => {

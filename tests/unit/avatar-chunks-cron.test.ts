@@ -12,7 +12,10 @@ const NOW = Date.parse("2026-10-06T12:00:00Z");
 const OLD = new Date(NOW - 2 * 60 * 60 * 1000).toISOString();
 const FRESH = new Date(NOW - 5 * 60 * 1000).toISOString();
 
-const tree: Record<string, { name: string; created_at?: string; updated_at?: string }[]> = {
+const tree: Record<
+  string,
+  { name: string; created_at?: string; updated_at?: string }[]
+> = {
   tmp: [{ name: "p1" }],
   "tmp/p1": [{ name: "up-old" }, { name: "up-live" }],
   "tmp/p1/up-old": [

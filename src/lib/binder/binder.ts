@@ -319,9 +319,11 @@ async function assemble(
   row: BinderRow,
   name: string,
   viewerId: string | null,
+  /** A Night's attendee looking at a binder its owner chose to show them. */
+  sharedForNight = false,
 ): Promise<Binder | null> {
   const yours = viewerId === row.player_id;
-  if (!yours && !row.for_trade) return null;
+  if (!yours && !row.for_trade && !sharedForNight) return null;
   const [rows, wanted] = await Promise.all([
     cardRows(row.id),
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
@@ -378,6 +380,25 @@ export async function readBinder(
   ]);
   if (!name || !row) return null;
   return assemble(row, name, viewerId);
+}
+
+/**
+ * A binder brought to a Night, for an attendee the Night's rules have
+ * already let in (`broughtVisible`). The one door past a binder's
+ * privacy, and only `night-binders.ts` opens it: the owner's choice to
+ * show a private binder to one Night's attendees, until it ends.
+ */
+export async function readBinderForNight(
+  ownerId: string,
+  viewerId: string | null,
+  binderId: string,
+): Promise<Binder | null> {
+  const [name, row] = await Promise.all([
+    ownerName(ownerId),
+    binderRow(ownerId, binderId),
+  ]);
+  if (!name || !row) return null;
+  return assemble(row, name, viewerId, true);
 }
 
 /** Letters and digits nobody misreads: no 0/o, 1/l/i. */
@@ -590,7 +611,9 @@ async function syncTradeCard(
 export async function tradeHoldings(
   playerId: string,
   cardId: string,
-): Promise<{ binderId: string; cardId: string; printingId: string | null; quantity: number }[]> {
+): Promise<
+  { binderId: string; cardId: string; printingId: string | null; quantity: number }[]
+> {
   if (!isSupabaseConfigured()) return [];
   const up = (await binderRows(playerId)).filter((row) => row.for_trade);
   if (up.length === 0) return [];
@@ -627,7 +650,12 @@ export async function tradeHoldings(
 export async function adjustBinderCard(
   playerId: string,
   displayName: string,
-  change: { binderId: string; cardId: string; printingId: string | null; delta: number },
+  change: {
+    binderId: string;
+    cardId: string;
+    printingId: string | null;
+    delta: number;
+  },
 ): Promise<number> {
   if (!isSupabaseConfigured() || change.delta === 0) return 0;
   const row = await binderRow(playerId, change.binderId);
@@ -656,7 +684,10 @@ export async function adjustBinderCard(
 export async function tradeBinderFor(playerId: string): Promise<string | null> {
   const existing = await firstTradeBinderId(playerId);
   if (existing) return existing;
-  const made = await createBinder(playerId, { name: FIRST_BINDER_NAME, forTrade: true });
+  const made = await createBinder(playerId, {
+    name: FIRST_BINDER_NAME,
+    forTrade: true,
+  });
   return made.ok ? made.id : null;
 }
 

@@ -51,7 +51,10 @@ const reminderKey = (eventId: string, playerId: string) =>
   `reminder:${eventId}:${playerId}`;
 
 /** The players of one night who already have their reminder. */
-async function alreadyReminded(eventId: string, players: string[]): Promise<Set<string>> {
+async function alreadyReminded(
+  eventId: string,
+  players: string[],
+): Promise<Set<string>> {
   const admin = getSupabaseAdmin();
   const done = new Set<string>();
   for (let start = 0; start < players.length; start += KEY_PAGE) {

@@ -169,7 +169,11 @@ export async function POST(request: Request): Promise<Response> {
      */
     const pieces: (string | null)[] = new Array(paths.length).fill(null);
     let missing = false;
-    for (let start = 0; start < paths.length && !missing; start += DOWNLOAD_CONCURRENCY) {
+    for (
+      let start = 0;
+      start < paths.length && !missing;
+      start += DOWNLOAD_CONCURRENCY
+    ) {
       await Promise.all(
         paths.slice(start, start + DOWNLOAD_CONCURRENCY).map(async (path, offset) => {
           const { data, error } = await admin.storage.from("avatars").download(path);

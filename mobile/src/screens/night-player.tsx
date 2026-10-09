@@ -13,6 +13,7 @@ import {
   type NightPlayerView,
 } from "../api";
 import { BinderList } from "../binder-list";
+import { BINDERS_THEYRE_BRINGING } from "../night-binder-copy";
 import { MessageButton, ThumbRow } from "../mutual-match";
 import {
   ACTIVE_FLARES,
@@ -51,6 +52,14 @@ import { useNightByCode } from "./night-matches";
  * Binders list's rows, up-for-trade ones only: the server never hands
  * over a private binder, and this screen never asks for one). View
  * full profile is the way to everything else about them.
+ *
+ * Binders they're bringing sits above Trade binders and apart from it:
+ * the founder (2026-10-09), "On attendee profiles, show a section
+ * called Binders They're Bringing, separate from their full public
+ * binder collection." The same rows, "This Night only" on a private
+ * one its owner showed to this night, and every row opens with the
+ * night's id, the one door such a binder opens through. Nothing
+ * brought, no section.
  */
 export function NightPlayerScreen({
   code,
@@ -124,6 +133,11 @@ export function NightPlayerScreen({
   if (!night || !view) return <Loading />;
 
   const { player } = view;
+  /* An older server sends no `bringing`: no section. */
+  const bringing = view.bringing ?? [];
+  const eventOnly = new Set(
+    bringing.filter((binder) => binder.eventOnly).map((binder) => binder.id),
+  );
   const shelf: ZoomCard[] = view.flares.map((f) => ({
     imageUrl: f.imageUrl,
     name: f.cardName,
@@ -211,6 +225,23 @@ export function NightPlayerScreen({
           <FlareTiles flares={view.flares} shelf={shelf} />
         )}
       </NightSection>
+
+      {bringing.length > 0 ? (
+        <NightSection label={BINDERS_THEYRE_BRINGING}>
+          <BinderList
+            binders={bringing}
+            yours={false}
+            eventOnly={eventOnly}
+            onOpen={(binderId) =>
+              navigation.navigate("Binder", {
+                playerId,
+                binderId,
+                nightId: night.eventId,
+              })
+            }
+          />
+        </NightSection>
+      ) : null}
 
       <NightSection label={TRADE_BINDERS} last>
         {view.binders.length === 0 ? (

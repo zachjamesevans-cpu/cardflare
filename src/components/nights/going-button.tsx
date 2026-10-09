@@ -4,10 +4,13 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Check, Loader2 } from "lucide-react";
 
+import { BringingPicker } from "@/components/nights/bringing-picker";
 import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { goingAction } from "@/lib/events/going-actions";
 import { GOING, goingLine, YOURE_GOING } from "@/lib/events/going-copy";
+import { nightBinderStateAction } from "@/lib/events/night-binder-actions";
+import type { NightBinderState } from "@/lib/events/night-binders";
 
 /**
  * Going, or You're going: one button, the same words on both platforms.
@@ -32,6 +35,13 @@ import { GOING, goingLine, YOURE_GOING } from "@/lib/events/going-copy";
  * Signed out, the button is a door to sign in that comes back here.
  * A button that cannot work is a lie, and a guest cannot be on a
  * roster that links to binders they do not have.
+ *
+ * Once the server has the player on the roster, the binders they are
+ * bringing are asked for: the founder (2026-10-09), "When someone RSVPs
+ * 'Going' to a Night, they should have the option to select which of
+ * their existing digital binders they're bringing." The picker opens
+ * only for a player with a binder to pick and nothing picked yet, and
+ * never on the tap that turns Going off: it is an offer, not a nag.
  *
  * The app's going-button.tsx is the same control with the same words;
  * tests/unit/nights-parity.test.ts holds the two together.
@@ -76,6 +86,7 @@ export function GoingButton({
   const [count, setCount] = useState(goingCount);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [picker, setPicker] = useState<NightBinderState | null>(null);
 
   /* The server's truth, when a refresh brings a newer one and no tap
      is in flight to argue with it: the room re-reads itself on a
@@ -115,6 +126,22 @@ export function GoingButton({
     );
   }
 
+  /* Read after the transition settles, so the button is not held
+     spinning on a question the player may not need asked. */
+  const offerBinders = () => {
+    nightBinderStateAction(eventId)
+      .then((result) => {
+        if (!result.ok) return;
+        const { state } = result;
+        if (state.editable && state.binders.length > 0 && state.selectedCount === 0) {
+          setPicker(state);
+        }
+      })
+      .catch(() => {
+        /* The offer is a convenience; the night's own row still has it. */
+      });
+  };
+
   const toggle = () => {
     if (pending) return;
     const nextGoing = !going;
@@ -128,6 +155,7 @@ export function GoingButton({
         if (result.ok) {
           setGoing(result.youGoing);
           setCount(result.goingCount);
+          if (nextGoing && result.youGoing) offerBinders();
         } else {
           setGoing(before.going);
           setCount(before.count);
@@ -142,6 +170,16 @@ export function GoingButton({
   };
 
   const Icon = pending ? Loader2 : going ? Check : null;
+
+  const bringing = (
+    <BringingPicker
+      eventId={eventId}
+      code={codeOf(next)}
+      open={picker !== null}
+      state={picker}
+      onClose={() => setPicker(null)}
+    />
+  );
 
   if (compact) {
     return (
@@ -166,6 +204,7 @@ export function GoingButton({
             {error}
           </span>
         )}
+        {bringing}
       </span>
     );
   }
@@ -197,6 +236,13 @@ export function GoingButton({
           {error}
         </span>
       )}
+      {bringing}
     </span>
   );
+}
+
+/** The room's code from a `/e/<code>` return path, for the picker's repaint. */
+function codeOf(next: string): string | null {
+  const match = /^\/e\/([^/?#]+)/.exec(next);
+  return match ? match[1] : null;
 }

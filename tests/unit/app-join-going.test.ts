@@ -41,7 +41,9 @@ describe("Going, from the app", () => {
 
   it("keeps the session token the server hands out once", () => {
     expect(going).toContain("if (result.sessionToken) {");
-    expect(going).toContain("await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);");
+    expect(going).toContain(
+      "await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);",
+    );
   });
 
   it("is the token the server sends", () => {

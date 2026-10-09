@@ -63,16 +63,21 @@ vi.mock("@/lib/players/cosmetics", () => ({
 const route = await import("@/app/api/players/[playerId]/route");
 
 function request(payload: unknown, token: string | null = "jwt-1"): Request {
-  return new Request("https://cardflare.gg/api/players/5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71", {
-    method: "POST",
-    headers: {
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-      "x-cf-payload": encodeURIComponent(JSON.stringify(payload)),
+  return new Request(
+    "https://cardflare.gg/api/players/5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+    {
+      method: "POST",
+      headers: {
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        "x-cf-payload": encodeURIComponent(JSON.stringify(payload)),
+      },
     },
-  });
+  );
 }
 
-const params = { params: Promise.resolve({ playerId: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71" }) };
+const params = {
+  params: Promise.resolve({ playerId: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71" }),
+};
 
 beforeEach(() => {
   /* apiPlayer remembers a token for two minutes; every case here fakes
@@ -110,7 +115,10 @@ describe("POST /api/players/[playerId]", () => {
   });
 
   it("refuses following yourself", async () => {
-    playerForUser.mockResolvedValue({ id: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71", display_name: "Me" });
+    playerForUser.mockResolvedValue({
+      id: "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+      display_name: "Me",
+    });
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(400);
     expect(followPlayer).not.toHaveBeenCalled();
@@ -119,7 +127,10 @@ describe("POST /api/players/[playerId]", () => {
   it("follows and returns the settled state", async () => {
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(200);
-    expect(followPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
+    expect(followPlayer).toHaveBeenCalledWith(
+      "me-1",
+      "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+    );
     const body = (await response.json()) as { follow: { following: boolean } };
     expect(body.follow.following).toBe(true);
   });
@@ -128,7 +139,10 @@ describe("POST /api/players/[playerId]", () => {
     blockedBetween.mockResolvedValue(true);
     const response = await route.POST(request({ action: "follow" }), params);
     expect(response.status).toBe(404);
-    expect(blockedBetween).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
+    expect(blockedBetween).toHaveBeenCalledWith(
+      "me-1",
+      "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+    );
     expect(followPlayer).not.toHaveBeenCalled();
     expect(notifyNewFollower).not.toHaveBeenCalled();
   });
@@ -142,7 +156,10 @@ describe("POST /api/players/[playerId]", () => {
     });
     const response = await route.POST(request({ action: "unfollow" }), params);
     expect(response.status).toBe(200);
-    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
+    expect(unfollowPlayer).toHaveBeenCalledWith(
+      "me-1",
+      "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+    );
   });
 
   it("unfollows through the same door", async () => {
@@ -153,7 +170,10 @@ describe("POST /api/players/[playerId]", () => {
     });
     const response = await route.POST(request({ action: "unfollow" }), params);
     expect(response.status).toBe(200);
-    expect(unfollowPlayer).toHaveBeenCalledWith("me-1", "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71");
+    expect(unfollowPlayer).toHaveBeenCalledWith(
+      "me-1",
+      "5b3c7a2e-1f4d-4c8a-9e2b-0d6f1a3c5e71",
+    );
   });
 
   it("rejects an unknown action", async () => {

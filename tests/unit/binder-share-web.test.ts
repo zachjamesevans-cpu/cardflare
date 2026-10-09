@@ -87,8 +87,9 @@ describe("an offer on a trade binder's cards: the Flare viewer's stack", () => {
     );
     expect(publicBinder).toContain("offerAs={offerAs}");
     /* The owner, and a binder that is not up for trade, see no offer. */
-    expect(view).toContain(
-      "const asking = !binder.yours && settings.forTrade && offerAs !== null;",
+    expect(flat(view)).toContain(
+      /* A binder brought to a night takes offers there too (night-binders.ts). */
+      "const asking = !binder.yours && (settings.forTrade || nightId !== null) && offerAs !== null;",
     );
     expect(view).toContain('const picking = asking && offerAs === "player";');
     expect(view).toContain("if (!asking) return null;");
@@ -142,7 +143,8 @@ describe("an offer on a trade binder's cards: the Flare viewer's stack", () => {
     expect(sheet).toContain("noteMax={BINDER_OFFER_NOTE_MAX}");
     expect(sheet).toContain("closeOnSent");
     const send = flat(view.slice(view.indexOf("const sendOffer: OfferSend")));
-    expect(send).toContain("await offerOnBinderAction(binder.id, {");
+    expect(send).toContain("await offerOnBinderAction( binder.id, {");
+    expect(send).toContain("}, nightId, );");
     expect(send).toContain(
       "items: lines.map((line) => ({ entryId: line.key, quantity: line.quantity })),",
     );

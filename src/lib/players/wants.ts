@@ -696,7 +696,8 @@ export async function doneWantKeys(playerId: string): Promise<Set<string>> {
     /* A Flare answering a hunt request that is ticked off is found too,
        whatever its own count says: a hunt's tick used to write the
        request alone, so Flares from before that was fixed still read 0. */
-    const answered = flare.hunt_request_id && completeRequests.has(flare.hunt_request_id);
+    const answered =
+      flare.hunt_request_id && completeRequests.has(flare.hunt_request_id);
     if (answered || (flare.found_quantity ?? 0) >= flare.quantity) done.add(key);
     else stillLooking.add(key);
   }
