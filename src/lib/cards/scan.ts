@@ -15,10 +15,14 @@ import {
   POCKETS_PER_PAGE,
   collectorValue,
   compactCode,
+  photoType,
   rankScan,
   scanScore,
   suggestedPrinting,
 } from "@/lib/cards/scan-rules";
+
+/* Kept importable from here for the routes and jobs that read photos. */
+export { photoType };
 import type { CardResult } from "@/lib/cards/schema";
 import { cardResultsByIds, searchCards } from "@/lib/cards/search";
 import { checkRateLimit } from "@/lib/rate-limit";
@@ -169,34 +173,6 @@ function allowReads(playerId: string, reads: number): boolean {
     }
   }
   return true;
-}
-
-/** Whether a photo's first bytes say JPEG, PNG or WebP. A named type is a hint. */
-export function photoType(
-  bytes: Uint8Array,
-): "image/jpeg" | "image/png" | "image/webp" | null {
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (
-    bytes[0] === 0x89 &&
-    bytes[1] === 0x50 &&
-    bytes[2] === 0x4e &&
-    bytes[3] === 0x47
-  ) {
-    return "image/png";
-  }
-  if (
-    bytes[0] === 0x52 &&
-    bytes[1] === 0x49 &&
-    bytes[2] === 0x46 &&
-    bytes[3] === 0x46 &&
-    bytes[8] === 0x57 &&
-    bytes[9] === 0x45 &&
-    bytes[10] === 0x42 &&
-    bytes[11] === 0x50
-  ) {
-    return "image/webp";
-  }
-  return null;
 }
 
 /** A scan, start to finish: the gate, the ceilings, the read, the lookup. */

@@ -38,7 +38,7 @@ const card = (id: string, number: string) => ({
       rarity: null,
       printingName: null,
       isPromo: false,
-      imageUrl: null,
+      imageUrl: null as string | null,
     },
   ],
 });
@@ -228,6 +228,80 @@ describe("the reader's loop", () => {
       games: [],
     });
     expect(outcome).toEqual({ ok: false, reason: "unavailable" });
+  });
+
+  it("names a catalogue picture's type from its bytes, not the host's label", async () => {
+    /* The founder's page failed whole: a host served a PNG labelled JPEG
+       and the API refused the mislabelled image. */
+    const art = { ...card("zoro", "OP01-025") };
+    art.printings = [
+      { ...art.printings[0], imageUrl: "https://optcgapi.com/zoro.png" },
+    ];
+    findScanned.mockResolvedValue([{ card: art, printingId: null }]);
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1]);
+    const html = new TextEncoder().encode("<html>not a picture</html>");
+    const api = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: unknown, init: RequestInit) => {
+        if (String(url) === "https://optcgapi.com/zoro.png") {
+          return new Response(png, { headers: { "content-type": "image/jpeg" } });
+        }
+        if (String(url) === "https://optcgapi.com/broken.png") {
+          return new Response(html, { headers: { "content-type": "image/png" } });
+        }
+        return api(url as string, init);
+      }),
+    );
+    const view = (id: string, cardId: string) =>
+      message([
+        { type: "tool_use", id, name: "view_card", input: { card_id: cardId } },
+      ]);
+    replies = [
+      message([
+        {
+          type: "tool_use",
+          id: "s1",
+          name: "search_cards",
+          input: { query: "Roronoa Zoro", game: "one-piece" },
+        },
+      ]),
+      view("v1", "zoro"),
+      message([{ type: "text", text: "done" }], "end_turn"),
+    ];
+
+    await agent.readWithAgent({ mode: "card", page: null, pockets: [JPEG], games: [] });
+
+    type Block = { type: string; content?: unknown; source?: { media_type: string } };
+    const third = sent[2].body as { messages: { content: Block[] | string }[] };
+    const viewed = third.messages.at(-1)!.content as Block[];
+    const picture = (viewed[0].content as Block[]).find(
+      (block) => block.type === "image",
+    );
+    expect(picture?.source?.media_type).toBe("image/png");
+
+    /* Something that is not a picture at all is left out, not sent. */
+    art.printings = [
+      { ...art.printings[0], imageUrl: "https://optcgapi.com/broken.png" },
+    ];
+    sent.length = 0;
+    replies = [
+      message([
+        {
+          type: "tool_use",
+          id: "s1",
+          name: "search_cards",
+          input: { query: "Roronoa Zoro", game: "one-piece" },
+        },
+      ]),
+      view("v1", "zoro"),
+      message([{ type: "text", text: "done" }], "end_turn"),
+    ];
+    await agent.readWithAgent({ mode: "card", page: null, pockets: [JPEG], games: [] });
+    const again = (sent[2].body as { messages: { content: Block[] }[] }).messages.at(
+      -1,
+    )!.content;
+    expect(String(again[0].content)).toContain("No picture is available");
   });
 
   it("only looks at art for cards it searched, from allowed hosts", () => {

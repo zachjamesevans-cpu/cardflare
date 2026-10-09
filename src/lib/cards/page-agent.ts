@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { findScanned, scannerKey, withoutKeys } from "@/lib/cards/scan";
-import { SCAN_GAMES, type ScanGame } from "@/lib/cards/scan-rules";
+import { photoType, SCAN_GAMES, type ScanGame } from "@/lib/cards/scan-rules";
 import type { CardResult } from "@/lib/cards/schema";
 
 /**
@@ -202,14 +202,13 @@ async function cardImage(
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
     if (!response.ok) return null;
-    const type = (response.headers.get("content-type") ?? "").split(";")[0].trim();
-    const mediaType =
-      type === "image/jpeg" || type === "image/png" || type === "image/webp"
-        ? type
-        : null;
-    if (!mediaType) return null;
     const bytes = new Uint8Array(await response.arrayBuffer());
     if (bytes.length === 0 || bytes.length > 2_000_000) return null;
+    /* The type comes from the bytes, never the host's header: a catalogue
+       host served a PNG labelled JPEG, and the API refuses a mislabelled
+       image by failing the whole read, so one card's picture sank a page. */
+    const mediaType = photoType(bytes);
+    if (!mediaType) return null;
     return imageBlock({ bytes, mediaType });
   } catch {
     return null;
