@@ -297,3 +297,35 @@ describe("the boundaries", () => {
     expect(read("src/lib/tiers/pro/index.ts")).toContain("cardScanner: true");
   });
 });
+
+describe("the key", () => {
+  it("never reaches a log, whatever the error quotes", () => {
+    const quoted =
+      'Headers.append: "sk-ant-usr-abc_DEF-123\nghi-456" is an invalid header value.';
+    const cleaned = scan.withoutKeys(quoted);
+    expect(cleaned).not.toContain("abc_DEF");
+    expect(cleaned).not.toContain("ghi-456");
+    expect(cleaned).toContain("sk-ant-[hidden]");
+  });
+
+  it("works with line breaks pasted into it, and never logs a raw error", async () => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test\n-key ");
+    answer({
+      found: false,
+      game: "other",
+      name: "",
+      englishName: "",
+      number: "",
+      setCode: "",
+    });
+    /* Reaching the model at all is the proof: a line break in the key
+       throws in Headers.append before any request is made. */
+    expect(await scan.scanCard(who, JPEG)).toMatchObject({
+      ok: false,
+      reason: "no-card",
+    });
+    expect(sent).not.toBeNull();
+    const source = read("src/lib/cards/scan.ts");
+    expect(source).not.toContain('console.error("Card scan read failed", error)');
+  });
+});

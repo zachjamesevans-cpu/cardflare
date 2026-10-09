@@ -39,7 +39,26 @@ const SCAN_MODEL = "claude-haiku-5-5";
 
 /** Whether the scanner can run at all: a key, and somewhere to look cards up. */
 export function scannerConfigured(): boolean {
-  return Boolean(process.env.ANTHROPIC_API_KEY) && isSupabaseConfigured();
+  return Boolean(scannerKey()) && isSupabaseConfigured();
+}
+
+/**
+ * The key, with any whitespace taken out. A real key never holds a space
+ * or a line break, and one pasted into Vercel across several lines was
+ * refused before it left the server: a line break is not allowed in a
+ * request header.
+ */
+function scannerKey(): string {
+  return (process.env.ANTHROPIC_API_KEY ?? "").replace(/\s+/g, "");
+}
+
+/**
+ * An error's sentence with anything shaped like a key blanked out. The
+ * founder's first failed scan logged the whole key: the runtime quotes a
+ * header it refuses, word for word. Nothing logged here may do that.
+ */
+export function withoutKeys(text: string): string {
+  return text.replace(/sk-ant-[A-Za-z0-9_\-\s]+/g, "sk-ant-[hidden]");
 }
 
 /**
@@ -246,7 +265,7 @@ const POCKET_LEAD = [
 /** A client per scan: it is a plain object, and the key is read when used. */
 function anthropic(): Anthropic {
   return new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
+    apiKey: scannerKey(),
     /* A scan is a person holding a card up to a camera. Past this they
        have given up, so a slow answer is a failed one. */
     timeout: 20_000,
@@ -292,13 +311,23 @@ async function readCard(
   } catch (error) {
     /*
      * Logged with the status and the API's own sentence ("Your credit
-     * balance is too low...", "invalid x-api-key"), which say what to fix
-     * and carry no key and no photo. The photo is never logged.
+     * balance is too low...", "invalid x-api-key"), which say what to
+     * fix, with anything shaped like a key blanked. The photo is never
+     * logged.
      */
     if (error instanceof Anthropic.APIError) {
-      console.error("Card scan read failed", error.status, error.name, error.message);
+      console.error(
+        "Card scan read failed",
+        error.status,
+        error.name,
+        withoutKeys(error.message),
+      );
     } else {
-      console.error("Card scan read failed", error);
+      /* Never the error object itself: its message and stack can quote a
+         header, and the key with it. */
+      const name = error instanceof Error ? error.name : "Error";
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Card scan read failed", name, withoutKeys(message));
     }
     return null;
   }
