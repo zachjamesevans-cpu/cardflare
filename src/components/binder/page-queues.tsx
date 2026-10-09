@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ScanLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { queuesForAction } from "@/lib/cards/page-job-actions";
 import { CHECK_NOW, pagesWaitingLine } from "@/lib/cards/scan-rules";
 
@@ -14,8 +15,9 @@ import { CHECK_NOW, pagesWaitingLine } from "@/lib/cards/scan-rules";
  * The founder: "maybe it scans it, and then they'll get a notification
  * once it's ready." The notice is one way back to the check; this is
  * the other, for somebody already on the binder. One banner per queue,
- * "Reading 5 pages..." while the reader works and "5 pages ready to
- * check" with Check now once it is done, the same as the app.
+ * "Finding the cards on 5 pages" with the small spinner on its right
+ * while the reader works, so it never reads as stuck, and "5 pages
+ * ready to check" with Check now once it is done, the same as the app.
  */
 
 export interface PageQueues {
@@ -85,7 +87,7 @@ export function usePageQueues(
 
 /**
  * One banner per queue out on this binder, over its pockets: the line
- * alone while it is read, Check now beside it once it is.
+ * and the spinner while it is read, Check now beside it once it is.
  */
 export function QueueBanners({
   queues,
@@ -109,6 +111,7 @@ export function QueueBanners({
           >
             {pagesWaitingLine(queue.pages, queue.ready)}
           </p>
+          {!queue.ready && <Spinner size="sm" />}
           {queue.ready && (
             <Button type="button" size="sm" onClick={() => onCheck(queue.batchId)}>
               {CHECK_NOW}

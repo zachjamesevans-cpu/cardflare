@@ -309,10 +309,11 @@ describe("checking and placing", () => {
     expect(src.viewer).toContain("{pocket.taken ? (");
   });
 
-  it("finds a pocket's card with the picker's own search, the read name typed", () => {
+  it("finds a pocket's card with the Flare picker itself, the read name typed", () => {
     expect(src.pages).toContain('lookFor: read ? read.englishName || read.name : "",');
-    expect(src.viewer).toContain('const search = useCardSearch({ kind: "list" });');
-    expect(src.viewer).toContain("initial={pocket.lookFor}");
+    expect(src.viewer).toContain("<CardSelectSheet");
+    expect(src.viewer).toContain("setFinding({ text: pocket.lookFor });");
+    expect(src.viewer).toContain("searchFor={finding}");
     expect(src.viewer).toContain("<PrintingChips");
     expect(src.viewer).toContain("export function PrintingChips(");
   });

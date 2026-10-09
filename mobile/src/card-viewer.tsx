@@ -13,14 +13,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { CardHit, ScanMatch } from "./api";
-import { useCardSearch } from "./card-select";
+import { CardSelectSheet } from "./card-select";
 import { leadArt } from "./flare-bits";
-import { GameSearchField } from "./game-chips";
-import { searchPlaceholder } from "./game-scope";
 import { RemoteImage } from "./remote-image";
 import {
   FIND_THE_CARD,
   LEAVE_EMPTY,
+  MIGHT_BE_THESE,
   NOT_SURE,
   NOT_THIS_CARD,
   OTHER_MATCHES,
@@ -35,7 +34,7 @@ import {
 } from "./scan-copy";
 import { scanHit } from "./scan-hit";
 import { colors, gutter, radius, spacing } from "./theme";
-import { Button, Loading, SheetClose, Tap } from "./ui";
+import { Button, SheetClose, Tap } from "./ui";
 
 /**
  * The card viewer: one full screen for checking what a photo was read
@@ -51,9 +50,12 @@ import { Button, Loading, SheetClose, Tap } from "./ui";
  * - "Your photo" beside "Our match", the card's name and number under
  *   the match, and the note there when the reader was sure.
  * - "That's it", then "Other printing" (the printings in a small panel),
- *   "Not this card" (the other guesses, then "Find the card", the
- *   picker's own search with the read name typed), and "Leave empty" on
- *   a pocket.
+ *   "Not this card" (the other guesses, then "Find the card": the Flare
+ *   picker itself, src/card-select.tsx, the read name typed, where a tap
+ *   chooses the card and closes it), and "Leave empty" on a pocket.
+ * - A pocket the reader could not place but the catalogue has guesses
+ *   for: "Might be one of these" and those cards under the photo, a tap
+ *   choosing one the way a found pocket's other guesses do.
  * - On a page, a swipe left or right is the next or previous pocket,
  *   across every page; "That's it" moves on by itself (the check's
  *   doing, src/page-scanner.tsx).
@@ -81,6 +83,11 @@ export interface ViewerPocket {
   sure?: boolean;
   /** How it decided, in a few words. */
   note?: string;
+  /**
+   * For an unread pocket: the catalogue's closest cards to what the
+   * reader saw, shown as "Might be one of these".
+   */
+  suggestions?: ScanMatch[];
   /** The name read off the card, typed into "Find the card". */
   lookFor: string;
   /** The pocket already holds a card in this binder. */
@@ -95,7 +102,7 @@ export function pickArt(pick: ViewerPick): string | null {
   );
 }
 
-type Panel = "printing" | "others" | "search";
+type Panel = "printing" | "others";
 
 export function CardViewer({
   pockets,
@@ -122,6 +129,8 @@ export function CardViewer({
   const window = useWindowDimensions();
   const list = useRef<FlatList<ViewerPocket>>(null);
   const [panel, setPanel] = useState<Panel | null>(null);
+  /* "Find the card": the words for the picker's search while it is open. */
+  const [finding, setFinding] = useState<{ text: string } | null>(null);
   /* The pager's own height, so each pocket scrolls inside it. */
   const [tall, setTall] = useState(0);
   /* The pocket the pager is on, so a swipe and a move from outside
@@ -130,6 +139,7 @@ export function CardViewer({
 
   useEffect(() => {
     setPanel(null);
+    setFinding(null);
     if (shown.current === index) return;
     shown.current = index;
     list.current?.scrollToIndex({ index, animated: true });
@@ -143,6 +153,11 @@ export function CardViewer({
   const choose = (next: ViewerPick) => {
     setPanel(null);
     onPick(index, next);
+  };
+  /* The Flare picker over the viewer, the read name typed. */
+  const find = () => {
+    setPanel(null);
+    setFinding({ text: pocket.lookFor });
   };
 
   return (
@@ -184,8 +199,13 @@ export function CardViewer({
         }}
         onLayout={(event) => setTall(event.nativeEvent.layout.height)}
         extraData={`${width}x${tall}`}
-        renderItem={({ item }) => (
-          <Pane pocket={item} width={width} height={tall > 0 ? tall : undefined} />
+        renderItem={({ item, index: at }) => (
+          <Pane
+            pocket={item}
+            width={width}
+            height={tall > 0 ? tall : undefined}
+            onChoose={(next) => onPick(at, next)}
+          />
         )}
         style={{ flex: 1 }}
       />
@@ -204,7 +224,7 @@ export function CardViewer({
           {pick ? (
             <Pill label={NOT_THIS_CARD} onPress={() => setPanel("others")} />
           ) : (
-            <Pill label={FIND_THE_CARD} onPress={() => setPanel("search")} />
+            <Pill label={FIND_THE_CARD} onPress={find} />
           )}
           {onLeaveEmpty && pick ? (
             <Pill label={LEAVE_EMPTY} onPress={() => onLeaveEmpty(index)} />
@@ -220,20 +240,10 @@ export function CardViewer({
             accessibilityLabel="Close"
             style={{ flex: 1, backgroundColor: colors.scrim }}
           />
-          <View
-            style={[
-              styles.panel,
-              { paddingBottom: insets.bottom + spacing(3) },
-              panel === "search" && { height: "85%" },
-            ]}
-          >
+          <View style={[styles.panel, { paddingBottom: insets.bottom + spacing(3) }]}>
             <View style={styles.panelTop}>
               <Text accessibilityRole="header" style={styles.heading}>
-                {panel === "printing"
-                  ? OTHER_PRINTING
-                  : panel === "search"
-                    ? FIND_THE_CARD
-                    : NOT_THIS_CARD}
+                {panel === "printing" ? OTHER_PRINTING : NOT_THIS_CARD}
               </Text>
               <SheetClose onPress={() => setPanel(null)} />
             </View>
@@ -281,23 +291,27 @@ export function CardViewer({
                     </ScrollView>
                   </View>
                 ) : null}
-                <Button
-                  label={FIND_THE_CARD}
-                  variant="secondary"
-                  onPress={() => setPanel("search")}
-                />
+                <Button label={FIND_THE_CARD} variant="secondary" onPress={find} />
               </View>
-            ) : null}
-
-            {panel === "search" ? (
-              <ViewerSearch
-                initial={pocket.lookFor}
-                onPick={(hit) => choose({ hit, printingId: null })}
-              />
             ) : null}
           </View>
         </View>
       ) : null}
+
+      {/* "Find the card" is the Flare composer's picker, the same sheet,
+          for one card: a tap chooses it and the sheet closes, no count.
+          Headed "Find the card", as the website's is. Drawn inside the
+          viewer, so on iOS it is presented from the viewer's own Modal
+          and lands on top of it, as the scanner does over the binder's
+          add menu. */}
+      <CardSelectSheet
+        visible={finding !== null}
+        target={{ kind: "list" }}
+        title={FIND_THE_CARD}
+        onPickOne={(hit, printingId) => choose({ hit, printingId })}
+        onClose={() => setFinding(null)}
+        searchFor={finding}
+      />
     </View>
   );
 }
@@ -324,10 +338,13 @@ function Pane({
   pocket,
   width,
   height: tall,
+  onChoose,
 }: {
   pocket: ViewerPocket;
   width: number;
   height?: number;
+  /** One of "Might be one of these" tapped. */
+  onChoose: (pick: ViewerPick) => void;
 }) {
   const column = Math.floor((width - 2 * gutter - spacing(3)) / 2);
   const height = Math.round((column * 88) / 63);
@@ -336,6 +353,7 @@ function Pane({
   const unsure = pocket.state === "found" && pocket.sure === false;
   const note = (pocket.note ?? "").trim();
   const frame = { width: column, height, borderRadius: radius.control / 2 };
+  const suggestions = pocket.state === "unread" ? (pocket.suggestions ?? []) : [];
 
   return (
     <ScrollView
@@ -405,6 +423,44 @@ function Pane({
           {!unsure && note ? <Text style={styles.line}>{note}</Text> : null}
         </View>
       </View>
+
+      {/* What it might be, when the reader could not place it: each a
+          tap to choose, as a found pocket's other guesses are. A plain
+          wrapping row, not a scroller, so a swipe is still the pager's. */}
+      {suggestions.length > 0 ? (
+        <View style={{ gap: spacing(2) }}>
+          <Text accessibilityRole="header" style={styles.label}>
+            {MIGHT_BE_THESE}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+            {suggestions.map((match) => {
+              const maybe = scanHit(match.card, match.printingId);
+              const on = pick?.hit.id === maybe.id;
+              return (
+                <Tap
+                  key={match.card.id}
+                  onPress={() => onChoose({ hit: maybe, printingId: match.printingId })}
+                  accessibilityLabel={`${maybe.name}, ${maybe.cardNumber}`}
+                  accessibilityState={{ selected: on }}
+                  style={{ width: 72, gap: spacing(1) }}
+                >
+                  <RemoteImage
+                    uri={leadArt(maybe)}
+                    contentFit="cover"
+                    style={[styles.otherArt, on && { borderColor: colors.accent }]}
+                  />
+                  <Text numberOfLines={1} style={styles.tinyName}>
+                    {maybe.name}
+                  </Text>
+                  <Text numberOfLines={1} style={styles.tiny}>
+                    {maybe.cardNumber}
+                  </Text>
+                </Tap>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -476,64 +532,6 @@ export function PrintingChips({
   );
 }
 
-/**
- * The picker's own search (src/card-select.tsx's useCardSearch and its
- * game field), for one card, the read name already typed: a tap chooses
- * it, any printing.
- */
-function ViewerSearch({
-  initial,
-  onPick,
-}: {
-  initial: string;
-  onPick: (hit: CardHit) => void;
-}) {
-  const search = useCardSearch({ kind: "list" });
-  const { setQuery } = search;
-
-  useEffect(() => {
-    if (initial) setQuery(initial);
-  }, [initial, setQuery]);
-
-  return (
-    <View style={{ flex: 1, gap: spacing(2) }}>
-      <GameSearchField
-        scope={search.scope}
-        playerGames={search.playerGames}
-        onPick={search.pickGame}
-        value={search.query}
-        onChangeText={search.setQuery}
-        placeholder={searchPlaceholder(search.scopedGame)}
-        autoFocus
-      />
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ gap: spacing(2), paddingBottom: spacing(4) }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-      >
-        {search.searching && search.hits.length === 0 ? <Loading /> : null}
-        {search.hits.map((hit) => (
-          <Tap
-            key={hit.id}
-            onPress={() => onPick(hit)}
-            accessibilityLabel={`${hit.name}, ${hit.cardNumber}`}
-            style={styles.hit}
-          >
-            <RemoteImage uri={leadArt(hit)} contentFit="cover" style={styles.hitArt} />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text numberOfLines={1} style={styles.hitName}>
-                {hit.name}
-              </Text>
-              <Text style={styles.small}>{hit.cardNumber}</Text>
-            </View>
-          </Tap>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   top: {
     flexDirection: "row",
@@ -599,23 +597,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.elevated,
   },
-  hit: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing(3),
-    padding: spacing(2),
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.canvas,
-  },
-  hitArt: {
-    width: 36,
-    height: 50,
-    borderRadius: 4,
-    backgroundColor: colors.elevated,
-  },
-  hitName: { color: colors.textPrimary, fontWeight: "700" },
   heading: { color: colors.textPrimary, fontSize: 16, fontWeight: "600" },
   label: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
   name: { color: colors.textPrimary, fontSize: 15, fontWeight: "600" },
@@ -625,4 +606,5 @@ const styles = StyleSheet.create({
   unknown: { color: colors.textSecondary, fontSize: 28, fontWeight: "600" },
   small: { color: colors.textMuted, fontSize: 12 },
   tiny: { color: colors.textMuted, fontSize: 10 },
+  tinyName: { color: colors.textPrimary, fontSize: 11, fontWeight: "600" },
 });

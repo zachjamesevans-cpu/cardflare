@@ -324,15 +324,13 @@ describe("the card viewer", () => {
   });
 
   it("shows the other guesses for Not this card, then Find the card with the read name", () => {
-    const panel = between(
-      src.viewer,
-      '{panel === "others" ? (',
-      '{panel === "search" ? (',
-    );
+    const panel = between(src.viewer, '{panel === "others" ? (', "<CardSelectSheet");
     expect(panel.indexOf("{OTHER_MATCHES}")).toBeLessThan(
       panel.indexOf("label={FIND_THE_CARD}"),
     );
-    expect(src.viewer).toContain("initial={pocket.lookFor}");
+    /* Find the card is the Flare picker, the read name typed
+       (tests/unit/scan-picker-app.test.ts). */
+    expect(src.viewer).toContain("setFinding({ text: pocket.lookFor });");
     expect(src.viewer).toContain("<PrintingChips");
   });
 

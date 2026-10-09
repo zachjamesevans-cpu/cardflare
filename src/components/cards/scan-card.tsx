@@ -205,10 +205,16 @@ export function PrintingChips({
 /** One of the other guesses: a small tile that swaps in as the top one. */
 export function OtherMatch({
   card,
+  chosen,
+  named = false,
   imagesEnabled,
   onPick,
 }: {
   card: CardResult;
+  /** Lit as the pocket's card now: "Might be one of these" keeps showing after a tap. */
+  chosen?: boolean;
+  /** Its name over its number, for a card the reader did not name itself. */
+  named?: boolean;
   imagesEnabled: boolean;
   onPick: () => void;
 }) {
@@ -218,9 +224,15 @@ export function OtherMatch({
       type="button"
       onClick={onPick}
       aria-label={`${card.exactName}, ${card.canonicalCardNumber}`}
+      aria-pressed={chosen}
       className="flex w-[60px] cursor-pointer flex-col gap-1 text-left"
     >
-      <span className="block h-[84px] w-[60px] overflow-hidden rounded-[5px] border border-border bg-elevated">
+      <span
+        className={cn(
+          "block h-[84px] w-[60px] overflow-hidden rounded-[5px] border bg-elevated",
+          chosen ? "border-accent" : "border-border",
+        )}
+      >
         {imagesEnabled && isRenderableImageUrl(art) ? (
           /* eslint-disable-next-line @next/next/no-img-element */
           <img src={art} alt="" className="size-full object-cover" />
@@ -230,6 +242,11 @@ export function OtherMatch({
           </span>
         )}
       </span>
+      {named && (
+        <span className="truncate text-[11px] font-semibold text-text-primary">
+          {card.exactName}
+        </span>
+      )}
       <span className="truncate font-mono text-[10px] text-text-muted">
         {card.canonicalCardNumber}
       </span>

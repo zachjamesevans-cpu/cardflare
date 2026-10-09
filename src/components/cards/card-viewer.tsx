@@ -3,13 +3,15 @@
 import { useRef, useState, type KeyboardEvent } from "react";
 import { ChevronLeft, ChevronRight, CircleAlert, CircleHelp } from "lucide-react";
 
-import { CardSearch } from "@/components/cards/card-search";
 import { OtherMatch, PrintingChips, ScannedCard } from "@/components/cards/scan-card";
+import { CardPicker } from "@/components/flares/card-picker";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { FullScreen } from "@/components/ui/full-screen";
 import {
   FIND_THE_CARD,
   LEAVE_EMPTY,
+  MIGHT_BE_THESE,
   NOT_SURE,
   NOT_THIS_CARD,
   OTHER_MATCHES,
@@ -40,9 +42,15 @@ import { cn } from "@/lib/cn";
  *    careful reader was unsure; the note under the match otherwise.
  * 2. The menu, in this order: That's it, Other printing (the printing
  *    chips), Not this card (the other guesses as tiles, then Find the
- *    card, the search with the read name already typed) and, on a page,
- *    Leave empty.
- * 3. On a page, the arrows, the keyboard's arrows and a swipe step to
+ *    card) and, on a page, Leave empty. A pocket the reader could not
+ *    place shows what it might be first, "Might be one of these", the
+ *    catalogue's closest cards to what it saw, then Find the card.
+ * 3. Find the card is the Flare composer's own picker (`CardPicker`),
+ *    presented the way the composer presents it, the read name already
+ *    typed. The founder: the Flare screen's picker "down to the pixel",
+ *    except that "it's just one card, so adding the card should close
+ *    that screen." So it picks one card, and the tap closes it.
+ * 4. On a page, the arrows, the keyboard's arrows and a swipe step to
  *    the pocket before or after, across every page; "Page 4" and nine
  *    dots say where. That's it keeps the card and steps on.
  *
@@ -63,6 +71,11 @@ export interface ViewerItem {
   choice: Choice;
   /** The reader's guesses, best first. */
   matches: readonly { card: CardResult; printingId: string | null }[];
+  /**
+   * An unread pocket only: the catalogue's closest cards to what the
+   * reader saw, for "Might be one of these".
+   */
+  suggestions?: readonly { card: CardResult; printingId: string | null }[];
   /** A card read, one that could not be, or a pocket with nothing in it. */
   state: "found" | "unread" | "empty";
   /** False when the careful reader was not sure. */
@@ -114,9 +127,11 @@ export function CardViewer({
     if (next >= 0 && next < items.length) onAt(next);
   };
   const touch = useRef<{ x: number; y: number } | null>(null);
+  /* Find the card: the picker over the card, until a card or Back. */
+  const [picking, setPicking] = useState(false);
 
   const keys = (event: KeyboardEvent<HTMLDialogElement>) => {
-    if (!steps) return;
+    if (!steps || picking) return;
     /* The search's field keeps its own arrows. */
     const target = event.target as HTMLElement;
     if (target.closest("input, textarea")) return;
@@ -126,54 +141,79 @@ export function CardViewer({
 
   if (!item) return null;
 
+  /* One screen throughout, so the picker swaps in without the dialog closing. */
   return (
-    <FullScreen label={label} onClose={onClose} onKeyDown={keys}>
-      <div
-        className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 pt-10"
-        onTouchStart={(event) => {
-          const finger = event.touches[0];
-          touch.current = finger ? { x: finger.clientX, y: finger.clientY } : null;
-        }}
-        onTouchEnd={(event) => {
-          const from = touch.current;
-          const finger = event.changedTouches[0];
-          touch.current = null;
-          if (!steps || !from || !finger) return;
-          const dx = finger.clientX - from.x;
-          const dy = finger.clientY - from.y;
-          if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy)) return;
-          step(dx < 0 ? 1 : -1);
-        }}
-      >
-        {item.place && <Whereabouts page={item.place.page} slot={item.place.slot} />}
-
-        <div className="flex items-center gap-2">
-          {steps && (
-            <StepArrow label="Previous" disabled={at === 0} onClick={() => step(-1)}>
-              <ChevronLeft className="size-5" aria-hidden="true" />
-            </StepArrow>
-          )}
-          {/* Keyed by the card, so a new card starts with the menu shut. */}
-          <Shown
-            key={item.key}
-            item={item}
-            imagesEnabled={imagesEnabled}
-            playerGames={playerGames}
-            onChoose={onChoose}
-            onConfirm={onConfirm}
-            onLeaveEmpty={onLeaveEmpty}
-          />
-          {steps && (
-            <StepArrow
-              label="Next"
-              disabled={at === items.length - 1}
-              onClick={() => step(1)}
-            >
-              <ChevronRight className="size-5" aria-hidden="true" />
-            </StepArrow>
-          )}
+    <FullScreen
+      label={label}
+      /* While picking, the X and Escape go back to the card, as Back does. */
+      onClose={picking ? () => setPicking(false) : onClose}
+      onKeyDown={keys}
+    >
+      {picking ? (
+        /* As the Flare composer presents it: its column, in a Card. */
+        <div className="mx-auto flex w-full max-w-2xl flex-col pt-10">
+          <Card className="flex flex-col gap-4 p-4 sm:p-6">
+            <CardPicker
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              title={FIND_THE_CARD}
+              initialQuery={item.lookFor}
+              onPickOne={(card, printing) => {
+                onChoose({ card, printingId: printing?.id ?? null });
+                setPicking(false);
+              }}
+              onDone={() => setPicking(false)}
+            />
+          </Card>
         </div>
-      </div>
+      ) : (
+        <div
+          className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 pt-10"
+          onTouchStart={(event) => {
+            const finger = event.touches[0];
+            touch.current = finger ? { x: finger.clientX, y: finger.clientY } : null;
+          }}
+          onTouchEnd={(event) => {
+            const from = touch.current;
+            const finger = event.changedTouches[0];
+            touch.current = null;
+            if (!steps || !from || !finger) return;
+            const dx = finger.clientX - from.x;
+            const dy = finger.clientY - from.y;
+            if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy)) return;
+            step(dx < 0 ? 1 : -1);
+          }}
+        >
+          {item.place && <Whereabouts page={item.place.page} slot={item.place.slot} />}
+
+          <div className="flex items-center gap-2">
+            {steps && (
+              <StepArrow label="Previous" disabled={at === 0} onClick={() => step(-1)}>
+                <ChevronLeft className="size-5" aria-hidden="true" />
+              </StepArrow>
+            )}
+            {/* Keyed by the card, so a new card starts with the menu shut. */}
+            <Shown
+              key={item.key}
+              item={item}
+              imagesEnabled={imagesEnabled}
+              onChoose={onChoose}
+              onConfirm={onConfirm}
+              onLeaveEmpty={onLeaveEmpty}
+              onFind={() => setPicking(true)}
+            />
+            {steps && (
+              <StepArrow
+                label="Next"
+                disabled={at === items.length - 1}
+                onClick={() => step(1)}
+              >
+                <ChevronRight className="size-5" aria-hidden="true" />
+              </StepArrow>
+            )}
+          </div>
+        </div>
+      )}
     </FullScreen>
   );
 }
@@ -228,25 +268,28 @@ function StepArrow({
 function Shown({
   item,
   imagesEnabled,
-  playerGames,
   onChoose,
   onConfirm,
   onLeaveEmpty,
+  onFind,
 }: {
   item: ViewerItem;
   imagesEnabled: boolean;
-  playerGames: readonly string[];
   onChoose: (choice: Choice) => void;
   onConfirm: () => void;
   onLeaveEmpty?: () => void;
+  /** Find the card: the picker, over the card. */
+  onFind: () => void;
 }) {
   const { choice } = item;
-  /* The menu's open part: the printings, the other guesses, or the search. */
-  const [menu, setMenu] = useState<"printing" | "other" | "search" | null>(null);
+  /* The menu's open part: the printings or the other guesses. */
+  const [menu, setMenu] = useState<"printing" | "other" | null>(null);
   /* On a narrow screen, the face showing. */
   const [face, setFace] = useState<"photo" | "match">("match");
   const unsure = item.sure === false;
   const others = item.matches.filter((match) => match.card.id !== choice?.card.id);
+  /* What an unread pocket might be: the catalogue's closest cards. */
+  const suggestions = item.state === "unread" ? (item.suggestions ?? []) : [];
   const choose = (next: Choice) => {
     onChoose(next);
     setMenu(null);
@@ -360,6 +403,24 @@ function Shown({
         <p className="text-center text-xs text-text-muted">{item.note}</p>
       )}
 
+      {/*
+       * A pocket the reader could not place: what it might be, each a
+       * tap to choose, as a found pocket's other guesses are, the one
+       * chosen lit. Over the menu, so Find the card stays below.
+       */}
+      {suggestions.length > 0 && (
+        <Popover>
+          <Guesses
+            word={MIGHT_BE_THESE}
+            guesses={suggestions}
+            named
+            chosen={choice?.card.id ?? null}
+            imagesEnabled={imagesEnabled}
+            onPick={choose}
+          />
+        </Popover>
+      )}
+
       {/* The menu, in the app's order. */}
       <div className="flex flex-wrap justify-center gap-2">
         {(choice || item.state === "empty") && (
@@ -381,18 +442,13 @@ function Shown({
           <Button
             type="button"
             variant="secondary"
-            aria-expanded={menu === "other" || menu === "search"}
+            aria-expanded={menu === "other"}
             onClick={() => setMenu(menu === "other" ? null : "other")}
           >
             {NOT_THIS_CARD}
           </Button>
         ) : (
-          <Button
-            type="button"
-            variant="secondary"
-            aria-expanded={menu === "search"}
-            onClick={() => setMenu(menu === "search" ? null : "search")}
-          >
+          <Button type="button" variant="secondary" onClick={onFind}>
             {FIND_THE_CARD}
           </Button>
         )}
@@ -416,43 +472,67 @@ function Shown({
       {menu === "other" && (
         <Popover>
           {others.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs text-text-muted">{OTHER_MATCHES}</p>
-              <ul className="flex [scrollbar-width:none] gap-2 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
-                {others.map((match) => (
-                  <li key={match.card.id} className="shrink-0">
-                    <OtherMatch
-                      card={match.card}
-                      imagesEnabled={imagesEnabled}
-                      onPick={() =>
-                        choose({ card: match.card, printingId: match.printingId })
-                      }
-                    />
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <Guesses
+              word={OTHER_MATCHES}
+              guesses={others}
+              imagesEnabled={imagesEnabled}
+              onPick={choose}
+            />
           )}
-          <Button type="button" variant="secondary" onClick={() => setMenu("search")}>
+          {/* The Flare composer's picker, over the card, the read name typed. */}
+          <Button type="button" variant="secondary" onClick={onFind}>
             {FIND_THE_CARD}
           </Button>
         </Popover>
       )}
+    </div>
+  );
+}
 
-      {/* The site's own search, the read name already typed. */}
-      {menu === "search" && (
-        <Popover>
-          <CardSearch
-            imagesEnabled={imagesEnabled}
-            playerGames={playerGames}
-            autoFocus
-            initialQuery={item.lookFor}
-            onSelect={(card, printing) =>
-              choose({ card, printingId: printing?.id ?? null })
-            }
-          />
-        </Popover>
-      )}
+/** Other cards it could be, as small tiles under their heading; a tap chooses one. */
+function Guesses({
+  word,
+  guesses,
+  chosen = null,
+  named = false,
+  imagesEnabled,
+  onPick,
+}: {
+  word: string;
+  guesses: readonly { card: CardResult; printingId: string | null }[];
+  /** The card the pocket has now, lit among them. */
+  chosen?: string | null;
+  /**
+   * Suggestions: each with its name, in a row that wraps rather than
+   * scrolls, as the app draws them.
+   */
+  named?: boolean;
+  imagesEnabled: boolean;
+  onPick: (choice: Choice) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs text-text-muted">{word}</p>
+      <ul
+        className={cn(
+          "flex gap-2",
+          named
+            ? "flex-wrap"
+            : "[scrollbar-width:none] overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden",
+        )}
+      >
+        {guesses.map((match) => (
+          <li key={match.card.id} className="shrink-0">
+            <OtherMatch
+              card={match.card}
+              chosen={chosen === null ? undefined : match.card.id === chosen}
+              named={named}
+              imagesEnabled={imagesEnabled}
+              onPick={() => onPick({ card: match.card, printingId: match.printingId })}
+            />
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

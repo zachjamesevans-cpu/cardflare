@@ -23,7 +23,8 @@
     "cards:probe": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/probe-optcgapi.ts",
     "cards:scrape:bandai": "tsx scripts/scrape-bandai.ts",
     "cards:sync:onepiece": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/sync-onepiece.ts",
-    "cards:import": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/import-catalogue.ts"
+    "cards:import": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/import-catalogue.ts",
+    "scan:compare": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/scan-compare.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

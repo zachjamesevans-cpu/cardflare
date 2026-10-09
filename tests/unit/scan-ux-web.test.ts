@@ -260,16 +260,14 @@ describe("the card viewer, for a single scan and for the check alike", () => {
     expect(viewer).toContain("{onLeaveEmpty && choice && (");
   });
 
-  it("opens the other guesses from Not this card, then the search with the read name", () => {
+  it("opens the other guesses from Not this card, then the picker with the read name", () => {
     expect(viewer).toMatch(
       /onClick=\{\(\) => setMenu\(menu === "other" \? null : "other"\)\}/,
     );
     expect(viewer).toMatch(
-      /\{menu === "other" && \([\s\S]*?\{OTHER_MATCHES\}[\s\S]*?\{FIND_THE_CARD\}/,
+      /\{menu === "other" && \([\s\S]*?word=\{OTHER_MATCHES\}[\s\S]*?onClick=\{onFind\}>\s*\{FIND_THE_CARD\}/,
     );
-    expect(viewer).toMatch(
-      /\{menu === "search" && \([\s\S]*?initialQuery=\{item\.lookFor\}/,
-    );
+    expect(viewer).toMatch(/\{picking \? \([\s\S]*?initialQuery=\{item\.lookFor\}/);
     expect(viewer).toMatch(
       /\{menu === "printing" && choice && \([\s\S]*?<PrintingChips/,
     );

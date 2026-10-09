@@ -6,20 +6,13 @@ import {
   placeBinderPages,
   type BinderPlacement,
 } from "@/lib/binder/binder";
-import { readWithAgent, type AgentPhoto } from "@/lib/cards/page-agent";
-import {
-  photoType,
-  scannerAccess,
-  type PocketOutcome,
-  type ScanMatch,
-} from "@/lib/cards/scan";
+import { readCards, type ReaderPhoto } from "@/lib/cards/page-reader";
+import { photoType, scannerAccess, type PocketOutcome } from "@/lib/cards/scan";
 import {
   MAX_SCAN_PAGES,
   PAGES_PER_DAY,
   POCKETS_PER_PAGE,
-  SCAN_GAMES,
   SCAN_MAX_BYTES,
-  type ScanGame,
   type ScanRefusal,
 } from "@/lib/cards/scan-rules";
 import { notifyPagesReady } from "@/lib/notifications/notify";
@@ -249,7 +242,7 @@ async function claim(id: string): Promise<PageScanRow | null> {
   return claimed ?? null;
 }
 
-async function photoAt(path: string | null): Promise<AgentPhoto | null> {
+async function photoAt(path: string | null): Promise<ReaderPhoto | null> {
   if (!path) return null;
   const { data } = await getSupabaseAdmin().storage.from(BUCKET).download(path);
   if (!data) return null;
@@ -275,48 +268,12 @@ export async function readPage(id: string): Promise<void> {
       return;
     }
 
-    const outcome = await readWithAgent({ mode: "page", page, pockets, games });
+    const outcome = await readCards({ mode: "page", page, pockets, games });
     if (!outcome.ok) {
       await finish(row, { status: "failed", error: outcome.reason, result: null });
       return;
     }
-
-    const result: PocketOutcome[] = outcome.pockets.map((pocket) => {
-      if (pocket.state === "empty") return { slot: pocket.slot, state: "empty" };
-      const card = pocket.cardId ? outcome.cards.get(pocket.cardId) : undefined;
-      const game: ScanGame | "other" = SCAN_GAMES.includes(card?.game as ScanGame)
-        ? (card?.game as ScanGame)
-        : "other";
-      const read = {
-        found: true,
-        game,
-        name: pocket.readName || card?.exactName || "",
-        englishName: pocket.readName || card?.exactName || "",
-        number: pocket.readNumber,
-        setCode: "",
-      };
-      if (!card) {
-        return {
-          slot: pocket.slot,
-          state: "unread",
-          read: pocket.readName ? read : null,
-          note: pocket.note,
-        };
-      }
-      const matches: ScanMatch[] = [{ card, printingId: pocket.printingId }];
-      for (const alt of pocket.alternatives) {
-        const other = outcome.cards.get(alt);
-        if (other) matches.push({ card: other, printingId: null });
-      }
-      return {
-        slot: pocket.slot,
-        state: "found",
-        read,
-        matches,
-        sure: pocket.sure,
-        note: pocket.note,
-      };
-    });
+    const result: PocketOutcome[] = outcome.pockets;
     await finish(row, { status: "ready", error: null, result });
   } catch (error) {
     console.error(

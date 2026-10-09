@@ -34,8 +34,10 @@ import { cn } from "@/lib/cn";
  * looked, so every pocket's card is the player's to change. A tap on a
  * pocket opens the card viewer on it, full screen (`CardViewer`): the
  * player's own photo of the pocket beside our match, and the menu, That's
- * it, Other printing, Not this card (the other guesses, then the site's
- * search) and Leave empty. The founder: "it should just have a popup
+ * it, Other printing, Not this card (the other guesses, then the Flare
+ * composer's picker, for one card) and Leave empty. A pocket the reader
+ * could not place offers "Might be one of these", the catalogue's
+ * closest cards to what it saw (`suggestions`), over Find the card. The founder: "it should just have a popup
  * full card viewer and a contextual menu there. i didn't even know i had
  * to scroll down." From there the arrows, the keyboard and a swipe step
  * through every pocket of every page. Whatever is left chosen is what
@@ -128,6 +130,7 @@ export function PageCheck({
       photo: page?.cellUrls[at.slot] ?? null,
       choice: page?.read?.choices[at.slot] ?? null,
       matches: pocket.state === "found" ? pocket.matches : [],
+      suggestions: pocket.state === "unread" ? pocket.suggestions : undefined,
       state: pocket.state,
       sure: pocket.state === "found" ? pocket.sure : undefined,
       note: pocket.state === "empty" ? undefined : pocket.note,

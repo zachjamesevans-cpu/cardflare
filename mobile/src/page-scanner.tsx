@@ -281,6 +281,7 @@ function PageCheck({
           matches: pocket.state === "found" ? pocket.matches : [],
           sure: pocket.state === "found" ? pocket.sure : undefined,
           note: pocket.state === "empty" ? undefined : pocket.note,
+          suggestions: pocket.state === "unread" ? pocket.suggestions : undefined,
           lookFor: read ? read.englishName || read.name : "",
           taken: taken.has(pocketAt(page.page, pocket.slot)),
         };
