@@ -65,10 +65,13 @@ import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
  *   "Scan cards with Pro" instead, to the Pro screen; anybody else
  *   sees nothing, so there is never a button that cannot work.
  * - On that tab, "One card" or "Whole pages" (src/page-scanner.tsx):
- *   pages of a real binder photographed into a queue, checked, and
- *   placed pocket for pocket. The founder (2026-10-09): "let's keep the
- *   single scan which should be fast and quick", and "scan, let's say 5
- *   pages of their binder into a queue". Pages never touch the tray.
+ *   pages of a real binder photographed into a queue and sent to be
+ *   read on the server, then checked from the binder and placed pocket
+ *   for pocket. The founder (2026-10-09): "let's keep the single scan
+ *   which should be fast and quick", "scan, let's say 5 pages of their
+ *   binder into a queue", and "Maybe it scans it, and then they'll get
+ *   a notification once it's ready." Pages never touch the tray; "Done"
+ *   closes the menu while they are read.
  *
  * Opened from a tapped "+" pocket, the batch starts AT that pocket:
  * the first card goes there, the rest into the next empty ones, which
@@ -112,6 +115,7 @@ export function BinderAddSheet({
   pocket,
   onClose,
   onAdded,
+  onPagesSent,
 }: {
   visible: boolean;
   binderId: string;
@@ -121,6 +125,8 @@ export function BinderAddSheet({
   pocket: number | null;
   onClose: () => void;
   onAdded: (added: BinderAdded) => void;
+  /** Whole pages sent to be read, and Done: the binder shows them waiting. */
+  onPagesSent: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
@@ -370,10 +376,11 @@ export function BinderAddSheet({
     </View>
   );
 
-  /* Pages placed: the tray's ending, the same refresh and sentence. */
-  const placed = (result: BinderAdded) => {
+  /* Pages sent and Done: an empty menu for next time, and the binder
+     shows the queue waiting to be read. Nothing was placed yet. */
+  const pagesSent = () => {
     reset();
-    onAdded(result);
+    onPagesSent();
   };
 
   /* One card or whole pages, a switch at the top of the scan tab. One
@@ -429,7 +436,7 @@ export function BinderAddSheet({
         <PageScanner
           binderId={binderId}
           occupied={cards.map((card) => card.pocket)}
-          onPlaced={placed}
+          onDone={pagesSent}
         />
       ) : (
         <CardScanner onAdd={addScanned} onNotFound={(text) => setSearchFor({ text })} />

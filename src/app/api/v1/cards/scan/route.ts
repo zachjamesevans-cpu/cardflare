@@ -5,6 +5,12 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { LIMITS, tooMany } from "@/lib/api/throttle";
 import { scanCard, scanPage, scannerAccess } from "@/lib/cards/scan";
 import { POCKETS_PER_PAGE, SCAN_MAX_BYTES } from "@/lib/cards/scan-rules";
+import {
+  removeUploads,
+  scanChunkPath,
+  stitchUpload,
+  uploadPaths,
+} from "@/lib/cards/scan-uploads";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +34,11 @@ export const dynamic = "force-dynamic";
 /* The avatar route's proven chunk size, and enough of them for the
    scanner's ceiling once base64 has grown it by a third. */
 const CHUNK_MAX_CHARS = 8000;
-const CHUNK_MAX_COUNT = Math.ceil((SCAN_MAX_BYTES * 4) / 3 / CHUNK_MAX_CHARS);
+/* Counted with the app's own piece, 6000 characters, not the largest the
+   server takes: counted at 8000, a photo over about 1.1MB ran out of
+   pieces before it reached the scanner's ceiling. */
+const APP_PIECE_CHARS = 6000;
+const CHUNK_MAX_COUNT = Math.ceil((SCAN_MAX_BYTES * 4) / 3 / APP_PIECE_CHARS);
 /** A whole photo as base64 text, at the scanner's ceiling. */
 const PHOTO_MAX_CHARS = Math.ceil((SCAN_MAX_BYTES * 4) / 3) + 4;
 
@@ -68,10 +78,6 @@ const schema = z.discriminatedUnion("action", [
 ]);
 
 const CHUNK_TYPE = "application/octet-stream";
-const DOWNLOAD_CONCURRENCY = 16;
-
-const chunkPath = (playerId: string, upload: string, index: number) =>
-  `tmp/scan/${playerId}/${upload}/${String(index).padStart(3, "0")}`;
 
 const decode = (text: string) => new Uint8Array(Buffer.from(text, "base64"));
 
@@ -79,31 +85,6 @@ export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
   return Response.json({ access: await scannerAccess(player) });
-}
-
-/**
- * One chunked upload's pieces, fetched several at a time and put back in
- * order, or null when one is missing. The pieces are left for the caller
- * to remove, so a failed read drops them too.
- */
-async function stitch(paths: string[]): Promise<Uint8Array | null> {
-  const admin = getSupabaseAdmin();
-  const pieces: (string | null)[] = new Array(paths.length).fill(null);
-  let missing = false;
-  for (let start = 0; start < paths.length && !missing; start += DOWNLOAD_CONCURRENCY) {
-    await Promise.all(
-      paths.slice(start, start + DOWNLOAD_CONCURRENCY).map(async (path, offset) => {
-        const { data, error } = await admin.storage.from("avatars").download(path);
-        if (error || !data) {
-          missing = true;
-          return;
-        }
-        pieces[start + offset] = await data.text();
-      }),
-    );
-  }
-  if (missing || pieces.some((piece) => piece === null)) return null;
-  return decode(pieces.join(""));
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -137,7 +118,7 @@ export async function POST(request: Request): Promise<Response> {
     const { error } = await admin.storage
       .from("avatars")
       .upload(
-        chunkPath(player.playerId, body.uploadId, body.index),
+        scanChunkPath(player.playerId, body.uploadId, body.index),
         new Blob([body.data], { type: CHUNK_TYPE }),
         { contentType: CHUNK_TYPE, upsert: true },
       );
@@ -166,16 +147,12 @@ export async function POST(request: Request): Promise<Response> {
       ? [{ uploadId: body.uploadId, count: body.count }]
       : body.cells;
   const pathsOf = uploads.map((cell) =>
-    cell
-      ? Array.from({ length: cell.count }, (_, index) =>
-          chunkPath(player.playerId, cell.uploadId, index),
-        )
-      : [],
+    cell ? uploadPaths(player.playerId, cell) : [],
   );
 
   try {
     const photos = await Promise.all(
-      pathsOf.map((paths) => (paths.length > 0 ? stitch(paths) : null)),
+      pathsOf.map((paths) => (paths.length > 0 ? stitchUpload(paths) : null)),
     );
     if (photos.some((bytes, at) => bytes === null && pathsOf[at].length > 0)) {
       return badRequest("The photo is missing a piece. Take it again.");
@@ -187,9 +164,6 @@ export async function POST(request: Request): Promise<Response> {
     );
   } finally {
     /* The tmp pieces go regardless of how the read went. */
-    await admin.storage
-      .from("avatars")
-      .remove(pathsOf.flat())
-      .catch(() => {});
+    await removeUploads(pathsOf.flat());
   }
 }

@@ -135,6 +135,20 @@ describe("the entry in the binder's add menu", () => {
       "printingId: outcome.matches[0]?.printingId ?? null,",
     );
   });
+
+  it("says when the careful reader was not sure, and how it decided, under the read line", () => {
+    expect(src.scanner).toContain("sure: outcome.sure,");
+    expect(src.scanner).toContain("note: outcome.note,");
+    const result = src.scanner.slice(src.scanner.indexOf("const line = scanReadLine("));
+    const line = result.indexOf("<Text style={styles.small}>{line}</Text>");
+    const unsure = result.indexOf("{step.sure === false ?");
+    const note = result.indexOf("<Text style={styles.small}>{step.note}</Text>");
+    expect(line).toBeGreaterThan(-1);
+    expect(unsure).toBeGreaterThan(line);
+    expect(note).toBeGreaterThan(unsure);
+    expect(result.slice(unsure, note)).toContain("{NOT_SURE}");
+    expect(result.indexOf("{IS_THIS_IT}")).toBeGreaterThan(note);
+  });
 });
 
 describe("the photo", () => {

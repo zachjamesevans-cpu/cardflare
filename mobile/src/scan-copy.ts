@@ -40,6 +40,7 @@ export const SCAN_REFUSALS = {
   "too-big": "That photo is too big. Try again.",
   "not-allowed": "Scanning is a Pro feature.",
   limit: "That is a lot of scans at once. Try again in a few minutes.",
+  "daily-pages": "That's 20 pages for today. You can scan more tomorrow.",
   unavailable: "The scanner isn't working right now. Try again in a moment.",
 } as const;
 
@@ -185,4 +186,39 @@ export function pagesPlacedLine(result: {
     );
   }
   return parts.join(" ") || "Nothing to place.";
+}
+
+/* ---- Pages read in the background ------------------------------------ */
+
+/*
+ * The founder: "maybe it scans it, and then they'll get a notification
+ * once it's ready." A page is sent and read on the server by the careful
+ * reader while the player does something else; one notice says when the
+ * queue is ready to check. Pro only, twenty pages a day.
+ */
+
+/** Pages one account may send to be read in a day. Admins have no limit. */
+export const PAGES_PER_DAY = 20;
+
+export const SENDING_PAGE = "Sending...";
+export const PAGE_SENT = "Sent";
+export const READING_IN_BACKGROUND =
+  "Reading your pages. We'll let you know when they're ready. You can close this.";
+export const CHECK_NOW = "Check now";
+export const THROW_PAGES_AWAY = "Throw these pages away";
+export const NOT_SURE = "Not sure. Check this one.";
+export const PAGE_TOOK_TOO_LONG = "That page took too long to read. Retake it.";
+export const QUEUE_FULL =
+  "That's 10 pages in one go. Check these first, then scan more.";
+export const DONE_SCANNING = "Done";
+
+/** The binder's line while a queue is out: "Reading 5 pages..." / "5 pages ready to check". */
+export function pagesWaitingLine(pages: number, ready: boolean): string {
+  const noun = pages === 1 ? "page" : "pages";
+  return ready ? `${pages} ${noun} ready to check` : `Reading ${pages} ${noun}...`;
+}
+
+/** "18 of 20 pages left today", under the shutter. */
+export function pagesLeftLine(left: number): string {
+  return `${left} of ${PAGES_PER_DAY} pages left today`;
 }

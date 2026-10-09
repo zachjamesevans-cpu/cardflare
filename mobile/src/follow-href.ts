@@ -19,7 +19,9 @@ import { openRoom } from "./open-room";
  *
  * Every path a notice can carry has a line here: /e/<code> (with or
  * without a query), /local?thread=<id>, /local, /feed, /feed?post=<id>, /inbox,
- * /profile, /p/<playerId>, /s/<storeId>, /cards/<cardId> and /nights.
+ * /profile, /p/<playerId>, /s/<storeId>, /cards/<cardId>, /nights and
+ * /profile/binders/<binderId>?scan=<batchId> (scanned pages ready to
+ * check: the binder, with that queue's check open).
  * A tap on a push used to land a message notice on the Messages list
  * with the conversation one row down; now the path names the thread
  * and the tap opens it.
@@ -54,6 +56,15 @@ export async function followHref(
   if (href === "/profile/settings") {
     navigation.navigate("Settings");
     return;
+  }
+  /* One of your binders; with ?scan=, the pages ready to check in it. */
+  if (href.startsWith("/profile/binders/")) {
+    const binderId = segmentAfter(href, "/profile/binders/");
+    if (binderId) {
+      const scan = queryValue(href, "scan");
+      navigation.navigate("Binder", scan ? { binderId, scan } : { binderId });
+      return;
+    }
   }
   if (href === "/profile") {
     navigation.navigate("Tabs", { screen: "Profile" });

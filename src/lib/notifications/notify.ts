@@ -136,7 +136,8 @@ async function record(entry: {
     | "post-comment"
     | "store-post"
     | "night-match"
-    | "night-reminder";
+    | "night-reminder"
+    | "pages-ready";
   title: string;
   body: string | null;
   url: string;
@@ -221,8 +222,13 @@ async function deliverByPush(
 
   /* The account's switch for this kind of notice. Off means the Inbox
      keeps the notice and the phone stays quiet. */
-  const prefs = await pushPrefsFor(playerId);
-  if (!prefs[groupForKind(kind)]) return;
+  /* "Your pages are ready" answers something the player just asked for
+     and is waiting on, so no group's switch silences it; every other
+     kind follows the account's switches. */
+  if (kind !== "pages-ready") {
+    const prefs = await pushPrefsFor(playerId);
+    if (!prefs[groupForKind(kind)]) return;
+  }
 
   const { data: devices, error } = await admin
     .from("player_devices")
@@ -1296,6 +1302,75 @@ export async function notifyNightReminder(entry: {
     console.error("Could not send the night reminder", error);
     return false;
   }
+}
+
+/**
+ * Scanned binder pages, read and ready to check. The founder: "maybe it
+ * scans it, and then they'll get a notification once it's ready." One
+ * notice per queue of pages, linking to the binder with the queue open.
+ */
+export async function notifyPagesReady(entry: {
+  playerId: string;
+  binderId: string;
+  batchId: string;
+  binderName: string;
+  /** Pages read. */
+  pages: number;
+  /** Pages that could not be read, to retake. */
+  failed: number;
+}): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+
+  try {
+    const { title, body } = pagesReadyCopy(entry.pages, entry.binderName, entry.failed);
+    const path = `/profile/binders/${entry.binderId}?scan=${entry.batchId}`;
+
+    const id = await record({
+      playerId: entry.playerId,
+      kind: "pages-ready",
+      title,
+      body,
+      url: path,
+      dedupeKey: `pages:${entry.batchId}`,
+      actorId: null,
+    });
+
+    if (id) await deliverByPush(entry.playerId, title, body, path, "pages-ready");
+    return id !== null;
+  } catch (error) {
+    console.error("Could not announce the scanned pages", error);
+    return false;
+  }
+}
+
+/**
+ * "Your 5 pages are ready to check" / "Check them and add them to Trade
+ * binder." A queue none of whose pages could be read says so, rather
+ * than inviting a check of nothing; one with some failures counts them.
+ */
+export function pagesReadyCopy(
+  pages: number,
+  binderName: string,
+  failed = 0,
+): { title: string; body: string } {
+  if (pages === 0) {
+    return {
+      title:
+        failed === 1 ? "Your page couldn't be read" : "Your pages couldn't be read",
+      body: "Open them to retake the photos.",
+    };
+  }
+  const them = pages === 1 ? "it" : "them";
+  return {
+    title:
+      pages === 1
+        ? "Your page is ready to check"
+        : `Your ${pages} pages are ready to check`,
+    body:
+      failed > 0
+        ? `Check ${them} and add ${them} to ${binderName}. ${failed} couldn't be read; retake ${failed === 1 ? "it" : "them"} there.`
+        : `Check ${them} and add ${them} to ${binderName}.`,
+  };
 }
 
 /**

@@ -17,6 +17,11 @@ import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { AddBinderCard } from "@/components/binder/add-binder-card";
 import { BinderSettings } from "@/components/binder/binder-settings";
 import {
+  QueueBanners,
+  usePageQueues,
+  type PageQueues,
+} from "@/components/binder/page-queues";
+import {
   usePocketDrag,
   useSlide,
   type DropSpot,
@@ -40,6 +45,7 @@ import {
   type ZoomAsk,
   type ZoomCard,
 } from "@/components/cards/card-image-zoom";
+import { QueueCheck } from "@/components/cards/queue-check";
 import { InYourOffer } from "@/components/feed/post-actions";
 import { OfferReview } from "@/components/flares/offer-review";
 import { Sheet } from "@/components/ui/sheet";
@@ -122,6 +128,15 @@ import { cn } from "@/lib/cn";
  * refusal puts the card back and says so. Alt and the arrow keys do
  * the same from a keyboard, pocket by pocket.
  *
+ * PAGES READ IN THE BACKGROUND. Whole binder pages scanned from Add
+ * cards are read on the server while the player does something else.
+ * Over the pockets, one banner per queue still out (`QueueBanners`):
+ * "Reading 5 pages..." while the reader works, then "5 pages ready to
+ * check" and Check now, which opens the check (`QueueCheck`). The
+ * notice opens the same check by its link, `?scan=<batchId>`
+ * (`openScan`). A page that did not read is retaken from the check,
+ * back in the Add cards sheet for that page of that queue.
+ *
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the
  * refresh and wins, which is also what keeps two tabs honest. The
@@ -171,6 +186,8 @@ export function BinderView({
   offerAs = null,
   nightId = null,
   scanAccess = null,
+  pageQueues = null,
+  openScan = null,
 }: {
   binder: Binder;
   imagesEnabled: boolean;
@@ -190,6 +207,10 @@ export function BinderView({
   nightId?: string | null;
   /** The owner's card scanner in the Add cards sheet: see `scannerAccess`. */
   scanAccess?: "on" | "pro-door" | null;
+  /** The owner's page queues, read with the page; null reads them here. */
+  pageQueues?: PageQueues | null;
+  /** A queue to check as the page opens: the notice's `?scan=<batchId>`. */
+  openScan?: string | null;
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
@@ -205,8 +226,16 @@ export function BinderView({
 
   const [at, setAt] = useState(0);
   const [onHuntsOnly, setOnHuntsOnly] = useState(false);
-  /** The Add cards sheet, open, and the pocket that opened it. */
-  const [adding, setAdding] = useState<{ pocket: number | null } | null>(null);
+  /** The Add cards sheet, open, and the pocket that opened it, or the page to retake. */
+  const [adding, setAdding] = useState<{
+    pocket: number | null;
+    retake?: { batchId: string; page: number };
+  } | null>(null);
+  /** The page queue being checked. */
+  const [checking, setChecking] = useState<string | null>(
+    binder.yours ? openScan : null,
+  );
+  const queues = usePageQueues(binder.id, binder.yours, pageQueues);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** What the last batch of adds said: "Added 3 cards." */
@@ -214,6 +243,17 @@ export function BinderView({
   /** Share was pressed on the owner's private binder. */
   const [shareRefused, setShareRefused] = useState(false);
   const [pending, start] = useTransition();
+
+  /* The pockets a checked page must not write over. */
+  const taken = useMemo(() => new Set(cards.map((card) => card.pocket)), [cards]);
+  const closeCheck = () => {
+    setChecking(null);
+    queues.refresh();
+    /* Opened by the notice's link: the link is spent once it is closed. */
+    if (openScan && window.location.search.includes("scan=")) {
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  };
 
   /* A visitor's "On your hunts" packs the matches into pockets in a
      row; everything else is drawn where it sits. */
@@ -485,6 +525,9 @@ export function BinderView({
         </div>
       )}
 
+      {/* Pages being read in the background, and ready to check. */}
+      {binder.yours && <QueueBanners queues={queues.queues} onCheck={setChecking} />}
+
       {/* The page: pockets on the binder-page background, the arrows
           over its middle. */}
       <div className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]">
@@ -683,16 +726,45 @@ export function BinderView({
             playerGames={playerGames}
             open={adding !== null}
             onOpenChange={(open) => {
-              if (!open) setAdding(null);
+              if (open) return;
+              setAdding(null);
+              /* Pages may have gone to be read: their banner, at once. */
+              queues.refresh();
             }}
             pocket={adding?.pocket ?? null}
             inBinder={cards}
             scanAccess={scanAccess}
+            pagesLeft={queues.known ? queues.left : undefined}
+            retake={adding?.retake ?? null}
             onAdded={(message, firstPocket) => {
               setError(null);
               setAdded(message);
               if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
             }}
+          />
+          <QueueCheck
+            key={checking ?? "none"}
+            batchId={checking}
+            imagesEnabled={imagesEnabled}
+            playerGames={playerGames}
+            taken={taken}
+            onClose={closeCheck}
+            onPlaced={(message, firstPocket) => {
+              setError(null);
+              setAdded(message);
+              if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
+              closeCheck();
+              router.refresh();
+            }}
+            onRetake={
+              scanAccess === "on" && checking
+                ? (page) => {
+                    const batchId = checking;
+                    closeCheck();
+                    setAdding({ pocket: null, retake: { batchId, page } });
+                  }
+                : null
+            }
           />
           <Sheet
             open={settingsOpen}

@@ -1918,6 +1918,40 @@ export type PlayerCollectionInsert = Omit<PlayerCollectionRow, "id" | "created_a
   created_at?: string;
 };
 
+/** One binder page waiting to be read or checked. See page_scans. */
+export type PageScanRow = {
+  id: string;
+  player_id: string;
+  binder_id: string;
+  batch_id: string;
+  page_number: number;
+  status: "queued" | "reading" | "ready" | "failed";
+  attempts: number;
+  photos: { page: string; pockets: (string | null)[] };
+  result: unknown;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  notified_at: string | null;
+  closed_at: string | null;
+};
+
+type PageScanDefaults =
+  | "id"
+  | "status"
+  | "attempts"
+  | "result"
+  | "error"
+  | "created_at"
+  | "started_at"
+  | "finished_at"
+  | "notified_at"
+  | "closed_at";
+
+export type PageScanInsert = Omit<PageScanRow, PageScanDefaults> &
+  Partial<Pick<PageScanRow, PageScanDefaults>>;
+
 export type NotificationRow = {
   id: string;
   created_at: string;
@@ -1934,7 +1968,8 @@ export type NotificationRow = {
     | "post-comment"
     | "store-post"
     | "night-match"
-    | "night-reminder";
+    | "night-reminder"
+    | "pages-ready";
   title: string;
   body: string | null;
   /** A site-relative path (the room to open), never an absolute URL. */
@@ -2150,6 +2185,7 @@ export type Database = {
       store_case_picks: Table<StoreCasePickRow, StoreCasePickRow>;
       event_hub_timer_log: Table<EventHubTimerLogRow, EventHubTimerLogInsert>;
       notifications: Table<NotificationRow, NotificationInsert>;
+      page_scans: Table<PageScanRow, PageScanInsert>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       push_tickets: Table<PushTicketRow, PushTicketInsert>;

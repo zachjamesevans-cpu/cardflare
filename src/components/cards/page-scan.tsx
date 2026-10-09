@@ -1,159 +1,124 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Camera, Minus, Plus } from "lucide-react";
 
-import {
-  PageCheck,
-  type CheckedPage,
-  type Choice,
-  type Pocket,
-} from "@/components/cards/page-check";
-import { fitJpeg, scanSize } from "@/components/cards/scan-card";
+import { QUALITIES, scanSize } from "@/components/cards/scan-card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { placeBinderPagesAction } from "@/lib/binder/actions";
-import { scanPageAction } from "@/lib/cards/scan-actions";
+import { sendPageAction } from "@/lib/cards/page-job-actions";
+import type { PageSendRefusal } from "@/lib/cards/page-jobs";
 import {
-  BACK_TO_PAGES,
   BINDER_PAGES,
-  CHECK_PAGES,
+  DONE_SCANNING,
   MAX_SCAN_PAGES,
-  PAGE_FAILED,
+  PAGE_SENT,
   PAGES_HINT,
   POCKETS_PER_PAGE,
-  READING_PAGE,
+  QUEUE_FULL,
+  READING_IN_BACKGROUND,
   REMOVE_PAGE,
   RETAKE,
+  SCAN_MAX_BYTES,
   SCAN_REFUSALS,
+  SENDING_PAGE,
   START_EARLIER,
   START_LATER,
-  addPagesLabel,
   firstEmptyPage,
-  pageStatusLine,
-  pocketAt,
+  pagesLeftLine,
   pocketCrop,
   startingAtLine,
   takePageLabel,
-  type ScanRefusal,
 } from "@/lib/cards/scan-rules";
 
 /**
  * Scanning whole binder pages, on the Add cards sheet's "Scan a card"
  * tab behind "Whole pages".
  *
- * The founder (2026-10-09): "would be cool if someone could scan, let's
- * say 5 pages of their binder into a queue and it auto fills in an
- * actual binder, with the exact same location the cards were in in
- * their binder." In this order, the same as the app:
+ * The founder (2026-10-09): "the full binder page scans should be fully
+ * agentic. It is a further away picture, often with glare inside a
+ * binder, so it's best to have it do a full pass. Maybe it scans it, and
+ * then they'll get a notification once it's ready." So this step only
+ * shoots and sends; the careful reader works on the server, and the
+ * check opens later, from the binder's banner or the notice
+ * (`QueueCheck`). In this order, the same as the app:
  *
  * 1. "Starting at page 4", the first page past this binder's last card
  *    unless the player steps it, and the hint.
- * 2. "Take page 4", a file input that on a phone opens the camera. Each
- *    photo is cut here, in the browser, into its nine pockets with
- *    `pocketCrop`, each shrunk to SCAN_LONG_EDGE as one card is, and
- *    queued. The queue is read in the background, one page at a time
- *    in queue order, while the player shoots the next. A page's number
- *    is its place in the queue from the starting page, so removing one
- *    renumbers the pages after it.
- * 3. "Check the pages": every page as its 3x3 grid, to change before
- *    anything is placed (`PageCheck`).
- * 4. "Add 5 pages to binder": every chosen card into the very pocket
- *    it sat in, `pocketAt(page, slot)`. The server counts a second copy
- *    up, never writes over a full pocket, and says so in one sentence.
+ * 2. "Take page 4", a file input that on a phone opens the camera, and
+ *    "18 of 20 pages left today" under it. Each photo is cut here, in
+ *    the browser: the whole page at PAGE_LONG_EDGE for the reader to
+ *    see the page as a page, and its nine pockets with `pocketCrop`.
+ * 3. Each page is sent, one at a time in queue order, while the player
+ *    shoots the next: "Sending...", then "Sent". A refused page says
+ *    why and offers Retake, which sends the same page number again, and
+ *    Remove; a page that went is on the server, and only the check
+ *    throws it away. The first page is stepped only before a shot.
+ * 4. Once a page is sent, "Reading your pages..." and Done, which
+ *    closes the sheet as soon as the sends still out have landed. The
+ *    sheet never waits for a page to be read.
  *
- * Nothing from here goes in the sheet's tray; the pages are placed by
- * their own action, and only from the check.
+ * Every page of one queue carries the same `batchId`, made once, so the
+ * server reads them as one queue and sends one notice. A retake from
+ * the check comes back here with that queue's batchId and the page's
+ * own number, and sending it replaces the page.
  */
 
-type Status =
-  | { kind: "waiting" }
-  | { kind: "read"; pockets: Pocket[]; choices: Choice[] }
-  | { kind: "failed"; reason: ScanRefusal | null };
-
-interface QueuedPage {
-  id: number;
-  /** The whole photo, small, for the queue's row; null while it is cut. */
-  thumb: string | null;
-  /** The nine pockets as they are sent; null while the photo is cut. */
-  cells: Blob[] | null;
-  /** The same pockets as pictures, for the check. */
-  cellUrls: string[];
-  status: Status;
-}
-
-/** A read page's count: pockets with a card in them, and the ones found. */
-export function pageTally(pockets: readonly Pocket[]): {
-  found: number;
-  cards: number;
-} {
-  return {
-    found: pockets.filter((pocket) => pocket.state === "found").length,
-    cards: pockets.filter((pocket) => pocket.state !== "empty").length,
-  };
-}
-
-/** Each pocket's card to start the check with: the best guess, where there is one. */
-export function firstChoices(pockets: readonly Pocket[]): Choice[] {
-  return Array.from({ length: POCKETS_PER_PAGE }, (_, slot) => {
-    const pocket = pockets.find((each) => each.slot === slot);
-    const top = pocket?.state === "found" ? pocket.matches[0] : undefined;
-    return top ? { card: top.card, printingId: top.printingId } : null;
-  });
-}
-
+/** The whole page's photo: this long on its long side, for the careful reader. */
+export const PAGE_LONG_EDGE = 1568;
 /**
- * What placing sends: every chosen card, in the pocket it sat in. The
- * queue's first page is `startPage`; a page that did not read, and a
- * pocket left empty, send nothing.
+ * All one page sends, the photo and its nine pockets, kept under the
+ * Server Action's four megabytes with room for the form around it.
  */
-export function pagePlacements(
-  pages: readonly (readonly Choice[] | null)[],
-  startPage: number,
-): { pocket: number; cardId: string; printingId: string | null }[] {
-  return pages.flatMap((choices, index) =>
-    (choices ?? []).flatMap((choice, slot) =>
-      choice
-        ? [
-            {
-              pocket: pocketAt(startPage + index, slot),
-              cardId: choice.card.id,
-              printingId: choice.printingId,
-            },
-          ]
-        : [],
-    ),
-  );
-}
-
-/** The pages with at least one card chosen: the number on the Add button. */
-export function pagesChosen(pages: readonly (readonly Choice[] | null)[]): number {
-  return pages.filter((choices) => choices?.some(Boolean)).length;
-}
-
-/** What a page that did not read says. A thrown error has no reason. */
-export function pageFailedLine(reason: ScanRefusal | null): string {
-  return reason ? SCAN_REFUSALS[reason] : PAGE_FAILED;
-}
-
-/** A page just shot: waiting to be cut, then read. */
-function blank(id: number): QueuedPage {
-  return { id, thumb: null, cells: null, cellUrls: [], status: { kind: "waiting" } };
-}
-
+const PAGE_FORM_BYTES = 3_500_000;
 /** The queue row's picture: the long side this many pixels. */
 const THUMB_EDGE = 160;
 
+type Status =
+  { kind: "waiting" } | { kind: "sent" } | { kind: "failed"; reason: PageSendRefusal };
+
+interface ShotPage {
+  id: number;
+  /** The binder page this photo is of, fixed when it is taken. */
+  number: number;
+  /** The whole photo, small, for the queue's row; null while it is cut. */
+  thumb: string | null;
+  /** What is sent; null while the photo is cut, and once it has gone. */
+  photos: { page: Blob; cells: Blob[] } | null;
+  status: Status;
+}
+
+/** What a page that was not sent says. */
+export function sendRefusalLine(reason: PageSendRefusal): string {
+  if (reason === "queue-full") return QUEUE_FULL;
+  if (reason === "not-yours") return SCAN_REFUSALS.unavailable;
+  return SCAN_REFUSALS[reason];
+}
+
+/** The size a photo is drawn at: `edge` on the long side, never larger. */
+function sizeAt(width: number, height: number, edge: number) {
+  const scale = Math.min(1, edge / Math.max(width, height, 1));
+  return {
+    width: Math.max(1, Math.round(width * scale)),
+    height: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+function jpeg(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((done) => canvas.toBlob(done, "image/jpeg", quality));
+}
+
 /**
- * A photo of a page cut into its nine pockets, each upright, shrunk to
- * SCAN_LONG_EDGE on its long side (never enlarged) and a JPEG under
- * SCAN_MAX_BYTES, and a small picture of the whole page for the queue.
- * Null when a pocket will not fit; throws when the browser cannot open
- * the file.
+ * A photo of a page, ready to send: its nine pockets, each upright and
+ * shrunk to SCAN_LONG_EDGE on its long side (never enlarged), the whole
+ * page at PAGE_LONG_EDGE, every one a JPEG under SCAN_MAX_BYTES and all
+ * of them together under PAGE_FORM_BYTES, stepping the quality down
+ * until they fit; and a small picture of the page for the queue. Null
+ * when they never fit; throws when the browser cannot open the file.
  */
 export async function cutPage(
   file: Blob,
-): Promise<{ cells: Blob[]; thumb: Blob | null } | null> {
+): Promise<{ page: Blob; cells: Blob[]; thumb: Blob | null } | null> {
   const url = URL.createObjectURL(file);
   try {
     const image = new Image();
@@ -161,10 +126,11 @@ export async function cutPage(
     await image.decode();
     const width = image.naturalWidth;
     const height = image.naturalHeight;
-    const cells: Blob[] = [];
-    for (let slot = 0; slot < POCKETS_PER_PAGE; slot += 1) {
-      const crop = pocketCrop(slot, width, height);
-      const size = scanSize(crop.width, crop.height);
+
+    const draw = (
+      crop: { x: number; y: number; width: number; height: number },
+      size: { width: number; height: number },
+    ) => {
       const canvas = document.createElement("canvas");
       canvas.width = size.width;
       canvas.height = size.height;
@@ -181,73 +147,124 @@ export async function cutPage(
         size.width,
         size.height,
       );
-      const cell = await fitJpeg(canvas);
-      if (!cell) return null;
-      cells.push(cell);
-    }
+      return canvas;
+    };
 
-    const scale = Math.min(1, THUMB_EDGE / Math.max(width, height, 1));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(width * scale));
-    canvas.height = Math.max(1, Math.round(height * scale));
-    canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const thumb = await new Promise<Blob | null>((done) =>
-      canvas.toBlob(done, "image/jpeg", 0.7),
+    const pockets: HTMLCanvasElement[] = [];
+    for (let slot = 0; slot < POCKETS_PER_PAGE; slot += 1) {
+      const crop = pocketCrop(slot, width, height);
+      const size = scanSize(crop.width, crop.height);
+      const canvas = draw(crop, size);
+      if (!canvas) return null;
+      pockets.push(canvas);
+    }
+    const whole = draw(
+      { x: 0, y: 0, width, height },
+      sizeAt(width, height, PAGE_LONG_EDGE),
     );
-    return { cells, thumb };
+    if (!whole) return null;
+
+    let sent: { page: Blob; cells: Blob[] } | null = null;
+    for (const quality of QUALITIES) {
+      const cells = await Promise.all(pockets.map((canvas) => jpeg(canvas, quality)));
+      const page = await jpeg(whole, quality);
+      if (!page || cells.some((cell) => !cell)) continue;
+      const fitted = cells as Blob[];
+      const total = fitted.reduce((sum, cell) => sum + cell.size, page.size);
+      if (
+        page.size <= SCAN_MAX_BYTES &&
+        fitted.every((cell) => cell.size <= SCAN_MAX_BYTES) &&
+        total <= PAGE_FORM_BYTES
+      ) {
+        sent = { page, cells: fitted };
+        break;
+      }
+    }
+    if (!sent) return null;
+
+    const small = sizeAt(width, height, THUMB_EDGE);
+    const canvas = document.createElement("canvas");
+    canvas.width = small.width;
+    canvas.height = small.height;
+    canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const thumb = await jpeg(canvas, 0.7);
+    return { ...sent, thumb };
   } finally {
     URL.revokeObjectURL(url);
   }
 }
 
-/** One page to the reader: the nine pockets, "cell0" to "cell8". */
-async function readPage(cells: Blob[]): Promise<Status> {
+/** One page to the server: the whole photo as "page", the nine pockets "pocket0" to "pocket8". */
+async function sendPage(
+  binderId: string,
+  batchId: string,
+  pageNumber: number,
+  photos: { page: Blob; cells: Blob[] },
+): Promise<{ status: Status; left?: number | null }> {
   const form = new FormData();
-  cells.forEach((cell, slot) => form.append(`cell${slot}`, cell, `pocket${slot}.jpg`));
+  form.append("binderId", binderId);
+  form.append("batchId", batchId);
+  form.append("pageNumber", String(pageNumber));
+  form.append("page", photos.page, "page.jpg");
+  photos.cells.forEach((cell, slot) =>
+    form.append(`pocket${slot}`, cell, `pocket${slot}.jpg`),
+  );
   try {
-    const outcome = await scanPageAction(form);
+    const outcome = await sendPageAction(form);
     return outcome.ok
-      ? {
-          kind: "read",
-          pockets: outcome.pockets,
-          choices: firstChoices(outcome.pockets),
-        }
-      : { kind: "failed", reason: outcome.reason };
+      ? { status: { kind: "sent" }, left: outcome.left }
+      : { status: { kind: "failed", reason: outcome.reason } };
   } catch {
-    return { kind: "failed", reason: null };
+    return { status: { kind: "failed", reason: "unavailable" } };
   }
+}
+
+/** A page just shot: waiting to be cut, then sent. */
+function blank(id: number, number: number): ShotPage {
+  return { id, number, thumb: null, photos: null, status: { kind: "waiting" } };
 }
 
 export function PageScan({
   binderId,
-  imagesEnabled,
-  playerGames,
   pockets,
-  onPlaced,
+  left: leftAtOpen,
+  retake = null,
+  onDone,
 }: {
   binderId: string;
-  imagesEnabled: boolean;
-  playerGames: readonly string[];
   /** The pockets this binder already has a card in. */
   pockets: readonly number[];
-  /** The action's sentence, and the first pocket filled. */
-  onPlaced: (message: string, firstPocket: number | null) => void;
+  /** Pages left today: null has no limit, undefined is not known yet. */
+  left?: number | null;
+  /** A page of a queue already out, shot again: that queue, that page. */
+  retake?: { batchId: string; page: number } | null;
+  /** Every page sent, or given up on: the sheet closes. */
+  onDone: () => void;
 }) {
-  const [startPage, setStartPage] = useState(() => firstEmptyPage(pockets));
-  const [queue, setQueue] = useState<QueuedPage[]>([]);
-  const [step, setStep] = useState<"shoot" | "check">("shoot");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  /* One queue, one id, made once: every page sent from this sheet joins it. */
+  const [batchId] = useState(() => retake?.batchId ?? crypto.randomUUID());
+  const [startPage, setStartPage] = useState(
+    () => retake?.page ?? firstEmptyPage(pockets),
+  );
+  const [queue, setQueue] = useState<ShotPage[]>([]);
+  const [left, setLeft] = useState(leftAtOpen);
+  /* Done was pressed: the sheet closes once the sends still out land. */
+  const [finishing, setFinishing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const nextId = useRef(0);
   /* The failed page a Retake is replacing, until its photo arrives. */
   const retaking = useRef<number | null>(null);
-  /* A page is with the reader. One at a time, so this is a flag. */
-  const reading = useRef(false);
+  /* A page is on its way. One at a time, so this is a flag. */
+  const sending = useRef(false);
   /* Every picture made, so the last ones go when the sheet closes. */
   const made = useRef(new Set<string>());
 
-  const taken = new Set(pockets);
+  /* The figure the binder read can arrive after the sheet opened. */
+  const [leftSeen, setLeftSeen] = useState(leftAtOpen);
+  if (leftSeen !== leftAtOpen) {
+    setLeftSeen(leftAtOpen);
+    if (left === undefined) setLeft(leftAtOpen);
+  }
 
   useEffect(() => {
     const urls = made.current;
@@ -257,34 +274,50 @@ export function PageScan({
   }, []);
 
   /*
-   * The reader: the first page still waiting, in queue order, once it
-   * has been cut. The answer lands on the page by its id, so a page
-   * removed while it was read is simply not there to land on.
+   * The sender: the first page still waiting, in queue order, once it
+   * has been cut. A page is sent and never read here; the answer is
+   * only whether the server has it.
    */
   useEffect(() => {
-    if (reading.current) return;
+    if (sending.current) return;
     const next = queue.find((page) => page.status.kind === "waiting");
-    if (!next?.cells) return;
-    reading.current = true;
-    void readPage(next.cells).then((status) => {
-      reading.current = false;
-      setQueue((current) =>
-        current.map((page) => (page.id === next.id ? { ...page, status } : page)),
-      );
-    });
-  }, [queue]);
+    if (!next?.photos) return;
+    sending.current = true;
+    void sendPage(binderId, batchId, next.number, next.photos).then(
+      ({ status, left: after }) => {
+        sending.current = false;
+        if (after !== undefined) setLeft(after);
+        if (status.kind === "failed" && status.reason === "daily-pages") setLeft(0);
+        setQueue((current) =>
+          current.map((page) =>
+            page.id === next.id
+              ? /* Sent, the photos have done their work. */
+                { ...page, status, photos: status.kind === "sent" ? null : page.photos }
+              : page,
+          ),
+        );
+      },
+    );
+  }, [queue, binderId, batchId]);
+
+  /* Done, once nothing is still on its way. */
+  const pending = queue.filter((page) => page.status.kind === "waiting").length;
+  const closed = useRef(false);
+  useEffect(() => {
+    if (!finishing || pending > 0 || closed.current) return;
+    closed.current = true;
+    onDone();
+  }, [finishing, pending, onDone]);
 
   const picture = (blob: Blob) => {
     const url = URL.createObjectURL(blob);
     made.current.add(url);
     return url;
   };
-  const release = (page: QueuedPage) => {
-    for (const url of [page.thumb, ...page.cellUrls]) {
-      if (!url) continue;
-      URL.revokeObjectURL(url);
-      made.current.delete(url);
-    }
+  const release = (page: ShotPage) => {
+    if (!page.thumb) return;
+    URL.revokeObjectURL(page.thumb);
+    made.current.delete(page.thumb);
   };
 
   const shoot = async (file: File) => {
@@ -294,24 +327,27 @@ export function PageScan({
     if (replacing !== null) {
       id = replacing;
       const old = queue.find((page) => page.id === id);
-      if (old) release(old);
-      setQueue((current) => current.map((page) => (page.id === id ? blank(id) : page)));
+      if (!old) return;
+      release(old);
+      setQueue((current) =>
+        current.map((page) => (page.id === id ? blank(id, old.number) : page)),
+      );
     } else {
-      if (queue.length >= MAX_SCAN_PAGES) return;
+      if (!canTake) return;
       id = nextId.current;
       nextId.current += 1;
-      setQueue((current) => [...current, blank(id)]);
+      const number = nextPage;
+      setQueue((current) => [...current, blank(id, number)]);
     }
 
-    let cut: Pick<QueuedPage, "thumb" | "cells" | "cellUrls"> | null = null;
+    let cut: Pick<ShotPage, "thumb" | "photos"> | null = null;
     let status: Status | null = null;
     try {
       const pieces = await cutPage(file);
       if (pieces) {
         cut = {
           thumb: pieces.thumb ? picture(pieces.thumb) : null,
-          cells: pieces.cells,
-          cellUrls: pieces.cells.map(picture),
+          photos: { page: pieces.page, cells: pieces.cells },
         };
       } else {
         status = { kind: "failed", reason: "too-big" };
@@ -329,65 +365,31 @@ export function PageScan({
     );
   };
 
-  const remove = (page: QueuedPage) => {
+  /* Every page keeps the number it was taken as, so the next one
+     follows the last, even past a refused page that was removed. */
+  const last = queue[queue.length - 1];
+  const nextPage = last ? last.number + 1 : startPage;
+  /* A page not yet answered for counts against the day already. A
+     retake from the check replaces a page and costs nothing. */
+  const leftNow =
+    left === undefined || left === null ? left : Math.max(0, left - pending);
+  const outOfPages = !retake && leftNow === 0;
+  /* A page to take only while the queue and the binder have room for
+     it and the day has pages left; a retake is the one page it replaces. */
+  const canTake =
+    !finishing &&
+    !outOfPages &&
+    (retake ? queue.length === 0 : queue.length < MAX_SCAN_PAGES) &&
+    nextPage <= BINDER_PAGES;
+  const anySent = queue.some((page) => page.status.kind === "sent");
+  const stepping = !retake && queue.length === 0;
+
+  /* Only a page the server turned down can go: one that went is in the
+     queue on the server, and is thrown away from the check. */
+  const remove = (page: ShotPage) => {
     release(page);
     setQueue((current) => current.filter((each) => each.id !== page.id));
   };
-
-  const choose = (pageId: number, slot: number, choice: Choice) =>
-    setQueue((current) =>
-      current.map((page) =>
-        page.id === pageId && page.status.kind === "read"
-          ? {
-              ...page,
-              status: {
-                ...page.status,
-                choices: page.status.choices.map((each, at) =>
-                  at === slot ? choice : each,
-                ),
-              },
-            }
-          : page,
-      ),
-    );
-
-  const choices = queue.map((page) =>
-    page.status.kind === "read" ? page.status.choices : null,
-  );
-  const placements = pagePlacements(choices, startPage);
-  const chosen = pagesChosen(choices);
-
-  const place = () => {
-    if (pending || placements.length === 0) return;
-    setError(null);
-    start(async () => {
-      const result = await placeBinderPagesAction(binderId, { placements });
-      if (!result.ok) {
-        setError(result.message);
-        return;
-      }
-      onPlaced(result.message, result.firstPocket);
-    });
-  };
-
-  const nextPage = startPage + queue.length;
-  /* A page to take only while the queue and the binder have room for it. */
-  const canTake = queue.length < MAX_SCAN_PAGES && nextPage <= BINDER_PAGES;
-  /* The starting page never pushes the queue off the binder's last page. */
-  const lastStart = BINDER_PAGES - Math.max(0, queue.length - 1);
-  const anyRead = queue.some((page) => page.status.kind === "read");
-
-  const checked: CheckedPage[] = queue.map((page, index) => ({
-    id: page.id,
-    page: startPage + index,
-    cellUrls: page.cellUrls,
-    read:
-      page.status.kind === "read"
-        ? { pockets: page.status.pockets, choices: page.status.choices }
-        : null,
-    line:
-      page.status.kind === "failed" ? pageFailedLine(page.status.reason) : READING_PAGE,
-  }));
 
   return (
     <div className="flex flex-1 flex-col gap-4">
@@ -409,110 +411,96 @@ export function PageScan({
         }}
       />
 
-      {step === "shoot" ? (
-        <>
-          <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border-strong px-4 py-6 text-center">
-            <div className="flex items-center gap-3">
-              <StepButton
-                label={START_EARLIER}
-                disabled={startPage <= 1}
-                onClick={() => setStartPage((page) => Math.max(1, page - 1))}
-              >
-                <Minus className="size-4" aria-hidden="true" />
-              </StepButton>
-              <p
-                aria-live="polite"
-                className="text-sm font-semibold text-text-primary tabular-nums"
-              >
-                {startingAtLine(startPage)}
-              </p>
-              <StepButton
-                label={START_LATER}
-                disabled={startPage >= lastStart}
-                onClick={() => setStartPage((page) => Math.min(lastStart, page + 1))}
-              >
-                <Plus className="size-4" aria-hidden="true" />
-              </StepButton>
-            </div>
-            <p className="max-w-xs text-sm text-text-secondary">{PAGES_HINT}</p>
-            {canTake && (
-              <Button
-                type="button"
-                onClick={() => {
-                  retaking.current = null;
-                  input.current?.click();
-                }}
-              >
-                <Camera className="size-4" aria-hidden="true" />
-                {takePageLabel(nextPage)}
-              </Button>
-            )}
-          </div>
-
-          {queue.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {queue.map((page, index) => (
-                <QueueRow
-                  key={page.id}
-                  page={page}
-                  number={startPage + index}
-                  onRetake={() => {
-                    retaking.current = page.id;
-                    input.current?.click();
-                  }}
-                  onRemove={() => remove(page)}
-                />
-              ))}
-            </ul>
+      <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border-strong px-4 py-6 text-center">
+        {/* The first page moves only before anything is shot: a page
+            sent is that page on the server. */}
+        <div className="flex items-center gap-3">
+          {stepping && (
+            <StepButton
+              label={START_EARLIER}
+              disabled={startPage <= 1}
+              onClick={() => setStartPage((page) => Math.max(1, page - 1))}
+            >
+              <Minus className="size-4" aria-hidden="true" />
+            </StepButton>
           )}
-
-          {anyRead && (
-            <Dock>
-              <Button type="button" className="w-full" onClick={() => setStep("check")}>
-                {CHECK_PAGES}
-              </Button>
-            </Dock>
-          )}
-        </>
-      ) : (
-        <>
-          <Button
-            type="button"
-            variant="secondary"
-            className="self-start"
-            disabled={pending}
-            onClick={() => setStep("shoot")}
+          <p
+            aria-live="polite"
+            className="text-sm font-semibold text-text-primary tabular-nums"
           >
-            {BACK_TO_PAGES}
-          </Button>
-          <PageCheck
-            pages={checked}
-            taken={taken}
-            imagesEnabled={imagesEnabled}
-            playerGames={playerGames}
-            onChoose={choose}
-          />
-          <Dock>
-            {(error || pending) && (
-              <div className="flex min-h-5 items-center gap-2 text-sm">
-                {pending && <Spinner size="sm" />}
-                {error && (
-                  <span role="alert" className="text-danger">
-                    {error}
-                  </span>
-                )}
-              </div>
-            )}
+            {startingAtLine(queue[0]?.number ?? startPage)}
+          </p>
+          {stepping && (
+            <StepButton
+              label={START_LATER}
+              disabled={startPage >= BINDER_PAGES}
+              onClick={() => setStartPage((page) => Math.min(BINDER_PAGES, page + 1))}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+            </StepButton>
+          )}
+        </div>
+        <p className="max-w-xs text-sm text-text-secondary">{PAGES_HINT}</p>
+        {outOfPages ? (
+          <p role="status" className="max-w-xs text-sm text-text-primary">
+            {SCAN_REFUSALS["daily-pages"]}
+          </p>
+        ) : (
+          canTake && (
             <Button
               type="button"
-              className="w-full"
-              disabled={pending || placements.length === 0}
-              onClick={place}
+              onClick={() => {
+                retaking.current = null;
+                input.current?.click();
+              }}
             >
-              {addPagesLabel(chosen)}
+              <Camera className="size-4" aria-hidden="true" />
+              {takePageLabel(nextPage)}
             </Button>
-          </Dock>
-        </>
+          )
+        )}
+        {!retake && typeof leftNow === "number" && !outOfPages && (
+          <p className="text-xs text-text-muted tabular-nums">
+            {pagesLeftLine(leftNow)}
+          </p>
+        )}
+      </div>
+
+      {queue.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {queue.map((page) => (
+            <QueueRow
+              key={page.id}
+              page={page}
+              canChange={!finishing}
+              onRetake={() => {
+                retaking.current = page.id;
+                input.current?.click();
+              }}
+              onRemove={() => remove(page)}
+            />
+          ))}
+        </ul>
+      )}
+
+      {anySent && (
+        <p role="status" className="text-center text-sm text-text-secondary">
+          {READING_IN_BACKGROUND}
+        </p>
+      )}
+
+      {anySent && (
+        <Dock>
+          <Button
+            type="button"
+            className="w-full"
+            disabled={finishing}
+            onClick={() => setFinishing(true)}
+          >
+            {finishing && <Spinner size="sm" />}
+            {DONE_SCANNING}
+          </Button>
+        </Dock>
       )}
     </div>
   );
@@ -551,28 +539,28 @@ function StepButton({
   );
 }
 
-/** A queued page: its picture, how its read is going, Retake when it failed, Remove always. */
+/**
+ * A shot page: its picture, its number, how its send is going, and
+ * Retake and Remove when it was refused.
+ */
 function QueueRow({
   page,
-  number,
+  canChange,
   onRetake,
   onRemove,
 }: {
-  page: QueuedPage;
-  number: number;
+  page: ShotPage;
+  canChange: boolean;
   onRetake: () => void;
   onRemove: () => void;
 }) {
   const { status } = page;
   const line =
-    status.kind === "read"
-      ? (() => {
-          const tally = pageTally(status.pockets);
-          return pageStatusLine(number, tally.found, tally.cards);
-        })()
-      : status.kind === "failed"
-        ? pageFailedLine(status.reason)
-        : READING_PAGE;
+    status.kind === "failed"
+      ? sendRefusalLine(status.reason)
+      : status.kind === "sent"
+        ? PAGE_SENT
+        : SENDING_PAGE;
   return (
     <li className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-2">
       <span className="flex h-14 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[4px] bg-elevated">
@@ -583,27 +571,32 @@ function QueueRow({
           status.kind === "waiting" && <Spinner size="sm" />
         )}
       </span>
-      <p
-        role={status.kind === "failed" ? "alert" : undefined}
-        className={
-          status.kind === "failed"
-            ? "min-w-0 flex-1 text-sm text-text-primary"
-            : "min-w-0 flex-1 text-sm text-text-secondary"
-        }
-      >
-        {status.kind === "waiting" && page.thumb && (
-          <Spinner size="sm" className="mr-1.5 inline-block align-[-2px]" />
-        )}
-        {line}
-      </p>
-      {status.kind === "failed" && (
-        <Button type="button" variant="secondary" size="sm" onClick={onRetake}>
-          {RETAKE}
-        </Button>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+        <span className="font-semibold text-text-primary tabular-nums">
+          Page {page.number}
+        </span>
+        <p
+          role={status.kind === "failed" ? "alert" : undefined}
+          className={
+            status.kind === "failed" ? "text-text-primary" : "text-text-secondary"
+          }
+        >
+          {status.kind === "waiting" && page.thumb && (
+            <Spinner size="sm" className="mr-1.5 inline-block align-[-2px]" />
+          )}
+          {line}
+        </p>
+      </div>
+      {status.kind === "failed" && canChange && (
+        <>
+          <Button type="button" variant="secondary" size="sm" onClick={onRetake}>
+            {RETAKE}
+          </Button>
+          <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
+            {REMOVE_PAGE}
+          </Button>
+        </>
       )}
-      <Button type="button" variant="ghost" size="sm" onClick={onRemove}>
-        {REMOVE_PAGE}
-      </Button>
     </li>
   );
 }
