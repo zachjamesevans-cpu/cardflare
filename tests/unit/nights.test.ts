@@ -169,7 +169,19 @@ describe("the night-match notice", () => {
     expect(matches).toContain("NIGHT_MATCH_ROSTER_CAP = 20");
     expect(matches).toContain("catch (error)");
     expect(read("src/lib/events/going.ts")).toContain(
-      "void afterGoing(eventId, playerId)",
+      "afterResponse(() => afterGoing(eventId, playerId))",
+    );
+  });
+
+  it("tells nobody on either side of a block", () => {
+    const matches = read("src/lib/events/night-matches.ts");
+    const going = matches.slice(matches.indexOf("export async function afterGoing("));
+    expect(going).toContain("blockedSet(playerId)");
+    expect(going).toContain("!blocked.has(row.playerId)");
+    /* Filtered before the cap, so a blocked player never takes a seat
+       in the twenty that are told. */
+    expect(going.indexOf("!blocked.has(row.playerId)")).toBeLessThan(
+      going.indexOf(".slice(0, NIGHT_MATCH_ROSTER_CAP)"),
     );
   });
 });

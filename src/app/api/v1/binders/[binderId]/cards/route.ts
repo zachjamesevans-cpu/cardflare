@@ -6,10 +6,13 @@ import {
   binderAddSchema,
   binderPlaceSchema,
 } from "@/lib/binder/add-copy";
+import { binderPagesSchema } from "@/lib/binder/pages-schema";
+import { pagesPlacedLine } from "@/lib/cards/scan-rules";
 import {
   addBinderCard,
   addBinderCards,
   placeBinderCard,
+  placeBinderPages,
   readBinder,
   removeBinderCard,
 } from "@/lib/binder/binder";
@@ -34,6 +37,39 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
   const id = binderIdSchema.safeParse((await params).binderId);
   if (!id.success) return Response.json({ error: "not-found" }, { status: 404 });
   const body = await readJsonPayload(request);
+
+  /* Scanned pages: every card into the exact pocket it sat in. */
+  const pages = binderPagesSchema.safeParse(body);
+  if (pages.success) {
+    const result = await placeBinderPages(
+      player.playerId,
+      player.displayName,
+      id.data,
+      pages.data.placements,
+    );
+    if (!result.ok) {
+      return Response.json(
+        { error: result.reason },
+        { status: result.reason === "not-yours" ? 404 : 503 },
+      );
+    }
+    const binder = await readBinder(player.playerId, player.playerId, id.data);
+    return Response.json(
+      absoluteImageUrls({
+        binder: binder && forOldBuild(binder),
+        message: pagesPlacedLine(result),
+        firstPocket: result.firstPocket,
+        /* The counts as well, so an app that sends a long queue a few
+           pages at a time can say what all of it did in one line. */
+        counts: {
+          added: result.added,
+          merged: result.merged,
+          occupied: result.occupied,
+          skipped: result.skipped,
+        },
+      }),
+    );
+  }
 
   const batch = binderAddSchema.safeParse(body);
   if (batch.success) {

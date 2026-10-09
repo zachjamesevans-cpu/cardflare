@@ -10,7 +10,7 @@ import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
-import type { ScanRefusal } from "./scan-copy";
+import { POCKETS_PER_PAGE, pagesPlacedLine, type ScanRefusal } from "./scan-copy";
 import type { ScanCard } from "./scan-hit";
 
 /**
@@ -533,6 +533,9 @@ async function call<T>(
   body?: unknown,
   retried = false,
   timeoutMs = 15_000,
+  /* In the body after all: only for a large upload, and only once the
+     probe below has seen a body arrive on this network. */
+  asBody = false,
 ): Promise<T> {
   const headers: Record<string, string> = {};
 
@@ -563,9 +566,10 @@ async function call<T>(
    * (URI-encoded JSON, pure ASCII) as the write's payload everywhere.
    * Our payloads are tiny — a name, a card id, a 120-char note.
    */
-  if (body !== undefined) {
+  if (body !== undefined && !asBody) {
     headers["x-cf-payload"] = encodeURIComponent(JSON.stringify(body));
   }
+  if (asBody) headers["content-type"] = "application/json";
 
   /*
    * A hard timeout on every call. A phone on flaky store wifi must never
@@ -577,11 +581,12 @@ async function call<T>(
 
   let response: Response;
   try {
-    // Deliberately no body — see the header note above.
+    // No body unless asked for: see the header note above.
     response = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
       signal: controller.signal,
+      ...(asBody ? { body: JSON.stringify(body) } : {}),
     });
   } catch (caught) {
     throw new ApiError(0, controller.signal.aborted ? "timeout" : "network");
@@ -592,7 +597,7 @@ async function call<T>(
   // One silent refresh on an expired account token, then give up honestly.
   if (response.status === 401 && access && !retried) {
     if (await refreshAccessToken()) {
-      return call<T>(method, path, body, true, timeoutMs);
+      return call<T>(method, path, body, true, timeoutMs, asBody);
     }
   }
 
@@ -2503,6 +2508,61 @@ export const addBinderCards = (
     { items, pocket },
   );
 
+/** One card of a scanned page, into the exact pocket it sat in. */
+export interface BinderPlacement {
+  pocket: number;
+  cardId: string;
+  printingId: string | null;
+}
+
+/**
+ * Scanned pages into a binder, checked by the player first: every card
+ * into the pocket it sat in, a second copy counting up in its pocket, a
+ * pocket already full left alone. The tray's route; the server tells the
+ * two apart by `placements`. Answers as the tray does, the sentence
+ * being the website's `pagesPlacedLine`.
+ */
+/** Pages per request: a long queue in one payload header would near its size limit. */
+const PAGES_PER_PLACE = 3;
+
+/**
+ * Scanned pages into a binder, each card in its exact pocket. Sent a few
+ * pages at a time, in order: the payload rides in a header, and ten pages
+ * of placements in one would be close to the size a server accepts for
+ * all of its headers together. The counts are added up so the line says
+ * what the whole queue did.
+ */
+export async function placeBinderPages(
+  binderId: string,
+  placements: BinderPlacement[],
+): Promise<{ binder: Binder; message: string; firstPocket: number | null }> {
+  const per = PAGES_PER_PLACE * POCKETS_PER_PAGE;
+  const totals = { added: 0, merged: 0, occupied: 0, skipped: 0 };
+  let binder: Binder | null = null;
+  let firstPocket: number | null = null;
+  for (let start = 0; start < placements.length; start += per) {
+    const answer = await call<{
+      binder: Binder;
+      firstPocket: number | null;
+      counts: typeof totals;
+    }>("POST", `${binderPath(binderId)}/cards`, {
+      placements: placements.slice(start, start + per),
+    });
+    binder = answer.binder;
+    if (
+      answer.firstPocket !== null &&
+      (firstPocket === null || answer.firstPocket < firstPocket)
+    ) {
+      firstPocket = answer.firstPocket;
+    }
+    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
+      totals[key] += answer.counts?.[key] ?? 0;
+    }
+  }
+  if (!binder) throw new Error("Nothing to place.");
+  return { binder, message: pagesPlacedLine(totals), firstPocket };
+}
+
 /**
  * One card to one pocket, the drop at the end of a drag: an empty
  * pocket takes it, a full one slides the run along to the next gap
@@ -2575,30 +2635,86 @@ export function binderOfferError(caught: unknown): string {
   return binderOfferFailure(caught.code);
 }
 
-/**
- * A new profile picture, sent the only way this network allows.
+/*
+ * A large upload, the quick way when the network allows it.
  *
- * The image is already a small JPEG by the time it gets here (the
- * screen resizes and compresses before calling). It still cannot ride
- * in a body, so it goes as numbered base64 chunks inside the same
- * header every other write uses, and the server stitches them back
- * together. Sequential on purpose: a phone on shop wifi does better
- * with one small request at a time than with twelve in flight.
+ * A photo in pieces is a request per 6000 characters, one after another:
+ * twenty round trips for a card, a couple of hundred for a page. That is
+ * the price of the founder's network, where a request with a body dies in
+ * transit, and most networks are not his. So once a session the app asks
+ * with one tiny request that carries a body; if it arrives, a photo goes
+ * up whole in one request, and the pieces stay for the networks that eat
+ * bodies.
+ *
+ * Remembered for the session, both ways. A whole upload that fails on the
+ * way (no answer at all) marks bodies blocked and goes again in pieces; a
+ * refusal from the server is a real answer and is not sent twice.
  */
-export async function uploadAvatar(
+let bodiesPass: boolean | null = null;
+let probing: Promise<boolean> | null = null;
+
+/** Whether a request with a body gets through here: asked once a session. */
+function bodiesGetThrough(): Promise<boolean> {
+  if (bodiesPass !== null) return Promise.resolve(bodiesPass);
+  probing ??= call<{ ok?: boolean }>(
+    "POST",
+    "/api/v1/cards/scan",
+    { action: "probe" },
+    false,
+    6_000,
+    true,
+  )
+    .then((answer) => answer.ok === true)
+    .catch(() => false)
+    .then((pass) => {
+      bodiesPass ??= pass;
+      return bodiesPass;
+    });
+  return probing;
+}
+
+/**
+ * One request with the whole upload in its body, when bodies pass here.
+ * `{ sent: false }` means go in pieces: bodies are blocked, or this one
+ * died on the way and they are blocked from now on.
+ */
+async function sendWhole<T>(
+  path: string,
+  body: unknown,
+  timeoutMs = 60_000,
+): Promise<{ sent: true; answer: T } | { sent: false }> {
+  if (!(await bodiesGetThrough())) return { sent: false };
+  try {
+    return {
+      sent: true,
+      answer: await call<T>("POST", path, body, false, timeoutMs, true),
+    };
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 0) {
+      bodiesPass = false;
+      return { sent: false };
+    }
+    throw caught;
+  }
+}
+
+/**
+ * The pieces: numbered base64 chunks inside the same header every other
+ * write uses, one after another, and the server stitches them back
+ * together. Sequential on purpose: a phone on shop wifi does better with
+ * one small request at a time than with twelve in flight. Answers how
+ * many pieces went.
+ */
+async function sendPieces(
+  path: string,
+  uploadId: string,
   base64: string,
   onProgress?: (sent: number, total: number) => void,
-  kind: "avatar" | "cover" | "avatar-animated" = "avatar",
-): Promise<void> {
+): Promise<number> {
   const CHUNK = 6000;
   const total = Math.ceil(base64.length / CHUNK);
-
-  const { uploadId } = await call<{ uploadId: string }>("POST", "/api/v1/avatar", {
-    action: "begin",
-  });
-
   for (let index = 0; index < total; index += 1) {
-    await call<{ ok: true }>("POST", "/api/v1/avatar", {
+    await call<{ ok: true }>("POST", path, {
       action: "chunk",
       uploadId,
       index,
@@ -2606,8 +2722,35 @@ export async function uploadAvatar(
     });
     onProgress?.(index + 1, total);
   }
+  return total;
+}
 
-  await call<{ ok: true }>("POST", "/api/v1/avatar", {
+/**
+ * A new profile picture. The image is already a small JPEG by the time
+ * it gets here (the screen resizes and compresses before calling). In one
+ * body where the network allows it, else in pieces (sendWhole above).
+ */
+export async function uploadAvatar(
+  base64: string,
+  onProgress?: (sent: number, total: number) => void,
+  kind: "avatar" | "cover" | "avatar-animated" = "avatar",
+): Promise<void> {
+  const path = "/api/v1/avatar";
+  const whole = await sendWhole<{ ok: true }>(path, {
+    action: "direct",
+    kind,
+    data: base64,
+  });
+  if (whole.sent) {
+    onProgress?.(1, 1);
+    return;
+  }
+
+  const { uploadId } = await call<{ uploadId: string }>("POST", path, {
+    action: "begin",
+  });
+  const total = await sendPieces(path, uploadId, base64, onProgress);
+  await call<{ ok: true }>("POST", path, {
     action: "commit",
     uploadId,
     count: total,
@@ -2648,50 +2791,94 @@ export const getScanAccess = () =>
     (result) => result.access ?? null,
   );
 
+/** One pocket of a scanned page: nothing there, a card and its guesses, or unread. */
+export type PocketOutcome =
+  | { slot: number; state: "empty" }
+  | { slot: number; state: "found"; read: ScanRead; matches: ScanMatch[] }
+  | { slot: number; state: "unread"; read: ScanRead | null };
+
+/** The website's PageOutcome (src/lib/cards/scan.ts), as the route sends it. */
+export type PageOutcome =
+  { ok: true; pockets: PocketOutcome[] } | { ok: false; reason: ScanRefusal };
+
+const SCAN_PATH = "/api/v1/cards/scan";
+
 /**
- * One photo of one card, read on the server: the avatar's road (begin,
- * numbered base64 pieces in the payload header one after another, then
- * "read"), because a body does not survive every network this app
- * meets. The photo is already cropped and small by the time it gets
- * here. A phone the server will not let scan hears it at "begin",
- * before a single piece is sent.
+ * An upload id for one photo in pieces, or null for a phone the server
+ * will not let scan: it hears so at "begin", before a single piece goes.
+ */
+async function beginScanUpload(): Promise<string | null> {
+  try {
+    const { uploadId } = await call<{ uploadId: string }>("POST", SCAN_PATH, {
+      action: "begin",
+    });
+    return uploadId;
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.code === "not-allowed") return null;
+    throw caught;
+  }
+}
+
+/**
+ * One photo of one card, read on the server. In one body where the
+ * network allows it ("read-direct"), else the avatar's road: begin,
+ * numbered pieces in the payload header one after another, then "read".
+ * The photo is already cropped and small by the time it gets here.
  */
 export async function scanCardPhoto(
   base64: string,
   onProgress?: (sent: number, total: number) => void,
 ): Promise<ScanOutcome> {
-  const CHUNK = 6000;
-  const total = Math.ceil(base64.length / CHUNK);
-  const path = "/api/v1/cards/scan";
+  const whole = await sendWhole<ScanOutcome>(SCAN_PATH, {
+    action: "read-direct",
+    data: base64,
+  });
+  if (whole.sent) return whole.answer;
 
-  let uploadId: string;
-  try {
-    ({ uploadId } = await call<{ uploadId: string }>("POST", path, {
-      action: "begin",
-    }));
-  } catch (caught) {
-    if (caught instanceof ApiError && caught.code === "not-allowed") {
-      return { ok: false, reason: "not-allowed" };
-    }
-    throw caught;
-  }
-
-  for (let index = 0; index < total; index += 1) {
-    await call<{ ok: true }>("POST", path, {
-      action: "chunk",
-      uploadId,
-      index,
-      data: base64.slice(index * CHUNK, (index + 1) * CHUNK),
-    });
-    onProgress?.(index + 1, total);
-  }
+  const uploadId = await beginScanUpload();
+  if (!uploadId) return { ok: false, reason: "not-allowed" };
+  const total = await sendPieces(SCAN_PATH, uploadId, base64, onProgress);
 
   /* The read is a model looking at a photo, with one retry on the
-     server: longer than the usual fifteen seconds is not a hang. */
+     server: longer than the usual fifteen seconds is not a hang (the
+     whole upload above waits as long, by default). */
   return call<ScanOutcome>(
     "POST",
-    path,
+    SCAN_PATH,
     { action: "read", uploadId, count: total },
+    false,
+    60_000,
+  );
+}
+
+/**
+ * One photo of a whole binder page, as its nine pockets (cut on the
+ * phone, base64 JPEG each, null for one that could not be cut), read on
+ * the server side by side. The same two roads as a card: in one body
+ * ("read-page-direct"), else each pocket in pieces of its own and then
+ * "read-page" naming the nine uploads.
+ */
+export async function scanPagePhotos(cells: (string | null)[]): Promise<PageOutcome> {
+  const whole = await sendWhole<PageOutcome>(SCAN_PATH, {
+    action: "read-page-direct",
+    cells,
+  });
+  if (whole.sent) return whole.answer;
+
+  const uploads: ({ uploadId: string; count: number } | null)[] = [];
+  for (const cell of cells) {
+    if (!cell) {
+      uploads.push(null);
+      continue;
+    }
+    const uploadId = await beginScanUpload();
+    if (!uploadId) return { ok: false, reason: "not-allowed" };
+    uploads.push({ uploadId, count: await sendPieces(SCAN_PATH, uploadId, cell) });
+  }
+  return call<PageOutcome>(
+    "POST",
+    SCAN_PATH,
+    { action: "read-page", cells: uploads },
     false,
     60_000,
   );

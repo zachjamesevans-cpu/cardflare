@@ -27,7 +27,7 @@ import {
 } from "@/lib/notifications/notify";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { roomIdentitiesFor } from "@/lib/players/profile";
-import { blockState } from "@/lib/players/safety";
+import { blockState, blockedSet } from "@/lib/players/safety";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { instantToLocal } from "@/lib/time/zone";
 
@@ -66,12 +66,19 @@ export async function afterGoing(eventId: string, playerId: string): Promise<voi
     if (!store) return;
 
     /* The other accounts on the roster: a guest has nothing to match
-       and nowhere to be told. */
-    const roster = await listParticipants(eventId);
+       and nowhere to be told. Nobody on either side of a block with the
+       goer, in either direction: a block means neither of you is told
+       the other is coming, or counted in a "N of them want" line. */
+    const [roster, blocked] = await Promise.all([
+      listParticipants(eventId),
+      blockedSet(playerId),
+    ]);
     const others = [
       ...new Set(
         roster.flatMap((row) =>
-          row.playerId && row.playerId !== playerId ? [row.playerId] : [],
+          row.playerId && row.playerId !== playerId && !blocked.has(row.playerId)
+            ? [row.playerId]
+            : [],
         ),
       ),
     ].slice(0, NIGHT_MATCH_ROSTER_CAP);

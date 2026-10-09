@@ -10,6 +10,7 @@ import { parseDeckList } from "@/lib/players/deck-list";
 import {
   addBinderCard,
   addBinderCards,
+  placeBinderPages,
   BINDER_NAME_MAX,
   createBinder,
   deleteBinder,
@@ -18,7 +19,9 @@ import {
   saveBinderOrder,
   saveBinderSettings,
 } from "./binder";
+import { pagesPlacedLine } from "@/lib/cards/scan-rules";
 import { binderAddedLine, binderAddSchema, binderPlaceSchema } from "./add-copy";
+import { binderPagesSchema } from "./pages-schema";
 import { isBinderCover, type BinderCoverId } from "./covers";
 import {
   BINDER_OFFER_MAX_CARDS,
@@ -178,6 +181,46 @@ export async function addBinderCardsAction(
   return {
     ok: true,
     message: binderAddedLine(result),
+    firstPocket: result.firstPocket,
+  };
+}
+
+/**
+ * Scanned pages, checked by the player, into the binder: each card in the
+ * exact pocket it sat in on the real page. See `placeBinderPages`.
+ */
+export async function placeBinderPagesAction(
+  binderId: string,
+  input: unknown,
+): Promise<
+  | { ok: true; message: string; firstPocket: number | null }
+  | { ok: false; message: string }
+> {
+  const player = await currentPlayer(await getViewer());
+  if (!player) return { ok: false, message: "Sign in to keep a binder." };
+  const which = binderIdOf(binderId);
+  if (!which) return { ok: false, message: NO_SUCH };
+  const parsed = binderPagesSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Those pages could not be read." };
+  const result = await placeBinderPages(
+    player.id,
+    player.name,
+    which,
+    parsed.data.placements,
+  );
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === "not-yours"
+          ? NO_SUCH
+          : "Could not place those pages. Try again in a moment.",
+    };
+  }
+  repaint(player.id, which);
+  return {
+    ok: true,
+    message: pagesPlacedLine(result),
     firstPocket: result.firstPocket,
   };
 }

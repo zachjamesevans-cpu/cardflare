@@ -179,10 +179,19 @@ describe("the photo", () => {
     expect(sent).toBeGreaterThan(shrunk);
   });
 
-  it("travels in pieces of 6000 characters, one after another", () => {
+  it("travels in pieces of 6000 characters, one after another, where a body cannot", () => {
+    /* The pieces are the avatar's and the scanner's both, one helper;
+       the quick way and the fallback are pinned in page-scan-app.test.ts. */
     const upload = src.api.slice(
+      src.api.indexOf("async function sendPieces("),
+      src.api.indexOf("export async function uploadAvatar("),
+    );
+    const card = src.api.slice(
       src.api.indexOf("export async function scanCardPhoto("),
-      src.api.indexOf("/* The read is a model looking at a photo"),
+      src.api.indexOf("export async function scanPagePhotos("),
+    );
+    expect(card).toContain(
+      "const total = await sendPieces(SCAN_PATH, uploadId, base64, onProgress);",
     );
     expect(upload).toContain("const CHUNK = 6000;");
     expect(upload).toContain("data: base64.slice(index * CHUNK, (index + 1) * CHUNK),");

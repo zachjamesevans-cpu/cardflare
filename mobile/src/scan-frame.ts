@@ -45,19 +45,21 @@ export function guideFrame(viewWidth: number, viewHeight: number): Box {
 /**
  * The frame in the photo's pixels, for the image manipulator: through
  * the preview's cover fit, widened by FRAME_MARGIN, kept inside the
- * photo.
+ * photo. A whole page is cut at its guide exactly (margin 0): each
+ * pocket is widened on its own, by POCKET_MARGIN.
  */
 export function frameInPhoto(
   frame: Box,
   view: { width: number; height: number },
   photo: { width: number; height: number },
+  margin = FRAME_MARGIN,
 ): { originX: number; originY: number; width: number; height: number } {
   const scale = Math.max(view.width / photo.width, view.height / photo.height);
   const offsetX = (photo.width * scale - view.width) / 2;
   const offsetY = (photo.height * scale - view.height) / 2;
 
-  const padX = frame.width * FRAME_MARGIN;
-  const padY = frame.height * FRAME_MARGIN;
+  const padX = frame.width * margin;
+  const padY = frame.height * margin;
   const left = Math.max(0, (frame.x - padX + offsetX) / scale);
   const top = Math.max(0, (frame.y - padY + offsetY) / scale);
   const right = Math.min(photo.width, (frame.x + frame.width + padX + offsetX) / scale);

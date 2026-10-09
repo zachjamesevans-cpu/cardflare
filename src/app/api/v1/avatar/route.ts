@@ -61,6 +61,18 @@ const uploadId = z.string().uuid();
 
 const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("begin") }),
+  /* The quick way: the whole picture in the body, one request, for a
+     network that lets a body through. The app falls back to the pieces
+     below when it does not. Base64 of the largest picture the app sends. */
+  z.object({
+    action: z.literal("direct"),
+    kind: z.enum(["avatar", "cover", "avatar-animated"]).default("avatar"),
+    data: z
+      .string()
+      .min(1)
+      .max(Math.ceil((APP_ANIMATED_MAX_BYTES * 4) / 3) + 4)
+      .regex(/^[A-Za-z0-9+/=]+$/),
+  }),
   z.object({
     action: z.literal("chunk"),
     uploadId,
@@ -108,6 +120,18 @@ export async function POST(request: Request): Promise<Response> {
 
   const body = parsed.data;
   const admin = getSupabaseAdmin();
+
+  if (body.action === "direct") {
+    const limited = tooMany(
+      `avatar-begin:${player.playerId}`,
+      LIMITS.avatarBegin.limit,
+      LIMITS.avatarBegin.windowMs,
+    );
+    if (limited) return limited;
+    const bytes = Buffer.from(body.data, "base64");
+    if (bytes.length === 0) return badRequest("That upload was empty.");
+    return save(player.playerId, bytes, body.kind);
+  }
 
   if (body.action === "begin") {
     const limited = tooMany(
@@ -197,53 +221,7 @@ export async function POST(request: Request): Promise<Response> {
     const bytes = Buffer.from(encoded, "base64");
     if (bytes.length === 0) return badRequest("That upload was empty.");
 
-    const animated = body.kind === "avatar-animated";
-    const ceiling = animated ? APP_ANIMATED_MAX_BYTES : AVATAR_MAX_BYTES;
-
-    if (bytes.length > ceiling) {
-      return badRequest(
-        animated
-          ? "That GIF is over 2MB. Try a shorter or smaller one."
-          : "That picture is over 2MB.",
-      );
-    }
-
-    /* The bytes are handed over as sent. `setAnimatedAvatar` decides
-       what a GIF really is by reading its header, exactly as it does for
-       the website's upload - a type named by a client is a hint. */
-    const file = {
-      arrayBuffer: async () =>
-        bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
-      size: bytes.length,
-      type: animated ? "image/gif" : "image/jpeg",
-    };
-
-    const outcome = animated
-      ? await setAnimatedAvatar(player.playerId, file)
-      : await (body.kind === "cover" ? setCover : setAvatar)(player.playerId, file);
-
-    if (!outcome.ok) {
-      /*
-       * Named rather than generic. An animated upload can fail for a
-       * reason the player can act on - it is a Pro feature, and a GIF
-       * that is not a GIF is a common mis-pick - and "try again" would
-       * send them round the same loop.
-       */
-      const reason = outcome.reason;
-      return badRequest(
-        reason === "not-pro"
-          ? "Animated pictures are a Pro feature."
-          : reason === "wrong-type"
-            ? "An animated picture has to be a GIF."
-            : reason === "too-big"
-              ? "That picture is too big."
-              : reason === "unreadable"
-                ? "That picture could not be read. Try a different one."
-                : "The picture could not be saved. Try again.",
-      );
-    }
-
-    return Response.json({ ok: true });
+    return save(player.playerId, bytes, body.kind);
   } finally {
     /* The tmp pieces go regardless of how commit went. */
     await admin.storage
@@ -251,4 +229,62 @@ export async function POST(request: Request): Promise<Response> {
       .remove(paths)
       .catch(() => {});
   }
+}
+
+/**
+ * The website's own pipeline for bytes that have arrived, however they
+ * came: stitched from pieces, or in one body on a network that allows it.
+ */
+async function save(
+  playerId: string,
+  bytes: Buffer<ArrayBuffer>,
+  kind: "avatar" | "cover" | "avatar-animated",
+): Promise<Response> {
+  const animated = kind === "avatar-animated";
+  const ceiling = animated ? APP_ANIMATED_MAX_BYTES : AVATAR_MAX_BYTES;
+
+  if (bytes.length > ceiling) {
+    return badRequest(
+      animated
+        ? "That GIF is over 2MB. Try a shorter or smaller one."
+        : "That picture is over 2MB.",
+    );
+  }
+
+  /* The bytes are handed over as sent. `setAnimatedAvatar` decides
+     what a GIF really is by reading its header, exactly as it does for
+     the website's upload - a type named by a client is a hint. */
+  const file = {
+    arrayBuffer: async () =>
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+    size: bytes.length,
+    type: animated ? "image/gif" : "image/jpeg",
+  };
+
+  const outcome = animated
+    ? await setAnimatedAvatar(playerId, file)
+    : await (kind === "cover" ? setCover : setAvatar)(playerId, file);
+
+  if (!outcome.ok) {
+    /*
+     * Named rather than generic. An animated upload can fail for a
+     * reason the player can act on - it is a Pro feature, and a GIF
+     * that is not a GIF is a common mis-pick - and "try again" would
+     * send them round the same loop.
+     */
+    const reason = outcome.reason;
+    return badRequest(
+      reason === "not-pro"
+        ? "Animated pictures are a Pro feature."
+        : reason === "wrong-type"
+          ? "An animated picture has to be a GIF."
+          : reason === "too-big"
+            ? "That picture is too big."
+            : reason === "unreadable"
+              ? "That picture could not be read. Try a different one."
+              : "The picture could not be saved. Try again.",
+    );
+  }
+
+  return Response.json({ ok: true });
 }

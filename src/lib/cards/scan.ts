@@ -11,6 +11,7 @@ import {
   SCAN_GAMES,
   SCAN_MATCHES,
   SCAN_MAX_BYTES,
+  POCKETS_PER_PAGE,
   compactCode,
   rankScan,
   suggestedPrinting,
@@ -84,12 +85,26 @@ export type ScanOutcome =
   | { ok: false; reason: ScanRefusal; read?: ScanRead };
 
 /*
- * Ceilings on a paid call. A real binder session is a card every few
- * seconds at most; these stop a stuck loop or a script, and the day's
- * ceiling bounds what one account can cost.
+ * Ceilings on a paid call, counted per card read: a page is nine. Ten
+ * pages in ten minutes is a real binder session; these stop a stuck loop
+ * or a script, and the day's ceiling bounds what one account can cost
+ * (fifteen hundred reads is under fifty cents).
  */
-const BURST = { limit: 60, windowMs: 10 * 60 * 1000 };
-const DAILY = { limit: 500, windowMs: 24 * 60 * 60 * 1000 };
+const BURST = { limit: 150, windowMs: 10 * 60 * 1000 };
+const DAILY = { limit: 1500, windowMs: 24 * 60 * 60 * 1000 };
+
+/** Takes `reads` from both ceilings; false when either has run out. */
+function allowReads(playerId: string, reads: number): boolean {
+  for (let i = 0; i < reads; i += 1) {
+    if (
+      !checkRateLimit(`card-scan:${playerId}`, BURST.limit, BURST.windowMs).allowed ||
+      !checkRateLimit(`card-scan-day:${playerId}`, DAILY.limit, DAILY.windowMs).allowed
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /** Whether a photo's first bytes say JPEG, PNG or WebP. A named type is a hint. */
 export function photoType(
@@ -132,13 +147,7 @@ export async function scanCard(
   const mediaType = photoType(bytes);
   if (!mediaType) return { ok: false, reason: "no-card" };
 
-  if (
-    !checkRateLimit(`card-scan:${who.playerId}`, BURST.limit, BURST.windowMs).allowed ||
-    !checkRateLimit(`card-scan-day:${who.playerId}`, DAILY.limit, DAILY.windowMs)
-      .allowed
-  ) {
-    return { ok: false, reason: "limit" };
-  }
+  if (!allowReads(who.playerId, 1)) return { ok: false, reason: "limit" };
 
   const read = await readCard(bytes, mediaType);
   if (!read) return { ok: false, reason: "unavailable" };
@@ -148,6 +157,63 @@ export async function scanCard(
   const matches = await findScanned(read);
   if (matches.length === 0) return { ok: false, reason: "not-found", read };
   return { ok: true, read, matches };
+}
+
+/**
+ * One pocket of a scanned page: nothing there, a card and our guesses,
+ * or a card we could not read or could not find (the player finds it).
+ */
+export type PocketOutcome =
+  | { slot: number; state: "empty" }
+  | { slot: number; state: "found"; read: ScanRead; matches: ScanMatch[] }
+  | { slot: number; state: "unread"; read: ScanRead | null };
+
+export type PageOutcome =
+  { ok: true; pockets: PocketOutcome[] } | { ok: false; reason: ScanRefusal };
+
+/**
+ * A page: the nine pockets the client cut out of one photo, read side by
+ * side. A pocket the client sent nothing for is empty. Each is read and
+ * looked up exactly as a single card is, so a page is only ever as good
+ * or as bad as nine single scans.
+ */
+export async function scanPage(
+  who: { playerId: string; userId: string },
+  cells: (Uint8Array | null)[],
+): Promise<PageOutcome> {
+  if ((await scannerAccess(who)) !== "on") return { ok: false, reason: "not-allowed" };
+  if (cells.length !== POCKETS_PER_PAGE) return { ok: false, reason: "no-card" };
+
+  const typed = cells.map((bytes) => {
+    if (!bytes || bytes.length === 0) return null;
+    if (bytes.length > SCAN_MAX_BYTES) return "too-big" as const;
+    const mediaType = photoType(bytes);
+    return mediaType ? { bytes, mediaType } : null;
+  });
+  if (typed.includes("too-big")) return { ok: false, reason: "too-big" };
+
+  const reads = typed.filter((cell) => cell !== null).length;
+  if (reads === 0) return { ok: false, reason: "no-card" };
+  if (!allowReads(who.playerId, reads)) return { ok: false, reason: "limit" };
+
+  const pockets = await Promise.all(
+    typed.map(async (cell, slot): Promise<PocketOutcome> => {
+      if (cell === null || cell === "too-big") return { slot, state: "empty" };
+      const read = await readCard(cell.bytes, cell.mediaType, true);
+      if (!read) return { slot, state: "unread", read: null };
+      if (!read.found) return { slot, state: "empty" };
+      if (read.game === "other") return { slot, state: "unread", read };
+      const matches = await findScanned(read);
+      return matches.length > 0
+        ? { slot, state: "found", read, matches }
+        : { slot, state: "unread", read };
+    }),
+  );
+  /* Every read failing is the service, not the page. */
+  if (pockets.every((pocket) => pocket.state === "unread" && pocket.read === null)) {
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: true, pockets };
 }
 
 const readSchema = z.object({
@@ -170,6 +236,13 @@ const READ_PROMPT = [
   "Write an empty string for anything you cannot read clearly. Never guess a number.",
 ].join("\n");
 
+/* A pocket is cut from a photo of a whole page, a little larger than
+   its square, so the edges of the cards beside it show. */
+const POCKET_LEAD = [
+  "This photo is one pocket cut from a photo of a binder page, so the edges of the cards beside it may show.",
+  "Read only the card in the middle. found: false if the middle of the pocket is empty.",
+].join("\n");
+
 /** A client per scan: it is a plain object, and the key is read when used. */
 function anthropic(): Anthropic {
   return new Anthropic({
@@ -185,6 +258,7 @@ function anthropic(): Anthropic {
 async function readCard(
   bytes: Uint8Array,
   mediaType: "image/jpeg" | "image/png" | "image/webp",
+  pocket = false,
 ): Promise<ScanRead | null> {
   try {
     const response = await anthropic().messages.parse({
@@ -203,7 +277,10 @@ async function readCard(
                 data: Buffer.from(bytes).toString("base64"),
               },
             },
-            { type: "text", text: READ_PROMPT },
+            {
+              type: "text",
+              text: pocket ? `${POCKET_LEAD}\n${READ_PROMPT}` : READ_PROMPT,
+            },
           ],
         },
       ],
