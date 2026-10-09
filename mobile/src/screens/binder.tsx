@@ -5,6 +5,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   AppState,
   KeyboardAvoidingView,
@@ -693,9 +694,11 @@ export function BinderScreen({
           </View>
         ) : null}
 
-        {/* Scanned pages out to be read: "Reading 5 pages..." alone
-            while they are, "5 pages ready to check" with Check now once
-            they are. Above the pockets, where the pages will land. */}
+        {/* Scanned pages out to be read: "Finding the cards on 5 pages"
+            with the accent spinner on the right while they are, so it
+            never looks stuck, and "5 pages ready to check" with Check
+            now once they are. Above the pockets, where the pages will
+            land. */}
         {yours
           ? queues.map((queue) => (
               <View key={queue.batchId} style={bannerStyle}>
@@ -737,7 +740,9 @@ export function BinderScreen({
                       {CHECK_NOW}
                     </Text>
                   </Tap>
-                ) : null}
+                ) : (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                )}
               </View>
             ))
           : null}

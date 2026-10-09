@@ -213,24 +213,45 @@ export function PickCount({
   );
 }
 
+/**
+ * Lines, or one card. The Flare composer and the binder keep lines:
+ * tap to add, tap again for another copy. The scan check wants one card
+ * and nothing else. The founder: "when you click a card, it doesn't add
+ * a '1' to it, then counts up. it's just one card, so adding the card
+ * should close that screen." So `onPickOne` takes the card tapped (and
+ * the version, when a version was tapped) and the sheet closes; there
+ * are no lines, so no count, no minus and no tray. Everything else is
+ * the same sheet.
+ */
+type Picking =
+  | {
+      items: PickedLine[];
+      onChange: (items: PickedLine[]) => void;
+      onPickOne?: undefined;
+    }
+  | {
+      onPickOne: (hit: CardHit, printingId: string | null) => void;
+      items?: undefined;
+      onChange?: undefined;
+    };
+
 export function CardSelectSheet({
   visible,
   target,
-  items,
+  items: lines,
   onChange,
+  onPickOne,
   onClose,
   title = "Select cards",
   above,
   body,
   belowSearch,
   hitNote,
-  footer,
+  footer: given,
   searchFor = null,
-}: {
+}: Picking & {
   visible: boolean;
   target: PostTarget;
-  items: PickedLine[];
-  onChange: (items: PickedLine[]) => void;
   onClose: () => void;
   /** The heading; the Flare's "Select cards" unless told otherwise. */
   title?: string;
@@ -253,6 +274,10 @@ export function CardSelectSheet({
   const insets = useSafeAreaInsets();
   const search = useCardSearch(target);
   const { setQuery } = search;
+  /* One card: no lines, so no PickCount, and in place of the tray and
+     Done only the room the home indicator needs. */
+  const items: PickedLine[] = onPickOne ? [] : (lines ?? []);
+  const footer = onPickOne ? <View style={{ height: insets.bottom }} /> : given;
 
   useEffect(() => {
     if (searchFor) setQuery(searchFor.text);
@@ -264,6 +289,11 @@ export function CardSelectSheet({
    * have a way to click the alt arts from this screen."
    */
   const pick = (hit: CardHit, printingId: string | null = null) => {
+    if (onPickOne) {
+      onPickOne(hit, printingId);
+      onClose();
+      return;
+    }
     const art = printingId
       ? (hit.printings.find((printing) => printing.id === printingId)?.imageUrl ??
         leadArt(hit))
@@ -271,14 +301,14 @@ export function CardSelectSheet({
     const key = lineKey({ cardId: hit.id, printingId });
     const index = items.findIndex((item) => lineKey(item) === key);
     if (index >= 0) {
-      onChange(
+      onChange?.(
         items.map((item, at) =>
           at === index ? { ...item, quantity: Math.min(99, item.quantity + 1) } : item,
         ),
       );
       return;
     }
-    onChange([
+    onChange?.([
       ...items,
       {
         cardId: hit.id,
@@ -296,7 +326,7 @@ export function CardSelectSheet({
      your quantity of cards." */
   const unpick = (hit: CardHit, printingId: string | null = null) => {
     const key = lineKey({ cardId: hit.id, printingId });
-    onChange(
+    onChange?.(
       items.flatMap((item) => {
         if (lineKey(item) !== key) return [item];
         return item.quantity > 1 ? [{ ...item, quantity: item.quantity - 1 }] : [];
@@ -366,8 +396,9 @@ export function CardSelectSheet({
               ) : null}
               {search.query.trim().length < 2 && items.length === 0 ? (
                 <Muted>
-                  Search by name or number. Tap a card to add it; tap again for another
-                  copy.
+                  {onPickOne
+                    ? "Search by name or number. Tap a card to add it."
+                    : "Search by name or number. Tap a card to add it; tap again for another copy."}
                 </Muted>
               ) : null}
               {search.hits.map((hit) => {

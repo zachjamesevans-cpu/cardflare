@@ -132,11 +132,11 @@ import { cn } from "@/lib/cn";
  * PAGES READ IN THE BACKGROUND. Whole binder pages scanned from Add
  * cards are read on the server while the player does something else.
  * Over the pockets, one banner per queue still out (`QueueBanners`):
- * "Reading 5 pages..." while the reader works, then "5 pages ready to
- * check" and Check now, which opens the check (`QueueCheck`). The
- * notice opens the same check by its link, `?scan=<batchId>`
- * (`openScan`). A page that did not read is retaken from the check,
- * in the scanner, for that page of that queue.
+ * "Finding the cards on 5 pages" and a spinner while the reader works,
+ * then "5 pages ready to check" and Check now, which opens the check
+ * (`QueueCheck`). The notice opens the same check by its link,
+ * `?scan=<batchId>` (`openScan`). A page that did not read is
+ * retaken from the check, in the scanner, for that page of that queue.
  *
  * The page's settings and order are held here as live values so a
  * change paints at once; the server's copy arrives behind it with the

@@ -215,10 +215,15 @@ export const QUEUE_FULL =
   "That's 10 pages in one go. Check these first, then scan more.";
 export const DONE_SCANNING = "Done";
 
-/** The binder's line while a queue is out: "Reading 5 pages..." / "5 pages ready to check". */
+/**
+ * The binder's line while a queue is out, beside a spinner until it is
+ * ready: "Finding the cards on 5 pages" / "5 pages ready to check".
+ */
 export function pagesWaitingLine(pages: number, ready: boolean): string {
   const noun = pages === 1 ? "page" : "pages";
-  return ready ? `${pages} ${noun} ready to check` : `Reading ${pages} ${noun}...`;
+  return ready
+    ? `${pages} ${noun} ready to check`
+    : `Finding the cards on ${pages} ${noun}`;
 }
 
 /** "18 of 20 pages left today", under the shutter. */
@@ -252,6 +257,8 @@ export const NOT_THIS_CARD = "Not this card";
 export const OTHER_PRINTING = "Other printing";
 export const YOUR_PHOTO = "Your photo";
 export const OUR_MATCH = "Our match";
+/** Over the cards a pocket might be, when the reader knew it but could not place it. */
+export const MIGHT_BE_THESE = "Might be one of these";
 
 /** "7 of 10 free scans left today". */
 export function freeScansLeftLine(left: number): string {

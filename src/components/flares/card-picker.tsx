@@ -22,6 +22,10 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  * number and its copies, and tapping it again is one more copy rather
  * than a second row. The search stays as it was between taps, so
  * somebody adding three Zoros does not type "zoro" three times.
+ *
+ * The scan check picks with this same component, for one pocket, by
+ * passing `onPickOne` instead of the draft: one tap is the card, and
+ * the host closes the picker (`PickOne`, below).
  */
 /**
  * How many copies are in, and nothing else. The founder: "Should now
@@ -35,28 +39,65 @@ function markCount(quantity: number): number {
   return quantity;
 }
 
-export function CardPicker({
-  imagesEnabled,
-  playerGames,
-  game = null,
-  cards,
-  onAdd,
-  onRemove,
-  onLess,
-  onDone,
-}: {
+/** What both ways of picking share. */
+type PickerBase = {
   imagesEnabled: boolean;
   playerGames: readonly string[];
   /** The room's game from a tournament QR, which narrows the search. */
   game?: string | null;
+  onDone: () => void;
+};
+
+/** Several cards, each with its copies: the Flare composer. */
+type PickMany = PickerBase & {
   cards: DraftCard[];
   onAdd: (card: CardResult, printing?: CardPrinting) => void;
   /** Both take a line key (`keyOf`): one card in one printing. */
   onRemove: (key: string) => void;
   /** One fewer copy; gone at none. The minus beside the badge. */
   onLess: (key: string) => void;
-  onDone: () => void;
-}) {
+  onPickOne?: never;
+  title?: never;
+};
+
+/**
+ * One card and no more: the scan check's pocket. The founder: "when
+ * you click a card, it doesn't add a '1' to it, then counts up. it's
+ * just one card, so adding the card should close that screen." A tap
+ * chooses it; there is no tray, no badge and no counting, and the host
+ * closes the picker.
+ */
+type PickOne = PickerBase & {
+  onPickOne: (card: CardResult, printing?: CardPrinting) => void;
+  /** The heading, in the host's own words. */
+  title: string;
+  /**
+   * What the field starts with: the name the card scanner read off a
+   * pocket, so the player does not type it again. Read once, on mount.
+   */
+  initialQuery?: string;
+  cards?: never;
+  onAdd?: never;
+  onRemove?: never;
+  onLess?: never;
+};
+
+export function CardPicker(props: PickMany | PickOne) {
+  const { imagesEnabled, playerGames, game = null, onDone } = props;
+  if (props.onPickOne) {
+    return (
+      <PickOneCard
+        imagesEnabled={imagesEnabled}
+        playerGames={playerGames}
+        game={game}
+        initialQuery={props.initialQuery ?? ""}
+        title={props.title}
+        onPickOne={props.onPickOne}
+        onDone={onDone}
+      />
+    );
+  }
+  const { cards, onAdd, onRemove, onLess } = props;
   return (
     <div className="flex flex-col gap-4">
       {/*
@@ -163,6 +204,59 @@ export function CardPicker({
             return line ? markCount(line.quantity) : null;
           };
         }}
+      />
+    </div>
+  );
+}
+
+/**
+ * The same picker for one card: the same header, the way out left of
+ * the title, and the same search, without the tray or the counting.
+ * Nothing is ever picked here for long, so the way out is always Back.
+ */
+function PickOneCard({
+  imagesEnabled,
+  playerGames,
+  game,
+  initialQuery,
+  title,
+  onPickOne,
+  onDone,
+}: {
+  imagesEnabled: boolean;
+  playerGames: readonly string[];
+  game: string | null;
+  initialQuery: string;
+  title: string;
+  onPickOne: (card: CardResult, printing?: CardPrinting) => void;
+  onDone: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-3 pr-8">
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          onClick={onDone}
+          className="shrink-0"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+          Back
+        </Button>
+        <div className="flex min-w-0 flex-col">
+          <h2 className="font-semibold text-text-primary">{title}</h2>
+        </div>
+      </div>
+
+      {/* No markFor and no onUnpick: one tap is the card, never a count. */}
+      <CardSearch
+        imagesEnabled={imagesEnabled}
+        playerGames={playerGames}
+        game={game}
+        autoFocus
+        initialQuery={initialQuery}
+        onSelect={onPickOne}
       />
     </div>
   );

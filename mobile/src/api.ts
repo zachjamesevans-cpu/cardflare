@@ -2760,7 +2760,17 @@ export type PocketOutcome =
       /** How it decided, in a few words, for the check. */
       note?: string;
     }
-  | { slot: number; state: "unread"; read: ScanRead | null; note?: string };
+  | {
+      slot: number;
+      state: "unread";
+      read: ScanRead | null;
+      note?: string;
+      /**
+       * What it might be: the catalogue's closest cards to what the
+       * reader saw (name, colour, power), for "Might be one of these".
+       */
+      suggestions?: ScanMatch[];
+    };
 
 const SCAN_PATH = "/api/v1/cards/scan";
 

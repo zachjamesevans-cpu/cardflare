@@ -134,6 +134,58 @@ export function rankScan<T extends { canonicalCardNumber: string }>(
 }
 
 /**
+ * What the reader saw besides the words: the frame's colours, the power
+ * and cost printed on it, and the card type. The founder's purple
+ * alternate-art Zoro: the number was unreadable at an angle, the name
+ * alone is dozens of Zoros, and these narrow them to the one.
+ */
+export interface ScanTraits {
+  colors: string[];
+  power: number | null;
+  cost: number | null;
+  cardType: string;
+}
+
+type Traited = {
+  colors: string[];
+  power: number | null;
+  cost: number | null;
+  cardType: string | null;
+};
+
+/**
+ * Candidates narrowed by what the reader saw, one trait at a time. Each
+ * is a soft filter: one that would rule out every candidate is skipped,
+ * because the reader can misjudge a colour in bad light, and a wrong
+ * trait must never hide the card the name found.
+ */
+export function narrowByTraits<T extends Traited>(
+  candidates: T[],
+  traits: ScanTraits,
+): T[] {
+  const lower = (value: string) => value.trim().toLowerCase();
+  const colors = traits.colors.map(lower).filter(Boolean);
+  const type = lower(traits.cardType);
+  const filters: ((card: T) => boolean)[] = [];
+  if (colors.length > 0) {
+    filters.push((card) => {
+      const own = card.colors.map(lower);
+      return colors.every((color) => own.includes(color));
+    });
+  }
+  if (type) filters.push((card) => lower(card.cardType ?? "") === type);
+  if (traits.power !== null) filters.push((card) => card.power === traits.power);
+  if (traits.cost !== null) filters.push((card) => card.cost === traits.cost);
+
+  let left = candidates;
+  for (const keep of filters) {
+    const narrowed = left.filter(keep);
+    if (narrowed.length > 0) left = narrowed;
+  }
+  return left;
+}
+
+/**
  * The printing to suggest: the one whose set code is the code printed
  * on the card, else none, and the player picks. A guess at a printing
  * that turns out wrong is worse than asking.
@@ -350,10 +402,15 @@ export const QUEUE_FULL =
   "That's 10 pages in one go. Check these first, then scan more.";
 export const DONE_SCANNING = "Done";
 
-/** The binder's line while a queue is out: "Reading 5 pages..." / "5 pages ready to check". */
+/**
+ * The binder's line while a queue is out, beside a spinner until it is
+ * ready: "Finding the cards on 5 pages" / "5 pages ready to check".
+ */
 export function pagesWaitingLine(pages: number, ready: boolean): string {
   const noun = pages === 1 ? "page" : "pages";
-  return ready ? `${pages} ${noun} ready to check` : `Reading ${pages} ${noun}...`;
+  return ready
+    ? `${pages} ${noun} ready to check`
+    : `Finding the cards on ${pages} ${noun}`;
 }
 
 /** "18 of 20 pages left today", under the shutter. */
@@ -387,6 +444,8 @@ export const NOT_THIS_CARD = "Not this card";
 export const OTHER_PRINTING = "Other printing";
 export const YOUR_PHOTO = "Your photo";
 export const OUR_MATCH = "Our match";
+/** Over the cards a pocket might be, when the reader knew it but could not place it. */
+export const MIGHT_BE_THESE = "Might be one of these";
 
 /** "7 of 10 free scans left today". */
 export function freeScansLeftLine(left: number): string {

@@ -8,6 +8,7 @@ import { normalizeName } from "@/lib/cards/domain";
 import {
   type ScanRead,
   type ScanRefusal,
+  type ScanTraits,
   FREE_SCANS_PER_DAY,
   SCAN_GAMES,
   SCAN_MATCHES,
@@ -15,6 +16,7 @@ import {
   POCKETS_PER_PAGE,
   collectorValue,
   compactCode,
+  narrowByTraits,
   photoType,
   rankScan,
   scanScore,
@@ -225,9 +227,11 @@ export async function scanCard(
 }
 
 /**
- * The careful reader on one card the quick reader was unsure of: its
- * pick first, then what else it weighed, then the quick reader's
- * guesses. Null when it found nothing either, or could not run.
+ * The page reader's look at one card the quick reader was unsure of:
+ * the stronger model describes it, the catalogue narrows by what it saw,
+ * and the cheap tiebreak compares pictures when that leaves a few. Its
+ * pick first, then the quick reader's guesses. Null when it found
+ * nothing either, or could not run.
  */
 async function secondLook(
   playerId: string,
@@ -236,12 +240,12 @@ async function secondLook(
   quick: ScanMatch[],
 ): Promise<Extract<ScanOutcome, { ok: true }> | null> {
   if (!allowReads(playerId, 1)) return null;
-  /* Loaded when needed: the agent imports this module back. */
-  const [{ readWithAgent }, { listPlayerGames }] = await Promise.all([
-    import("@/lib/cards/page-agent"),
+  /* Loaded when needed: the reader imports this module back. */
+  const [{ readCards }, { listPlayerGames }] = await Promise.all([
+    import("@/lib/cards/page-reader"),
     import("@/lib/players/games"),
   ]);
-  const outcome = await readWithAgent({
+  const outcome = await readCards({
     mode: "card",
     page: null,
     pockets: [photo],
@@ -249,27 +253,26 @@ async function secondLook(
   });
   if (!outcome.ok) return null;
   const pocket = outcome.pockets[0];
-  const chosen = pocket?.cardId ? outcome.cards.get(pocket.cardId) : undefined;
-  if (!pocket || !chosen) return null;
+  if (!pocket || pocket.state === "empty") return null;
+  const careful =
+    pocket.state === "found" ? pocket.matches : (pocket.suggestions ?? []);
+  if (careful.length === 0) return null;
 
-  const matches: ScanMatch[] = [{ card: chosen, printingId: pocket.printingId }];
-  for (const id of pocket.alternatives) {
-    const card = outcome.cards.get(id);
-    if (card) matches.push({ card, printingId: null });
-  }
+  const matches = [...careful];
   for (const match of quick) {
     if (!matches.some((each) => each.card.id === match.card.id)) matches.push(match);
   }
+  const seen = pocket.read;
   return {
     ok: true,
     read: {
       ...read,
-      name: read.name || pocket.readName,
-      englishName: read.englishName || pocket.readName,
-      number: read.number || pocket.readNumber,
+      name: read.name || seen?.name || "",
+      englishName: read.englishName || seen?.englishName || "",
+      number: read.number || seen?.number || "",
     },
     matches: matches.slice(0, SCAN_MATCHES),
-    sure: pocket.sure,
+    sure: pocket.state === "found" ? pocket.sure : false,
     note: pocket.note,
   };
 }
@@ -290,7 +293,17 @@ export type PocketOutcome =
       /** How it decided, in a few words, for the check. */
       note?: string;
     }
-  | { slot: number; state: "unread"; read: ScanRead | null; note?: string };
+  | {
+      slot: number;
+      state: "unread";
+      read: ScanRead | null;
+      note?: string;
+      /**
+       * What it might be: the catalogue's closest cards to what the
+       * reader saw (name, colour, power), for "Might be one of these".
+       */
+      suggestions?: ScanMatch[];
+    };
 
 export type PageOutcome =
   { ok: true; pockets: PocketOutcome[] } | { ok: false; reason: ScanRefusal };
@@ -445,16 +458,52 @@ async function readCard(
 /** Cards a name can be, at most this many, before the number narrows them. */
 const NAME_CANDIDATES = 500;
 
+/** The columns a candidate needs: its number, and the traits a read narrows by. */
+const CANDIDATE_COLUMNS = "id, canonical_card_number, colors, power, cost, card_type";
+
+type CandidateRow = {
+  id: string;
+  canonical_card_number: string;
+  colors: string[] | null;
+  power: number | null;
+  cost: number | null;
+  card_type: string | null;
+};
+
+type Candidate = {
+  id: string;
+  canonicalCardNumber: string;
+  colors: string[];
+  power: number | null;
+  cost: number | null;
+  cardType: string | null;
+};
+
+const candidate = (row: CandidateRow): Candidate => ({
+  id: row.id,
+  canonicalCardNumber: row.canonical_card_number,
+  colors: row.colors ?? [],
+  power: row.power,
+  cost: row.cost,
+  cardType: row.card_type,
+});
+
 /**
  * The catalogue's answer to a read: cards with the name read (in English
  * when the card was not), best number and set match first. When the
  * name finds nothing, the ranked search tries, and then the number on
  * its own for the games that print the set into it.
+ *
+ * `traits` (what the reader saw: colours, power, cost, type) narrow a
+ * name with many cards before the top few are taken, unless the number
+ * already names one. Without them a character with dozens of cards could
+ * leave the right one outside the few returned.
  */
 export async function findScanned(
   read: ScanRead,
-  /* The careful reader asks for more: a character with many printings. */
+  /* The page reader asks for more: a character with many printings. */
   limit = SCAN_MATCHES,
+  traits?: ScanTraits,
 ): Promise<ScanMatch[]> {
   if (read.game === "other") return [];
   const admin = getSupabaseAdmin();
@@ -464,20 +513,17 @@ export async function findScanned(
     ),
   ];
 
-  let candidates: { id: string; canonicalCardNumber: string }[] = [];
+  let candidates: Candidate[] = [];
 
   if (names.length > 0) {
     const { data, error } = await admin
       .from("cards")
-      .select("id, canonical_card_number")
+      .select(CANDIDATE_COLUMNS)
       .eq("game", read.game)
       .in("normalized_name", names)
       .limit(NAME_CANDIDATES);
     if (error) console.error("Card scan lookup failed", error);
-    candidates = (data ?? []).map((row) => ({
-      id: row.id,
-      canonicalCardNumber: row.canonical_card_number,
-    }));
+    candidates = ((data ?? []) as CandidateRow[]).map(candidate);
   }
 
   if (candidates.length === 0 && names.length > 0) {
@@ -485,6 +531,10 @@ export async function findScanned(
     candidates = found.map((card) => ({
       id: card.id,
       canonicalCardNumber: card.canonicalCardNumber,
+      colors: card.colors ?? [],
+      power: card.power ?? null,
+      cost: card.cost ?? null,
+      cardType: card.cardType ?? null,
     }));
   }
 
@@ -501,24 +551,73 @@ export async function findScanned(
     ].filter(Boolean);
     const { data } = await admin
       .from("cards")
-      .select("id, canonical_card_number")
+      .select(CANDIDATE_COLUMNS)
       .eq("game", read.game)
       .in("compact_card_number", compact)
       .limit(limit);
     const have = new Set(candidates.map((card) => card.id));
-    for (const row of data ?? []) {
-      if (!have.has(row.id)) {
-        candidates.push({ id: row.id, canonicalCardNumber: row.canonical_card_number });
-      }
+    for (const row of (data ?? []) as CandidateRow[]) {
+      if (!have.has(row.id)) candidates.push(candidate(row));
     }
   }
 
   if (candidates.length === 0) return [];
 
-  const best = rankScan(read, candidates, limit);
-  const cards = await cardResultsByIds(best.map((card) => card.id));
-  return cards.map((card) => ({
-    card,
-    printingId: suggestedPrinting(read.setCode, card.printings),
-  }));
+  /* A number read right outranks anything the eye judged. */
+  const numbered = candidates.some(
+    (card) => scanScore(read, card.canonicalCardNumber) >= 2,
+  );
+  const narrowed =
+    traits && !numbered ? narrowByTraits(candidates, traits) : candidates;
+  const best = rankScan(read, narrowed, limit);
+  return matchesFor(
+    best.map((card) => card.id),
+    read.setCode,
+  );
+}
+
+/** Cards by id, in that order, each with the printing its set code names. */
+async function matchesFor(ids: string[], setCode: string): Promise<ScanMatch[]> {
+  if (ids.length === 0) return [];
+  const cards = await cardResultsByIds(ids);
+  const order = new Map(ids.map((id, index) => [id, index]));
+  return [...cards]
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0))
+    .map((card) => ({
+      card,
+      printingId: suggestedPrinting(setCode, card.printings),
+    }));
+}
+
+/**
+ * When the name finds nothing at all (a misread name, a nickname): the
+ * game's cards with the power and cost the reader saw, narrowed by colour
+ * and type, for "Might be one of these". Needs a power or a cost, or it
+ * would be half the game.
+ */
+export async function suggestByTraits(
+  game: ScanRead["game"],
+  traits: ScanTraits,
+  limit = 4,
+): Promise<ScanMatch[]> {
+  if (game === "other" || (traits.power === null && traits.cost === null)) return [];
+  let query = getSupabaseAdmin()
+    .from("cards")
+    .select(CANDIDATE_COLUMNS)
+    .eq("game", game);
+  if (traits.power !== null) query = query.eq("power", traits.power);
+  if (traits.cost !== null) query = query.eq("cost", traits.cost);
+  const { data, error } = await query.limit(NAME_CANDIDATES);
+  if (error) {
+    console.error("Card scan trait lookup failed", error);
+    return [];
+  }
+  const rows = ((data ?? []) as CandidateRow[]).map(candidate);
+  const narrowed = narrowByTraits(rows, traits);
+  /* Only worth showing when the traits got it down to a handful. */
+  if (narrowed.length === 0 || narrowed.length > limit * 3) return [];
+  return matchesFor(
+    narrowed.slice(0, limit).map((card) => card.id),
+    "",
+  );
 }

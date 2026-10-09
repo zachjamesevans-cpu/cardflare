@@ -267,13 +267,14 @@ describe("the pages are checked from the server before anything is placed", () =
     expect(viewer).toMatch(/onClick=\{onLeaveEmpty\}>\s*\{LEAVE_EMPTY\}/);
   });
 
-  it("checks a pocket in the card viewer, with the single scan's parts and the site's search", () => {
+  it("checks a pocket in the card viewer, with the single scan's parts and the Flare picker", () => {
     expect(check).toContain("<CardViewer");
     expect(viewer).toContain("<ScannedCard");
     expect(viewer).toContain("<PrintingChips");
     expect(viewer).toContain("<OtherMatch");
-    expect(viewer).toContain("{OTHER_MATCHES}");
-    expect(viewer).toContain("<CardSearch");
+    expect(viewer).toContain("word={OTHER_MATCHES}");
+    expect(viewer).toContain("<CardPicker");
+    expect(viewer).not.toContain("<CardSearch");
     expect(viewer).toContain("{FIND_THE_CARD}");
     /* The search opens with the read name, in English first. */
     expect(check).toContain('lookFor: read ? read.englishName || read.name : "",');
