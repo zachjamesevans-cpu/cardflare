@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Camera, ScanLine } from "lucide-react";
+import { Camera, CircleHelp, ScanLine } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -11,6 +11,7 @@ import { scanCardAction } from "@/lib/cards/scan-actions";
 import {
   ADD_TO_BINDER,
   IS_THIS_IT,
+  NOT_SURE,
   OTHER_MATCHES,
   READING_CARD,
   SCAN_AGAIN,
@@ -75,6 +76,10 @@ type Step =
       printingId: string | null;
       /** In the tray; a new printing or guess is a new add. */
       added: boolean;
+      /** The careful reader's second look: false when it was unsure. */
+      sure?: boolean;
+      /** How it decided, in a few words. */
+      note?: string;
     }
   | { kind: "refused"; reason: ScanRefusal };
 
@@ -91,7 +96,7 @@ export function scanSize(
 }
 
 /** JPEG qualities to try, best first, until the photo fits SCAN_MAX_BYTES. */
-const QUALITIES = [0.85, 0.7, 0.55] as const;
+export const QUALITIES = [0.85, 0.7, 0.55] as const;
 
 /**
  * The photo, upright and shrunk, as a JPEG under SCAN_MAX_BYTES; null
@@ -192,6 +197,8 @@ export function ScanCard({
       at: 0,
       printingId: top.printingId,
       added: false,
+      sure: outcome.sure,
+      note: outcome.note,
     });
   };
 
@@ -302,8 +309,19 @@ function Found({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* What the model read, small, so a misread is plain to see. */}
+      {/* What the model read, small, so a misread is plain to see; and,
+          after the careful reader's second look, whether it was sure. */}
       {line && <p className="text-xs text-text-muted">{line}</p>}
+      {step.sure === false && (
+        <p className="flex items-start gap-1.5 text-sm text-text-secondary">
+          <CircleHelp
+            className="mt-0.5 size-4 shrink-0 text-warning"
+            aria-hidden="true"
+          />
+          {NOT_SURE}
+        </p>
+      )}
+      {step.note && <p className="text-xs text-text-muted">{step.note}</p>}
 
       <h3 className="text-base font-semibold text-text-primary">{IS_THIS_IT}</h3>
 

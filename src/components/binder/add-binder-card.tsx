@@ -38,9 +38,11 @@ import { cn } from "@/lib/cn";
  * the same one button. Whether it is drawn is the server's answer,
  * `scanAccess`, read with the page: the scanner, the door to Pro, or
  * nothing, never a button that appears and then goes. Its switch has a
- * second way to scan, "Whole pages": photos of real binder pages, read
- * in a queue, checked as grids, and placed pocket for pocket by their
- * own action (`PageScan`), never through the tray.
+ * second way to scan, "Whole pages": photos of real binder pages, sent
+ * to be read in the background (`PageScan`), then checked as grids and
+ * placed pocket for pocket from the binder's banner or the notice,
+ * never through the tray. A page that did not read is retaken here: the
+ * sheet opens on Whole pages for that page of that queue (`retake`).
  *
  * Opened from an empty pocket, the batch starts AT that pocket: "Adding
  * a card in a specific slot should put that exact card there." The
@@ -69,6 +71,8 @@ export function AddBinderCard({
   onAdded,
   trigger = false,
   scanAccess = null,
+  pagesLeft,
+  retake = null,
 }: {
   /** The binder the cards land in. */
   binderId: string;
@@ -87,6 +91,10 @@ export function AddBinderCard({
   trigger?: boolean;
   /** "on" draws the scanner, "pro-door" the way to Pro, null nothing. */
   scanAccess?: "on" | "pro-door" | null;
+  /** Pages the player may still send today: null has no limit, undefined is not known yet. */
+  pagesLeft?: number | null;
+  /** Opened to shoot one page of a queue again: straight to Whole pages. */
+  retake?: { batchId: string; page: number } | null;
 }) {
   const router = useRouter();
   const [tab, setTab] = useState<"search" | "paste" | "scan">("search");
@@ -100,13 +108,17 @@ export function AddBinderCard({
   const [preview, setPreview] = useState<ListPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  /* A fresh sheet each time it opens: an empty tray, the search first. */
+  /* Each opening's own page queue: a new one every time the sheet opens. */
+  const [session, setSession] = useState(0);
+  /* A fresh sheet each time it opens: an empty tray, the search first,
+     or Whole pages for a retake. */
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
     if (open) {
-      setTab("search");
-      setScanMode("one");
+      setSession((count) => count + 1);
+      setTab(retake ? "scan" : "search");
+      setScanMode(retake ? "pages" : "one");
       setPicks([]);
       setFocus(null);
       setLookFor("");
@@ -353,18 +365,15 @@ export function AddBinderCard({
                   />
                 </>
               ) : (
-                /* Placed the way the tray's Add lands: the page says
-                   what happened, the sheet closes, the binder redraws. */
+                /* Sent, not placed: Done closes the sheet, and the
+                   binder's banner takes it from there. */
                 <PageScan
+                  key={session}
                   binderId={binderId}
-                  imagesEnabled={imagesEnabled}
-                  playerGames={playerGames}
                   pockets={filled}
-                  onPlaced={(message, firstPocket) => {
-                    onAdded?.(message, firstPocket);
-                    onOpenChange(false);
-                    router.refresh();
-                  }}
+                  left={pagesLeft}
+                  retake={retake}
+                  onDone={() => onOpenChange(false)}
                 />
               )}
             </div>

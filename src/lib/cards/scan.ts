@@ -14,6 +14,7 @@ import {
   POCKETS_PER_PAGE,
   compactCode,
   rankScan,
+  scanScore,
   suggestedPrinting,
 } from "@/lib/cards/scan-rules";
 import type { CardResult } from "@/lib/cards/schema";
@@ -48,7 +49,7 @@ export function scannerConfigured(): boolean {
  * refused before it left the server: a line break is not allowed in a
  * request header.
  */
-function scannerKey(): string {
+export function scannerKey(): string {
   return (process.env.ANTHROPIC_API_KEY ?? "").replace(/\s+/g, "");
 }
 
@@ -100,7 +101,14 @@ export interface ScanMatch {
 }
 
 export type ScanOutcome =
-  | { ok: true; read: ScanRead; matches: ScanMatch[] }
+  | {
+      ok: true;
+      read: ScanRead;
+      matches: ScanMatch[];
+      /** Set when the careful reader took a second look. */
+      sure?: boolean;
+      note?: string;
+    }
   | { ok: false; reason: ScanRefusal; read?: ScanRead };
 
 /*
@@ -174,8 +182,67 @@ export async function scanCard(
   if (read.game === "other") return { ok: false, reason: "not-carried", read };
 
   const matches = await findScanned(read);
+  /* Sure when the number read names the top card. Anything less gets
+     the careful reader's second look, which costs a few cents and only
+     happens when the quick look could be wrong. */
+  const certain =
+    matches.length > 0 && scanScore(read, matches[0].card.canonicalCardNumber) >= 2;
+  if (!certain) {
+    const careful = await secondLook(who.playerId, { bytes, mediaType }, read, matches);
+    if (careful) return careful;
+  }
   if (matches.length === 0) return { ok: false, reason: "not-found", read };
   return { ok: true, read, matches };
+}
+
+/**
+ * The careful reader on one card the quick reader was unsure of: its
+ * pick first, then what else it weighed, then the quick reader's
+ * guesses. Null when it found nothing either, or could not run.
+ */
+async function secondLook(
+  playerId: string,
+  photo: { bytes: Uint8Array; mediaType: "image/jpeg" | "image/png" | "image/webp" },
+  read: ScanRead,
+  quick: ScanMatch[],
+): Promise<Extract<ScanOutcome, { ok: true }> | null> {
+  if (!allowReads(playerId, 1)) return null;
+  /* Loaded when needed: the agent imports this module back. */
+  const [{ readWithAgent }, { listPlayerGames }] = await Promise.all([
+    import("@/lib/cards/page-agent"),
+    import("@/lib/players/games"),
+  ]);
+  const outcome = await readWithAgent({
+    mode: "card",
+    page: null,
+    pockets: [photo],
+    games: await listPlayerGames(playerId),
+  });
+  if (!outcome.ok) return null;
+  const pocket = outcome.pockets[0];
+  const chosen = pocket?.cardId ? outcome.cards.get(pocket.cardId) : undefined;
+  if (!pocket || !chosen) return null;
+
+  const matches: ScanMatch[] = [{ card: chosen, printingId: pocket.printingId }];
+  for (const id of pocket.alternatives) {
+    const card = outcome.cards.get(id);
+    if (card) matches.push({ card, printingId: null });
+  }
+  for (const match of quick) {
+    if (!matches.some((each) => each.card.id === match.card.id)) matches.push(match);
+  }
+  return {
+    ok: true,
+    read: {
+      ...read,
+      name: read.name || pocket.readName,
+      englishName: read.englishName || pocket.readName,
+      number: read.number || pocket.readNumber,
+    },
+    matches: matches.slice(0, SCAN_MATCHES),
+    sure: pocket.sure,
+    note: pocket.note,
+  };
 }
 
 /**
@@ -184,8 +251,17 @@ export async function scanCard(
  */
 export type PocketOutcome =
   | { slot: number; state: "empty" }
-  | { slot: number; state: "found"; read: ScanRead; matches: ScanMatch[] }
-  | { slot: number; state: "unread"; read: ScanRead | null };
+  | {
+      slot: number;
+      state: "found";
+      read: ScanRead;
+      matches: ScanMatch[];
+      /** The careful reader's confidence; absent from a quick read. */
+      sure?: boolean;
+      /** How it decided, in a few words, for the check. */
+      note?: string;
+    }
+  | { slot: number; state: "unread"; read: ScanRead | null; note?: string };
 
 export type PageOutcome =
   { ok: true; pockets: PocketOutcome[] } | { ok: false; reason: ScanRefusal };

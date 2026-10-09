@@ -200,9 +200,12 @@ export type StackParams = {
    * on either profile and from the Binders list. `nightId` is a binder
    * opened from a night's "Binders they're bringing": the website's
    * ?night=, the one door a private binder shown to that night opens
-   * through.
+   * through. `scan` is a queue of scanned pages from a "pages ready"
+   * notice, the website's ?scan=: its check opens over the binder.
    */
-  Binder: { playerId?: string; binderId: string; nightId?: string } | undefined;
+  Binder:
+    | { playerId?: string; binderId: string; nightId?: string; scan?: string }
+    | undefined;
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
@@ -1013,6 +1016,7 @@ function AppGates() {
                 playerId={route.params?.playerId}
                 binderId={route.params?.binderId}
                 nightId={route.params?.nightId}
+                scan={route.params?.scan}
               />
             )}
           </Stack.Screen>

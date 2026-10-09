@@ -6,6 +6,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -45,10 +46,12 @@ import {
   friendlyError,
   getBinder,
   getBroughtBinder,
+  getPageQueues,
   type OfferItem,
   offerOnBinder,
   type OfferOutcome,
   openDirectThread,
+  type PageQueue,
   placeBinderCard,
   removeBinderCard,
   saveBinder,
@@ -62,6 +65,7 @@ import { nightSharedLine } from "../night-binder-copy";
 import { binderShareUrl } from "../config";
 import { inYourOfferLine } from "../offer-copy";
 import { OfferReviewSheet } from "../offer-review-sheet";
+import { PageCheckSheet } from "../page-scanner";
 import { POCKETS_PER_PAGE, pageOf, pagesFor, placeInPockets } from "../pocket-math";
 import {
   AddPocket,
@@ -79,6 +83,7 @@ import {
   type Geometry,
 } from "../pockets";
 import { RemoteImage } from "../remote-image";
+import { CHECK_NOW, pagesWaitingLine } from "../scan-copy";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
   AsyncButton,
@@ -193,6 +198,18 @@ const EDGE_WIDTH = 28;
 /** The other cards making way, on the drop's clock. */
 const SLIDE = LinearTransition.duration(DROP.duration);
 
+/** A waiting queue's banner, above the pockets. */
+const bannerStyle = {
+  flexDirection: "row",
+  alignItems: "center",
+  gap: spacing(2.5),
+  padding: spacing(3),
+  borderRadius: radius.card,
+  borderWidth: 1,
+  borderColor: colors.border,
+  backgroundColor: colors.surface,
+} as const;
+
 /** Under the Up for trade switch, the create sheet's line word for word. */
 const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";
 
@@ -201,16 +218,22 @@ type Filter = "all" | "hunts";
 const clamp = (value: number, low: number, high: number) =>
   Math.max(low, Math.min(high, value));
 
+/** How often the banner asks again while pages are being read, the screen in front. */
+const QUEUE_POLL_MS = 15_000;
+
 export function BinderScreen({
   playerId,
   binderId,
   nightId,
+  scan,
 }: {
   playerId?: string;
   /** The binder's uuid. */
   binderId?: string;
   /** Opened from a night's "Binders they're bringing": read through that night. */
   nightId?: string;
+  /** Opened from a "pages ready" notice: the queue whose check opens. */
+  scan?: string;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const id = binderId || "";
@@ -237,6 +260,10 @@ export function BinderScreen({
   const [reviewing, setReviewing] = useState(false);
   /* What the last send answered: the conversation Open chat goes to. */
   const lastSent = useRef<{ threadId: string } | null>(null);
+  /* Scanned pages out to be read, each queue one banner; and the one
+     whose check is open. */
+  const [queues, setQueues] = useState<PageQueue[]>([]);
+  const [checking, setChecking] = useState<string | null>(null);
 
   /* Another binder in the same screen (a share link opened over this
      one) starts with an empty offer. */
@@ -294,6 +321,48 @@ export function BinderScreen({
   /* Writes go to the binder's own id once it is known: a share link
      may have opened it by its short code. */
   const writeId = binder?.id ?? id;
+
+  /*
+   * Scanned pages waiting on this binder, the owner's alone: read on
+   * focus, and every fifteen seconds while one is still being read and
+   * the screen is in front. A banner each, above the pockets.
+   */
+  const mine = binder?.yours ?? false;
+  const loadQueues = useCallback(async () => {
+    if (!mine || !writeId) return;
+    try {
+      const answer = await getPageQueues(writeId);
+      setQueues(answer.queues);
+    } catch {
+      /* The banner waits for the next look; the binder is still the binder. */
+    }
+  }, [mine, writeId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void loadQueues();
+    }, [loadQueues]),
+  );
+
+  const stillReading = queues.some((queue) => !queue.ready);
+  useFocusEffect(
+    useCallback(() => {
+      if (!stillReading) return;
+      const timer = setInterval(() => {
+        if (AppState.currentState === "active") void loadQueues();
+      }, QUEUE_POLL_MS);
+      return () => clearInterval(timer);
+    }, [stillReading, loadQueues]),
+  );
+
+  /* The notice's link, /profile/binders/<id>?scan=<batch>: the check
+     opens over the binder, once, and the link is spent so a later tap
+     on the same notice opens it again. */
+  useEffect(() => {
+    if (!scan || !mine) return;
+    setChecking(scan);
+    navigation.setParams({ scan: undefined });
+  }, [scan, mine, navigation]);
 
   /*
    * Every write: paint what came back at once, then re-read. The
@@ -624,6 +693,55 @@ export function BinderScreen({
           </View>
         ) : null}
 
+        {/* Scanned pages out to be read: "Reading 5 pages..." alone
+            while they are, "5 pages ready to check" with Check now once
+            they are. Above the pockets, where the pages will land. */}
+        {yours
+          ? queues.map((queue) => (
+              <View key={queue.batchId} style={bannerStyle}>
+                <Ionicons name="scan-outline" size={18} color={colors.accent} />
+                <Text
+                  accessibilityLiveRegion="polite"
+                  style={{
+                    flex: 1,
+                    color: colors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  {pagesWaitingLine(queue.pages, queue.ready)}
+                </Text>
+                {queue.ready ? (
+                  <Tap
+                    onPress={() => {
+                      setNotice(null);
+                      setChecking(queue.batchId);
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={CHECK_NOW}
+                    hitSlop={8}
+                    style={{
+                      paddingHorizontal: spacing(3),
+                      paddingVertical: spacing(1.5),
+                      borderRadius: 999,
+                      backgroundColor: colors.accent,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.accentContrast,
+                        fontSize: 13,
+                        fontWeight: "700",
+                      }}
+                    >
+                      {CHECK_NOW}
+                    </Text>
+                  </Tap>
+                ) : null}
+              </View>
+            ))
+          : null}
+
         {/* The page frame: as wide as the screen's content, measured,
             and the pages inside it exactly that wide. The hold-and-drag
             gesture is on the frame, not on a pocket, so a page turn or
@@ -782,7 +900,14 @@ export function BinderScreen({
           binderId={writeId}
           cards={allCards}
           pocket={addAt}
-          onClose={() => setAddAt(null)}
+          onClose={() => {
+            setAddAt(null);
+            void loadQueues();
+          }}
+          onPagesSent={() => {
+            setAddAt(null);
+            void loadQueues();
+          }}
           onAdded={(added) => {
             setAddAt(null);
             setFilter("all");
@@ -793,6 +918,28 @@ export function BinderScreen({
               turnTo(Math.floor(added.firstPocket / POCKETS_PER_PAGE));
             }
             void load();
+          }}
+        />
+      ) : null}
+
+      {/* The check of a queue of scanned pages, from its banner or its
+          notice. Placed: the server's sentence, the binder read again. */}
+      {yours ? (
+        <PageCheckSheet
+          batchId={checking}
+          binderId={writeId}
+          occupied={allCards.map((card) => card.pocket)}
+          onClose={() => {
+            setChecking(null);
+            void loadQueues();
+          }}
+          onPlaced={(message) => {
+            setChecking(null);
+            setFilter("all");
+            setWriteError(null);
+            setNotice(message);
+            void load();
+            void loadQueues();
           }}
         />
       ) : null}

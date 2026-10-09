@@ -382,7 +382,7 @@ describe("the binder page, by id", () => {
     expect(web.oldPlayerBinder).toContain("redirect(`/p/${playerId}?tab=binders`)");
     /* The app's Binder screen takes the id, always. */
     expect(app.stack).toMatch(
-      /Binder: \{ playerId\?: string; binderId: string; nightId\?: string \}/,
+      /Binder:\s+\|? ?\{ playerId\?: string; binderId: string; nightId\?: string; scan\?: string \}/,
     );
     expect(app.stack).toMatch(/name="Hunts"/);
     expect(app.stack).toContain("<HuntsScreen");

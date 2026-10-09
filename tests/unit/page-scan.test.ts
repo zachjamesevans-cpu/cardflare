@@ -288,8 +288,8 @@ describe("the doors", () => {
 
   it("sends a long queue from the app a few pages at a time, and adds the counts up", () => {
     const api = read("mobile/src/api.ts");
-    const place = api.slice(api.indexOf("export async function placeBinderPages("));
-    expect(place).toContain("placements.slice(start, start + per)");
+    const place = api.slice(api.indexOf("export async function placePageQueue("));
+    expect(place).toContain("for (const part of placementParts(placements)) {");
     expect(place).toContain("pagesPlacedLine(totals)");
     expect(read("src/app/api/v1/binders/[binderId]/cards/route.ts")).toContain(
       "occupied: result.occupied",

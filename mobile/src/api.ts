@@ -10,7 +10,8 @@ import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
-import { POCKETS_PER_PAGE, pagesPlacedLine, type ScanRefusal } from "./scan-copy";
+import { isSendRefusal, placementParts, type PageSendRefusal } from "./page-scan";
+import { pagesPlacedLine, type ScanRefusal } from "./scan-copy";
 import type { ScanCard } from "./scan-hit";
 
 /**
@@ -2508,61 +2509,6 @@ export const addBinderCards = (
     { items, pocket },
   );
 
-/** One card of a scanned page, into the exact pocket it sat in. */
-export interface BinderPlacement {
-  pocket: number;
-  cardId: string;
-  printingId: string | null;
-}
-
-/**
- * Scanned pages into a binder, checked by the player first: every card
- * into the pocket it sat in, a second copy counting up in its pocket, a
- * pocket already full left alone. The tray's route; the server tells the
- * two apart by `placements`. Answers as the tray does, the sentence
- * being the website's `pagesPlacedLine`.
- */
-/** Pages per request: a long queue in one payload header would near its size limit. */
-const PAGES_PER_PLACE = 3;
-
-/**
- * Scanned pages into a binder, each card in its exact pocket. Sent a few
- * pages at a time, in order: the payload rides in a header, and ten pages
- * of placements in one would be close to the size a server accepts for
- * all of its headers together. The counts are added up so the line says
- * what the whole queue did.
- */
-export async function placeBinderPages(
-  binderId: string,
-  placements: BinderPlacement[],
-): Promise<{ binder: Binder; message: string; firstPocket: number | null }> {
-  const per = PAGES_PER_PLACE * POCKETS_PER_PAGE;
-  const totals = { added: 0, merged: 0, occupied: 0, skipped: 0 };
-  let binder: Binder | null = null;
-  let firstPocket: number | null = null;
-  for (let start = 0; start < placements.length; start += per) {
-    const answer = await call<{
-      binder: Binder;
-      firstPocket: number | null;
-      counts: typeof totals;
-    }>("POST", `${binderPath(binderId)}/cards`, {
-      placements: placements.slice(start, start + per),
-    });
-    binder = answer.binder;
-    if (
-      answer.firstPocket !== null &&
-      (firstPocket === null || answer.firstPocket < firstPocket)
-    ) {
-      firstPocket = answer.firstPocket;
-    }
-    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
-      totals[key] += answer.counts?.[key] ?? 0;
-    }
-  }
-  if (!binder) throw new Error("Nothing to place.");
-  return { binder, message: pagesPlacedLine(totals), firstPocket };
-}
-
 /**
  * One card to one pocket, the drop at the end of a drag: an empty
  * pocket takes it, a full one slides the run along to the next gap
@@ -2780,7 +2726,14 @@ export interface ScanMatch {
 
 /** The website's ScanOutcome (src/lib/cards/scan.ts), as the route sends it. */
 export type ScanOutcome =
-  | { ok: true; read: ScanRead; matches: ScanMatch[] }
+  | {
+      ok: true;
+      read: ScanRead;
+      matches: ScanMatch[];
+      /** Set when the careful reader took a second look. */
+      sure?: boolean;
+      note?: string;
+    }
   | { ok: false; reason: ScanRefusal; read?: ScanRead };
 
 /** "on" scans, "pro-door" is the way to Pro, null draws nothing. */
@@ -2794,12 +2747,17 @@ export const getScanAccess = () =>
 /** One pocket of a scanned page: nothing there, a card and its guesses, or unread. */
 export type PocketOutcome =
   | { slot: number; state: "empty" }
-  | { slot: number; state: "found"; read: ScanRead; matches: ScanMatch[] }
-  | { slot: number; state: "unread"; read: ScanRead | null };
-
-/** The website's PageOutcome (src/lib/cards/scan.ts), as the route sends it. */
-export type PageOutcome =
-  { ok: true; pockets: PocketOutcome[] } | { ok: false; reason: ScanRefusal };
+  | {
+      slot: number;
+      state: "found";
+      read: ScanRead;
+      matches: ScanMatch[];
+      /** The careful reader's confidence; absent from a quick read. */
+      sure?: boolean;
+      /** How it decided, in a few words, for the check. */
+      note?: string;
+    }
+  | { slot: number; state: "unread"; read: ScanRead | null; note?: string };
 
 const SCAN_PATH = "/api/v1/cards/scan";
 
@@ -2851,38 +2809,168 @@ export async function scanCardPhoto(
   );
 }
 
-/**
- * One photo of a whole binder page, as its nine pockets (cut on the
- * phone, base64 JPEG each, null for one that could not be cut), read on
- * the server side by side. The same two roads as a card: in one body
- * ("read-page-direct"), else each pocket in pieces of its own and then
- * "read-page" naming the nine uploads.
- */
-export async function scanPagePhotos(cells: (string | null)[]): Promise<PageOutcome> {
-  const whole = await sendWhole<PageOutcome>(SCAN_PATH, {
-    action: "read-page-direct",
-    cells,
-  });
-  if (whole.sent) return whole.answer;
+/* ------------------------------------------------------------------ */
+/* Binder pages read in the background                                 */
+/* ------------------------------------------------------------------ */
 
-  const uploads: ({ uploadId: string; count: number } | null)[] = [];
-  for (const cell of cells) {
-    if (!cell) {
-      uploads.push(null);
-      continue;
-    }
-    const uploadId = await beginScanUpload();
-    if (!uploadId) return { ok: false, reason: "not-allowed" };
-    uploads.push({ uploadId, count: await sendPieces(SCAN_PATH, uploadId, cell) });
-  }
-  return call<PageOutcome>(
-    "POST",
-    SCAN_PATH,
-    { action: "read-page", cells: uploads },
-    false,
-    60_000,
-  );
+/*
+ * The founder (2026-10-09): "the full binder page scans should be fully
+ * agentic... Maybe it scans it, and then they'll get a notification once
+ * it's ready." A page is SENT (the whole photo and its nine pockets) and
+ * read on the server after the answer; the player closes the menu, the
+ * binder says when the pages are ready, and a notice does too. The
+ * website's src/lib/cards/page-jobs.ts, through /api/v1/scans/pages.
+ */
+
+const PAGES_PATH = "/api/v1/scans/pages";
+
+/** A queue waiting on a binder, for its banner. */
+export interface PageQueue {
+  batchId: string;
+  pages: number;
+  /** Every page read or failed: ready to check. */
+  ready: boolean;
 }
+
+/** One page of a queue as the check draws it: the website's QueuedPage. */
+export interface QueuedPage {
+  scanId: string;
+  /** The binder page it fills, 1-based. */
+  page: number;
+  status: "queued" | "reading" | "ready" | "failed";
+  /** "timeout" or "unavailable" on a failed page. */
+  error: string | null;
+  pockets: PocketOutcome[] | null;
+  /** Short-lived links to the player's own photos. */
+  photos: { page: string | null; pockets: (string | null)[] };
+}
+
+/** One card of a checked page, into the exact pocket it sat in. */
+export interface BinderPlacement {
+  pocket: number;
+  cardId: string;
+  printingId: string | null;
+}
+
+/** The queues waiting on a binder, and the pages left today (null: no limit). */
+export const getPageQueues = (binderId: string) =>
+  call<{ queues: PageQueue[]; left: number | null }>(
+    "GET",
+    `${PAGES_PATH}?binder=${encodeURIComponent(binderId)}`,
+  );
+
+/** One queue for its check, or null when it is gone: placed, thrown away, or not yours. */
+export async function getPageQueue(
+  batchId: string,
+): Promise<{ binderId: string; pages: QueuedPage[] } | null> {
+  try {
+    const { queue } = await call<{
+      queue: { binderId: string; pages: QueuedPage[] };
+    }>("GET", `${PAGES_PATH}?batch=${encodeURIComponent(batchId)}`);
+    return queue;
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status === 404) return null;
+    throw caught;
+  }
+}
+
+export type PageSent =
+  | { ok: true; scanId: string; left: number | null }
+  | { ok: false; reason: PageSendRefusal };
+
+/**
+ * One page into its queue, to be read on the server: the answer comes
+ * at once and says only that it arrived. In one body where the network
+ * allows it ("send-direct"), else each photo in pieces through the
+ * scanner's own upload and then "send" naming them. A refusal is an
+ * answer, `{ ok: false, reason }`, whichever road it came by.
+ */
+export async function sendScanPage(input: {
+  binderId: string;
+  batchId: string;
+  pageNumber: number;
+  /** The whole page, base64 JPEG. */
+  page: string;
+  /** The nine pockets, base64 JPEG, null for one that could not be cut. */
+  pockets: (string | null)[];
+}): Promise<PageSent> {
+  const where = {
+    binderId: input.binderId,
+    batchId: input.batchId,
+    pageNumber: input.pageNumber,
+  };
+  try {
+    const whole = await sendWhole<PageSent>(PAGES_PATH, {
+      action: "send-direct",
+      ...where,
+      page: input.page,
+      pockets: input.pockets,
+    });
+    if (whole.sent) return whole.answer;
+
+    const upload = async (photo: string) => {
+      const uploadId = await beginScanUpload();
+      if (!uploadId) return null;
+      return { uploadId, count: await sendPieces(SCAN_PATH, uploadId, photo) };
+    };
+    const page = await upload(input.page);
+    if (!page) return { ok: false, reason: "not-allowed" };
+    const pockets: ({ uploadId: string; count: number } | null)[] = [];
+    for (const cell of input.pockets) {
+      if (!cell) {
+        pockets.push(null);
+        continue;
+      }
+      const sent = await upload(cell);
+      if (!sent) return { ok: false, reason: "not-allowed" };
+      pockets.push(sent);
+    }
+    return await call<PageSent>(
+      "POST",
+      PAGES_PATH,
+      { action: "send", ...where, page, pockets },
+      false,
+      60_000,
+    );
+  } catch (caught) {
+    /* 403, 429, 503 and 400 carry the reason in words the screen knows. */
+    if (caught instanceof ApiError && caught.status > 0 && isSendRefusal(caught.code)) {
+      return { ok: false, reason: caught.code };
+    }
+    throw caught;
+  }
+}
+
+/**
+ * A checked queue into its binder, each card in its exact pocket: a
+ * second copy counting up, a pocket already full left alone. Sent three
+ * pages at a time, in order, `last` on the final part only (the server
+ * closes the queue on that one): the payload rides in a header, and ten
+ * pages of placements in one would be close to the size a server
+ * accepts for all of its headers together. The counts are added up so
+ * the line says what the whole queue did.
+ */
+export async function placePageQueue(
+  batchId: string,
+  placements: BinderPlacement[],
+): Promise<{ message: string }> {
+  const totals = { added: 0, merged: 0, occupied: 0, skipped: 0 };
+  for (const part of placementParts(placements)) {
+    const answer = await call<{ message: string; counts?: typeof totals }>(
+      "POST",
+      PAGES_PATH,
+      { action: "place", batchId, placements: part.placements, last: part.last },
+    );
+    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
+      totals[key] += answer.counts?.[key] ?? 0;
+    }
+  }
+  return { message: pagesPlacedLine(totals) };
+}
+
+/** A queue thrown away: nothing placed, and its photos gone from the server. */
+export const discardPageQueue = (batchId: string) =>
+  call<{ ok: boolean }>("POST", PAGES_PATH, { action: "discard", batchId });
 
 export const removeFromShowcase = (entryId: string) =>
   call<{ ok: true }>("POST", "/api/v1/profile", {

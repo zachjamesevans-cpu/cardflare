@@ -15,6 +15,7 @@ import { RemoteImage } from "./remote-image";
 import {
   ADD_TO_BINDER,
   IS_THIS_IT,
+  NOT_SURE,
   OTHER_MATCHES,
   READING_CARD,
   SCAN_AGAIN,
@@ -61,6 +62,9 @@ type Step =
       top: number;
       printingId: string | null;
       added: boolean;
+      /** The careful reader's second look: false when it was not sure. */
+      sure?: boolean;
+      note?: string;
     }
   | { kind: "refused"; reason: ScanRefusal };
 
@@ -153,6 +157,8 @@ export function CardScanner({
           top: 0,
           printingId: outcome.matches[0]?.printingId ?? null,
           added: false,
+          sure: outcome.sure,
+          note: outcome.note,
         });
         return;
       }
@@ -222,8 +228,16 @@ export function CardScanner({
         style={{ flex: 1 }}
         contentContainerStyle={{ gap: spacing(4), paddingBottom: spacing(4) }}
       >
-        {/* What was read, small, so a misread is plain to see. */}
-        {line ? <Text style={styles.small}>{line}</Text> : null}
+        {/* What was read, small, so a misread is plain to see; under
+            it, when the careful reader took a second look, whether it
+            was sure and how it decided. */}
+        {line || step.sure === false || step.note ? (
+          <View style={{ gap: spacing(1) }}>
+            {line ? <Text style={styles.small}>{line}</Text> : null}
+            {step.sure === false ? <Text style={styles.unsure}>{NOT_SURE}</Text> : null}
+            {step.note ? <Text style={styles.small}>{step.note}</Text> : null}
+          </View>
+        ) : null}
         <Text accessibilityRole="header" style={styles.heading}>
           {IS_THIS_IT}
         </Text>
@@ -495,5 +509,6 @@ const styles = StyleSheet.create({
   name: { color: colors.textPrimary, fontSize: 18, fontWeight: "600" },
   number: { color: colors.textMuted, fontSize: 14, fontVariant: ["tabular-nums"] },
   small: { color: colors.textMuted, fontSize: 12 },
+  unsure: { color: colors.warning, fontSize: 13, fontWeight: "600" },
   tiny: { color: colors.textMuted, fontSize: 10 },
 });

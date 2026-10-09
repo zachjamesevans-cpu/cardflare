@@ -4,10 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   canTakeAnother,
-  lastStartPage,
-  nextToRead,
+  nextToSend,
   pageCells,
-  pageCounts,
   pageFrame,
   pagePlacements,
   pagesWithCards,
@@ -25,6 +23,8 @@ import * as site from "@/lib/cards/scan-rules";
  * their binder", and the single scan kept "fast and quick". The app's
  * page scanner is the website's: the same words, the same steps, the
  * same cuts, and a faster upload with the old pieces as its fallback.
+ * Pages read in the background, and their check from the binder, are
+ * pinned in page-queue-app.test.ts.
  *
  * Read off the source where it has to be: the app has no renderer in
  * the test run. The upload rule runs for real, against a stubbed fetch.
@@ -104,7 +104,7 @@ describe("the words and the rules", () => {
       "{startingAtLine(start)}",
       "{PAGES_HINT}",
       "label={takePageLabel(nextNumber)}",
-      "label={CHECK_PAGES}",
+      "<Title>{CHECK_PAGES}</Title>",
       "{IS_THIS_IT}",
       "{OTHER_MATCHES}",
       "label={FIND_THE_CARD}",
@@ -115,10 +115,9 @@ describe("the words and the rules", () => {
       "{RETAKE}",
       "{REMOVE_PAGE}",
       "label={addPagesLabel(chosenPages)}",
-      "SCAN_REFUSALS[outcome.reason]",
+      "sendRefusalLine(result.reason)",
       "PAGE_FAILED",
       "READING_PAGE",
-      "pageStatusLine(number, found, cards)",
       "label={BACK_TO_PAGES}",
       "lessLabel={START_EARLIER}",
       "moreLabel={START_LATER}",
@@ -158,25 +157,30 @@ describe("the switch on the scan tab", () => {
     );
   });
 
-  it("puts nothing in the tray from pages, and ends as the tray's Add does", () => {
+  it("puts nothing in the tray from pages, and ends with the pages sent, not placed", () => {
     expect(src.pages).not.toContain("onAdd");
     expect(src.pages).not.toContain("addBinderCards");
-    expect(src.sheet).toContain("onPlaced={placed}");
-    const placed = src.sheet.slice(
-      src.sheet.indexOf("const placed ="),
+    expect(src.sheet).toContain("onDone={pagesSent}");
+    const sent = src.sheet.slice(
+      src.sheet.indexOf("const pagesSent ="),
       src.sheet.indexOf("const pages ="),
     );
-    expect(placed).toContain("reset();");
-    expect(placed).toContain("onAdded(result);");
+    expect(sent).toContain("reset();");
+    expect(sent).toContain("onPagesSent();");
+    expect(sent).not.toContain("onAdded");
     /* No tray and no tray button under the pages. */
     expect(src.sheet).toContain("const footer = pages ? (");
   });
 
   it("starts at the first empty page of this binder", () => {
     expect(src.sheet).toContain("occupied={cards.map((card) => card.pocket)}");
-    expect(src.pages).toContain("useState(() => firstEmptyPage(occupied))");
-    expect(src.pages).toContain("max={lastStartPage(queue.length)}");
+    expect(src.pages).toContain(
+      "useState(() => retake?.page ?? firstEmptyPage(occupied))",
+    );
+    expect(src.pages).toContain("max={BINDER_PAGES}");
     expect(src.pages).toContain("min={1}");
+    /* The first page moves only before anything is shot. */
+    expect(src.pages).toContain("{!retake && queue.length === 0 ? (");
   });
 });
 
@@ -219,7 +223,8 @@ describe("the photo of a page", () => {
   });
 
   it("sends each pocket shrunk to SCAN_LONG_EDGE, never enlarged, as JPEG at 0.6", () => {
-    expect(src.pages).toContain("[{ crop }, { resize: scanResize(crop) }]");
+    expect(src.pages).toContain("cutJpeg(uri, crop, scanResize(crop))");
+    expect(src.pages).toContain("[{ crop }, { resize }]");
     expect(src.pages).toContain("let quality = 0.6;");
     expect(src.pages).toContain("format: SaveFormat.JPEG,");
     expect(src.pages).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
@@ -227,46 +232,34 @@ describe("the photo of a page", () => {
     expect(scanResize({ width: 1500, height: 2100 })).toEqual({
       height: site.SCAN_LONG_EDGE,
     });
-    /* Each pocket's photo is kept for the check grid. */
-    expect(src.pages).toContain("photo={page.cells[pocket.slot]?.uri ?? null}");
+    /* The check grid shows the server's photos of each pocket. */
+    expect(src.pages).toContain("photo={page.photos.pockets[pocket.slot] ?? null}");
   });
 });
 
 describe("the queue", () => {
-  const page = (status: "waiting" | "reading" | "read" | "failed") => ({ status });
+  const page = (status: "waiting" | "sending" | "sent" | "refused") => ({ status });
 
-  it("reads one page at a time, in queue order", () => {
-    expect(nextToRead([])).toBe(-1);
-    expect(nextToRead([page("waiting"), page("waiting")])).toBe(0);
-    expect(nextToRead([page("read"), page("failed"), page("waiting")])).toBe(2);
-    expect(nextToRead([page("reading"), page("waiting")])).toBe(-1);
-    expect(nextToRead([page("waiting"), page("reading")])).toBe(-1);
+  it("sends one page at a time, in queue order", () => {
+    expect(nextToSend([])).toBe(-1);
+    expect(nextToSend([page("waiting"), page("waiting")])).toBe(0);
+    expect(nextToSend([page("sent"), page("refused"), page("waiting")])).toBe(2);
+    expect(nextToSend([page("sending"), page("waiting")])).toBe(-1);
+    expect(nextToSend([page("waiting"), page("sending")])).toBe(-1);
     /* And the screen holds one in flight whatever the queue does. */
-    const round = src.pages.slice(src.pages.indexOf("if (reading.current) return;"));
-    expect(round).toContain("const at = nextToRead(queue);");
-    expect(round).toContain("reading.current = page.id;");
-    expect(round).toContain("reading.current = null;");
+    const round = src.pages.slice(src.pages.indexOf("if (sending.current) return;"));
+    expect(round).toContain("const at = nextToSend(queue);");
+    expect(round).toContain("sending.current = page.id;");
+    expect(round).toContain("sending.current = null;");
     expect(src.pages).not.toContain("Promise.all(queue");
   });
 
   it("holds at most MAX_SCAN_PAGES, inside the binder's pages", () => {
     expect(canTakeAnother(1, 0)).toBe(true);
-    expect(canTakeAnother(1, site.MAX_SCAN_PAGES)).toBe(false);
+    expect(canTakeAnother(11, site.MAX_SCAN_PAGES)).toBe(false);
     expect(canTakeAnother(site.BINDER_PAGES, 0)).toBe(true);
-    expect(canTakeAnother(site.BINDER_PAGES, 1)).toBe(false);
-    expect(lastStartPage(0)).toBe(site.BINDER_PAGES);
-    expect(lastStartPage(3)).toBe(site.BINDER_PAGES - 2);
-  });
-
-  it("counts a read page as the website does", () => {
-    expect(
-      pageCounts([
-        { state: "found" },
-        { state: "found" },
-        { state: "unread" },
-        { state: "empty" },
-      ]),
-    ).toEqual({ found: 2, cards: 3 });
+    expect(canTakeAnother(site.BINDER_PAGES + 1, 1)).toBe(false);
+    expect(src.pages).toContain("canTakeAnother(nextNumber, queue.length)");
   });
 });
 
@@ -274,39 +267,39 @@ describe("checking and placing", () => {
   const a = { cardId: "a", printingId: "pa" };
   const b = { cardId: "b", printingId: null };
 
-  it("sends each chosen card to pocketAt(start + queue place, slot), and no empty one", () => {
+  it("sends each chosen card to pocketAt(the page's own number, slot), and no empty one", () => {
     const pages = [
-      [a, null, null, null, null, null, null, null, b],
-      [],
-      [null, a, null, null, null, null, null, null, null],
+      { page: 4, choices: [a, null, null, null, null, null, null, null, b] },
+      { page: 5, choices: [] },
+      /* Page 6 was removed: page 7 keeps its own number. */
+      { page: 7, choices: [null, a, null, null, null, null, null, null, null] },
     ];
-    expect(pagePlacements(4, pages)).toEqual([
+    expect(pagePlacements(pages)).toEqual([
       { pocket: site.pocketAt(4, 0), ...a },
       { pocket: site.pocketAt(4, 8), ...b },
-      { pocket: site.pocketAt(6, 1), ...a },
+      { pocket: site.pocketAt(7, 1), ...a },
     ]);
-    expect(pagesWithCards(pages)).toBe(2);
+    expect(pagesWithCards(pages.map((one) => one.choices))).toBe(2);
     expect(pagesWithCards([[null, null]])).toBe(0);
   });
 
-  it("checks the grid before anything is placed", () => {
-    const check = src.pages.indexOf('if (step === "check") {');
+  it("checks the grid before anything is placed, in the check, not the camera", () => {
+    const check = src.pages.indexOf("function PageCheck(");
     const shoot = src.pages.indexOf("label={takePageLabel(nextNumber)}");
     const add = src.pages.indexOf("label={addPagesLabel(chosenPages)}");
     expect(check).toBeGreaterThan(-1);
     expect(add).toBeGreaterThan(check);
-    expect(add).toBeLessThan(shoot);
-    expect(src.pages).toContain('onPress={() => setStep("check")}');
-    expect(src.pages.match(/placeBinderPages\(/g)).toHaveLength(1);
-    expect(src.pages).toContain("const placements = pagePlacements(start, choices);");
+    expect(shoot).toBeLessThan(check);
+    expect(src.pages.match(/placePageQueue\(/g)).toHaveLength(1);
+    expect(src.pages).toContain("const placements = pagePlacements(choices);");
   });
 
-  it("goes back to the camera from the check with the queue intact", () => {
+  it("goes back to the check from a retake with the queue as it was", () => {
     const back = src.pages.slice(src.pages.indexOf("label={BACK_TO_PAGES}"));
-    expect(back.slice(0, 200)).toContain('setStep("shoot");');
-    expect(back.slice(0, 200)).not.toContain("setQueue");
+    expect(back.slice(0, 200)).toContain("setRetaking(null)");
+    expect(back.slice(0, 200)).not.toContain("setPages");
     expect(src.pages.indexOf("label={BACK_TO_PAGES}")).toBeGreaterThan(
-      src.pages.indexOf('if (step === "check") {'),
+      src.pages.indexOf("function PageCheck("),
     );
   });
 
@@ -325,7 +318,7 @@ describe("checking and placing", () => {
   });
 
   it("leaves a pocket empty when asked, and it is not sent", () => {
-    expect(src.pages).toContain("choose(page.id, openSlot, null);");
+    expect(src.pages).toContain("choose(page.scanId, openSlot, null);");
     expect(src.pages).toContain(
       "pick ? { cardId: pick.hit.id, printingId: pick.printingId } : null,",
     );
@@ -333,6 +326,7 @@ describe("checking and placing", () => {
 
   it("marks a pocket already full in this binder", () => {
     expect(src.pages).toContain("taken={taken.has(pocketAt(number, pocket.slot))}");
+    expect(src.pages).toContain("const number = page.page;");
     expect(src.pages).toContain("const taken = new Set(occupied);");
   });
 
@@ -352,14 +346,16 @@ describe("checking and placing", () => {
     expect(src.scanner).toContain("export function CameraAllowed(");
   });
 
-  it("posts the placements to the tray's route", () => {
+  it("posts the placements to the queue's own route, which closes it", () => {
     const place = src.api.slice(
-      src.api.indexOf("export async function placeBinderPages("),
+      src.api.indexOf("export async function placePageQueue("),
     );
+    expect(flat(place.slice(0, 1200))).toContain('"POST", PAGES_PATH,');
     expect(flat(place.slice(0, 1200))).toContain(
-      '"POST", `${binderPath(binderId)}/cards`',
+      '{ action: "place", batchId, placements: part.placements, last: part.last },',
     );
-    expect(place).toContain("placements: placements.slice(start, start + per)");
+    expect(src.api).toContain('const PAGES_PATH = "/api/v1/scans/pages";');
+    expect(src.api).not.toContain("placeBinderPages");
   });
 });
 
@@ -376,7 +372,13 @@ type Sent = { path: string; action: string; inBody: boolean };
  */
 interface AppApi {
   scanCardPhoto: (base64: string) => Promise<unknown>;
-  scanPagePhotos: (cells: (string | null)[]) => Promise<unknown>;
+  sendScanPage: (input: {
+    binderId: string;
+    batchId: string;
+    pageNumber: number;
+    page: string;
+    pockets: (string | null)[];
+  }) => Promise<unknown>;
   uploadAvatar: (
     base64: string,
     onProgress?: undefined,
@@ -434,9 +436,19 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
         ? ok({ ok: true })
         : one.action === "read"
           ? ok({ ok: false, reason: "no-card" })
-          : one.action === "read-page"
-            ? ok({ ok: true, pockets: [] })
+          : one.action === "send"
+            ? ok({ ok: true, scanId: "s", left: 19 })
             : ok({ ok: true });
+
+  const BINDER = "00000000-0000-4000-8000-0000000000b1";
+  const BATCH = "00000000-0000-4000-8000-0000000000b2";
+  const pageOf = (pockets: (string | null)[]) => ({
+    binderId: BINDER,
+    batchId: BATCH,
+    pageNumber: 4,
+    page: "UEFHRQ",
+    pockets,
+  });
 
   it("probes once a session, then sends a card whole in its body", async () => {
     answer = (one) =>
@@ -455,14 +467,19 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
     expect(sent.every((one) => one.path === "/api/v1/cards/scan")).toBe(true);
   });
 
-  it("sends a page whole: nine pockets in one body", async () => {
+  it("sends a page whole: the page and nine pockets in one body, to be read later", async () => {
     answer = (one) =>
-      one.action === "read-page-direct"
-        ? ok({ ok: true, pockets: [] })
+      one.action === "send-direct"
+        ? ok({ ok: true, scanId: "s", left: 19 })
         : ok({ ok: true });
     const api = await loadApi();
-    await api.scanPagePhotos(Array.from({ length: 9 }, () => "QUJD"));
-    expect(sent.map((one) => one.action)).toEqual(["probe", "read-page-direct"]);
+    await expect(
+      api.sendScanPage(pageOf(Array.from({ length: 9 }, () => "QUJD"))),
+    ).resolves.toEqual({ ok: true, scanId: "s", left: 19 });
+    expect(sent.map((one) => `${one.path} ${one.action}`)).toEqual([
+      "/api/v1/cards/scan probe",
+      "/api/v1/scans/pages send-direct",
+    ]);
   });
 
   it("goes in pieces when the probe does not arrive, all session", async () => {
@@ -490,32 +507,27 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
     answer = (one) =>
       one.action === "probe" ? ok({ ok: true }) : one.inBody ? "network" : pieces(one);
     const api = await loadApi();
-    await api.scanPagePhotos([
-      "QUJD",
-      null,
-      "QUJD",
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-    ]);
+    await api.sendScanPage(
+      pageOf(["QUJD", null, "QUJD", null, null, null, null, null, null]),
+    );
     await api.scanCardPhoto("QUJD");
     expect(sent.map((one) => one.action)).toEqual([
       "probe",
-      "read-page-direct",
-      /* A pocket at a time: its own upload, its own pieces. */
+      "send-direct",
+      /* The page, then a pocket at a time: each its own upload and pieces. */
       "begin",
       "chunk",
       "begin",
       "chunk",
-      "read-page",
+      "begin",
+      "chunk",
+      "send",
       /* Remembered: no whole try for the next photo. */
       "begin",
       "chunk",
       "read",
     ]);
+    expect(sent.find((one) => one.action === "send")?.path).toBe("/api/v1/scans/pages");
   });
 
   it("takes an HTTP error as the answer and never sends it again in pieces", async () => {

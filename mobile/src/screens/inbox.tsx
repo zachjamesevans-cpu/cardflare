@@ -273,9 +273,11 @@ export function InboxScreen() {
                   >
                     <Ionicons
                       name={
-                        kindIcon(item.kind) === "store"
-                          ? "storefront-outline"
-                          : "notifications-outline"
+                        item.kind === "pages-ready"
+                          ? "scan-outline"
+                          : kindIcon(item.kind) === "store"
+                            ? "storefront-outline"
+                            : "notifications-outline"
                       }
                       size={18}
                       color={colors.textMuted}

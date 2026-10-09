@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, Store } from "lucide-react";
+import { Bell, ScanLine, Store } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { cn } from "@/lib/cn";
@@ -15,7 +15,9 @@ import { ago, collapseRuns, kindIcon, splitTitle } from "@/lib/notifications/inb
  * profile — then the sentence with their name in bold and the time
  * inline after it, then the detail line. A row with nobody behind it
  * (a board opening) leads with the kind's icon in the same slot, so
- * the column of faces stays a column.
+ * the column of faces stays a column: the store for a board, the
+ * scanner for scanned pages ready to check ("pages-ready"), the bell
+ * for anything else.
  *
  * Two links side by side rather than one nested in another: the face
  * opens the person, the words open where it happened. The app draws
@@ -82,7 +84,9 @@ export function InboxList({ items }: { items: InboxItem[] }) {
                 aria-hidden="true"
                 className="flex size-10 shrink-0 items-center justify-center rounded-full border border-border bg-elevated text-text-muted"
               >
-                {kindIcon(item.kind) === "store" ? (
+                {item.kind === "pages-ready" ? (
+                  <ScanLine className="size-4" />
+                ) : kindIcon(item.kind) === "store" ? (
                   <Store className="size-4" />
                 ) : (
                   <Bell className="size-4" />

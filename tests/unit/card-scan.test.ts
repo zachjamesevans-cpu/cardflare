@@ -290,7 +290,7 @@ describe("the boundaries", () => {
     expect(begin.indexOf("scannerAccess(player)")).toBeLessThan(
       begin.indexOf("randomUUID"),
     );
-    expect(route).toContain(".remove(pathsOf.flat())");
+    expect(route).toContain("removeUploads(pathsOf.flat())");
   });
 
   it("is a Pro capability", () => {
