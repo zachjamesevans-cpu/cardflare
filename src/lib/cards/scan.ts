@@ -290,9 +290,13 @@ async function readCard(
     if (!parsed.success) return null;
     return parsed.data;
   } catch (error) {
-    /* Logged with the SDK's own class name and status, never the photo. */
+    /*
+     * Logged with the status and the API's own sentence ("Your credit
+     * balance is too low...", "invalid x-api-key"), which say what to fix
+     * and carry no key and no photo. The photo is never logged.
+     */
     if (error instanceof Anthropic.APIError) {
-      console.error("Card scan read failed", error.status, error.name);
+      console.error("Card scan read failed", error.status, error.name, error.message);
     } else {
       console.error("Card scan read failed", error);
     }
