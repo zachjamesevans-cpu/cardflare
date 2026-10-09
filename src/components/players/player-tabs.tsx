@@ -2,14 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  CalendarDays,
-  Home,
-  MapPin,
-  MessageCircle,
-  Search,
-  UserCircle2,
-} from "lucide-react";
+import { Home, MapPin, MessageCircle, Search, Store, UserCircle2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -19,7 +12,7 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
  *
  * The founder's parity call: somebody who uses the app on Wednesday and
  * the site on Thursday should not have to learn two products. Same five
- * places, same order: Feed, Nights, Messages, Search, Profile, so a
+ * places, same order: Feed, Rooms, Messages, Search, Profile, so a
  * thumb that knows one knows the other.
  *
  * Round 16 reshaped it the way Instagram's is. Messages took the
@@ -48,10 +41,13 @@ const TABS = [
      (src/lib/local/enabled.ts) the slot is Nights: rooms open the
      moment a store posts a night, so the tab is the calendar of them.
      The founder: "Trying to keep our tabs to our 'hero's'." The code
-     door (/room) is a button on the Nights page, not a tab. */
+     door (/room) is a button on the Nights page, not a tab. Then
+     (2026-10-09) the store became the room and the day its time, so
+     the tab is Rooms with a storefront, still at /nights so every link
+     to it keeps working. */
   ...(LOCAL_ENABLED
     ? [{ href: "/local", label: "Local", icon: MapPin } as const]
-    : [{ href: "/nights", label: "Nights", icon: CalendarDays } as const]),
+    : [{ href: "/nights", label: "Rooms", icon: Store } as const]),
   /* The conversations list. With Local off, /local is the Messages
      page; with it on, the same page leads with them. In the middle. */
   { href: "/local", label: "Messages", icon: MessageCircle },
@@ -64,7 +60,7 @@ const TABS = [
 function isActive(label: string, href: string, pathname: string): boolean {
   /*
    * The room lives at /e/CODE once you are in one, and the code door at
-   * /room, so the Nights tab has to own both paths too or the bar goes
+   * /room, so the Rooms tab has to own both paths too or the bar goes
    * blank exactly when a player is deepest in the product.
    */
   const roomOwner = LOCAL_ENABLED ? "/feed" : "/nights";

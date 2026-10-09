@@ -91,7 +91,7 @@ export const joinCodeSchema = z
   .pipe(z.string().regex(JOIN_CODE_PATTERN, "That code doesn't look right."));
 
 export type EventStatus = "draft" | "open" | "closed";
-export type EventKind = "scheduled" | "walk_in";
+export type EventKind = "scheduled" | "walk_in" | "day";
 
 /** Statuses an event may be moved to, and what each one means. */
 export const STATUS_LABELS: Record<EventStatus, string> = {
@@ -233,6 +233,20 @@ export function roomPhase(
   now: number = Date.now(),
 ): RoomPhase {
   if (event.status === "closed") return "finished";
+
+  /*
+   * A day room has no store to press Open: players opened it by saying
+   * they were going. It is upcoming until the day's start, live through
+   * the store's hours, and over at their end, on the clock alone. Its
+   * board is readable and writable from the moment it exists, which is
+   * the point: the roster and the matches are there before anyone goes.
+   */
+  if (event.kind === "day") {
+    if (now < new Date(event.startsAt).getTime()) return "upcoming";
+    if (event.endsAt && now >= new Date(event.endsAt).getTime()) return "finished";
+    return "live";
+  }
+
   /*
    * A night past its end is over whatever its row says: the sweep that
    * closes it runs on a clock (/api/cron/close-nights) and on the next

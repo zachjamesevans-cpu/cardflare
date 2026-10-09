@@ -241,7 +241,8 @@ describe("the home screen's furniture", () => {
     const webTabs = read("src/components/players/player-tabs.tsx");
     expect(webTabs).toContain('label: "Feed"');
     expect(webTabs).toContain('label: "Local"');
-    expect(webTabs).toContain('label: "Nights"');
+    /* Store days (2026-10-09): the slot is labelled Rooms, at /nights. */
+    expect(webTabs).toContain('label: "Rooms"');
     expect(webTabs).not.toContain('label: "Room"');
     expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });

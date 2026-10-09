@@ -150,7 +150,7 @@ export default async function AdminPage() {
    */
   const walkInEnabled = new Map(stores.map((s) => [s.id, s.walk_in_enabled]));
   const live = liveRooms.filter(
-    (room) => room.kind === "scheduled" || walkInEnabled.get(room.storeId),
+    (room) => room.kind !== "walk_in" || walkInEnabled.get(room.storeId),
   );
 
   const [flareCounts, presence] = await Promise.all([

@@ -40,6 +40,8 @@ import { LogTradeScreen } from "./src/screens/log-trade";
 import { ProfileScreen } from "./src/screens/profile";
 import { EditProfileScreen } from "./src/screens/edit-profile";
 import { BringingHost } from "./src/bringing-sheet";
+import { PlanVisitHost } from "./src/plan-visit-sheet";
+import { checkStoreHere } from "./src/youre-here";
 import { BinderScreen } from "./src/screens/binder";
 import { BindersScreen } from "./src/screens/binders";
 import { HuntsScreen } from "./src/screens/hunts";
@@ -86,10 +88,10 @@ import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages"
  * rooms as cardflare.gg — plus the one thing a website cannot do: tell
  * you about an offer while your phone is locked.
  *
- * Five tabs: Feed, Nights (the nights near you and the ones you are
- * going to), the raised + that posts a Flare, Messages, Profile. The
- * notices are the bell at the Feed's top right (the Inbox, a stack
- * screen now). The Room (where you are right now;
+ * Five tabs: Feed, Rooms (on the Nights route: the stores' rooms near
+ * you and the ones you are going to), the raised + that posts a Flare,
+ * Messages, Profile. The notices are the bell at the Feed's top right
+ * (the Inbox, a stack screen now). The Room (where you are right now;
  * remembers the last room), scanning, posting, signing in and settings
  * ride on top as stack screens; the QR icon on Nights' header is the
  * door to the scanner and the Room's code form, and a night's matches
@@ -288,9 +290,10 @@ const TAB_ICONS: Partial<
   /* The website's dock draws lucide Search. */
   Search: { idle: "search-outline", focused: "search" },
   Local: { idle: "location-outline" },
-  /* The website's dock draws lucide CalendarDays for Nights; the
-       calendar fills in when it is the open tab, like the flame. */
-  Nights: { idle: "calendar-outline", focused: "calendar" },
+  /* Rooms, on the Nights route: the website's dock draws lucide Store,
+       and the storefront fills in when it is the open tab. The store is
+       the room (the founder, 2026-10-09). */
+  Nights: { idle: "storefront-outline", focused: "storefront" },
   /* The website's dock draws lucide MessageCircle for Messages. */
   Messages: { idle: "chatbubble-outline", focused: "chatbubble" },
   Profile: { idle: "person-circle-outline" },
@@ -522,9 +525,10 @@ function Tabs() {
         }}
       />
       {/* Second: Local while it is on, Nights otherwise. Nights
-          took the Room's slot on 2026-10-03: rooms open the moment a
-          store posts a night, and the tab is the list of them. The
-          website's dock does the same (/nights, CalendarDays). See
+          took the Room's slot on 2026-10-03, and on 2026-10-09 it was
+          labelled Rooms: the store is the room and a day is the time.
+          The route keeps its name so links and params hold. The
+          website's dock does the same (/nights, Store). See
           src/local-enabled.ts for the Local call. */}
       {LOCAL_ENABLED ? (
         <Tab.Screen name="Local" component={LocalScreen} options={{ title: "Local" }} />
@@ -535,8 +539,8 @@ function Tabs() {
           /* The QR icon at the header's end: Scan QR, or Enter event
              code. The giant "Scan or enter a code" button is gone. */
           options={{
-            title: "Nights",
-            tabBarLabel: "Nights",
+            title: "Rooms",
+            tabBarLabel: "Rooms",
             headerRight: () => <NightsCodeButton />,
           }}
         />
@@ -849,10 +853,15 @@ function AppGates() {
     if (gate !== "open") return;
     void refreshUnread();
     void refreshUnreadMessages();
+    void checkStoreHere();
     const foreground = AppState.addEventListener("change", (next) => {
       if (next !== "active") return;
       void refreshUnread();
       void refreshUnreadMessages();
+      /* You're here: whether the phone is standing in a store, only
+         when location was granted before, at most every ten minutes
+         (src/youre-here.tsx). It offers the room; it never joins. */
+      void checkStoreHere();
     });
     const arrived = Notifications.addNotificationReceivedListener(() => {
       void refreshUnread();
@@ -1073,6 +1082,9 @@ function AppGates() {
         {/* The binders picker after Going, over whatever screen is up
             (src/bringing-sheet.tsx says why it lives here). */}
         <BringingHost />
+        {/* Plan a visit, opened from Rooms, a store's page and the Feed
+            (src/plan-visit-sheet.tsx says why it lives here). */}
+        <PlanVisitHost />
       </NavigationContainer>
     </StartupGuard>
   );

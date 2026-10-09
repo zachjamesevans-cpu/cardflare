@@ -104,8 +104,10 @@ describe("the Feed's Coming up section", () => {
 
 describe("the room lobby's count line", () => {
   it("says coming, not tonight, on both platforms", () => {
-    expect(web.lobby).toContain("· {participants.length} coming · {flareCount}");
-    expect(app.roomPeople).toContain("`${hereNow} here now · ${people.length} coming`");
+    /* Store days (2026-10-09): no "here now" count on player screens. */
+    expect(web.lobby).toContain("{participants.length} coming");
+    expect(web.lobby).not.toContain("here now\n");
+    expect(app.roomPeople).toContain("`${people.length} coming`");
     expect(web.lobby).not.toContain("{participants.length} tonight");
     expect(app.roomPeople).not.toContain("${people.length} tonight");
   });

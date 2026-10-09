@@ -51,9 +51,10 @@ describe("the header", () => {
 
   it("says attendance once, on the header's line, and nowhere else", () => {
     expect(joined).toContain("playersCount={playersCount}");
-    expect(joined).toContain("hereNow={hereNow}");
     expect(header).toContain("{playersLine(playersCount)}");
-    expect(header).toContain("{hereNowLine(hereNow)}");
+    /* No "here now" (2026-10-09): it counted people browsing from home. */
+    expect(joined).not.toContain("hereNow={hereNow}");
+    expect(header).not.toContain("hereNowLine(");
     /* The old meta line, the people sheet and the roster card are gone. */
     expect(room).not.toContain('accessibilityLabel="Who\'s here"');
     expect(room).not.toContain("tonight ·");
@@ -62,10 +63,8 @@ describe("the header", () => {
     expect(room).not.toContain("function RosterCard");
     /* People, not seats: an account in from two devices is one in the
        count, the website's room-door rule. */
-    expect(room).toContain("const people = dedupeParticipants(participants);");
-    expect(room).toContain(
-      "const hereNow = room.hereNow ?? people.filter((p) => p.present).length;",
-    );
+    expect(room).toContain("dedupeParticipants(state.participants ?? [])");
+    expect(room).not.toContain("const hereNow =");
   });
 
   it("has lost the old text link, counts and remote card", () => {

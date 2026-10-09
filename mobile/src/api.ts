@@ -1027,6 +1027,12 @@ export interface NightItem {
   matches?: number | null;
   /** How many of the roster are in the room right now. */
   hereNow?: number;
+  /**
+   * What kind of room: a night the store posted, a day room players
+   * opened ("Open trading", named by the server), or a walk-in room.
+   * Absent from an older server, which only listed posted nights.
+   */
+  kind?: "scheduled" | "day" | "walk_in";
 }
 
 /** Live rooms first, then upcoming and early by start time, then
@@ -3780,6 +3786,125 @@ export interface UpcomingNight {
 
 export const getStore = (storeId: string) =>
   call<{ store: PublicStore }>("GET", `/api/v1/stores/${encodeURIComponent(storeId)}`);
+
+/* ------------------------------------------------------------------ */
+/* Store days: the store is the room and a day is the time             */
+/* ------------------------------------------------------------------ */
+
+/** The room on one of a store's days: its night, or the day room. */
+export interface StoreDayRoom {
+  eventId: string;
+  code: string | null;
+  name: string;
+  kind: "scheduled" | "day" | "walk_in";
+  goingCount: number;
+  youGoing: boolean;
+}
+
+/** One of the seven days on offer at a store. The website's `StoreDay`. */
+export interface StoreDay {
+  /** The store-local date, "2026-10-16". */
+  date: string;
+  /** "Today", "Tomorrow", "Fri 17". */
+  label: string;
+  /** The store is closed that day by its own hours. */
+  closed: boolean;
+  /** The room for that day, when there is one yet. */
+  room: StoreDayRoom | null;
+}
+
+/** A store's week, for the plan-a-visit sheet's second step. */
+export interface StoreDays {
+  storeId: string;
+  storeName: string;
+  /** The store's today, so "today" and "tomorrow" are the store's. */
+  today: string;
+  /** The store takes days players open: walk-in trading is on. */
+  openTrading: boolean;
+  days: StoreDay[];
+}
+
+/** The store a phone is standing in, and its counter code. */
+export interface StoreHere {
+  storeId: string;
+  storeName: string;
+  code: string;
+}
+
+/** A store in the picker's first step. */
+export interface PickerStore {
+  storeId: string;
+  name: string;
+  city: string | null;
+  /** Miles from the player, rounded; null when it cannot be placed. */
+  miles: number | null;
+}
+
+/** The picker's first step: followed stores, then nearby ones. */
+export interface StorePicker {
+  following: PickerStore[];
+  near: PickerStore[];
+}
+
+/**
+ * The stores to pick from. The position goes only when the caller
+ * already has it, which on this app means permission was granted
+ * before: the picker never asks.
+ */
+export const getStorePicker = (position?: { latitude: number; longitude: number }) =>
+  call<{ picker: StorePicker }>(
+    "GET",
+    position
+      ? `/api/v1/stores/picker?lat=${position.latitude}&lng=${position.longitude}`
+      : "/api/v1/stores/picker",
+  );
+
+/** A store's next seven days and the room on each. */
+export const getStoreDays = (storeId: string) =>
+  call<{ days: StoreDays }>(
+    "GET",
+    `/api/v1/stores/${encodeURIComponent(storeId)}/days`,
+  );
+
+/** What planning a visit comes back with: Going's answer and the room. */
+export interface PlanVisitAnswer extends GoingAnswer {
+  eventId: string;
+  code: string | null;
+}
+
+/**
+ * "Going to this store on this day." Opens the day room when nobody has
+ * yet, and says Going exactly as the Going button does. A refusal is an
+ * ApiError whose code is a `PLAN_REFUSALS` key (src/store-day-copy.ts).
+ */
+export async function planVisit(
+  storeId: string,
+  date: string,
+): Promise<PlanVisitAnswer> {
+  const result = await call<PlanVisitAnswer & { sessionToken?: string }>(
+    "POST",
+    `/api/v1/stores/${encodeURIComponent(storeId)}/days`,
+    { date },
+  );
+
+  /* Kept exactly as Going keeps it: see setGoing. */
+  if (result.sessionToken) {
+    await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+  }
+
+  const { sessionToken: _token, ...answer } = result;
+  return answer;
+}
+
+/**
+ * The store this position is inside, or null. The position is used for
+ * one comparison on the server and kept nowhere.
+ */
+export const getStoreHere = (latitude: number, longitude: number) =>
+  call<{ store: StoreHere | null }>(
+    "GET",
+    `/api/v1/stores/here?lat=${latitude}&lng=${longitude}`,
+  );
 
 /** What somebody at the shop tells us when claiming a listing. */
 export interface ClaimFields {

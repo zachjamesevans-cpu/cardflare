@@ -101,11 +101,12 @@ describe("the door card", () => {
     expect(page).toContain('? "Trading now"');
   });
 
-  it("makes the meta line one button named Who's here, with faces and three counts", () => {
+  it("makes the meta line one button named Who's here, with faces and two counts", () => {
     expect(lobby).toContain('"use client"');
     expect(lobby).toContain('aria-label="Who\'s here"');
     expect(lobby).toContain('aria-haspopup="dialog"');
-    expect(lobby).toContain("{present} here now");
+    /* Store days (2026-10-09): no "here now" count on player screens. */
+    expect(lobby).not.toContain("{present} here now");
     expect(lobby).toContain("{participants.length} coming");
     expect(lobby).toContain('{flareCount === 1 ? "Flare" : "Flares"}');
     /* Up to three faces, present ones first, 22px. */

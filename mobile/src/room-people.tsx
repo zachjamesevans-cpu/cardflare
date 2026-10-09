@@ -71,7 +71,6 @@ export function RoomPeopleModal({
   const insets = useSafeAreaInsets();
   /* People, not seats: the count and the rows agree with the door. */
   const people = dedupeParticipants(participants);
-  const hereNow = people.filter((p) => p.present).length;
   const sorted = [...people].sort((a, b) => Number(b.present) - Number(a.present));
 
   return (
@@ -109,7 +108,9 @@ export function RoomPeopleModal({
           >
             <View style={{ gap: 2, flexShrink: 1 }}>
               <Title>Who&rsquo;s here</Title>
-              <Muted>{`${hereNow} here now · ${people.length} coming`}</Muted>
+              {/* No "here now" (the founder, 2026-10-09): it counted
+                  people looking at the room from home. */}
+              <Muted>{`${people.length} coming`}</Muted>
             </View>
             <SheetClose onPress={onClose} />
           </View>

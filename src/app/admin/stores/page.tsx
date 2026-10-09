@@ -80,7 +80,7 @@ export default async function AdminStoresPage() {
   const duplicateGroups = likelyDuplicates(stores);
   const directory: DirectoryStore[] = stores.map((store) => {
     const room = liveByStore.get(store.id);
-    const live = room && (room.kind === "scheduled" || store.walk_in_enabled);
+    const live = room && (room.kind !== "walk_in" || store.walk_in_enabled);
 
     return {
       id: store.id,

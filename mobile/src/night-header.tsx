@@ -10,7 +10,7 @@ import { markFeedStale } from "./feed-refresh";
 import { FollowStoreButton } from "./follow-store-button";
 import { GoingButton } from "./going-button";
 import { GOING } from "./going-copy";
-import { hereNowLine, playersLine } from "./night-copy";
+import { playersLine } from "./night-copy";
 import { colors, spacing } from "./theme";
 import { Muted, Tap } from "./ui";
 import { VerifiedMark } from "./verified-mark";
@@ -22,9 +22,11 @@ import { VerifiedMark } from "./verified-mark";
  * information (1 here now, 1 tonight, You're going, You're going
  * button, 1 going, Who's going, another attendance count). REMOVE
  * REPEATED INFORMATION." So one block, top to bottom: the venue, the
- * night's name, when, and ONE line with the RSVP state, the players
- * count and "here now". Attendance is said here and nowhere else on
- * the page.
+ * night's name, when, and ONE line with the RSVP state and the
+ * players count. Attendance is said here and nowhere else on the page.
+ * It said how many were here now as well until the founder
+ * (2026-10-09) took it off: it counted people looking at the room from
+ * home. The website's header lost it in the same round.
  *
  * The Going button sits on that line at chip size while the viewer is
  * not going; once they are, the line reads "Going" with the check and
@@ -42,7 +44,6 @@ export function NightHeader({
   eventId,
   going,
   playersCount,
-  hereNow,
   onSettled,
   right,
 }: {
@@ -60,14 +61,11 @@ export function NightHeader({
   going: { youGoing: boolean; goingCount: number } | null;
   /** Who is going, the number the players line says. */
   playersCount: number;
-  /** In the room right now. Drawn only when live or early and above zero. */
-  hereNow: number;
   onSettled: () => void;
   /** The small round buttons at the end of the name's line. */
   right?: ReactNode;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const showHereNow = hereNow > 0 && (phase === "live" || phase === "early");
   const canGo = Boolean(eventId && going) && phase !== "finished";
 
   return (
@@ -162,11 +160,6 @@ export function NightHeader({
         <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
           {playersLine(playersCount)}
         </Text>
-        {showHereNow ? (
-          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
-            {hereNowLine(hereNow)}
-          </Text>
-        ) : null}
       </View>
     </View>
   );

@@ -118,14 +118,13 @@ describe("the words around Going", () => {
 });
 
 describe("the dock", () => {
-  it("gives Room's slot to Nights on the website", () => {
-    expect(webDock).toContain(
-      '{ href: "/nights", label: "Nights", icon: CalendarDays }',
-    );
+  it("gives Room's slot to Rooms on the website, a storefront at /nights", () => {
+    /* Store days (2026-10-09): the store is the room, so the tab is
+       Rooms with a store glyph; the address stays so links keep working. */
+    expect(webDock).toContain('{ href: "/nights", label: "Rooms", icon: Store }');
     expect(webDock).not.toContain('label: "Room"');
-    expect(webDock).toMatch(
-      /import \{[^}]*\bCalendarDays\b[^}]*\} from "lucide-react"/,
-    );
+    expect(webDock).not.toContain('label: "Nights"');
+    expect(webDock).toMatch(/import \{[^}]*\bStore\b[^}]*\} from "lucide-react"/);
   });
 
   it("keeps Nights lit on /nights, /room and /e/ on the website", () => {
@@ -136,10 +135,10 @@ describe("the dock", () => {
 
   it("gives Room's slot to Nights in the app, calendar idle and filled focused", () => {
     expect(appRoot).toContain('name="Nights"');
-    expect(appRoot).toContain('tabBarLabel: "Nights"');
+    expect(appRoot).toContain('tabBarLabel: "Rooms"');
     expect(appRoot).not.toMatch(/<Tab\.Screen\s+name="Room"/);
     expect(appRoot).toContain(
-      'Nights: { idle: "calendar-outline", focused: "calendar" }',
+      'Nights: { idle: "storefront-outline", focused: "storefront" }',
     );
   });
 
@@ -157,9 +156,9 @@ describe("the dock", () => {
 
 describe("the Nights screen", () => {
   it("is headed Nights on both", () => {
-    expect(webNights).toContain(">Nights</h2>");
-    expect(webNightsPage).toContain('title="Nights"');
-    expect(appRoot).toContain('title: "Nights"');
+    expect(webNights).toContain(">Rooms</h2>");
+    expect(webNightsPage).toContain('title="Rooms"');
+    expect(appRoot).toContain('title: "Rooms"');
   });
 
   it("draws the same three tabs in the same order on both", () => {

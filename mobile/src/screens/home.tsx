@@ -26,6 +26,7 @@ import type { StackParams, TabParams } from "../../App";
 import { LOCAL_ENABLED } from "../local-enabled";
 import { GoingButton } from "../going-button";
 import { openRoom } from "../open-room";
+import { openPlanVisit } from "../plan-visit-sheet";
 import { followHref } from "../follow-href";
 import {
   belongsToTab,
@@ -96,6 +97,7 @@ import { API_BASE } from "../config";
 import { colors, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 import { useUnread } from "../unread";
+import { YoureHereBanner } from "../youre-here";
 
 /**
  * The Feed tab — what is on, and who needs what you are holding.
@@ -136,8 +138,8 @@ const STARTERS = {
   store: {
     icon: "map-marker-outline",
     headline: "Where do you play?",
-    body: "Join your store's room once and you follow the store, with its next board and who is looking for what. The code is on the counter.",
-    label: "Enter a store code",
+    body: "Join your store's room once and it saves itself here, with its next board and who is looking for what. The code is on the counter.",
+    label: "Find your store",
   },
   deck: {
     icon: "clipboard-list-outline",
@@ -1018,6 +1020,10 @@ export function HomeScreen() {
          * only way to reach anything.
          */}
 
+        {/* You're here: offered when the app opened inside a store,
+            never joined by itself (src/youre-here.tsx). */}
+        <YoureHereBanner />
+
         {/* The three filters, first thing under the wordmark. */}
         {guest ? null : <FeedFilterTabs value={tab} onChange={setTab} />}
 
@@ -1303,8 +1309,10 @@ export function HomeScreen() {
                 <Button
                   label={STARTERS[item.topic].label}
                   onPress={() =>
+                    /* The store starter opens Plan a visit at its first
+                       step: a store picked there is a day from its room. */
                     item.topic === "store"
-                      ? openRoom(navigation)
+                      ? openPlanVisit()
                       : navigation.navigate("DeckPaste")
                   }
                 />

@@ -23,6 +23,8 @@ import { GoingButton } from "../going-button";
 import { RemoteImage } from "../remote-image";
 import { CoverBanner } from "../showcase-zoom";
 import { openRoom } from "../open-room";
+import { openPlanVisit } from "../plan-visit-sheet";
+import { PLAN_VISIT } from "../store-day-copy";
 import { hoursLines } from "../store-hours";
 import { colors, gutter, radius, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
@@ -349,6 +351,15 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         ) : (
           <Button label="Follow" onPress={() => navigation.navigate("CreateAccount")} />
         )}
+        {/* Plan a visit beside Follow: the sheet straight at this
+            store's days, the website's button in the same place. */}
+        <Button
+          label={PLAN_VISIT}
+          variant="secondary"
+          onPress={() =>
+            openPlanVisit({ storeId: store.storeId, storeName: store.name })
+          }
+        />
         <Muted>
           Following puts this store&rsquo;s nights in your Feed and on your Following
           list.

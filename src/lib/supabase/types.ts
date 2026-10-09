@@ -506,8 +506,12 @@ export type Game =
  * `walk_in` rooms are opened by the application when somebody scans a store's
  * permanent code, so they have no planned end and no code of their own — both
  * columns are null for them, and the database enforces that.
+ *
+ * `day` rooms are a store's room for one day, opened by players saying
+ * they are going (src/lib/events/store-days.ts): a code, a start and an
+ * end like a scheduled event, and `plan_day`, the store-local date.
  */
-export type EventKind = "scheduled" | "walk_in";
+export type EventKind = "scheduled" | "walk_in" | "day";
 
 export type EventRow = {
   id: string;
@@ -525,12 +529,22 @@ export type EventRow = {
   repeat_weekly: boolean;
   /** Set alongside status "closed" when the store cancelled the night. */
   cancelled_at: string | null;
+  /** A day room's store-local date ("2026-10-16"); null for every other kind. */
+  plan_day: string | null;
 };
 
 export type EventInsert = Omit<
   EventRow,
-  "id" | "created_at" | "status" | "game" | "kind" | "repeat_weekly" | "cancelled_at"
+  | "id"
+  | "created_at"
+  | "status"
+  | "game"
+  | "kind"
+  | "repeat_weekly"
+  | "cancelled_at"
+  | "plan_day"
 > & {
+  plan_day?: string | null;
   id?: string;
   created_at?: string;
   status?: EventStatus;

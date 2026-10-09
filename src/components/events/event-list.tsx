@@ -7,6 +7,14 @@ import { goingLine } from "@/lib/events/going-copy";
 import { STATUS_LABELS } from "@/lib/events/schema";
 import type { EventRow } from "@/lib/supabase/types";
 
+/**
+ * A day room, as the store sees it. Players open one by saying they are
+ * going to the shop on a day the store posted nothing; it opens and
+ * closes on the store's hours, so there is nothing here to edit, cancel
+ * or open by hand.
+ */
+export const DAY_EVENT_LABEL = "Open trading, opened by players";
+
 export function EventRowCard({
   event,
   storeName,
@@ -32,6 +40,9 @@ export function EventRowCard({
           {storeName ? `${storeName} · ` : ""}
           {formatEventWindow(event.starts_at, event.ends_at, timeZone)}
         </p>
+        {event.kind === "day" && (
+          <p className="text-xs text-text-secondary">{DAY_EVENT_LABEL}</p>
+        )}
       </div>
 
       <div className="flex shrink-0 items-center gap-2">

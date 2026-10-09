@@ -95,7 +95,8 @@ export async function GET(request: Request): Promise<Response> {
   const { data: events, error } = await admin
     .from("events")
     .select("id, name, store_id, kind, status, starts_at, ends_at, join_code")
-    .eq("kind", "scheduled")
+    /* A day players opened at a store reminds its goers the same way. */
+    .in("kind", ["scheduled", "day"])
     .is("cancelled_at", null)
     .gt("starts_at", new Date(now).toISOString())
     .lte("starts_at", new Date(now + HORIZON_MS).toISOString())

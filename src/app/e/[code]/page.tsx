@@ -433,7 +433,6 @@ async function RoomBody({
       : Promise.resolve(null),
   ]);
   const roster = dedupeRoster(rawRoster);
-  const hereNow = roster.filter((player) => player.present).length;
 
   /*
    * The composer is the Flare tab's, given the same things: the hunts a
@@ -649,7 +648,6 @@ async function RoomBody({
               youGoing: night.youGoing,
               goingCount: night.goingCount,
               signedIn: Boolean(accountPlayerId),
-              hereNow: phase === "upcoming" ? 0 : hereNow,
             }
           : null
       }

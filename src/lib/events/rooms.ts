@@ -9,6 +9,7 @@ import {
   createEvent,
   findEventByJoinCode,
   findOpenWalkInRoom,
+  findRunningDayRoom,
   findRunningScheduledEvent,
   findShowByJoinCode,
   findStoreByJoinCode,
@@ -151,6 +152,17 @@ export function isIdle(
  * has to happen before anybody can be told what is running, and it is
  * idempotent under the `status = 'open'` guard.
  */
+/**
+ * The room a store has running right now, or null: the same answer a
+ * scan of its counter gets, for the doors that start from a store
+ * rather than a code (store-days.ts: planning today, "you're here").
+ */
+export async function liveRoomForStore(
+  store: PublicStore,
+): Promise<PublicEvent | null> {
+  return findLiveRoom(store);
+}
+
 async function findLiveRoom(store: PublicStore): Promise<PublicEvent | null> {
   const now = Date.now();
 
@@ -161,6 +173,16 @@ async function findLiveRoom(store: PublicStore): Promise<PublicEvent | null> {
   );
 
   if (scheduled) return scheduled;
+
+  /* The store's room for today, when players opened one by saying they
+     were going: the counter puts you in with them, not in a walk-in
+     room of your own beside them. */
+  const day = await findRunningDayRoom(
+    store.id,
+    new Date(now + DOORS_OPEN_LEAD_MS).toISOString(),
+    new Date(now).toISOString(),
+  );
+  if (day) return day;
 
   const walkIn = await findOpenWalkInRoom(store.id);
   if (!walkIn) return null;
@@ -236,7 +258,7 @@ export async function resolveCode(code: string): Promise<CodeResolution> {
      * module exists to prevent.
      */
     if (
-      room.kind === "scheduled" &&
+      (room.kind === "scheduled" || room.kind === "day") &&
       room.status === "open" &&
       room.endsAt &&
       new Date(room.endsAt).getTime() <= Date.now()
@@ -297,7 +319,7 @@ export async function enterRoomByCode(code: string): Promise<PublicEvent | null>
      * "code not found" — the code on the sheet is real, just over.
      */
     if (
-      room.kind === "scheduled" &&
+      (room.kind === "scheduled" || room.kind === "day") &&
       room.status === "open" &&
       room.endsAt &&
       new Date(room.endsAt).getTime() <= Date.now()
@@ -392,7 +414,7 @@ export async function listLiveRooms(now: number = Date.now()): Promise<LiveRoom[
   const live: LiveRoom[] = [];
 
   for (const row of rows) {
-    if (row.kind === "scheduled") {
+    if (row.kind === "scheduled" || row.kind === "day") {
       const doorsOpen = new Date(row.startsAt).getTime() <= now + DOORS_OPEN_LEAD_MS;
       const stillRunning = !row.endsAt || new Date(row.endsAt).getTime() > now;
       if (doorsOpen && stillRunning) {

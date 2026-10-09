@@ -148,7 +148,9 @@ export async function closeEndedScheduledEvents(
   const { data, error } = await getSupabaseAdmin()
     .from("events")
     .update({ status: "closed" })
-    .eq("kind", "scheduled")
+    /* A store day room ends on the clock the same way, and owes the
+       same debts: the Flares of anyone going who never turned up. */
+    .in("kind", ["scheduled", "day"])
     .eq("status", "open")
     .lte("ends_at", nowIso)
     .select("id, store_id, name, starts_at, ends_at, repeat_weekly");
@@ -488,6 +490,40 @@ export async function findRunningScheduledEvent(
 
   if (error) {
     console.error("Could not look for a running event", error);
+    return null;
+  }
+
+  const row = (data ?? [])[0] as unknown as PublicRoomRow | undefined;
+  return row ? toPublicEvent(row) : null;
+}
+
+/**
+ * The store's day room that is running now, or about to: from the
+ * doors-open lead before its start until its end. A day room is a
+ * store's room for one day, opened by players saying they are going
+ * (store-days.ts); the counter scan joins it rather than opening a
+ * walk-in room beside it.
+ */
+export async function findRunningDayRoom(
+  storeId: string,
+  startsBefore: string,
+  endsAfter: string,
+): Promise<PublicEvent | null> {
+  if (!canQuery("look for the day room")) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("events")
+    .select(PUBLIC_ROOM_COLUMNS)
+    .eq("store_id", storeId)
+    .eq("kind", "day")
+    .eq("status", "open")
+    .lte("starts_at", startsBefore)
+    .gt("ends_at", endsAfter)
+    .order("starts_at", { ascending: true })
+    .limit(1);
+
+  if (error) {
+    console.error("Could not look for the day room", error);
     return null;
   }
 

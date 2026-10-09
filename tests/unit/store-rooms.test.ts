@@ -21,6 +21,7 @@ const findEventByJoinCode = vi.fn();
 const findShowByJoinCode = vi.fn();
 const findStoreByJoinCode = vi.fn();
 const findRunningScheduledEvent = vi.fn();
+const findRunningDayRoom = vi.fn();
 const findOpenWalkInRoom = vi.fn();
 const latestActivityAt = vi.fn();
 const closeWalkInRoom = vi.fn();
@@ -38,6 +39,7 @@ vi.mock("@/lib/events/repository", () => ({
   findStoreByJoinCode: (...args: unknown[]) => findStoreByJoinCode(...args),
   findShowByJoinCode: (...args: unknown[]) => findShowByJoinCode(...args),
   findRunningScheduledEvent: (...args: unknown[]) => findRunningScheduledEvent(...args),
+  findRunningDayRoom: (...args: unknown[]) => findRunningDayRoom(...args),
   findOpenWalkInRoom: (...args: unknown[]) => findOpenWalkInRoom(...args),
   latestActivityAt: (...args: unknown[]) => latestActivityAt(...args),
   closeWalkInRoom: (...args: unknown[]) => closeWalkInRoom(...args),
@@ -123,6 +125,7 @@ beforeEach(() => {
     findShowByJoinCode,
     findStoreByJoinCode,
     findRunningScheduledEvent,
+    findRunningDayRoom,
     findOpenWalkInRoom,
     latestActivityAt,
     closeWalkInRoom,
@@ -140,6 +143,7 @@ beforeEach(() => {
   findEventByJoinCode.mockResolvedValue(null);
   findStoreByJoinCode.mockResolvedValue(null);
   findRunningScheduledEvent.mockResolvedValue(null);
+  findRunningDayRoom.mockResolvedValue(null);
   findOpenWalkInRoom.mockResolvedValue(null);
   latestActivityAt.mockResolvedValue(null);
   closeWalkInRoom.mockResolvedValue(true);
@@ -148,6 +152,17 @@ beforeEach(() => {
 });
 
 describe("resolveCode", () => {
+  it("puts a counter scan in the store's day room rather than a walk-in room beside it", async () => {
+    findStoreByJoinCode.mockResolvedValue(store());
+    findRunningDayRoom.mockResolvedValue(scheduled({ id: "day-room", kind: "day" }));
+    findOpenWalkInRoom.mockResolvedValue(room());
+
+    const result = await resolveCode(STORE_CODE);
+
+    expect(result).toMatchObject({ outcome: "room", room: { id: "day-room" } });
+    expect(openWalkInRoom).not.toHaveBeenCalled();
+  });
+
   it("does not recognise a code of no length at all", async () => {
     // Nine characters, not eight: eight is a show code now.
     for (const code of ["K3M9P", "K3M9PZQ89", "", "k3m9pz"]) {

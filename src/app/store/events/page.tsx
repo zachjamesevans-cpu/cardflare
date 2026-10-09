@@ -33,9 +33,14 @@ function isEmptySession(event: EventRow): boolean {
   return event.kind === "walk_in" && event.ends_at === event.starts_at;
 }
 
-/** A finished walk-in session: the store's history, one tap away. */
+/**
+ * A finished walk-in session or day room: the store's history, one tap
+ * away. Neither is a night the store posted, so neither stays on top.
+ */
 function isHistory(event: EventRow): boolean {
-  return event.kind === "walk_in" && event.status === "closed";
+  return (
+    (event.kind === "walk_in" || event.kind === "day") && event.status === "closed"
+  );
 }
 
 /** The Events tab: tonight's, the next ones, and the form for a new one. */
