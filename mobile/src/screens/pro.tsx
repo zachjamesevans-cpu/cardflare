@@ -8,6 +8,7 @@ import type { StackParams } from "../../App";
 import { getProfile, storedAccessToken } from "../api";
 import { API_BASE } from "../config";
 import { PRO_PRICE_FALLBACK, buyPro, proPrice, restorePro, syncOwnedPro } from "../pro";
+import { ProMark } from "../pro-mark";
 import {
   APPLE_SUBSCRIPTIONS_URL,
   CLAIMED_MESSAGE,
@@ -192,15 +193,16 @@ export function ProScreen() {
       }}
     >
       <View style={{ gap: spacing(1) }}>
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-          CARDFLARE PRO
+        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
+          cardflare <ProMark size={13} />
         </Text>
         <Text style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "800" }}>
           Wear your collection.
         </Text>
         <Muted>
-          Free accounts change their profile picture. Pro wears everything: every ring,
-          aura, border and title you own, moving, on both your profiles.
+          Free accounts change their profile picture. <ProMark size={13} /> wears
+          everything: every ring, aura, border and title you own, moving, on both your
+          profiles.
         </Muted>
       </View>
 
@@ -260,7 +262,7 @@ export function ProScreen() {
             >
               <Ionicons name="checkmark-circle" size={18} color={colors.accent} />
               <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
-                You are Pro. Go get dressed.
+                You are <ProMark size={14} />. Go get dressed.
               </Text>
             </View>
           ) : (

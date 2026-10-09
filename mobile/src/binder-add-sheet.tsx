@@ -15,9 +15,8 @@ import {
   type BinderListEntry,
   type CardHit,
   friendlyError,
-  getScanAccess,
+  getScanRights,
   previewBinderList,
-  type ScanAccess,
   serverMessage,
 } from "./api";
 import {
@@ -31,10 +30,10 @@ import {
 import { CardScanner } from "./card-scanner";
 import { CardSelectSheet, lineKey, type PickedLine } from "./card-select";
 import { leadArt } from "./flare-bits";
-import { PageScanner } from "./page-scanner";
 import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
-import { SCAN_CARD, SCAN_ONE, SCAN_PAGES, SCAN_WITH_PRO } from "./scan-copy";
+import { READING_IN_BACKGROUND, SCAN_TITLE } from "./scan-copy";
+import { NO_SCAN_RIGHTS, type ScanRights } from "./scan-flow";
 import { Stepper } from "./stepper";
 import { colors, gutter, radius, spacing } from "./theme";
 import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
@@ -54,24 +53,21 @@ import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
  * - The tray along the foot: every picked card, its copies as the
  *   small black quantity tag, a minus on each.
  * - One button, "Add 3 cards to binder", counting cards not copies.
- * - "Paste a list" beside Search: a deck list, looked up first, shown
- *   as art with names and tags, quantities editable, the lines that
- *   matched nothing said plainly, and the same button.
- * - "Scan a card" beside those two, for a player the server lets scan
- *   (src/card-scanner.tsx): a photo is read, the player says "Add to
- *   binder", and the card lands in the same tray the search fills.
- *   The founder (2026-10-09): a Pro feature, "to cover the cost",
- *   tried by admins first. A player who could have it with Pro sees
- *   "Scan cards with Pro" instead, to the Pro screen; anybody else
- *   sees nothing, so there is never a button that cannot work.
- * - On that tab, "One card" or "Whole pages" (src/page-scanner.tsx):
- *   pages of a real binder photographed into a queue and sent to be
- *   read on the server, then checked from the binder and placed pocket
- *   for pocket. The founder (2026-10-09): "let's keep the single scan
- *   which should be fast and quick", "scan, let's say 5 pages of their
- *   binder into a queue", and "Maybe it scans it, and then they'll get
- *   a notification once it's ready." Pages never touch the tray; "Done"
- *   closes the menu while they are read.
+ * - No tabs. The founder (2026-10-09): "all the tabs of 'scan' etc
+ *   having 3 tabs seems redundant." The search first, as the menu's
+ *   body; under its field, "Scan" with the camera, for a player the
+ *   server lets scan (free singles up to ten a day, whole pages with
+ *   Pro), and "Paste a list" as a small link.
+ * - "Scan" opens the one scanner, full screen (src/card-scanner.tsx): a
+ *   card is checked in the card viewer and "That's it" lands it in the
+ *   same tray the search fills; a whole binder page is sent to be read
+ *   in the background for Pro, and is the door to Pro for anyone else.
+ *   Pages never touch the tray: "Done" comes back here with the tray as
+ *   it was, and a line that the pages are being read, while the binder
+ *   shows them waiting.
+ * - "Paste a list": a deck list, looked up first, shown as art with
+ *   names and tags, quantities editable, the lines that matched nothing
+ *   said plainly, and the same button. "Search" goes back.
  *
  * Opened from a tapped "+" pocket, the batch starts AT that pocket:
  * the first card goes there, the rest into the next empty ones, which
@@ -86,10 +82,7 @@ export interface BinderAdded {
   firstPocket: number | null;
 }
 
-type Mode = "search" | "paste" | "scan";
-
-/** On the scan tab: one card into the tray, or whole pages into their pockets. */
-type ScanKind = "one" | "pages";
+type Mode = "search" | "paste";
 
 /** A pasted line, looked up, with the copies the owner settled on. */
 type PastedLine = BinderListEntry & { key: string };
@@ -125,7 +118,7 @@ export function BinderAddSheet({
   pocket: number | null;
   onClose: () => void;
   onAdded: (added: BinderAdded) => void;
-  /** Whole pages sent to be read, and Done: the binder shows them waiting. */
+  /** Whole pages sent to be read: the binder shows them waiting. */
   onPagesSent: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -136,18 +129,20 @@ export function BinderAddSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* Whether this player scans, sees the way to Pro, or neither. Asked
-     once with the binder, so the menu opens already knowing: nothing is
-     drawn until the server has said, and nothing drawn then vanishes. */
-  const [scanAccess, setScanAccess] = useState<ScanAccess>(null);
+  /* What this player may scan. Asked once with the binder, so the menu
+     opens already knowing: nothing is drawn until the server has said,
+     and nothing drawn then vanishes. */
+  const [rights, setRights] = useState<ScanRights>(NO_SCAN_RIGHTS);
+  const [scanning, setScanning] = useState(false);
+  /* Pages went to be read from this menu: it says so under Scan. */
+  const [pagesOut, setPagesOut] = useState(false);
   const [searchFor, setSearchFor] = useState<{ text: string } | null>(null);
-  const [scanKind, setScanKind] = useState<ScanKind>("one");
 
   useEffect(() => {
     let live = true;
-    void getScanAccess()
-      .then((access) => {
-        if (live) setScanAccess(access);
+    void getScanRights()
+      .then((given) => {
+        if (live) setRights(given);
       })
       .catch(() => {});
     return () => {
@@ -182,7 +177,7 @@ export function BinderAddSheet({
     setText("");
     setPasted(null);
     setMode("search");
-    setScanKind("one");
+    setPagesOut(false);
     setError(null);
   };
 
@@ -232,9 +227,10 @@ export function BinderAddSheet({
   };
 
   /* Closing leaves the camera: the menu never reopens straight into it,
-     so the camera is only ever asked for on a tap of "Scan a card". */
+     so the camera is only ever asked for on a tap of "Scan". */
   const close = () => {
-    setMode((current) => (current === "scan" ? "search" : current));
+    setScanning(false);
+    setPagesOut(false);
     onClose();
   };
 
@@ -295,152 +291,69 @@ export function BinderAddSheet({
     );
   };
 
-  /* Search, Paste a list and, for a player who scans, Scan a card: the
-     website's tabs. The way to Pro sits under them, a full-width button
-     as on the website, for a player who could scan with Pro. */
-  const modes: (readonly [Mode, string])[] = [
-    ["search", BINDER_ADD_COPY.search],
-    ["paste", BINDER_ADD_COPY.paste],
-    ...(scanAccess === "on" ? [["scan", SCAN_CARD] as const] : []),
-  ];
-  const switcher = (
+  /* Under the search field: "Scan", large, for a player the server lets
+     scan, and "Paste a list" as a small link. The scanner itself, full
+     screen, opens over the menu from here. */
+  const belowSearch = (
     <View style={{ gap: spacing(2) }}>
-      <View
-        style={{
-          flexDirection: "row",
-          borderRadius: radius.control,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.surface,
-          padding: 3,
-          gap: 3,
-        }}
-      >
-        {modes.map(([value, label]) => {
-          const on = mode === value;
-          return (
-            <Tap
-              key={value}
-              onPress={() => {
-                setMode(value);
-                setError(null);
-              }}
-              accessibilityLabel={label}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                paddingVertical: spacing(2),
-                borderRadius: radius.control - 3,
-                backgroundColor: on ? colors.accent : "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.accentContrast : colors.textSecondary,
-                  fontWeight: "700",
-                  fontSize: 13,
-                }}
-              >
-                {label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
-      {scanAccess === "pro-door" ? (
+      {rights.singles !== null ? (
         <Tap
           onPress={() => {
-            close();
-            navigation.navigate("Pro");
+            setError(null);
+            setScanning(true);
           }}
-          accessibilityRole="link"
-          accessibilityLabel={SCAN_WITH_PRO}
+          accessibilityLabel={SCAN_TITLE}
           style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "center",
-            gap: spacing(1.5),
-            paddingVertical: spacing(2),
+            gap: spacing(2),
+            paddingVertical: spacing(3.5),
             borderRadius: radius.control,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.surface,
+            backgroundColor: colors.accent,
           }}
         >
-          <Ionicons name="scan-outline" size={16} color={colors.accent} />
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
-            {SCAN_WITH_PRO}
+          <Ionicons name="camera-outline" size={20} color={colors.accentContrast} />
+          <Text
+            style={{ color: colors.accentContrast, fontWeight: "700", fontSize: 16 }}
+          >
+            {SCAN_TITLE}
           </Text>
         </Tap>
       ) : null}
-    </View>
-  );
-
-  /* Pages sent and Done: an empty menu for next time, and the binder
-     shows the queue waiting to be read. Nothing was placed yet. */
-  const pagesSent = () => {
-    reset();
-    onPagesSent();
-  };
-
-  /* One card or whole pages, a switch at the top of the scan tab. One
-     card is today's scanner, unchanged; it is the default. */
-  const pages = mode === "scan" && scanKind === "pages";
-  const scanBody = (
-    <View style={{ flex: 1, gap: spacing(3) }}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignSelf: "center",
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: colors.border,
-          padding: 2,
-          gap: 2,
+      <Tap
+        onPress={() => {
+          setMode("paste");
+          setError(null);
         }}
+        accessibilityLabel={BINDER_ADD_COPY.paste}
+        hitSlop={8}
+        style={{ alignSelf: "center" }}
       >
-        {(
-          [
-            ["one", SCAN_ONE],
-            ["pages", SCAN_PAGES],
-          ] as const
-        ).map(([value, label]) => {
-          const on = scanKind === value;
-          return (
-            <Tap
-              key={value}
-              onPress={() => setScanKind(value)}
-              accessibilityLabel={label}
-              accessibilityState={{ selected: on }}
-              style={{
-                paddingHorizontal: spacing(3.5),
-                paddingVertical: spacing(1.5),
-                borderRadius: 999,
-                backgroundColor: on ? colors.elevated : "transparent",
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.textPrimary : colors.textMuted,
-                  fontWeight: "700",
-                  fontSize: 12,
-                }}
-              >
-                {label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
-      {scanKind === "pages" ? (
-        <PageScanner
-          binderId={binderId}
-          occupied={cards.map((card) => card.pocket)}
-          onDone={pagesSent}
-        />
-      ) : (
-        <CardScanner onAdd={addScanned} onNotFound={(text) => setSearchFor({ text })} />
-      )}
+        <Text style={{ color: colors.textSecondary, fontWeight: "600", fontSize: 13 }}>
+          {BINDER_ADD_COPY.paste}
+        </Text>
+      </Tap>
+      <CardScanner
+        visible={scanning}
+        binderId={binderId}
+        occupied={cards.map((card) => card.pocket)}
+        rights={rights}
+        onRights={setRights}
+        onAdd={addScanned}
+        onNotFound={(text) => setSearchFor({ text })}
+        onGetPro={() => {
+          close();
+          navigation.navigate("Pro");
+        }}
+        onClose={(sent) => {
+          setScanning(false);
+          if (sent) {
+            setPagesOut(true);
+            onPagesSent();
+          }
+        }}
+      />
     </View>
   );
 
@@ -454,6 +367,20 @@ export function BinderAddSheet({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
     >
+      {/* Back to the search, with the tray as it was. */}
+      <Tap
+        onPress={() => {
+          setMode("search");
+          setError(null);
+        }}
+        accessibilityLabel={BINDER_ADD_COPY.search}
+        style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
+      >
+        <Ionicons name="chevron-back" size={16} color={colors.textSecondary} />
+        <Text style={{ color: colors.textSecondary, fontWeight: "600", fontSize: 13 }}>
+          {BINDER_ADD_COPY.search}
+        </Text>
+      </Tap>
       {pasted === null ? (
         <>
           <Muted>{BINDER_ADD_COPY.pasteHint}</Muted>
@@ -581,11 +508,9 @@ export function BinderAddSheet({
     </ScrollView>
   );
 
-  /* The foot: the tray of picked cards (search), then the one button.
-     Whole pages have their own button and no tray: only the safe area. */
-  const footer = pages ? (
-    <View style={{ paddingBottom: insets.bottom }} />
-  ) : (
+  /* The foot: the tray of picked cards (search and scan), then the one
+     button. */
+  const footer = (
     <View
       style={{
         paddingTop: spacing(2),
@@ -686,8 +611,9 @@ export function BinderAddSheet({
       onChange={setLines}
       onClose={close}
       title={BINDER_ADD_COPY.title}
-      above={switcher}
-      body={mode === "paste" ? pasteBody : mode === "scan" ? scanBody : undefined}
+      above={pagesOut ? <Muted>{READING_IN_BACKGROUND}</Muted> : undefined}
+      body={mode === "paste" ? pasteBody : undefined}
+      belowSearch={belowSearch}
       hitNote={hitNote}
       footer={footer}
       searchFor={searchFor}

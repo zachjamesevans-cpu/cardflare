@@ -12,6 +12,7 @@ import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
 import { isSendRefusal, placementParts, type PageSendRefusal } from "./page-scan";
 import { pagesPlacedLine, type ScanRefusal } from "./scan-copy";
+import { NO_SCAN_RIGHTS, type ScanRights } from "./scan-flow";
 import type { ScanCard } from "./scan-hit";
 
 /**
@@ -2736,12 +2737,14 @@ export type ScanOutcome =
     }
   | { ok: false; reason: ScanRefusal; read?: ScanRead };
 
-/** "on" scans, "pro-door" is the way to Pro, null draws nothing. */
-export type ScanAccess = "on" | "pro-door" | null;
-
-export const getScanAccess = () =>
-  call<{ access?: ScanAccess }>("GET", "/api/v1/cards/scan").then(
-    (result) => result.access ?? null,
+/**
+ * What this player may scan: single cards (and the free ones left
+ * today) and whole pages. Nothing until the server has said, so no
+ * button is drawn that cannot work.
+ */
+export const getScanRights = () =>
+  call<{ rights?: ScanRights }>("GET", "/api/v1/cards/scan").then(
+    (result) => result.rights ?? NO_SCAN_RIGHTS,
   );
 
 /** One pocket of a scanned page: nothing there, a card and its guesses, or unread. */

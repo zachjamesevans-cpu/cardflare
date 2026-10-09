@@ -650,6 +650,11 @@ export interface CardSearchProps {
    * finds it by hand without typing it again. Read once, on mount.
    */
   initialQuery?: string;
+  /**
+   * Drawn right under the field, over the results: the binder's Add
+   * cards sheet puts its Scan button and "Paste a list" here.
+   */
+  underField?: React.ReactNode;
 }
 
 /**
@@ -673,6 +678,7 @@ export function CardSearch({
   onUnpick,
   noteFor,
   initialQuery = "",
+  underField = null,
 }: CardSearchProps) {
   const [query, setQuery] = useState(initialQuery);
   const [active, setActive] = useState(0);
@@ -890,6 +896,8 @@ export function CardSearch({
           color, a type or a set to narrow it: &ldquo;luffy leader&rdquo;.
         </p>
       </div>
+
+      {underField}
 
       {/* Announced politely, so a screen reader hears the count change. */}
       <p role="status" aria-live="polite" className="sr-only">

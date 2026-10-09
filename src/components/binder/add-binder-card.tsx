@@ -2,12 +2,11 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, Plus } from "lucide-react";
 
-import { BinderPicker, BinderTray } from "@/components/binder/binder-picker";
+import { BinderPicker } from "@/components/binder/binder-picker";
 import { PasteList, type ListPreview } from "@/components/binder/paste-list";
-import { PageScan } from "@/components/cards/page-scan";
-import { ScanCard, ScanWithPro } from "@/components/cards/scan-card";
+import { Scanner } from "@/components/cards/scanner";
 import {
   addCard,
   keyOf,
@@ -18,9 +17,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { addBinderCardsAction, previewBinderListAction } from "@/lib/binder/actions";
+import type { ScanRights } from "@/lib/cards/scan";
+import { READING_IN_BACKGROUND, SCAN_TITLE } from "@/lib/cards/scan-rules";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
-import { SCAN_CARD, SCAN_ONE, SCAN_PAGES } from "@/lib/cards/scan-rules";
-import { cn } from "@/lib/cn";
 
 /**
  * "Add cards": the Flare picker in a sheet, over the binder page.
@@ -29,20 +28,24 @@ import { cn } from "@/lib/cn";
  * can select multiple of one card, etc, to put into binder at mass."
  * So nothing lands on a tap any more: the taps fill a tray, several
  * copies of one card and several cards, and one button puts the whole
- * tray in the binder, "Add 5 cards to binder". Beside the search, a
- * second way in for somebody with the list already written: "Paste a
- * list", looked up and shown back before anything is added.
+ * tray in the binder, "Add 5 cards to binder".
  *
- * And a third, for a Pro player: "Scan a card", a photo read into the
- * same tray, one card after another, so a stack of scans goes in with
- * the same one button. Whether it is drawn is the server's answer,
- * `scanAccess`, read with the page: the scanner, the door to Pro, or
- * nothing, never a button that appears and then goes. Its switch has a
- * second way to scan, "Whole pages": photos of real binder pages, sent
- * to be read in the background (`PageScan`), then checked as grids and
- * placed pocket for pocket from the binder's banner or the notice,
- * never through the tray. A page that did not read is retaken here: the
- * sheet opens on Whole pages for that page of that queue (`retake`).
+ * No tabs: the founder (2026-10-09), "all the tabs of 'scan' etc having
+ * 3 tabs seems redundant." The search is the sheet, and under its field,
+ * in this order, the same as the app: a large "Scan" for somebody who
+ * may scan, then "Paste a list", a small link to the pasted list (for
+ * somebody with the list already written, looked up and shown back
+ * before anything is added), which has its own way back to the search.
+ *
+ * Scan opens the scanner over everything (`Scanner`): one camera for a
+ * single card, read into this same tray so a stack of scans goes in
+ * with the same one button, or a whole binder page, sent to be read in
+ * the background and placed pocket for pocket later from the binder's
+ * banner or the notice, never through the tray. Whether Scan is drawn
+ * is the server's answer, `rights`, read with the page: never a button
+ * that appears and then goes. A page that did not read is retaken here:
+ * the sheet opens straight into the scanner for that page of that queue
+ * (`retake`), and closes with it.
  *
  * Opened from an empty pocket, the batch starts AT that pocket: "Adding
  * a card in a specific slot should put that exact card there." The
@@ -70,7 +73,7 @@ export function AddBinderCard({
   inBinder = [],
   onAdded,
   trigger = false,
-  scanAccess = null,
+  rights = null,
   pagesLeft,
   retake = null,
 }: {
@@ -89,17 +92,20 @@ export function AddBinderCard({
   onAdded?: (message: string, firstPocket: number | null) => void;
   /** Draw an "Add cards" button that opens the sheet. Off by default. */
   trigger?: boolean;
-  /** "on" draws the scanner, "pro-door" the way to Pro, null nothing. */
-  scanAccess?: "on" | "pro-door" | null;
+  /** What the player may scan; null, or no singles, draws no Scan button. */
+  rights?: ScanRights | null;
   /** Pages the player may still send today: null has no limit, undefined is not known yet. */
   pagesLeft?: number | null;
-  /** Opened to shoot one page of a queue again: straight to Whole pages. */
+  /** Opened to shoot one page of a queue again: straight into the scanner. */
   retake?: { batchId: string; page: number } | null;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"search" | "paste" | "scan">("search");
-  /* The scan tab's switch: one card into the tray, or whole pages. */
-  const [scanMode, setScanMode] = useState<"one" | "pages">("one");
+  /* The search, or the pasted list it links to. */
+  const [view, setView] = useState<"search" | "paste">("search");
+  /* The scanner, open over the sheet. */
+  const [scanning, setScanning] = useState(false);
+  /* Pages went to be read from this sheet: it says so. */
+  const [pagesWent, setPagesWent] = useState(false);
   const [picks, setPicks] = useState<DraftCard[]>([]);
   const [focus, setFocus] = useState<string | null>(null);
   /* A name the scanner read but could not find, waiting in the search. */
@@ -111,14 +117,15 @@ export function AddBinderCard({
   /* Each opening's own page queue: a new one every time the sheet opens. */
   const [session, setSession] = useState(0);
   /* A fresh sheet each time it opens: an empty tray, the search first,
-     or Whole pages for a retake. */
+     or the scanner for a retake. */
   const [wasOpen, setWasOpen] = useState(open);
   if (wasOpen !== open) {
     setWasOpen(open);
     if (open) {
       setSession((count) => count + 1);
-      setTab(retake ? "scan" : "search");
-      setScanMode(retake ? "pages" : "one");
+      setView("search");
+      setScanning(Boolean(retake));
+      setPagesWent(false);
       setPicks([]);
       setFocus(null);
       setLookFor("");
@@ -128,9 +135,7 @@ export function AddBinderCard({
     }
   }
 
-  /* Pages bring their own button and their own action: the sheet's
-     footer, the tray's Add, is not theirs. */
-  const pageMode = tab === "scan" && scanMode === "pages";
+  const scans = rights !== null && rights.singles !== null;
   const filled = useMemo(() => inBinder.map((card) => card.pocket), [inBinder]);
 
   const copiesHere = useMemo(() => {
@@ -144,7 +149,7 @@ export function AddBinderCard({
   /* What the one button would add: the tray (searched or scanned into
      it), or the list's found cards. */
   const items =
-    tab !== "paste"
+    view === "search"
       ? picks.map((item) => ({
           cardId: item.card.id,
           printingId: item.printingId,
@@ -214,39 +219,37 @@ export function AddBinderCard({
         onClose={() => onOpenChange(false)}
         title="Add cards"
         footer={
-          !pageMode && (
-            <div className="flex flex-col gap-2">
-              {(error || pending) && (
-                <div className="flex min-h-5 items-center gap-2 text-sm">
-                  {pending && (
-                    <Loader2
-                      className="size-4 animate-spin text-accent"
-                      aria-hidden="true"
-                    />
-                  )}
-                  {error && (
-                    <span role="alert" className="text-danger">
-                      {error}
-                    </span>
-                  )}
-                </div>
-              )}
-              {tab !== "paste" || preview ? (
-                <Button
-                  type="button"
-                  className="w-full"
-                  disabled={pending || count === 0}
-                  onClick={submit}
-                >
-                  {addLabel(count)}
-                </Button>
-              ) : (
-                <p className="text-sm text-text-muted">
-                  Look the list up to check it before anything is added.
-                </p>
-              )}
-            </div>
-          )
+          <div className="flex flex-col gap-2">
+            {(error || pending) && (
+              <div className="flex min-h-5 items-center gap-2 text-sm">
+                {pending && (
+                  <Loader2
+                    className="size-4 animate-spin text-accent"
+                    aria-hidden="true"
+                  />
+                )}
+                {error && (
+                  <span role="alert" className="text-danger">
+                    {error}
+                  </span>
+                )}
+              </div>
+            )}
+            {view === "search" || preview ? (
+              <Button
+                type="button"
+                className="w-full"
+                disabled={pending || count === 0}
+                onClick={submit}
+              >
+                {addLabel(count)}
+              </Button>
+            ) : (
+              <p className="text-sm text-text-muted">
+                Look the list up to check it before anything is added.
+              </p>
+            )}
+          </div>
         }
       >
         {/*
@@ -259,50 +262,16 @@ export function AddBinderCard({
          * sheet under the footer.
          */}
         <div className="flex min-h-[70dvh] flex-col gap-4">
-          <div
-            role="tablist"
-            aria-label="How to add"
-            className={cn(
-              "grid gap-1 rounded-full border border-border bg-canvas p-1",
-              scanAccess === "on" ? "grid-cols-3" : "grid-cols-2",
-            )}
-          >
-            {(
-              [
-                ["search", "Search"],
-                ["paste", "Paste a list"],
-                ...(scanAccess === "on" ? ([["scan", SCAN_CARD]] as const) : []),
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                aria-selected={tab === id}
-                onClick={() => {
-                  /* The scanner's name goes in the search once, not
-                     every time the search tab is opened again. */
-                  if (tab === "search" && id !== "search") setLookFor("");
-                  setTab(id);
-                  setError(null);
-                }}
-                className={cn(
-                  "cursor-pointer rounded-full px-2 py-1.5 text-sm font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
-                  tab === id
-                    ? "bg-accent text-accent-contrast"
-                    : "text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {pagesWent && (
+            <p role="status" className="text-sm text-text-secondary">
+              {READING_IN_BACKGROUND}
+            </p>
+          )}
 
-          {/* Not Pro, while the scanner is open to Pro: the way there. */}
-          {scanAccess === "pro-door" && <ScanWithPro />}
-
-          {tab === "search" ? (
+          {view === "search" ? (
             <BinderPicker
+              /* Remade with a name the scanner could not find, typed in. */
+              key={lookFor}
               imagesEnabled={imagesEnabled}
               playerGames={playerGames}
               picks={picks}
@@ -314,102 +283,105 @@ export function AddBinderCard({
               onQuantity={quantityOf}
               onRemove={removeLine}
               onFocus={setFocus}
-            />
-          ) : tab === "scan" ? (
-            <div className="flex flex-1 flex-col gap-4">
-              <div
-                role="radiogroup"
-                aria-label="How to scan"
-                className="grid grid-cols-2 gap-1 self-center rounded-full border border-border bg-canvas p-1"
-              >
-                {(
-                  [
-                    ["one", SCAN_ONE],
-                    ["pages", SCAN_PAGES],
-                  ] as const
-                ).map(([id, label]) => (
+              underField={
+                <div className="flex flex-col items-center gap-3">
+                  {scans && (
+                    <Button
+                      type="button"
+                      size="lg"
+                      className="w-full"
+                      onClick={() => {
+                        setError(null);
+                        setScanning(true);
+                      }}
+                    >
+                      <Camera className="size-5" aria-hidden="true" />
+                      {SCAN_TITLE}
+                    </Button>
+                  )}
                   <button
-                    key={id}
                     type="button"
-                    role="radio"
-                    aria-checked={scanMode === id}
                     onClick={() => {
-                      setScanMode(id);
+                      setView("paste");
                       setError(null);
                     }}
-                    className={cn(
-                      "cursor-pointer rounded-full px-3 py-1 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
-                      scanMode === id
-                        ? "bg-elevated text-text-primary"
-                        : "text-text-secondary hover:text-text-primary",
-                    )}
+                    className="cursor-pointer text-sm font-semibold text-text-secondary underline-offset-4 hover:text-text-primary hover:underline"
                   >
-                    {label}
+                    Paste a list
                   </button>
-                ))}
-              </div>
-              {scanMode === "one" ? (
-                <>
-                  <BinderTray
-                    imagesEnabled={imagesEnabled}
-                    picks={picks}
-                    focus={focus}
-                    onQuantity={quantityOf}
-                    onRemove={removeLine}
-                    onFocus={setFocus}
-                  />
-                  <ScanCard
-                    imagesEnabled={imagesEnabled}
-                    onAdd={pick}
-                    onNotFound={setLookFor}
-                  />
-                </>
-              ) : (
-                /* Sent, not placed: Done closes the sheet, and the
-                   binder's banner takes it from there. */
-                <PageScan
-                  key={session}
-                  binderId={binderId}
-                  pockets={filled}
-                  left={pagesLeft}
-                  retake={retake}
-                  onDone={() => onOpenChange(false)}
-                />
-              )}
-            </div>
+                </div>
+              }
+            />
           ) : (
-            <PasteList
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setView("search");
+                  setError(null);
+                }}
+                className="inline-flex w-fit cursor-pointer items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary"
+              >
+                <ArrowLeft className="size-4" aria-hidden="true" />
+                Search
+              </button>
+              <PasteList
+                imagesEnabled={imagesEnabled}
+                text={text}
+                onText={setText}
+                preview={preview}
+                pending={pending}
+                onLookUp={lookUp}
+                onQuantity={(index, quantity) =>
+                  setPreview((current) =>
+                    current
+                      ? {
+                          ...current,
+                          entries: current.entries.map((entry, at) =>
+                            at === index ? { ...entry, quantity } : entry,
+                          ),
+                        }
+                      : current,
+                  )
+                }
+                onRemove={(index) =>
+                  setPreview((current) =>
+                    current
+                      ? {
+                          ...current,
+                          entries: current.entries.filter((_, at) => at !== index),
+                        }
+                      : current,
+                  )
+                }
+                onEdit={() => {
+                  setPreview(null);
+                  setError(null);
+                }}
+              />
+            </>
+          )}
+
+          {scanning && rights && (
+            <Scanner
+              key={session}
+              binderId={binderId}
+              rights={rights}
+              pockets={filled}
+              left={pagesLeft}
+              retake={retake}
               imagesEnabled={imagesEnabled}
-              text={text}
-              onText={setText}
-              preview={preview}
-              pending={pending}
-              onLookUp={lookUp}
-              onQuantity={(index, quantity) =>
-                setPreview((current) =>
-                  current
-                    ? {
-                        ...current,
-                        entries: current.entries.map((entry, at) =>
-                          at === index ? { ...entry, quantity } : entry,
-                        ),
-                      }
-                    : current,
-                )
-              }
-              onRemove={(index) =>
-                setPreview((current) =>
-                  current
-                    ? {
-                        ...current,
-                        entries: current.entries.filter((_, at) => at !== index),
-                      }
-                    : current,
-                )
-              }
-              onEdit={() => {
-                setPreview(null);
-                setError(null);
+              playerGames={playerGames}
+              onAdd={pick}
+              onNotFound={(name) => {
+                setLookFor(name);
+                setView("search");
+              }}
+              onDone={(sentPages) => {
+                setScanning(false);
+                if (sentPages) setPagesWent(true);
+                /* Opened for a retake: the scanner was the whole visit. */
+                if (retake) onOpenChange(false);
               }}
             />
           )}

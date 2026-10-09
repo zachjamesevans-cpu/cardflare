@@ -7,7 +7,9 @@ import {
   type ScanOutcome,
   scanCard,
   scanPage,
+  scanRights,
   scannerAccess,
+  type ScanRights,
 } from "@/lib/cards/scan";
 import { playerForUser } from "@/lib/players/accounts";
 
@@ -29,6 +31,12 @@ async function scanner(): Promise<{ playerId: string; userId: string } | null> {
 export async function scannerAccessAction(): Promise<ScanAccess> {
   const who = await scanner();
   return who ? scannerAccess(who) : null;
+}
+
+/** What this viewer may scan: single cards (and how many free ones are left), whole pages. */
+export async function scanRightsAction(): Promise<ScanRights> {
+  const who = await scanner();
+  return who ? scanRights(who) : { singles: null, singlesLeft: null, pages: null };
 }
 
 export async function scanCardAction(form: FormData): Promise<ScanOutcome> {

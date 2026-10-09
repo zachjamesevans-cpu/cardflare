@@ -41,6 +41,9 @@ export const SCAN_REFUSALS = {
   "not-allowed": "Scanning is a Pro feature.",
   limit: "That is a lot of scans at once. Try again in a few minutes.",
   "daily-pages": "That's 20 pages for today. You can scan more tomorrow.",
+  "daily-singles":
+    "That's your 10 free scans for today. Pro scans without a limit, whole binder pages too.",
+  "is-page": "That's a whole binder page. Scanning pages is Pro.",
   unavailable: "The scanner isn't working right now. Try again in a moment.",
 } as const;
 
@@ -221,4 +224,46 @@ export function pagesWaitingLine(pages: number, ready: boolean): string {
 /** "18 of 20 pages left today", under the shutter. */
 export function pagesLeftLine(left: number): string {
   return `${left} of ${PAGES_PER_DAY} pages left today`;
+}
+
+/* ---- One scanner ------------------------------------------------------ */
+
+/*
+ * The founder (2026-10-09): "a unified scan - it can detect if it's
+ * scanning a full page and says you need pro for that", "Free singles up
+ * to 10 a day", and the check as "a popup full card viewer and a
+ * contextual menu there". One camera for one card or a whole page; the
+ * quick reader says which it is.
+ */
+
+/** Single-card scans a free account gets a day. Pro and admins have no limit. */
+export const FREE_SCANS_PER_DAY = 10;
+
+export const SCAN_TITLE = "Scan";
+export const SCAN_INTRO_SINGLE = "Scan a card.";
+/** Followed by the PRO mark: "Scan a whole binder page with PRO". */
+export const SCAN_INTRO_PAGES = "Scan a whole binder page with";
+export const FILL_THE_FRAME =
+  "One card or one binder page, filling the frame, in good light.";
+export const PAGES_ARE_PRO = "Scanning whole binder pages is Pro.";
+export const GET_PRO = "Get Pro";
+export const THATS_IT = "That's it";
+export const NOT_THIS_CARD = "Not this card";
+export const OTHER_PRINTING = "Other printing";
+export const YOUR_PHOTO = "Your photo";
+export const OUR_MATCH = "Our match";
+
+/** "7 of 10 free scans left today". */
+export function freeScansLeftLine(left: number): string {
+  return `${left} of ${FREE_SCANS_PER_DAY} free scans left today`;
+}
+
+/** After a page is shot: "Page 4 added. Reading it in the background." */
+export function pageAddedLine(page: number): string {
+  return `Page ${page} added. Reading it in the background.`;
+}
+
+/** The check's shortcut through the doubtful pockets: "Check 2 unsure". */
+export function checkUnsureLabel(count: number): string {
+  return `Check ${count} unsure`;
 }

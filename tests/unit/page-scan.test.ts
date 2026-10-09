@@ -211,6 +211,7 @@ describe("reading a page", () => {
               {
                 type: "text",
                 text: JSON.stringify({
+                  layout: "one-card",
                   found: true,
                   game: "one-piece",
                   name: "Roronoa Zoro",

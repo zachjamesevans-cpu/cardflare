@@ -31,6 +31,7 @@ const src = {
   sheet: read("mobile/src/binder-add-sheet.tsx"),
   select: read("mobile/src/card-select.tsx"),
   scanner: read("mobile/src/card-scanner.tsx"),
+  viewer: read("mobile/src/card-viewer.tsx"),
   api: read("mobile/src/api.ts"),
 };
 
@@ -65,28 +66,26 @@ describe("the words", () => {
 });
 
 describe("the entry in the binder's add menu", () => {
-  it("is drawn only for the access the server gave", () => {
+  it("is drawn only for the rights the server gave", () => {
     /* Nothing until the server has said, so nothing appears and vanishes. */
-    expect(src.sheet).toContain("useState<ScanAccess>(null)");
-    expect(src.sheet).toContain("void getScanAccess()");
-    expect(flat(src.sheet)).toContain(
-      '...(scanAccess === "on" ? [["scan", SCAN_CARD] as const] : [])',
-    );
-    /* "pro-door" is the way to the Pro screen, in the website's words. */
-    const door = src.sheet.slice(src.sheet.indexOf('scanAccess === "pro-door"'));
-    expect(door).toContain('navigation.navigate("Pro");');
-    expect(door).toContain("{SCAN_WITH_PRO}");
-    /* And null is neither. */
-    expect(src.sheet.match(/scanAccess ===/g)).toHaveLength(2);
+    expect(src.sheet).toContain("useState<ScanRights>(NO_SCAN_RIGHTS)");
+    expect(src.sheet).toContain("void getScanRights()");
+    /* Scan for anyone with single cards; the door to Pro lives in the
+       scanner now (tests/unit/scan-ux-app.test.ts). */
+    expect(src.sheet).toContain("{rights.singles !== null ? (");
+    expect(src.sheet).not.toContain("SCAN_WITH_PRO");
     expect(src.api).toContain(
-      'call<{ access?: ScanAccess }>("GET", "/api/v1/cards/scan")',
+      'call<{ rights?: ScanRights }>("GET", "/api/v1/cards/scan")',
     );
+    expect(src.api).not.toContain("getScanAccess");
   });
 
-  it("sits beside Search and Paste a list, and the camera is its body", () => {
-    expect(src.sheet).toContain('type Mode = "search" | "paste" | "scan";');
-    expect(src.sheet).toContain(
-      'body={mode === "paste" ? pasteBody : mode === "scan" ? scanBody : undefined}',
+  it("opens the full-screen scanner from under the search field", () => {
+    expect(src.sheet).toContain('type Mode = "search" | "paste";');
+    expect(src.sheet).toContain("belowSearch={belowSearch}");
+    expect(src.sheet).toContain("visible={scanning}");
+    expect(flat(src.scanner)).toContain(
+      '<Modal visible={visible} animationType="slide"',
     );
   });
 
@@ -102,6 +101,8 @@ describe("the entry in the binder's add menu", () => {
     expect(add).not.toContain("addBinderCards");
     /* The tray and its button are the scan's too. */
     expect(src.sheet).toContain('{mode !== "paste" && lines.length > 0 ? (');
+    /* "That's it" is the add: one copy into the tray, back to the camera. */
+    expect(src.scanner).toContain("if (pick) onAdd?.(pick.hit, pick.printingId);");
     expect(src.scanner).not.toContain("addBinderCards");
   });
 
@@ -116,38 +117,49 @@ describe("the entry in the binder's add menu", () => {
 
   it("follows the website's steps in the website's words", () => {
     for (const word of [
-      "{SCAN_HINT}",
-      "label={TAKE_PHOTO}",
+      "{FILL_THE_FRAME}",
+      "label={retake ? takePageLabel(retake.page) : TAKE_PHOTO}",
       "<Loading label={READING_CARD} />",
-      "{IS_THIS_IT}",
-      "{OTHER_MATCHES}",
-      "label={ADD_TO_BINDER}",
-      "label={SCAN_NEXT}",
       "label={SCAN_AGAIN}",
-      "{SCAN_REFUSALS[step.reason]}",
-      "reason: outcome.reason",
-      "scanReadLine(step.read)",
+      "{step.line}",
+      'SCAN_REFUSALS[next.kind === "refused" ? next.reason : "unavailable"]',
     ]) {
       expect(src.scanner, word).toContain(word);
     }
+    for (const word of [
+      "{OTHER_MATCHES}",
+      "label={THATS_IT}",
+      "{YOUR_PHOTO}",
+      "{OUR_MATCH}",
+    ]) {
+      expect(src.viewer, word).toContain(word);
+    }
     /* The printing the set code named is chosen from the start. */
     expect(src.scanner).toContain(
-      "printingId: outcome.matches[0]?.printingId ?? null,",
+      "? { hit: scanHit(top.card, top.printingId), printingId: top.printingId }",
     );
   });
 
-  it("says when the careful reader was not sure, and how it decided, under the read line", () => {
+  it("says when the careful reader was not sure, and how it decided", () => {
     expect(src.scanner).toContain("sure: outcome.sure,");
     expect(src.scanner).toContain("note: outcome.note,");
-    const result = src.scanner.slice(src.scanner.indexOf("const line = scanReadLine("));
-    const line = result.indexOf("<Text style={styles.small}>{line}</Text>");
-    const unsure = result.indexOf("{step.sure === false ?");
-    const note = result.indexOf("<Text style={styles.small}>{step.note}</Text>");
-    expect(line).toBeGreaterThan(-1);
-    expect(unsure).toBeGreaterThan(line);
-    expect(note).toBeGreaterThan(unsure);
-    expect(result.slice(unsure, note)).toContain("{NOT_SURE}");
-    expect(result.indexOf("{IS_THIS_IT}")).toBeGreaterThan(note);
+    /* Not sure: the words and the note at the top. Sure: the note under
+       the match. */
+    const pane = src.viewer.slice(src.viewer.indexOf("function Pane("));
+    const unsure = pane.indexOf("{unsure ? (");
+    const words = pane.indexOf("{NOT_SURE}");
+    const topNote = pane.indexOf(
+      "{note ? <Text style={styles.line}>{note}</Text> : null}",
+    );
+    const match = pane.indexOf("{OUR_MATCH}");
+    const underNote = pane.indexOf(
+      "{!unsure && note ? <Text style={styles.line}>{note}</Text> : null}",
+    );
+    expect(unsure).toBeGreaterThan(-1);
+    expect(words).toBeGreaterThan(unsure);
+    expect(topNote).toBeGreaterThan(words);
+    expect(match).toBeGreaterThan(topNote);
+    expect(underNote).toBeGreaterThan(match);
   });
 });
 
@@ -188,7 +200,7 @@ describe("the photo", () => {
     expect(src.scanner).toContain("let quality = 0.6;");
     const shoot = src.scanner.slice(src.scanner.indexOf("const shoot = async"));
     const shrunk = shoot.indexOf("await shrinkPhoto(photo, view)");
-    const sent = shoot.indexOf("await scanCardPhoto(encoded");
+    const sent = shoot.indexOf("await scanCardPhoto(shrunk.base64");
     expect(shrunk).toBeGreaterThan(-1);
     expect(sent).toBeGreaterThan(shrunk);
   });
@@ -292,14 +304,13 @@ describe("the camera", () => {
     expect(asking).toEqual(["card-scanner.tsx", "screens/scan.tsx"]);
   });
 
-  it("is asked for when the scanner opens, which only a tap on Scan a card does", () => {
+  it("is asked for when the scanner opens, which only a tap on Scan does", () => {
     expect(src.scanner).toContain("void requestPermission();");
-    /* The scanner mounts only as the scan tab's body, and closing the
-       menu leaves that tab, so reopening it never asks on its own. */
-    expect(src.sheet).toContain('mode === "scan" ? scanBody');
-    expect(src.sheet).toContain(
-      'setMode((current) => (current === "scan" ? "search" : current));',
-    );
+    /* The scanner opens only on Scan's tap, and closing the menu shuts
+       it, so reopening the menu never asks on its own. */
+    expect(src.sheet.match(/setScanning\(true\)/g)).toHaveLength(1);
+    const close = src.sheet.slice(src.sheet.indexOf("const close = () => {"));
+    expect(close.slice(0, 200)).toContain("setScanning(false);");
     expect(src.sheet).toContain("onClose={close}");
   });
 

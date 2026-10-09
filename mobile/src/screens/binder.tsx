@@ -893,7 +893,8 @@ export function BinderScreen({
       {/* The add menu: the Flare picker, adapted, the batch starting at
           the pocket tapped. What it adds paints at once, the page turns
           to the first card it put in, and the server's sentence says
-          what happened. */}
+          what happened. Pages its scanner sent wait in the banner, and
+          the menu stays open on its tray. */}
       {yours ? (
         <BinderAddSheet
           visible={addAt !== null}
@@ -905,7 +906,6 @@ export function BinderScreen({
             void loadQueues();
           }}
           onPagesSent={() => {
-            setAddAt(null);
             void loadQueues();
           }}
           onAdded={(added) => {

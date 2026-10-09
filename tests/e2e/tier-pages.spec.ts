@@ -28,7 +28,8 @@ test.describe("the tier pages", () => {
     await page.goto("/pro");
     await expect(page).toHaveTitle(/cardflare pro/i);
     const title = page.getByRole("heading", { level: 1 });
-    await expect(title.locator(".gold-text")).toHaveText("Pro");
+    /* The glowing PRO mark, in the brand lime. */
+    await expect(title.locator(".pro-mark")).toHaveText("Pro");
     await expect(page.getByText("$7.99").first()).toBeVisible();
     await expect(
       page.getByText("Wear cosmetics: rings, auras, card borders, titles"),

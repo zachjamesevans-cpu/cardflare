@@ -35,6 +35,7 @@ import {
   hasTitleArt,
 } from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
+import { ProMark } from "../pro-mark";
 import { colors, gutter, radius, spacing } from "../theme";
 
 /**
@@ -559,7 +560,8 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
           <Text
             style={{ color: colors.accent, fontSize: 13, fontWeight: "700", flex: 1 }}
           >
-            Wearing cosmetics is a cardflare Pro feature. Tap to get Pro.
+            Wearing cosmetics is a cardflare <ProMark size={13} /> feature. Tap to get{" "}
+            <ProMark size={13} />.
           </Text>
           <Ionicons name="chevron-forward" size={16} color={colors.accent} />
         </Tap>

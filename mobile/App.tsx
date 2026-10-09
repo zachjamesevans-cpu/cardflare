@@ -69,6 +69,7 @@ import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, forgetWelcome, hasSeenWelcome } from "./src/screens/welcome";
 import { onSignedOut, storedAccessToken } from "./src/api";
 import { startProSync } from "./src/pro";
+import { ProMark } from "./src/pro-mark";
 import { firstBootError } from "./src/boot-errors";
 import { colors } from "./src/theme";
 import { Tap } from "./src/ui";
@@ -1031,7 +1032,18 @@ function AppGates() {
           <Stack.Screen
             name="Pro"
             component={ProScreen}
-            options={{ title: "cardflare Pro" }}
+            options={{
+              title: "cardflare Pro",
+              headerTitle: () => (
+                <Text
+                  numberOfLines={1}
+                  accessibilityRole="header"
+                  style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "700" }}
+                >
+                  cardflare <ProMark size={17} />
+                </Text>
+              ),
+            }}
           />
           <Stack.Screen
             name="PlayerProfile"

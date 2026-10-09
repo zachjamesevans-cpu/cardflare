@@ -570,5 +570,10 @@ export async function sweepPageScans(): Promise<{ failed: number; removed: numbe
       .remove(paths.slice(at, at + 100))
       .catch(() => {});
   }
+  /* Free single scans only count for a day; two is plenty of history. */
+  await admin
+    .from("card_scans")
+    .delete()
+    .lt("created_at", new Date(Date.now() - 2 * DAY_MS).toISOString());
   return { failed, removed: (old ?? []).length };
 }

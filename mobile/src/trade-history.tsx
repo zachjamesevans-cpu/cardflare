@@ -8,6 +8,7 @@ import { FLARE_OUTCOME_LABELS } from "./history-items";
 import { PlayerAvatar } from "./player-avatar";
 import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
+import { ProMark } from "./pro-mark";
 import { colors, radius, spacing } from "./theme";
 import { Button, Tap } from "./ui";
 
@@ -355,7 +356,7 @@ export function TradeHistoryWall({
           style={{ color: colors.textSecondary, fontSize: 14, textAlign: "center" }}
         >
           See every card you got and gave, who it was with, and the Embers it earned,
-          with cardflare Pro.
+          with cardflare <ProMark size={14} />.
         </Text>
         <Button label="Get cardflare Pro" onPress={onGetPro} />
         <Text style={{ color: colors.textMuted, fontSize: 12 }}>$7.99 a month</Text>

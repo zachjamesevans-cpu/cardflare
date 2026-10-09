@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { FlareHistoryRow } from "@/components/trades/flare-history-row";
+import { ProMark } from "@/components/stores/ultra-mark";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
@@ -474,7 +475,7 @@ export function TradeHistoryWall({ count }: { count: number }) {
         </p>
         <p className="text-sm text-text-secondary">
           See every card you got and gave, who it was with, and the Embers it earned,
-          with cardflare Pro.
+          with cardflare <ProMark />.
         </p>
         <Link href="/pro" className={buttonStyles("primary", "sm")}>
           Get cardflare Pro
@@ -531,8 +532,8 @@ export function TradeHistoryCard({
           </p>
         </div>
         {locked && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs font-semibold text-accent">
-            Pro
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2.5 py-1 text-xs">
+            <ProMark />
           </span>
         )}
       </div>

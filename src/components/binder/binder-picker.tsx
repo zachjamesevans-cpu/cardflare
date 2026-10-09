@@ -42,6 +42,7 @@ export function BinderPicker({
   focus,
   inBinder,
   initialQuery = "",
+  underField = null,
   onAdd,
   onLess,
   onQuantity,
@@ -53,6 +54,8 @@ export function BinderPicker({
   inBinder: ReadonlyMap<string, number>;
   /** The search's opening words: a scanned name the catalogue missed. */
   initialQuery?: string;
+  /** Under the search's field: the sheet's other ways in. */
+  underField?: React.ReactNode;
   onAdd: (card: CardResult, printing?: CardPrinting) => void;
   /** One fewer copy of a line; gone at none. */
   onLess: (key: string) => void;
@@ -73,6 +76,7 @@ export function BinderPicker({
         playerGames={playerGames}
         autoFocus
         initialQuery={initialQuery}
+        underField={underField}
         onSelect={onAdd}
         onUnpick={(card, printing) => onLess(lineKey(card.id, printing?.id ?? null))}
         /* The Flare picker's rule: the tag goes where the tap went, on

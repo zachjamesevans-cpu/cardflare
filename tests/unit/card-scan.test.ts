@@ -69,9 +69,15 @@ const cardRows = vi.fn();
 const cardResultsByIds = vi.fn();
 const searchCards = vi.fn();
 
+/* Free scans already used today, as the card_scans count returns it. */
+let freeUsed = 0;
+
 function chain(result: () => unknown) {
   const self: Record<string, unknown> = {};
-  for (const name of ["select", "eq", "in", "order"]) self[name] = () => self;
+  for (const name of ["select", "eq", "in", "order", "gte"]) self[name] = () => self;
+  self.insert = async () => ({ error: null });
+  self.then = (resolve: (value: unknown) => unknown) =>
+    resolve({ count: freeUsed, data: [] });
   self.limit = async () => result();
   self.maybeSingle = async () => result();
   return self;
@@ -187,6 +193,7 @@ describe("a scan", () => {
 
   it("sends the photo with a schema, and the catalogue picks the card", async () => {
     answer({
+      layout: "one-card",
       found: true,
       game: "one-piece",
       name: "Roronoa Zoro",
@@ -236,6 +243,7 @@ describe("a scan", () => {
 
   it("says when there is no card, or a game we do not carry", async () => {
     answer({
+      layout: "no-card",
       found: false,
       game: "other",
       name: "",
@@ -245,6 +253,7 @@ describe("a scan", () => {
     });
     expect((await scan.scanCard(who, JPEG)).ok).toBe(false);
     answer({
+      layout: "one-card",
       found: true,
       game: "other",
       name: "Dark Magician",
@@ -287,7 +296,7 @@ describe("the boundaries", () => {
   it("asks the gate before the app sends a single piece, and drops the pieces after", () => {
     const route = read("src/app/api/v1/cards/scan/route.ts");
     const begin = route.slice(route.indexOf('if (body.action === "begin")'));
-    expect(begin.indexOf("scannerAccess(player)")).toBeLessThan(
+    expect(begin.indexOf("scanRights(player)")).toBeLessThan(
       begin.indexOf("randomUUID"),
     );
     expect(route).toContain("removeUploads(pathsOf.flat())");
@@ -311,6 +320,7 @@ describe("the key", () => {
   it("works with line breaks pasted into it, and never logs a raw error", async () => {
     vi.stubEnv("ANTHROPIC_API_KEY", "sk-ant-test\n-key ");
     answer({
+      layout: "no-card",
       found: false,
       game: "other",
       name: "",
@@ -327,5 +337,63 @@ describe("the key", () => {
     expect(sent).not.toBeNull();
     const source = read("src/lib/cards/scan.ts");
     expect(source).not.toContain('console.error("Card scan read failed", error)');
+  });
+});
+
+describe("free singles and pages", () => {
+  beforeEach(() => {
+    freeUsed = 0;
+    vi.stubEnv("CARD_SCANNER_OPEN", "on");
+    adminRow.mockReturnValue({ data: null, error: null });
+    playerRow.mockReturnValue({ data: { tier: "free" }, error: null });
+  });
+
+  it("gives a free player ten single scans a day, and pages behind Pro", async () => {
+    expect(await scan.scanRights(who)).toEqual({
+      singles: "on",
+      singlesLeft: 10,
+      pages: "pro-door",
+    });
+    freeUsed = 10;
+    expect(await scan.scanRights(who)).toEqual({
+      singles: "used-up",
+      singlesLeft: 0,
+      pages: "pro-door",
+    });
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    expect(await scan.scanCard(who, JPEG)).toEqual({
+      ok: false,
+      reason: "daily-singles",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("gives Pro and admins everything, with no count", async () => {
+    playerRow.mockReturnValue({ data: { tier: "pro" }, error: null });
+    expect(await scan.scanRights(who)).toEqual({
+      singles: "on",
+      singlesLeft: null,
+      pages: "on",
+    });
+  });
+
+  it("says when a photo is a whole page, without reading it as a card", async () => {
+    answer({
+      layout: "binder-page",
+      found: true,
+      game: "one-piece",
+      name: "",
+      englishName: "",
+      number: "",
+      setCode: "",
+    });
+    const outcome = await scan.scanCard(who, JPEG);
+    expect(outcome).toMatchObject({ ok: false, reason: "is-page" });
+    const source = read("src/lib/cards/scan.ts");
+    const page = source.indexOf('looked.layout === "binder-page"');
+    const count = source.indexOf('.from("card_scans")\n      .insert(');
+    expect(page).toBeGreaterThan(-1);
+    expect(count === -1 || page < count).toBe(true);
   });
 });

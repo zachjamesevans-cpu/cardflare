@@ -358,14 +358,23 @@
   animation: cfa-pan 6s linear infinite;
 }
 
-/* Pro: the Gold name. Max: the Shimmer name. Same clip, same reason. */
-.gold-text {
-  background: linear-gradient(180deg, #fff3c4 10%, #f0c24b 45%, #8a6414 90%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 1px 4px rgba(240, 194, 75, 0.45));
+/*
+ * PRO: the brand's own lime, lit. The founder (2026-10-09): "change the
+ * pro font on site, app, etc. to a glowing green pro moniker that matches
+ * our main brand color." Capitals, tracked out, a soft glow of the same
+ * green. The app draws the same in mobile/src/pro-mark.tsx.
+ */
+.pro-mark {
+  color: var(--color-accent);
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow:
+    0 0 6px color-mix(in srgb, var(--color-accent) 70%, transparent),
+    0 0 16px color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
+
+/* Max: the Shimmer name, clipped to the letters. */
 
 .shimmer-text {
   background: linear-gradient(100deg, #b3becc 40%, #ffffff 50%, #b3becc 60%);

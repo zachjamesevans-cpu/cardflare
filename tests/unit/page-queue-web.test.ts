@@ -29,6 +29,7 @@ vi.mock("@/lib/cards/scan-actions", () => ({
   scanCardAction: vi.fn(),
   scanPageAction: vi.fn(),
   scannerAccessAction: vi.fn(),
+  scanRightsAction: vi.fn(),
 }));
 vi.mock("@/lib/cards/actions", () => ({ searchCardsAction: vi.fn() }));
 
@@ -36,12 +37,13 @@ const read = (path: string) =>
   readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
 
 const shoot = read("src/components/cards/page-scan.tsx");
+const scanner = read("src/components/cards/scanner.tsx");
+const viewer = read("src/components/cards/card-viewer.tsx");
 const check = read("src/components/cards/page-check.tsx");
 const queueCheck = read("src/components/cards/queue-check.tsx");
 const banner = read("src/components/binder/page-queues.tsx");
 const view = read("src/components/binder/binder-page.tsx");
 const add = read("src/components/binder/add-binder-card.tsx");
-const single = read("src/components/cards/scan-card.tsx");
 const ownPage = read("src/app/profile/binders/[binderId]/page.tsx");
 const inbox = read("src/components/inbox/inbox-list.tsx");
 const notify = read("src/lib/notifications/notify.ts");
@@ -70,38 +72,42 @@ describe("the shoot step sends pages and never waits for a read", () => {
   });
 
   it("makes the queue's batchId once, and sends every page with it", () => {
-    expect(shoot).toContain(
+    expect(scanner).toContain(
       "const [batchId] = useState(() => retake?.batchId ?? crypto.randomUUID());",
     );
-    expect(shoot.match(/crypto\.randomUUID\(\)/g)).toHaveLength(1);
+    expect(scanner.match(/crypto\.randomUUID\(\)/g)).toHaveLength(1);
+    expect(shoot).not.toContain("crypto.randomUUID()");
     expect(shoot).toContain('form.append("batchId", batchId);');
     expect(shoot).toContain('form.append("binderId", binderId);');
     expect(shoot).toContain('form.append("pageNumber", String(pageNumber));');
   });
 
-  it("says Sending..., then Sent, and a refusal in its own sentence with Retake", () => {
-    expect(shoot).toMatch(/\? PAGE_SENT\s*: SENDING_PAGE;/);
-    expect(shoot).toContain("? sendRefusalLine(status.reason)");
-    expect(shoot).toContain("{RETAKE}");
+  it("says Sending..., then Page 4 added, and a refusal in its own sentence", () => {
+    expect(scanner).toMatch(/\{inFlight > 0 && \([\s\S]*?\{SENDING_PAGE\}/);
+    expect(scanner).toContain("pageAddedLine(number)");
+    expect(scanner).toContain("sendRefusalLine(outcome.reason)");
   });
 
-  it("offers Done once a page is sent, and closes only when nothing is on its way", () => {
-    expect(shoot).toMatch(
-      /\{anySent && \(\s*<p[^>]*>\s*\{READING_IN_BACKGROUND\}\s*<\/p>/,
+  it("closes on Done only when nothing is on its way, and says the pages are read", () => {
+    expect(scanner).toMatch(/onClick=\{\(\) => setFinishing\(true\)\}/);
+    expect(scanner).toContain("{DONE_SCANNING}");
+    expect(scanner).toContain(
+      "if (!finishing || inFlight > 0 || closed.current) return;",
     );
-    expect(shoot).toMatch(/onClick=\{\(\) => setFinishing\(true\)\}/);
-    expect(shoot).toContain("{DONE_SCANNING}");
-    expect(shoot).toContain(
-      'const pending = queue.filter((page) => page.status.kind === "waiting").length;',
+    expect(scanner).toContain("onDone(sent > 0);");
+    expect(add).toContain("if (sentPages) setPagesWent(true);");
+    expect(add).toMatch(
+      /\{pagesWent && \(\s*<p[^>]*>\s*\{READING_IN_BACKGROUND\}\s*<\/p>/,
     );
-    expect(shoot).toContain("if (!finishing || pending > 0 || closed.current) return;");
   });
 
-  it("shows the pages left under the shutter, and the day's refusal instead of it at 0", () => {
-    expect(shoot).toContain("{pagesLeftLine(leftNow)}");
-    expect(shoot).toContain("const outOfPages = !retake && leftNow === 0;");
-    expect(shoot).toMatch(
-      /\{outOfPages \? \(\s*<p[^>]*>\s*\{SCAN_REFUSALS\["daily-pages"\]\}/,
+  it("shows the pages left once a page is sent, and the day's refusal at 0", () => {
+    expect(scanner).toContain("{pagesLeftLine(leftNow)}");
+    expect(scanner).toContain(
+      'const leftNow = typeof left === "number" ? Math.max(0, left - inFlight) : left;',
+    );
+    expect(scanner).toMatch(
+      /if \(leftNow === 0\) \{\s*setStep\(\{ kind: "refused", line: SCAN_REFUSALS\["daily-pages"\] \}\);/,
     );
     expect(add).toContain("left={pagesLeft}");
     expect(view).toContain("pagesLeft={queues.known ? queues.left : undefined}");
@@ -225,25 +231,25 @@ describe("a guess the reader was not sure of", () => {
     expect(unsure({ slot: 0, state: "empty" })).toBe(false);
   });
 
-  it("wears a mark on its tile, and says NOT_SURE and the note in its detail", () => {
+  it("wears a mark on its tile, and the viewer says NOT_SURE and the note", () => {
     expect(check).toMatch(/\{unsure\(pocket\) && \(\s*<span[^>]*>\s*<CircleHelp/);
-    expect(check).toMatch(
-      /\{unsure\(pocket\) && \(\s*<p[^>]*>\s*<CircleHelp[\s\S]*?\{NOT_SURE\}/,
+    expect(viewer).toMatch(
+      /\{unsure && \(\s*<div[^>]*>\s*<p[^>]*>\s*<CircleHelp[\s\S]*?\{NOT_SURE\}\s*<\/p>\s*\{item\.note && /,
     );
-    expect(check).toContain('{pocket.state === "found" && note && (');
-    /* An unread pocket's note, when it has one. */
-    expect(check).toContain('{pocket.state === "unread" && note && (');
+    /* Sure, or a quick read: the note under the match. */
+    expect(viewer).toContain("{!unsure && item.note && (");
+    expect(check).toContain(
+      'sure: pocket.state === "found" ? pocket.sure : undefined,',
+    );
+    expect(check).toContain(
+      'note: pocket.state === "empty" ? undefined : pocket.note,',
+    );
   });
 
-  it("on a single scan, says NOT_SURE under the read line, and the note", () => {
-    const line = single.indexOf("{line && <p");
-    const unsureAt = single.indexOf("{step.sure === false && (");
-    expect(line).toBeGreaterThan(-1);
-    expect(unsureAt).toBeGreaterThan(line);
-    expect(single.slice(unsureAt)).toMatch(/^[\s\S]*?\{NOT_SURE\}/);
-    expect(single).toContain("{step.note && <p");
-    expect(single).toContain("sure: outcome.sure,");
-    expect(single).toContain("note: outcome.note,");
+  it("on a single scan, says NOT_SURE and the note the same way, in the same viewer", () => {
+    expect(scanner).toContain("<CardViewer");
+    expect(scanner).toContain("sure: answer.sure,");
+    expect(scanner).toContain("note: answer.note,");
   });
 });
 
@@ -255,7 +261,7 @@ describe("a page that did not read is retaken into the same queue", () => {
     expect(failedPageLine(null)).toBe(rules.PAGE_FAILED);
   });
 
-  it("offers Retake, which opens the shoot step for that page with the queue's batchId", () => {
+  it("offers Retake, which opens the scanner for that page with the queue's batchId", () => {
     expect(queueCheck).toContain(
       'page.status === "failed" && onRetake ? () => onRetake(page.page) : undefined,',
     );
@@ -263,9 +269,12 @@ describe("a page that did not read is retaken into the same queue", () => {
     expect(view).toContain("setAdding({ pocket: null, retake: { batchId, page } });");
     expect(view).toContain("retake={adding?.retake ?? null}");
     expect(add).toContain("retake={retake}");
-    expect(shoot).toContain("() => retake?.page ?? firstEmptyPage(pockets),");
+    expect(add).toContain("setScanning(Boolean(retake));");
+    expect(scanner).toContain("() => retake?.page ?? firstEmptyPage(pockets),");
+    /* The photo is that page: it goes as one, without the single read. */
+    expect(scanner).toMatch(/if \(retake\) \{\s*await sendAsPage\(file\);/);
     /* Only when the camera is the player's: never a Retake that cannot work. */
-    expect(view).toMatch(/onRetake=\{\s*scanAccess === "on" && checking/);
+    expect(view).toMatch(/onRetake=\{\s*scanRights\?\.pages === "on" && checking/);
   });
 });
 
