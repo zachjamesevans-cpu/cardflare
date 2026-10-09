@@ -343,3 +343,32 @@ describe("pieces", () => {
     expect(read("mobile/src/api.ts")).toContain("const CHUNK = 6000;");
   });
 });
+
+describe("recognising like a collector", () => {
+  const source = read("src/lib/cards/page-agent.ts");
+  const prompt = source.slice(
+    source.indexOf("const SYSTEM = ["),
+    source.indexOf("const tools"),
+  );
+
+  it("recognises from the artwork and its own knowledge, not only from text", () => {
+    /* The founder's first page came back all "Text unreadable": the old
+       instructions forbade naming a card from memory. */
+    expect(prompt).not.toContain("Never name a card from memory");
+    expect(prompt).toContain("Use your own knowledge of the games freely.");
+    expect(prompt).toContain("most cards can be named from the artwork alone");
+  });
+
+  it("still only places cards its searches returned, and says what it saw when it cannot", () => {
+    expect(prompt).toContain("must use a card_id");
+    expect(prompt).toContain("put the name you recognised in read_name");
+    expect(source).toContain("That card was not in your search results.");
+  });
+
+  it("searches wide enough for a character with many printings", () => {
+    expect(source).toMatch(/findScanned\(\s*\{[\s\S]*?\},\s*12,\s*\)/);
+    expect(read("src/lib/cards/scan.ts")).toContain(
+      "if (read.number && !nameHasNumber) {",
+    );
+  });
+});

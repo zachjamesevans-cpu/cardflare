@@ -12,6 +12,7 @@ import {
   SCAN_MATCHES,
   SCAN_MAX_BYTES,
   POCKETS_PER_PAGE,
+  collectorValue,
   compactCode,
   rankScan,
   scanScore,
@@ -418,7 +419,11 @@ const NAME_CANDIDATES = 500;
  * name finds nothing, the ranked search tries, and then the number on
  * its own for the games that print the set into it.
  */
-export async function findScanned(read: ScanRead): Promise<ScanMatch[]> {
+export async function findScanned(
+  read: ScanRead,
+  /* The careful reader asks for more: a character with many printings. */
+  limit = SCAN_MATCHES,
+): Promise<ScanMatch[]> {
   if (read.game === "other") return [];
   const admin = getSupabaseAdmin();
   const names = [
@@ -451,7 +456,14 @@ export async function findScanned(read: ScanRead): Promise<ScanMatch[]> {
     }));
   }
 
-  if (candidates.length === 0 && read.number) {
+  /* The number on its own as well, whenever there is one and the name
+     found nothing with it: a misspelt or translated name must not hide a
+     card whose number was read right. */
+  const wanted = collectorValue(read.number);
+  const nameHasNumber = candidates.some(
+    (card) => wanted !== null && collectorValue(card.canonicalCardNumber) === wanted,
+  );
+  if (read.number && !nameHasNumber) {
     const compact = [
       ...new Set([compactCode(read.setCode + read.number), compactCode(read.number)]),
     ].filter(Boolean);
@@ -460,16 +472,18 @@ export async function findScanned(read: ScanRead): Promise<ScanMatch[]> {
       .select("id, canonical_card_number")
       .eq("game", read.game)
       .in("compact_card_number", compact)
-      .limit(SCAN_MATCHES);
-    candidates = (data ?? []).map((row) => ({
-      id: row.id,
-      canonicalCardNumber: row.canonical_card_number,
-    }));
+      .limit(limit);
+    const have = new Set(candidates.map((card) => card.id));
+    for (const row of data ?? []) {
+      if (!have.has(row.id)) {
+        candidates.push({ id: row.id, canonicalCardNumber: row.canonical_card_number });
+      }
+    }
   }
 
   if (candidates.length === 0) return [];
 
-  const best = rankScan(read, candidates);
+  const best = rankScan(read, candidates, limit);
   const cards = await cardResultsByIds(best.map((card) => card.id));
   return cards.map((card) => ({
     card,
