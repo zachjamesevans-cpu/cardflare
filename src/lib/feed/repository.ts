@@ -112,6 +112,16 @@ export function firstPerCard<T>(entries: T[], cardIdOf: (entry: T) => string): T
 /** How far back "just added" and "traded recently" reach. */
 const RECENT_DAYS = 7;
 
+/**
+ * How long an open Flare stays in the Feed. Not a week, like the news
+ * items above: a Flare is a standing "I want this" or "I have this",
+ * and still true until it is found or taken down (which takes it out at
+ * once). The founder (2026-10-09), after a week-old Flare quietly left
+ * his Feed: "go with 30 days." Read-time, so it reached back over the
+ * Flares a week had already hidden.
+ */
+const FLARE_DAYS = 30;
+
 /** Cards named on one "added to their binder" item before it counts instead. */
 const ADDED_SAMPLE = 3;
 
@@ -1596,7 +1606,7 @@ async function ownRoomFlares(viewerId: string) {
     .not("event_id", "is", null)
     .eq("status", "open")
     .in("intent", ["want", "showcase"])
-    .gte("created_at", since(RECENT_DAYS))
+    .gte("created_at", since(FLARE_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
 
@@ -1631,7 +1641,7 @@ async function areaHuntsFor(
        composer nowhere at all. */
     .in("intent", ["want", "showcase"])
     .is("event_id", null)
-    .gte("created_at", since(RECENT_DAYS))
+    .gte("created_at", since(FLARE_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
 
@@ -2350,7 +2360,7 @@ async function recentItems(
       "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, accepts_trade, accepts_cash, printing_id, quantity, hunt_request_id, found_quantity",
     )
     .eq("status", "open")
-    .gte("created_at", since(RECENT_DAYS))
+    .gte("created_at", since(FLARE_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
 
@@ -3006,7 +3016,7 @@ export async function guestSampleFeed(origin: Point | null): Promise<FeedEntry[]
     .in("intent", ["want", "showcase"])
     .is("event_id", null)
     .not("player_id", "is", null)
-    .gte("created_at", since(RECENT_DAYS))
+    .gte("created_at", since(FLARE_DAYS))
     .order("created_at", { ascending: false })
     .limit(RECENT_READ);
 

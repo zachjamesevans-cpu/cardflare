@@ -217,3 +217,21 @@ describe("the ring on a row that is all yours", () => {
     expect(grid).toContain("ring-2 ring-accent ring-inset");
   });
 });
+
+describe("how long a Flare stays in the Feed", () => {
+  const feed = readFileSync(
+    resolve(process.cwd(), "src/lib/feed/repository.ts"),
+    "utf8",
+  );
+
+  it("is thirty days for every Flare read, and a week for the news items", () => {
+    expect(feed).toContain("const FLARE_DAYS = 30;");
+    expect(feed).toContain("const RECENT_DAYS = 7;");
+    const flareReads = feed.split('.from("flares")').slice(1);
+    for (const read of flareReads) {
+      const window = read.slice(0, 900);
+      expect(window).not.toContain("since(RECENT_DAYS)");
+    }
+    expect(feed.match(/since\(FLARE_DAYS\)/g)).toHaveLength(4);
+  });
+});
