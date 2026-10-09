@@ -70,15 +70,17 @@ export type AgentOutcome =
 
 /* Budgets: a page may search and look a good deal; one card far less. */
 const BUDGET = {
-  page: { turns: 30, views: 27, searches: 45, ms: 230_000 },
-  card: { turns: 10, views: 8, searches: 12, ms: 40_000 },
+  page: { turns: 40, views: 45, searches: 60, ms: 230_000 },
+  card: { turns: 12, views: 12, searches: 15, ms: 45_000 },
 } as const;
 
 const SYSTEM = [
-  "You identify trading cards in photos for cardflare, a trading app, by matching each card to cardflare's own catalogue.",
-  "Never name a card from memory. Every card you choose must be one that search_cards returned in this conversation, and every printing must be one listed under that card.",
-  "Work like a careful collector: read the name, the collector number and the set code where you can; search; and when the number is unreadable, several cards fit, or the printing is unclear (alternate art, reprints, foils), use view_card on the candidates and compare the artwork, frame, set symbol and layout with the photo.",
-  "Glare, sleeves and distance are normal. Use the whole page photo for context and the close-ups for detail.",
+  "You identify trading cards in photos for cardflare, a trading app, and match each one to cardflare's own catalogue so it can go in the player's binder.",
+  "First recognise every card the way an expert collector would, from everything visible: the character or card name, the artwork, the frame and colours, the set's style and symbol, rarity marks, and any text you can read. Use your own knowledge of the games freely. Text does not need to be readable for you to know a card: most cards can be named from the artwork alone.",
+  "Then find each card with search_cards, using the English name you recognised and the set code or collector number when you know or can read them. If a search misses, search again differently: the name alone, a shorter or alternative spelling, or the set code and number alone.",
+  "When several results could be it (the same character in many sets, alternate arts, parallels, reprints), use view_card on the likely ones and choose the one whose artwork matches the photo.",
+  "Your answer for a pocket must use a card_id, and a printing_id when you can tell, from your search results. If you recognised a card but could not find it, answer unsure with card_id null, put the name you recognised in read_name, and say what you recognised in the note, for example: Roronoa Zoro, OP01 alternate art, not in the results.",
+  "Glare, sleeves, distance and photos of a screen are normal: rely on the artwork. Ignore anything laid over the photo, such as an on-screen button.",
   "Mark sure as false whenever you are not confident, and say why in the note in a few words. A wrong card the player trusts is worse than an honest unsure.",
   "When you have decided every pocket, call submit_page exactly once.",
 ].join("\n");
@@ -87,20 +89,20 @@ const tools: Anthropic.Beta.BetaTool[] = [
   {
     name: "search_cards",
     description:
-      "Search cardflare's catalogue. Give the card's name as printed (in English when you know it), the game, and the collector number and set code when you can read them. Returns up to six candidate cards with their printings.",
+      "Search cardflare's catalogue. Give the card's English name as you recognised it, the game, and the set code and collector number when you know or can read them (they narrow the results, and the number alone also finds a card). Returns up to twelve candidate cards with their printings.",
     input_schema: {
       type: "object",
       properties: {
         query: {
           type: "string",
-          description: "The card's name, as printed or in English.",
+          description: "The card's name in English, as you recognised it.",
         },
         game: { type: "string", enum: [...SCAN_GAMES] },
         number: {
           type: "string",
-          description: "Collector number as printed, or empty.",
+          description: "Collector number, or empty.",
         },
-        set_code: { type: "string", description: "Set code as printed, or empty." },
+        set_code: { type: "string", description: "Set code, or empty." },
       },
       required: ["query", "game"],
     },
@@ -345,14 +347,17 @@ export async function readWithAgent(input: {
             continue;
           }
           const query = asText(args.query);
-          const found = await findScanned({
-            found: true,
-            game,
-            name: query,
-            englishName: query,
-            number: asText(args.number),
-            setCode: asText(args.set_code),
-          });
+          const found = await findScanned(
+            {
+              found: true,
+              game,
+              name: query,
+              englishName: query,
+              number: asText(args.number),
+              setCode: asText(args.set_code),
+            },
+            12,
+          );
           for (const match of found) seen.set(match.card.id, match.card);
           results.push({
             type: "tool_result",
@@ -370,6 +375,8 @@ export async function readWithAgent(input: {
                         set_code: printing.setCode,
                         set_name: printing.setName,
                         label: printing.printingLabel,
+                        rarity: printing.rarity,
+                        variant: printing.variantType,
                       })),
                     })),
                   ),
