@@ -223,6 +223,7 @@ export function CardSelectSheet({
   body,
   hitNote,
   footer,
+  searchFor = null,
 }: {
   visible: boolean;
   target: PostTarget;
@@ -239,9 +240,19 @@ export function CardSelectSheet({
   hitNote?: (hit: CardHit) => ReactNode;
   /** Drawn instead of the summary and Done: the binder's tray and Add button. */
   footer?: ReactNode;
+  /**
+   * Words to put in the search, each time a new one arrives: the
+   * binder's scanner, when it read a card the catalogue could not find.
+   */
+  searchFor?: { text: string } | null;
 }) {
   const insets = useSafeAreaInsets();
   const search = useCardSearch(target);
+  const { setQuery } = search;
+
+  useEffect(() => {
+    if (searchFor) setQuery(searchFor.text);
+  }, [searchFor, setQuery]);
 
   /*
    * A printing named here is the exact art asked for; the row's own

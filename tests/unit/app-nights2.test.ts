@@ -290,7 +290,9 @@ describe("the night's page", () => {
     expect(mutual).toContain('name="flame"');
     expect(mutual).toContain("{MUTUAL_MATCH}");
     expect(mutual).toContain("<ThumbRow label={YOU_WANT} cards={match.youWant} />");
-    expect(mutual).toContain("<ThumbRow label={THEY_WANT} cards={match.theyWant} />");
+    expect(mutual).toContain(
+      "<ThumbRow label={THEY_WANT} cards={match.theyWant} held />",
+    );
     expect(mutual).toContain("{MUTUAL_LINE}");
     expect(mutual).toContain("label={`Message ${player.displayName}`}");
     /* Message opens the one direct thread, the profile's way; a guest

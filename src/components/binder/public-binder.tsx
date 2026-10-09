@@ -9,6 +9,7 @@ import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { scannerAccess } from "@/lib/cards/scan";
 import { readNightBinder } from "@/lib/events/night-binders";
 import { playerForUser } from "@/lib/players/accounts";
 import { listPlayerGames } from "@/lib/players/games";
@@ -56,9 +57,13 @@ export async function PublicBinder({
   if (!binder) notFound();
 
   const other = Boolean(me && me !== playerId);
-  const [games, block] = await Promise.all([
+  const [games, block, scanAccess] = await Promise.all([
     binder.yours ? listPlayerGames(playerId) : [],
     blockState(me, playerId),
+    /* The owner's tools include the card scanner, read with the page. */
+    binder.yours && me && viewer.kind !== "anonymous"
+      ? scannerAccess({ playerId: me, userId: viewer.user.id })
+      : null,
   ]);
 
   /*
@@ -97,6 +102,7 @@ export async function PublicBinder({
         title={name}
         offerAs={offerAs}
         nightId={nightId}
+        scanAccess={scanAccess}
         footer={
           other ? (
             /* The message door, under the same block rule as the

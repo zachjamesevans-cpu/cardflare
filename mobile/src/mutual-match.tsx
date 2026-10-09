@@ -19,6 +19,7 @@ import {
   THEY_WANT,
   YOU_WANT,
 } from "./night-copy";
+import { HeldRing } from "./held-ring";
 import { PlayerAvatar } from "./player-avatar";
 import { colors, radius, spacing } from "./theme";
 import { Button, CardImage, ErrorLine, Tap, type ZoomCard } from "./ui";
@@ -96,7 +97,7 @@ export function MutualMatchBlock({
       </Tap>
 
       <ThumbRow label={YOU_WANT} cards={match.youWant} />
-      <ThumbRow label={THEY_WANT} cards={match.theyWant} />
+      <ThumbRow label={THEY_WANT} cards={match.theyWant} held />
 
       <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{MUTUAL_LINE}</Text>
 
@@ -114,21 +115,29 @@ export function MutualMatchBlock({
  * the tile: "They have another printing" on their side, "You have
  * another printing" on yours. The caption keeps the printing the
  * wanter named. The website's MatchThumbs.
+ *
+ * The They want row is cards YOU hold, every one, so it wears the
+ * green ring; on the other row a card's `match` says how well THEY
+ * hold it, which is not the ring's fact, so no ring there.
  */
 export function ThumbRow({
   label,
   cards,
   width = 44,
+  held = false,
 }: {
   label: string;
   cards: MatchCard[];
   width?: number;
+  /** True on the They want row: the viewer holds every card in it. */
+  held?: boolean;
 }) {
   const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     name: card.name,
     cardNumber: card.number,
     caption: card.printingLabel,
+    youHave: held ? { kind: card.match, count: 0 } : null,
   }));
 
   return (
@@ -139,19 +148,22 @@ export function ThumbRow({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5), paddingVertical: 2 }}
+        contentContainerStyle={{ gap: spacing(1.5), padding: 2 }}
       >
         {cards.map((card, position) => (
           <View key={card.cardId} style={{ width, gap: spacing(0.5) }}>
-            <CardImage
-              imageUrl={card.imageUrl}
-              width={width}
-              name={card.name}
-              cardNumber={card.number}
-              caption={card.printingLabel}
-              siblings={shelf}
-              position={position}
-            />
+            <View>
+              <CardImage
+                imageUrl={card.imageUrl}
+                width={width}
+                name={card.name}
+                cardNumber={card.number}
+                caption={card.printingLabel}
+                siblings={shelf}
+                position={position}
+              />
+              <HeldRing match={held ? card.match : null} />
+            </View>
             {card.match === "other-printing" ? (
               <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: 11, lineHeight: 12 }}>
                 {OTHER_PRINTING_SHORT}

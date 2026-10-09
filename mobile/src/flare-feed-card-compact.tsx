@@ -6,6 +6,7 @@ import { ActionSheet, DotsButton } from "./action-menu";
 import type { FeedEntry } from "./api";
 import { agoFrom, postActions } from "./flare-feed-card";
 import { shelfFor } from "./flare-deck-pager";
+import { HeldRing } from "./held-ring";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
 import { QuantityBadge } from "./quantity-badge";
@@ -177,7 +178,10 @@ export function FlareFeedCardCompact({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
+        /* Room for a held card's ring, the edges kept where they were:
+           the website's -mx-1 px-1. */
+        style={{ marginHorizontal: -spacing(0.5) }}
+        contentContainerStyle={{ gap: spacing(1.5), padding: spacing(0.5) }}
       >
         {item.cards.map((card, index) => (
           <View key={card.cardId}>
@@ -190,6 +194,8 @@ export function FlareFeedCardCompact({
               siblings={shelf}
               position={index}
             />
+            {/* The copies tag owns the top left. */}
+            <HeldRing match={card.match} corner="right" />
             <NeedBadge card={card} offering={offering} />
           </View>
         ))}

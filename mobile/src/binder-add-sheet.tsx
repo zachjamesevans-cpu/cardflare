@@ -1,8 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useMemo, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useEffect, useMemo, useState } from "react";
 import { ScrollView, Text, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import type { StackParams } from "../App";
 import {
   addBinderCards,
   ApiError,
@@ -12,7 +15,9 @@ import {
   type BinderListEntry,
   type CardHit,
   friendlyError,
+  getScanAccess,
   previewBinderList,
+  type ScanAccess,
   serverMessage,
 } from "./api";
 import {
@@ -23,9 +28,12 @@ import {
   notFoundLine,
   unreadableLine,
 } from "./binder-add-copy";
+import { CardScanner } from "./card-scanner";
 import { CardSelectSheet, lineKey, type PickedLine } from "./card-select";
+import { leadArt } from "./flare-bits";
 import { QuantityBadge } from "./quantity-badge";
 import { RemoteImage } from "./remote-image";
+import { SCAN_CARD, SCAN_WITH_PRO } from "./scan-copy";
 import { Stepper } from "./stepper";
 import { colors, gutter, radius, spacing } from "./theme";
 import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
@@ -48,6 +56,13 @@ import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
  * - "Paste a list" beside Search: a deck list, looked up first, shown
  *   as art with names and tags, quantities editable, the lines that
  *   matched nothing said plainly, and the same button.
+ * - "Scan a card" beside those two, for a player the server lets scan
+ *   (src/card-scanner.tsx): a photo is read, the player says "Add to
+ *   binder", and the card lands in the same tray the search fills.
+ *   The founder (2026-10-09): a Pro feature, "to cover the cost",
+ *   tried by admins first. A player who could have it with Pro sees
+ *   "Scan cards with Pro" instead, to the Pro screen; anybody else
+ *   sees nothing, so there is never a button that cannot work.
  *
  * Opened from a tapped "+" pocket, the batch starts AT that pocket:
  * the first card goes there, the rest into the next empty ones, which
@@ -62,7 +77,7 @@ export interface BinderAdded {
   firstPocket: number | null;
 }
 
-type Mode = "search" | "paste";
+type Mode = "search" | "paste" | "scan";
 
 /** A pasted line, looked up, with the copies the owner settled on. */
 type PastedLine = BinderListEntry & { key: string };
@@ -100,10 +115,29 @@ export function BinderAddSheet({
 }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [mode, setMode] = useState<Mode>("search");
   const [lines, setLines] = useState<PickedLine[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* Whether this player scans, sees the way to Pro, or neither. Asked
+     once with the binder, so the menu opens already knowing: nothing is
+     drawn until the server has said, and nothing drawn then vanishes. */
+  const [scanAccess, setScanAccess] = useState<ScanAccess>(null);
+  const [searchFor, setSearchFor] = useState<{ text: string } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void getScanAccess()
+      .then((access) => {
+        if (live) setScanAccess(access);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
 
   /* The pasted list: the text, then what it looked up to. */
   const [text, setText] = useState("");
@@ -180,6 +214,45 @@ export function BinderAddSheet({
     }
   };
 
+  /* Closing leaves the camera: the menu never reopens straight into it,
+     so the camera is only ever asked for on a tap of "Scan a card". */
+  const close = () => {
+    setMode((current) => (current === "scan" ? "search" : current));
+    onClose();
+  };
+
+  /* A scanned card into the tray: one copy, or one more of a line that
+     is there already, exactly as a tap on a search result does. */
+  const addScanned = (hit: CardHit, printingId: string | null) => {
+    setError(null);
+    setLines((current) => {
+      const key = lineKey({ cardId: hit.id, printingId });
+      if (current.some((line) => lineKey(line) === key)) {
+        return current.map((line) =>
+          lineKey(line) === key
+            ? { ...line, quantity: Math.min(99, line.quantity + 1) }
+            : line,
+        );
+      }
+      const art = printingId
+        ? (hit.printings.find((printing) => printing.id === printingId)?.imageUrl ??
+          leadArt(hit))
+        : leadArt(hit);
+      return [
+        ...current,
+        {
+          cardId: hit.id,
+          name: hit.name,
+          cardNumber: hit.cardNumber,
+          imageUrl: art,
+          printings: hit.printings,
+          printingId,
+          quantity: 1,
+        },
+      ];
+    });
+  };
+
   /* One fewer copy of a picked line, gone at none: the picker's minus. */
   const less = (key: string) =>
     setLines((current) =>
@@ -205,55 +278,89 @@ export function BinderAddSheet({
     );
   };
 
-  /* Search or Paste a list, the website's two tabs. */
+  /* Search, Paste a list and, for a player who scans, Scan a card: the
+     website's tabs. The way to Pro sits under them, a full-width button
+     as on the website, for a player who could scan with Pro. */
+  const modes: (readonly [Mode, string])[] = [
+    ["search", BINDER_ADD_COPY.search],
+    ["paste", BINDER_ADD_COPY.paste],
+    ...(scanAccess === "on" ? [["scan", SCAN_CARD] as const] : []),
+  ];
   const switcher = (
-    <View
-      style={{
-        flexDirection: "row",
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        padding: 3,
-        gap: 3,
-      }}
-    >
-      {(
-        [
-          ["search", BINDER_ADD_COPY.search],
-          ["paste", BINDER_ADD_COPY.paste],
-        ] as const
-      ).map(([value, label]) => {
-        const on = mode === value;
-        return (
-          <Tap
-            key={value}
-            onPress={() => {
-              setMode(value);
-              setError(null);
-            }}
-            accessibilityLabel={label}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              paddingVertical: spacing(2),
-              borderRadius: radius.control - 3,
-              backgroundColor: on ? colors.accent : "transparent",
-            }}
-          >
-            <Text
+    <View style={{ gap: spacing(2) }}>
+      <View
+        style={{
+          flexDirection: "row",
+          borderRadius: radius.control,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          padding: 3,
+          gap: 3,
+        }}
+      >
+        {modes.map(([value, label]) => {
+          const on = mode === value;
+          return (
+            <Tap
+              key={value}
+              onPress={() => {
+                setMode(value);
+                setError(null);
+              }}
+              accessibilityLabel={label}
               style={{
-                color: on ? colors.accentContrast : colors.textSecondary,
-                fontWeight: "700",
-                fontSize: 13,
+                flex: 1,
+                alignItems: "center",
+                paddingVertical: spacing(2),
+                borderRadius: radius.control - 3,
+                backgroundColor: on ? colors.accent : "transparent",
               }}
             >
-              {label}
-            </Text>
-          </Tap>
-        );
-      })}
+              <Text
+                style={{
+                  color: on ? colors.accentContrast : colors.textSecondary,
+                  fontWeight: "700",
+                  fontSize: 13,
+                }}
+              >
+                {label}
+              </Text>
+            </Tap>
+          );
+        })}
+      </View>
+      {scanAccess === "pro-door" ? (
+        <Tap
+          onPress={() => {
+            close();
+            navigation.navigate("Pro");
+          }}
+          accessibilityRole="link"
+          accessibilityLabel={SCAN_WITH_PRO}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing(1.5),
+            paddingVertical: spacing(2),
+            borderRadius: radius.control,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
+        >
+          <Ionicons name="scan-outline" size={16} color={colors.accent} />
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
+            {SCAN_WITH_PRO}
+          </Text>
+        </Tap>
+      ) : null}
     </View>
+  );
+
+  const scanBody = (
+    <CardScanner onAdd={addScanned} onNotFound={(text) => setSearchFor({ text })} />
   );
 
   /* The pasted list's confirmation grid: three across, measured off the window. */
@@ -404,7 +511,7 @@ export function BinderAddSheet({
         gap: spacing(2),
       }}
     >
-      {mode === "search" && lines.length > 0 ? (
+      {mode !== "paste" && lines.length > 0 ? (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -453,7 +560,7 @@ export function BinderAddSheet({
         </ScrollView>
       ) : null}
       <ErrorLine message={error} />
-      {mode === "search" ? (
+      {mode !== "paste" ? (
         <Button
           label={addToBinderLabel(lines.length)}
           busy={busy}
@@ -493,12 +600,13 @@ export function BinderAddSheet({
       target={{ kind: "list" }}
       items={lines}
       onChange={setLines}
-      onClose={onClose}
+      onClose={close}
       title={BINDER_ADD_COPY.title}
       above={switcher}
-      body={mode === "paste" ? pasteBody : undefined}
+      body={mode === "paste" ? pasteBody : mode === "scan" ? scanBody : undefined}
       hitNote={hitNote}
       footer={footer}
+      searchFor={searchFor}
     />
   );
 }

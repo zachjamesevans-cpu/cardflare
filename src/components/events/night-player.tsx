@@ -61,7 +61,8 @@ export function NightPlayer({
     cardName: entry.cardName,
     cardNumber: entry.cardNumber,
     imageUrl: imagesEnabled ? entry.imageUrl : null,
-    match: null,
+    /* The server's: a want your Have list answers, already first. */
+    match: entry.match,
     printingId: entry.printingId,
     printingLabel: entry.printingLabel,
     quantity: entry.quantity,
@@ -114,6 +115,7 @@ export function NightPlayer({
             imagesEnabled={imagesEnabled}
             direction="want"
             label={THEY_WANT}
+            held
           />
         </section>
       )}

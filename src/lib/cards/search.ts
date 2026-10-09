@@ -263,6 +263,47 @@ export async function cardResultById(cardId: string): Promise<CardResult | null>
 }
 
 /**
+ * Several cards, shaped the way search results are, in the order the
+ * ids were given: a scan's best guesses, best first. Two queries for
+ * the lot, whatever the count.
+ */
+export async function cardResultsByIds(cardIds: string[]): Promise<CardResult[]> {
+  if (!isSupabaseConfigured() || cardIds.length === 0) return [];
+  const { data: rows, error } = await getSupabaseAdmin()
+    .from("cards")
+    .select(
+      "id, game, exact_name, canonical_card_number, card_type, colors, traits, cost, power, counter, life, rarity, effect_text, trigger_text",
+    )
+    .in("id", cardIds);
+  if (error || !rows) return [];
+  const printings = await printingsFor(rows.map((row) => row.id));
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  return cardIds.flatMap((id) => {
+    const row = byId.get(id);
+    if (!row) return [];
+    return [
+      {
+        id: row.id,
+        game: row.game,
+        exactName: row.exact_name,
+        canonicalCardNumber: row.canonical_card_number,
+        cardType: row.card_type,
+        colors: row.colors ?? [],
+        traits: row.traits ?? [],
+        cost: row.cost,
+        power: row.power,
+        counter: row.counter,
+        life: row.life,
+        rarity: row.rarity,
+        effectText: row.effect_text,
+        triggerText: row.trigger_text,
+        printings: printings.get(row.id) ?? [],
+      },
+    ];
+  });
+}
+
+/**
  * Card ids for a list of printed numbers, keyed by compact number.
  *
  * One query for a whole deck list rather than one per line: a pasted

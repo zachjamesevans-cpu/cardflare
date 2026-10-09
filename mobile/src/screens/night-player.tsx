@@ -25,6 +25,7 @@ import {
   tradeCardsLine,
 } from "../night-copy";
 import { NightSection } from "../night-section";
+import { HeldRing } from "../held-ring";
 import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, spacing } from "../theme";
 import {
@@ -146,6 +147,7 @@ export function NightPlayerScreen({
     note: f.note,
     lookingFor: f.quantity,
     direction: f.intent,
+    youHave: f.match ? { kind: f.match, count: 0 } : null,
   }));
 
   return (
@@ -197,7 +199,7 @@ export function NightPlayerScreen({
           <ThumbRow label={THEY_HAVE} cards={view.theyHave} width={56} />
         ) : null}
         {view.theyWant.length > 0 ? (
-          <ThumbRow label={THEY_WANT} cards={view.theyWant} width={56} />
+          <ThumbRow label={THEY_WANT} cards={view.theyWant} width={56} held />
         ) : null}
 
         <MessageButton
@@ -270,22 +272,27 @@ function FlareTiles({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ gap: spacing(2), paddingVertical: 2 }}
+      contentContainerStyle={{ gap: spacing(2), padding: 2 }}
     >
       {flares.map((f, position) => (
         <View key={f.id} style={{ width: 72, gap: spacing(1) }}>
-          <CardImage
-            imageUrl={f.imageUrl}
-            width={72}
-            name={f.cardName}
-            cardNumber={f.cardNumber}
-            caption={f.printingLabel}
-            note={f.note}
-            lookingFor={f.quantity}
-            direction={f.intent}
-            siblings={shelf}
-            position={position}
-          />
+          {/* A want your Have list answers: the server put it first and
+              graded it the way the They want row is. */}
+          <View>
+            <CardImage
+              imageUrl={f.imageUrl}
+              width={72}
+              name={f.cardName}
+              cardNumber={f.cardNumber}
+              caption={f.printingLabel}
+              note={f.note}
+              lookingFor={f.quantity}
+              direction={f.intent}
+              siblings={shelf}
+              position={position}
+            />
+            <HeldRing match={f.match} />
+          </View>
           <Text
             numberOfLines={1}
             style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "700" }}

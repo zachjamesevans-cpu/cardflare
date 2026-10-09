@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Layers, PackageCheck } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
@@ -10,8 +11,9 @@ import type { ProfileFlare } from "@/lib/players/profile";
  * opens on.
  *
  * The count is the same number the header's Flares stat shows, and
- * the grid under it is the whole list, three across, newest first: a
- * profile with sixty Flares scrolls. Each tile is the one card viewer
+ * the grid under it is the whole list, three across, newest first,
+ * except that a want in the viewer's binder comes first and wears the
+ * green ring: a profile with sixty Flares scrolls. Each tile is the one card viewer
  * every shelf uses. A want wears no label: the founder, on a grid where
  * every tile wore the want label, "Delete the 'looking for' part on all
  * cards. Seems kinda redundant when they know it's for flares." A
@@ -54,6 +56,7 @@ export function ProfileFlares({
     caption: flare.printingLabel,
     lookingFor: flare.quantity,
     direction: flare.direction === "want" ? "want" : "showcase",
+    youHave: flare.match ? { kind: flare.match, count: 0 } : null,
   }));
 
   return (
@@ -112,6 +115,7 @@ export function ProfileFlares({
                   caption={flare.printingLabel}
                   lookingFor={flare.quantity}
                   direction={want ? "want" : "showcase"}
+                  youHave={flare.match ? { kind: flare.match, count: 0 } : null}
                   siblings={shelf}
                   position={index}
                   enabled={imagesEnabled}
@@ -121,6 +125,30 @@ export function ProfileFlares({
                      to twice its size and reads as a blur. */
                   thumbSizes="(max-width: 672px) 33vw, 220px"
                 />
+                {flare.match && (
+                  /* A want in your binder: the green ring a card you
+                     have wears everywhere, and the server put it
+                     first. Inset, because the grid runs tile to tile
+                     and a ring outside would sit on the neighbour. The
+                     corner icon goes top right: the copies tag owns
+                     top left on this grid. */
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-accent ring-inset"
+                    />
+                    <span className="pointer-events-none absolute top-1 right-1 rounded-full bg-surface/90 p-0.5">
+                      {flare.match === "exact" ? (
+                        <PackageCheck
+                          className="size-3 text-accent"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Layers className="size-3 text-accent" aria-hidden="true" />
+                      )}
+                    </span>
+                  </>
+                )}
                 <QuantityBadge
                   quantity={flare.quantity}
                   className="pointer-events-none absolute top-1 left-1"

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 
 import type { ProfileFlare } from "./api";
+import { HeldRing } from "./held-ring";
 import { QuantityBadge } from "./quantity-badge";
 import { PROFILE_INSET } from "./profile-tabs";
 import { colors, spacing } from "./theme";
@@ -15,13 +16,14 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
  * No heading of its own: the Flares tab in the strip above is the
  * heading. A small count line sits at the top, the same number the
  * header's Flares stat shows, and the grid under it is the whole
- * list, three across, newest first: a profile with sixty Flares
- * scrolls. Each tile is the one card viewer every shelf uses. A want
- * wears no label (the founder: "Delete the 'looking for' part on all
- * cards. Seems kinda redundant when they know it's for flares."); a
- * showcase keeps a small "Offering" chip at the foot, so a mixed grid
- * still tells the two apart. More than one copy is the quantity tag in
- * the top-left corner, the binder's. Nothing to offer on from here;
+ * list, three across, newest first, except that a want in the
+ * viewer's binder comes first and wears the green ring: a profile with
+ * sixty Flares scrolls. Each tile is the one card viewer every shelf
+ * uses. A want wears no label (the founder: "Delete the 'looking for'
+ * part on all cards. Seems kinda redundant when they know it's for
+ * flares."); a showcase keeps a small "Offering" chip at the foot, so
+ * a mixed grid still tells the two apart. More than one copy is the
+ * quantity tag in the top-left corner, the binder's. Nothing to offer on from here;
  * the Feed and the room are where a Flare is answered.
  */
 
@@ -55,6 +57,7 @@ export function ProfileFlares({
     caption: flare.printingLabel,
     lookingFor: flare.quantity,
     direction: flare.direction === "want" ? "want" : "showcase",
+    youHave: flare.match ? { kind: flare.match, count: 0 } : null,
   }));
 
   return (
@@ -99,9 +102,14 @@ export function ProfileFlares({
                 caption={flare.printingLabel}
                 lookingFor={flare.quantity}
                 direction={flare.direction === "want" ? "want" : "showcase"}
+                youHave={flare.match ? { kind: flare.match, count: 0 } : null}
                 siblings={shelf}
                 position={index}
               />
+              {/* A want in your binder. Inset, because the grid runs tile
+                  to tile; the icon top right, because the copies tag owns
+                  top left. */}
+              <HeldRing match={flare.match} inset corner="right" />
               <QuantityBadge
                 quantity={flare.quantity}
                 style={{ position: "absolute", top: 4, left: 4 }}

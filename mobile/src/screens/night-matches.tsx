@@ -17,6 +17,7 @@ import {
   type NightMatches,
   type RoomPhase,
 } from "../api";
+import { HeldRing } from "../held-ring";
 import { MessageButton, MutualMatchBlock } from "../mutual-match";
 import {
   FROM_YOUR_FLARE,
@@ -250,6 +251,7 @@ export function NightMatchesScreen({ code }: { code: string }) {
               key={entry.player.playerId}
               player={entry.player}
               onPlayer={onPlayer}
+              held
               cards={entry.cards.map((card) => ({
                 card,
                 lead: "Looking for",
@@ -269,12 +271,14 @@ export function NightMatchesScreen({ code }: { code: string }) {
  * event-facing profile), one line per card with its thumbnail, the
  * muted "another printing" line when the match is not on the printing
  * the wanter named, and Message. The match card is one of the two
- * boxes the page allows.
+ * boxes the page allows. On "They want what you have" every card is
+ * one you hold, so its thumbnails wear the green ring.
  */
 function MatchPlayerCard({
   player,
   cards,
   onPlayer,
+  held = false,
 }: {
   player: MatchPlayer;
   cards: {
@@ -285,12 +289,15 @@ function MatchPlayerCard({
     note: string | null;
   }[];
   onPlayer: (playerId: string) => void;
+  /** True on They want what you have: the viewer holds every card. */
+  held?: boolean;
 }) {
   const shelf: ZoomCard[] = cards.map(({ card }) => ({
     imageUrl: card.imageUrl,
     name: card.name,
     cardNumber: card.number,
     caption: card.printingLabel,
+    youHave: held ? { kind: card.match, count: 0 } : null,
   }));
 
   return (
@@ -329,15 +336,18 @@ function MatchPlayerCard({
             key={card.cardId}
             style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}
           >
-            <CardImage
-              imageUrl={card.imageUrl}
-              width={36}
-              name={card.name}
-              cardNumber={card.number}
-              caption={card.printingLabel}
-              siblings={shelf}
-              position={position}
-            />
+            <View>
+              <CardImage
+                imageUrl={card.imageUrl}
+                width={36}
+                name={card.name}
+                cardNumber={card.number}
+                caption={card.printingLabel}
+                siblings={shelf}
+                position={position}
+              />
+              <HeldRing match={held ? card.match : null} />
+            </View>
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={{ color: colors.textPrimary, fontSize: 14 }}>
                 <Text style={{ color: colors.textMuted }}>{`${lead}: `}</Text>

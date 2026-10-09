@@ -1,6 +1,7 @@
-import { ScrollView } from "react-native";
+import { ScrollView, View } from "react-native";
 
 import type { FeedCard } from "./api";
+import { HeldRing } from "./held-ring";
 import { haveFor, type PostRef } from "./post-social";
 import { spacing } from "./theme";
 import { CardImage, Muted, type ZoomCard } from "./ui";
@@ -52,37 +53,44 @@ export function CardRail({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      /* Room for a held card's ring at either end, the edges kept where
+         they were: the website's -mx-1 px-1. */
+      style={{ marginHorizontal: -spacing(0.5) }}
       contentContainerStyle={{
         gap: spacing(2),
         alignItems: "center",
         paddingVertical: spacing(0.5),
+        paddingHorizontal: spacing(0.5),
       }}
     >
       {cards.map((card, index) => (
-        <CardImage
-          key={card.cardId}
-          imageUrl={card.imageUrl}
-          width={width}
-          name={card.cardName}
-          cardNumber={card.cardNumber}
-          youHave={card.match ? { kind: card.match, count: 0 } : undefined}
-          state={card.state}
-          have={haveFor(card, post)}
-          /*
-           * The rest of the rail, so an opened card can be swiped along
-           * it. The founder: "when there's a card u click on anywhere,
-           * for example someones flares, you cant swipe between the
-           * cards on the app. u can on the website though."
-           *
-           * The zoom has always been able to do this - `siblings` and
-           * the swipe that reads it are already in CardImage, and Room
-           * and Local both hand it a shelf. The Feed never did, so its
-           * cards opened one at a time and closed again, which is the
-           * one place somebody is browsing rather than working.
-           */
-          siblings={shelf}
-          position={index}
-        />
+        <View key={card.cardId}>
+          <CardImage
+            imageUrl={card.imageUrl}
+            width={width}
+            name={card.cardName}
+            cardNumber={card.cardNumber}
+            youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+            state={card.state}
+            have={haveFor(card, post)}
+            /*
+             * The rest of the rail, so an opened card can be swiped along
+             * it. The founder: "when there's a card u click on anywhere,
+             * for example someones flares, you cant swipe between the
+             * cards on the app. u can on the website though."
+             *
+             * The zoom has always been able to do this - `siblings` and
+             * the swipe that reads it are already in CardImage, and Room
+             * and Local both hand it a shelf. The Feed never did, so its
+             * cards opened one at a time and closed again, which is the
+             * one place somebody is browsing rather than working.
+             */
+            siblings={shelf}
+            position={index}
+          />
+          {/* A card you hold: the server put it first, the ring says so. */}
+          <HeldRing match={card.match} />
+        </View>
       ))}
       {more > 0 ? <Muted>{`+${more} more`}</Muted> : null}
     </ScrollView>

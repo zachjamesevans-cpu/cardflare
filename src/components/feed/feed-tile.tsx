@@ -129,6 +129,7 @@ export function FeedTile({
   state = "open",
   direction = "want",
   have = null,
+  corner = "left",
 }: {
   imageUrl: string | null;
   name: string;
@@ -146,6 +147,8 @@ export function FeedTile({
   direction?: "want" | "showcase";
   /** The offer in the large view, when the viewer can make one. */
   have?: ZoomHave | null;
+  /** Where the held icon sits, for a tile whose top left holds a count. */
+  corner?: "left" | "right";
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -219,7 +222,11 @@ export function FeedTile({
         </span>
       )}
       {match && (
-        <span className="pointer-events-none absolute top-0.5 left-0.5 rounded-full bg-surface/90 p-0.5">
+        <span
+          className={`pointer-events-none absolute top-0.5 rounded-full bg-surface/90 p-0.5 ${
+            corner === "left" ? "left-0.5" : "right-0.5"
+          }`}
+        >
           {match === "exact" ? (
             <PackageCheck className="size-3 text-accent" aria-hidden="true" />
           ) : (
