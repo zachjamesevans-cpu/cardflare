@@ -131,36 +131,60 @@ type Raw = z.infer<typeof pocketSchema>;
 type Seen = Omit<Raw, "state" | "game"> & {
   state: "empty" | "card";
   game: ScanGame | "other";
+  /** The reader's own word for the game, kept for the log. */
+  said: string;
 };
 
-/** The names a reader might write for each game, to ours. */
-const GAME_WORDS: Record<string, ScanGame> = {
-  onepiece: "one-piece",
-  riftbound: "riftbound",
-  lorcana: "lorcana",
-  disneylorcana: "lorcana",
-  mtg: "mtg",
-  magic: "mtg",
-  magicthegathering: "mtg",
-  pokemon: "pokemon",
-  pokmon: "pokemon",
-  fleshandblood: "flesh-and-blood",
-  fab: "flesh-and-blood",
-};
+/**
+ * The words a reader might use for each game, found anywhere in what it
+ * wrote: "One Piece Card Game", "Pokémon TCG", "Disney Lorcana". The
+ * founder's first page on this reader came back with every pocket unread
+ * because a long name like those fell through to "other" and was never
+ * looked up.
+ */
+const GAME_WORDS: [string, ScanGame][] = [
+  ["onepiece", "one-piece"],
+  ["optcg", "one-piece"],
+  ["riftbound", "riftbound"],
+  ["lorcana", "lorcana"],
+  ["magic", "mtg"],
+  ["mtg", "mtg"],
+  ["pokemon", "pokemon"],
+  ["pokmon", "pokemon"],
+  ["ptcg", "pokemon"],
+  ["fleshandblood", "flesh-and-blood"],
+  ["fab", "flesh-and-blood"],
+];
 
 /** A reader's word for a game, as one of ours, or "other". */
 export function gameOf(word: string): ScanGame | "other" {
-  const key = word.toLowerCase().replace(/[^a-z]/g, "");
-  if ((SCAN_GAMES as readonly string[]).includes(word.trim().toLowerCase())) {
-    return word.trim().toLowerCase() as ScanGame;
-  }
-  return GAME_WORDS[key] ?? "other";
+  const exact = word.trim().toLowerCase();
+  if ((SCAN_GAMES as readonly string[]).includes(exact)) return exact as ScanGame;
+  const key = exact.replace(/[^a-z]/g, "");
+  return GAME_WORDS.find(([words]) => key.includes(words))?.[1] ?? "other";
+}
+
+/**
+ * The games to look a pocket up in: the one the reader named, or, when
+ * it named none we carry, the player's own games (every game when the
+ * player has not said), so an odd word never leaves a card unsearched.
+ */
+export function gamesToTry(
+  seen: ScanGame | "other",
+  playerGames: readonly string[],
+): ScanGame[] {
+  if (seen !== "other") return [seen];
+  const own = playerGames.filter((game): game is ScanGame =>
+    (SCAN_GAMES as readonly string[]).includes(game),
+  );
+  return own.length > 0 ? own : [...SCAN_GAMES];
 }
 
 const tidy = (raw: Raw): Seen => ({
   ...raw,
   state: raw.state.trim().toLowerCase() === "empty" ? "empty" : "card",
   game: gameOf(raw.game),
+  said: raw.game,
 });
 
 const tiebreakSchema = z.object({
@@ -170,7 +194,7 @@ const tiebreakSchema = z.object({
 const READ_PROMPT = [
   "You identify trading cards in photos for cardflare, a trading app. Our catalogue finds each card from what you say, so describe each one precisely.",
   "Recognise every card the way an expert collector would, from everything visible: the artwork, the character, the frame and its colours, the set's style, rarity marks, and any text you can read. Use your own knowledge of the games freely: most cards can be named from the artwork alone, even at an angle or under glare.",
-  "For each card give: game; name as printed; englishName (the English name, the same as name when it is printed in English); number and setCode exactly as printed, only if you can read them or are certain of them, otherwise empty; colors, the card's colours as lower-case words (red, green, blue, purple, black, yellow, white), empty if unclear; power and cost as the numbers printed, or null; cardType in lower case (leader, character, event, stage, creature, instant, pokemon, trainer, and so on), empty if unclear; altArt true for an alternate, parallel or special art; sure false whenever you are not confident; note, a few words on how you decided, or what got in the way.",
+  "For each card give: game, exactly one of one-piece, riftbound, lorcana, mtg (Magic: The Gathering), pokemon, flesh-and-blood, or other for a game not listed; name as printed; englishName (the English name, the same as name when it is printed in English); number and setCode exactly as printed, only if you can read them or are certain of them, otherwise empty; colors, the card's colours as lower-case words (red, green, blue, purple, black, yellow, white), empty if unclear; power and cost as the numbers printed, or null; cardType in lower case (leader, character, event, stage, creature, instant, pokemon, trainer, and so on), empty if unclear; altArt true for an alternate, parallel or special art; sure false whenever you are not confident; note, a few words on how you decided, or what got in the way.",
   "Ignore sleeves, glare, reflections and anything laid over the photo, such as an on-screen button.",
 ].join("\n");
 
@@ -432,9 +456,19 @@ export async function readCards(input: {
       const seen = bySlot.get(slot);
       if (!seen || seen.state === "empty")
         return { slot, seen, matches: [] as ScanMatch[] };
-      if (seen.game === "other") return { slot, seen, matches: [] as ScanMatch[] };
-      const matches = await findScanned(readOf(seen), 6, traitsOf(seen));
-      return { slot, seen, matches };
+      const games = gamesToTry(seen.game, input.games);
+      for (const game of games) {
+        const named = { ...seen, game };
+        const matches = await findScanned(readOf(named), 6, traitsOf(named));
+        if (matches.length > 0) return { slot, seen: named, matches };
+      }
+      /* Nothing in any game: kept as the one game when there was only one,
+         so "Might be one of these" can still look there. */
+      return {
+        slot,
+        seen: games.length === 1 ? { ...seen, game: games[0] } : seen,
+        matches: [] as ScanMatch[],
+      };
     }),
   );
 
@@ -494,6 +528,10 @@ export async function readCards(input: {
     mode: input.mode,
     cents: Math.round(cents * 100) / 100,
     tiebreaks: asks.length,
+    /* What came of it, so a page that placed nothing says why in the log. */
+    found: pockets.filter((pocket) => pocket.state === "found").length,
+    unread: pockets.filter((pocket) => pocket.state === "unread").length,
+    games: [...new Set(looked.seen.map((seen) => `${seen.said} -> ${seen.game}`))],
   });
   return { ok: true, pockets, cents };
 }
