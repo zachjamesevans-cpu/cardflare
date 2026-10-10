@@ -229,6 +229,45 @@ describe("tolerant of how the reader writes a game", () => {
     expect(reader.gameOf("Yu-Gi-Oh!")).toBe("other");
   });
 
+  it("understands the long names a model actually writes", () => {
+    /* The founder's first page: every pocket unread, all of them "One
+       Piece Card Game" or the like, filed as a game we do not carry. */
+    expect(reader.gameOf("One Piece Card Game")).toBe("one-piece");
+    expect(reader.gameOf("One Piece TCG")).toBe("one-piece");
+    expect(reader.gameOf("OPTCG")).toBe("one-piece");
+    expect(reader.gameOf("Pokémon Trading Card Game")).toBe("pokemon");
+    expect(reader.gameOf("Disney Lorcana TCG")).toBe("lorcana");
+    expect(reader.gameOf("Flesh and Blood")).toBe("flesh-and-blood");
+    expect(reader.gameOf("Riftbound: League of Legends TCG")).toBe("riftbound");
+  });
+
+  it("tells the reader the exact words for each game", () => {
+    expect(read("src/lib/cards/page-reader.ts")).toContain(
+      "game, exactly one of one-piece, riftbound, lorcana, mtg (Magic: The Gathering), pokemon, flesh-and-blood, or other",
+    );
+  });
+
+  it("looks a card up in the player's own games when the reader named none we carry", async () => {
+    findScanned.mockImplementation(async (read: { game: string }) =>
+      read.game === "one-piece"
+        ? [{ card: card("loki", "OP13-100"), printingId: null }]
+        : [],
+    );
+    replies = [reply({ pockets: [pocket(0, { game: "a card game", name: "Loki" })] })];
+    const outcome = await reader.readCards({
+      mode: "card",
+      page: null,
+      pockets: [JPEG],
+      games: ["pokemon", "one-piece"],
+    });
+    expect(
+      findScanned.mock.calls.map((call) => (call[0] as { game: string }).game),
+    ).toEqual(["pokemon", "one-piece"]);
+    expect(outcome.ok && outcome.pockets[0]).toMatchObject({ state: "found" });
+    expect(reader.gamesToTry("other", [])).toHaveLength(6);
+    expect(reader.gamesToTry("mtg", ["one-piece"])).toEqual(["mtg"]);
+  });
+
   it("does not fail a page over one odd word", async () => {
     findScanned.mockResolvedValue([
       { card: card("zoro", "OP06-118"), printingId: null },
@@ -444,7 +483,7 @@ describe("recognising like a collector", () => {
 
   it("describes, and lets the catalogue and the pictures decide", () => {
     expect(source).not.toContain("card_id");
-    expect(source).toContain("findScanned(readOf(seen), 6, traitsOf(seen))");
+    expect(source).toContain("findScanned(readOf(named), 6, traitsOf(named))");
   });
 
   it("trusts the whole page over a close-up cut off-centre", () => {
