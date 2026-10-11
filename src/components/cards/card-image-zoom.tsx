@@ -28,7 +28,6 @@ import {
   type OfferOutcome,
 } from "@/components/flares/offer-review";
 import { Button, buttonStyles } from "@/components/ui/button";
-import { Badge } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
@@ -838,6 +837,10 @@ export function CardImageZoom({
   const shelf = siblings && siblings.length > 1 ? siblings : null;
   const [at, setAt] = useState(position);
   const shown = shelf ? (shelf[at] ?? shelf[0]) : null;
+  /* The status line keeps its place on every card if any card has one. */
+  const statusOnShelf = Boolean(
+    shelf?.some((card) => card.lookingFor != null || card.youHave),
+  );
 
   /*
    * Everything below reads these, not the props, so the panel draws
@@ -1297,75 +1300,67 @@ export function CardImageZoom({
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col">
               <p className="truncate font-semibold">{exactName}</p>
-              <p className="font-mono text-xs text-text-muted">
+              {/* One line, never two: a long printing wrapping here made
+                  the panel change height from card to card. */}
+              <p className="truncate font-mono text-xs text-text-muted">
                 {cardNumber}
                 {caption && <span className="font-sans"> · {caption}</span>}
               </p>
-              {/* Said in words here even though the tile draws it as a
-                  stack, for anyone who cannot read the layers. Both truths
-                  when hands are up: the ask, and what is still missing.
-                  Coverage is a want's problem only — nobody pledges to
-                  take a card off somebody's hands. */}
-              {lookingFor != null && (
-                <p className="mt-1 text-sm font-medium text-accent">
-                  {direction === "showcase" ? (
-                    lookingFor === 1 ? (
-                      "Offering this"
-                    ) : (
-                      `Offering ${lookingFor}`
-                    )
-                  ) : (
-                    <>
-                      Looking for {lookingFor}
-                      {stillNeeds != null &&
-                        stillNeeds !== lookingFor &&
-                        (stillNeeds === 0
-                          ? " · all spoken for"
-                          : ` · still needs ${stillNeeds}`)}
-                    </>
+              {/*
+               * THE STATUS LINE: the ask, and your own binder's answer, on
+               * one line in the ring's accent, the icon and a dot keeping
+               * them apart. Said in words even though the tile draws it,
+               * for anyone who cannot read the ring. Coverage is a want's
+               * problem only — nobody pledges to take a card off
+               * somebody's hands.
+               *
+               * "You have this" was a pill on a line of its own; the
+               * founder, of the app's: "it's not really centered with
+               * anything. please make this look cleaner", and of
+               * swiping: "the top and bottom of the 'block' can sometimes
+               * shift in height". So the line is held on every card of
+               * the shelf if any card has one, and what only some cards
+               * carry (pledges, terms, a note) sits under the picture.
+               */}
+              {(lookingFor != null || youHave || statusOnShelf) && (
+                <p className="mt-1 flex min-h-5 min-w-0 items-center gap-1.5 text-sm font-medium text-accent">
+                  {lookingFor != null && (
+                    <span className="truncate">
+                      {direction === "showcase" ? (
+                        lookingFor === 1 ? (
+                          "Offering this"
+                        ) : (
+                          `Offering ${lookingFor}`
+                        )
+                      ) : (
+                        <>
+                          Looking for {lookingFor}
+                          {stillNeeds != null &&
+                            stillNeeds !== lookingFor &&
+                            (stillNeeds === 0
+                              ? " · all spoken for"
+                              : ` · still needs ${stillNeeds}`)}
+                        </>
+                      )}
+                    </span>
+                  )}
+                  {lookingFor != null && youHave && <span aria-hidden="true">·</span>}
+                  {youHave && (
+                    <span className="flex min-w-0 items-center gap-1">
+                      {youHave.kind === "exact" ? (
+                        <PackageCheck
+                          className="size-3.5 shrink-0"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Layers className="size-3.5 shrink-0" aria-hidden="true" />
+                      )}
+                      <span className="truncate">
+                        {youHaveLabel(youHave.kind, youHave.count)}
+                      </span>
+                    </span>
                   )}
                 </p>
-              )}
-              {pledges.length > 0 && (
-                <ul className="mt-1 flex flex-col">
-                  {pledges.map((pledge, index) => (
-                    <li key={index} className="text-sm text-text-secondary">
-                      <span className="font-medium text-text-primary">
-                        {pledge.name}
-                      </span>{" "}
-                      is bringing {pledge.quantity}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {terms && <p className="mt-1 text-sm font-medium text-accent">{terms}</p>}
-              {/*
-               * Your own binder's answer, drawn as the pill the stacked
-               * view has always drawn it as, with the same two icons.
-               *
-               * It was briefly a bare line in `--color-success`, which was
-               * a third treatment invented for a fact that already had
-               * one: the ring on the tile and the badge in the stacked
-               * view are both the accent. A pill also keeps it from
-               * blending into "Looking for 2" directly above it, which a
-               * bare accent line would have done.
-               */}
-              {youHave && (
-                <span className="mt-1.5 self-start">
-                  <Badge>
-                    {youHave.kind === "exact" ? (
-                      <PackageCheck className="size-3.5" aria-hidden="true" />
-                    ) : (
-                      <Layers className="size-3.5" aria-hidden="true" />
-                    )}
-                    {youHaveLabel(youHave.kind, youHave.count)}
-                  </Badge>
-                </span>
-              )}
-              {/* The note travels with the card: the carousel tile has no
-                  room for it, so the zoom is where it gets read. */}
-              {note && (
-                <p className="mt-1 text-sm text-text-secondary italic">{note}</p>
               )}
             </div>
 
@@ -1503,6 +1498,21 @@ export function CardImageZoom({
               </>
             )}
           </div>
+
+          {pledges.length > 0 && (
+            <ul className="flex flex-col">
+              {pledges.map((pledge, index) => (
+                <li key={index} className="text-sm text-text-secondary">
+                  <span className="font-medium text-text-primary">{pledge.name}</span>{" "}
+                  is bringing {pledge.quantity}
+                </li>
+              ))}
+            </ul>
+          )}
+          {terms && <p className="text-sm font-medium text-accent">{terms}</p>}
+          {/* The note travels with the card: the carousel tile has no
+              room for it, so the zoom is where it gets read. */}
+          {note && <p className="text-sm text-text-secondary italic">{note}</p>}
 
           {/* Last, under the picture, where the thumb is. The room's form
               is keyed on the shelf position so a half-typed note does not

@@ -459,6 +459,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             ) : (
               <FlareStrip
                 cards={post.cards}
+                /* To the screen's edges, the way the Feed runs it to the post's. */
+                bleed={gutter}
                 direction={direction}
                 post={ref}
                 picks={picks}
