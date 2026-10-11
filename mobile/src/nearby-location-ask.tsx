@@ -41,9 +41,12 @@ export function NearbyLocationAsk({
    * was the wall of text the founder asked to streamline.
    */
   intro = "cardflare knows about shops whether or not they use it yet. Tell us roughly where you are and we’ll list the close ones.",
+  /** The ZIP button: what saving the ZIP shows you. */
+  saveLabel = "Show stores",
 }: {
   onDone: () => void;
   intro?: string | null;
+  saveLabel?: string;
 }) {
   /* Calm: a refusal, or a device with Location Services off. */
   const [note, setNote] = useState<string | null>(null);
@@ -119,7 +122,7 @@ export function NearbyLocationAsk({
            * the server anyway, and its message is the one worth
            * reading.
            */}
-          <AsyncButton label="Show stores" pendingLabel="Saving…" onPress={saveZip} />
+          <AsyncButton label={saveLabel} pendingLabel="Saving…" onPress={saveZip} />
           {settings ? (
             <Text
               style={{ color: colors.textMuted, fontSize: 12 }}

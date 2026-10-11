@@ -93,7 +93,7 @@ import {
   useHeaderScroll,
 } from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
-import { NearbyHeader, StoreRow } from "../nearby-parts";
+import { NearbyHeader } from "../nearby-parts";
 import { planNearby } from "../nearby-plan";
 import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
@@ -944,24 +944,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * of the pager, so each tab keeps its items and its place.
    */
   const tabContent = (tab: FeedTab) => {
-    /* Nearby is laid out rather than listed: see nearby-parts.tsx. The
-       store row sits after the posts, before the nights. */
+    /* Nearby is a trade room, not the whole of what the server files
+       under it: see nearby-plan.ts. */
     const all = shownFor(tab);
     const plan = tab === "nearby" && !guest ? planNearby(all) : null;
-    const shown = plan
-      ? [...(plan.ask ? [plan.ask] : []), ...plan.before, ...plan.after]
-      : all;
-    const storeAt = plan ? (plan.ask ? 1 : 0) + plan.before.length : -1;
-    const storeRow = plan ? (
-      <StoreRow
-        stores={plan.stores}
-        bleed={gutter}
-        onOpen={(tile) => {
-          if (tile.storeId) navigation.navigate("StoreProfile", { storeId: tile.storeId });
-          else if (tile.code) void enter(tile.code);
-        }}
-      />
-    ) : null;
+    const shown = plan ? plan.items : all;
     const sectionsShown = new Set(shown.map((item) => item.section)).size;
     /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
     const shownKeys = feedKeys(shown);
@@ -975,6 +962,17 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
               void setLocalRadius(miles).then(() => load(() => true));
             }}
           />
+        ) : null}
+        {/* Nothing here works without a place, so the ask comes first. */}
+        {plan?.ask ? (
+          <Card>
+            <Title>See Flares near you</Title>
+            <NearbyLocationAsk
+              intro="Tell us roughly where you are and we’ll show what players around you are looking for and trading."
+              saveLabel="Show Flares near me"
+              onDone={() => void load(() => true)}
+            />
+          </Card>
         ) : null}
             {/*
              * The Feed leads. Everything here is derived - nobody posts to it -
@@ -1702,7 +1700,6 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
 
               return (
                 <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
-                  {index === storeAt ? storeRow : null}
                   {opensSection ? (
                     <Text
                       style={{
@@ -1729,21 +1726,6 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 </View>
               );
             })}
-            {/* No nights after the posts: the store row closes the tab. */}
-            {plan && storeAt >= shown.length ? storeRow : null}
-            {/* The Rooms screen lost its slot in the bar, not its door:
-                every night, Going, Nearby and Past, from here. */}
-            {plan ? (
-              <Tap
-                onPress={() => navigation.navigate("Tabs", { screen: "Nights" })}
-                accessibilityLabel="All nights"
-                style={{ alignSelf: "flex-start" }}
-              >
-                <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
-                  All nights ›
-                </Text>
-              </Tap>
-            ) : null}
 
             {/*
              * The explainer, for a screen that has not filled up yet.
@@ -1776,19 +1758,29 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 />
               </Card>
             )}
-            {!guest && feedReady && shown.length === 0 && tab === "nearby" && (
+            {/* The room with nobody in it yet: said, with the two ways to
+                change that - post, or look further. Under any "wanted"
+                rows, since those are trades too. */}
+            {!guest && feedReady && tab === "nearby" && plan && !plan.ask && plan.posts === 0 && (
               <Card>
-                <Title>Nothing on right now</Title>
+                <Title>No Flares near you yet</Title>
                 <Body>
-                  Post a Flare for a card you are looking for, or follow a friend, and it
-                  shows up here. At a store? The code at the counter gets you into
-                  tonight&rsquo;s room.
+                  {`Nobody within ${nearbyMiles ?? 50} miles has a Flare up right now. Post one and players around you will see it here.`}
                 </Body>
                 <Button
-                  label="Open the room"
-                  variant="secondary"
-                  onPress={() => openRoom(navigation)}
+                  label="Post a Flare"
+                  onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
                 />
+                {(nearbyMiles ?? 50) < 100 ? (
+                  <Button
+                    label="Look within 100 miles"
+                    variant="secondary"
+                    onPress={() => {
+                      setNearbyMiles(100);
+                      void setLocalRadius(100).then(() => load(() => true));
+                    }}
+                  />
+                ) : null}
               </Card>
             )}
       </View>

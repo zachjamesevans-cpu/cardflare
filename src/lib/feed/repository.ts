@@ -2289,11 +2289,12 @@ async function nearbyAuthorsFor(
   viewerId: string,
   origin: Point | null,
   exclude: Set<string>,
+  reach: number,
 ): Promise<Map<string, FollowedPlayer>> {
   const out = new Map<string, FollowedPlayer>();
   if (!origin) return out;
 
-  const zips = zipsWithin(origin, await feedRadiusFor(viewerId));
+  const zips = zipsWithin(origin, reach);
   if (zips.length === 0) return out;
 
   const chunks: string[][] = [];
@@ -2914,14 +2915,19 @@ export async function listFeed(
 
   /* And the posts of people near you whom you do not follow, for the
      Nearby tab: the same builder, fed the authors found by distance. */
+  const reach = await feedRadiusFor(playerId);
   const aroundHunts = (
     await areaHuntsFor(
-      await nearbyAuthorsFor(playerId, origin, new Set(authors.keys())),
+      await nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach),
       playerId,
       held,
       origin,
     )
-  ).map((hunt) => ({ ...hunt, around: true }));
+  )
+    /* An author is found by one post near you, but the builder reads
+       all of theirs: only the posts inside the reach stay. */
+    .filter((hunt) => hunt.milesAway !== null && hunt.milesAway <= reach)
+    .map((hunt) => ({ ...hunt, around: true }));
 
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
