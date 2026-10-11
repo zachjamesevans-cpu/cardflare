@@ -4,6 +4,7 @@ import {
   Pressable,
   Text,
   View,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -113,6 +114,17 @@ export function ProfileTabs({
   const count = panes.length;
   /* The screen's width, edge to edge: one page of the pager, measured. */
   const [width, setWidth] = useState(0);
+  /*
+   * Where the panes start on screen, for the least height they take: down
+   * to the bottom of the screen. A pane is as tall as what is in it, and a
+   * profile with no Flares was one line tall - the founder: "the only way
+   * for me to swipe between them is to swipe where there is text. make it
+   * so the full page below the words is swipable."
+   */
+  const window = useWindowDimensions();
+  const root = useRef<View>(null);
+  const [top, setTop] = useState(0);
+  const fill = top > 0 ? Math.max(0, Math.round(window.height - top)) : 0;
   const [active, setActive] = useState(() =>
     Math.max(
       0,
@@ -211,8 +223,17 @@ export function ProfileTabs({
 
   return (
     <View
+      ref={root}
       style={{ gap: 0 }}
-      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}
+      onLayout={(event) => {
+        setWidth(Math.round(event.nativeEvent.layout.width));
+        /* Once, at rest: the strip's foot is where the panes begin. */
+        if (top === 0) {
+          root.current?.measureInWindow((_x, y) => {
+            if (y > 0) setTop(y + STRIP_HEIGHT);
+          });
+        }
+      }}
     >
       {/* The strip: evenly spaced icon tabs, a hairline under the row,
           and the one underline that slides to the tab in front. */}
@@ -303,6 +324,9 @@ export function ProfileTabs({
                 key={pane.key}
                 style={{
                   width,
+                  /* At least down to the screen's foot, so an empty pane
+                     still turns on a swipe anywhere below the strip. */
+                  minHeight: fill,
                   paddingHorizontal: EDGE_TO_EDGE.includes(pane.key)
                     ? 0
                     : PROFILE_INSET,

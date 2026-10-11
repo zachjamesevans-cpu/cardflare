@@ -189,7 +189,9 @@ describe("the Hunts tab: one binder row per hunt", () => {
     expect(sheet).toContain('<Modal visible transparent animationType="fade"');
     expect(sheet).toContain("createHunt({");
     expect(sheet).not.toContain("visibility");
-    expect(src.panel).toContain("{yours ? HUNT_EXPLAINER : \"No hunts yet.\"}");
+    expect(src.panel).toContain(
+      '{yours ? HUNT_EXPLAINER : ownerName ? `${ownerName} has no hunts yet.` : "No hunts yet."}',
+    );
     expect(src.panel).toContain(
       '<Ionicons name="locate-outline" size={16} color={colors.accent} />',
     );

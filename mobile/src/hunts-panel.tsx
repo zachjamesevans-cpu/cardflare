@@ -99,7 +99,6 @@ export function HuntsPanel({
 }) {
   void onTick;
   void onAdd;
-  void ownerName;
   /* New hunt, Edit hunt or What's a hunt?, as a sheet from the bottom
      (hunt-sheet.tsx). It was a bare name field in the pane's top row. */
   const [sheet, setSheet] = useState<HuntSheetMode | null>(null);
@@ -176,7 +175,7 @@ export function HuntsPanel({
       ) : null}
 
       {hunts.length === 0 ? (
-        <Body>{yours ? HUNT_EXPLAINER : "No hunts yet."}</Body>
+        <Body>{yours ? HUNT_EXPLAINER : ownerName ? `${ownerName} has no hunts yet.` : "No hunts yet."}</Body>
       ) : (
         <View style={{ gap: spacing(2) }}>
           {hunts.map((hunt) => (

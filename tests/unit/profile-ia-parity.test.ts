@@ -484,10 +484,17 @@ describe("the Flares grid", () => {
       expect(source.flares, name).not.toMatch(/>\s*Looking for|"Looking for"/);
       expect(source.flares, name).toContain("Offering");
       expect(source.flares, name).not.toContain("Letting go");
+      /* An empty grid says what to do next, the same words on both:
+         the founder, "what do we do about profiles who dont have
+         flares? thinking of a CTA on their page". */
+      expect(source.flares, name).toContain("What are you hunting?");
       expect(source.flares, name).toContain(
-        "No Flares yet. Tap + on the Feed to post one.",
+        "Post a Flare for a card you want, and players near you who have it can raise a hand.",
       );
-      expect(source.flares, name).toMatch(/"No Flares yet\."|>\s*No Flares yet\.\s*</);
+      expect(source.flares, name).toContain("looking for anything right now.");
+      expect(source.flares, name).toContain(
+        "When they post a Flare, you’ll see it in your Following feed.",
+      );
       expect(source.flares, name).toContain("flares.length");
     }
     expect(web.flares).toContain("grid-cols-3");

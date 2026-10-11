@@ -146,14 +146,15 @@ export function PlayerProfileScreen() {
    */
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
-  const message = async () => {
+  /** `draft`: words to start with, from "Ask what they're after". */
+  const message = async (draft?: string) => {
     if (messaging) return;
     setMessaging(true);
     setMessageError(null);
     try {
       const result = await openDirectThread(playerId);
       if (result.ok && result.threadId) {
-        navigation.navigate("LocalThread", { threadId: result.threadId });
+        navigation.navigate("LocalThread", { threadId: result.threadId, draft });
         return;
       }
       setMessageError(result.message ?? "Could not start the conversation.");
@@ -416,7 +417,23 @@ export function PlayerProfileScreen() {
       switch (tab) {
         case "flares":
           /* Every Flare they have up, newest first, three across. */
-          return <ProfileFlares flares={stillWanted(profile.flares)} yours={false} />;
+          return (
+            <ProfileFlares
+              flares={stillWanted(profile.flares)}
+              yours={false}
+              ownerName={profile.displayName}
+              /* An empty grid says what to do next: ask, if you follow
+                 them (Message is already up top; this one starts the
+                 conversation for you), or follow, if you do not. */
+              following={profile.follow?.following ?? false}
+              onAsk={() => void message("What are you hunting for right now?")}
+              followButton={
+                profile.follow ? (
+                  <FollowButton playerId={profile.playerId} initial={profile.follow} fill />
+                ) : undefined
+              }
+            />
+          );
         case "hunts":
           /* The panel the Hunts screen draws for a visitor: a row opens
              the hunt's own screen. */

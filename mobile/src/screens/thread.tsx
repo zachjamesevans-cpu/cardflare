@@ -143,7 +143,8 @@ export function ThreadScreen() {
   const [closed, setClosed] = useState(false);
   const [kind, setKind] = useState<ThreadKind>("direct");
   const [trade, setTrade] = useState<ThreadTrade | null>(null);
-  const [draft, setDraft] = useState("");
+  /* Words already in the box when a profile asked to start one. */
+  const [draft, setDraft] = useState(route.params.draft ?? "");
   const [error, setError] = useState<string | null>(null);
 
   /* "We traded": the form, open or not, and what it holds. The card

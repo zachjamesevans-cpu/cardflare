@@ -172,7 +172,8 @@ export type StackParams = {
       src/open-room.ts, never by name. */
   Room: undefined;
   /** One conversation about one Flare, from Local, Messages or the Inbox. */
-  LocalThread: { threadId: string };
+  /** `draft`: words already in the box, from a profile's "Ask what they're after". */
+  LocalThread: { threadId: string; draft?: string };
   /** The notices, from the bell at the Feed's top right. It was a tab. */
   Inbox: undefined;
   SignIn: undefined;

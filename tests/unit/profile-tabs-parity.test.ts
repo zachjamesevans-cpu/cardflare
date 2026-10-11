@@ -309,7 +309,7 @@ describe("the panes' contents, own and theirs", () => {
     for (const [name, source] of platforms) {
       expect(source.flares, name).not.toContain('=== 1 ? "Flare" : "Flares"');
     }
-    expect(web.flares).toContain("No Flares yet. Tap + on the Feed to post one.");
+    expect(web.flares).toContain("What are you hunting?");
     for (const [name, source] of platforms) {
       expect(source.ownProfile, name).toContain("<ProfileFlares");
       expect(source.playerProfile, name).toContain("<ProfileFlares");

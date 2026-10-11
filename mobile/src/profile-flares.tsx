@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import { useState, type ReactNode } from "react";
 import { Text, View, useWindowDimensions } from "react-native";
 
 import type { ProfileFlare } from "./api";
@@ -6,7 +7,7 @@ import { HeldRing } from "./held-ring";
 import { QuantityBadge } from "./quantity-badge";
 import { PROFILE_INSET } from "./profile-tabs";
 import { colors, spacing } from "./theme";
-import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
+import { Button, CardImage, type ZoomCard } from "./ui";
 
 /**
  * A profile's Flares as a grid: the app's half of
@@ -40,15 +41,86 @@ const ACROSS = 3;
 export const stillWanted = (flares: ProfileFlare[] | null | undefined): ProfileFlare[] =>
   (flares ?? []).filter((flare) => flare.direction === "want");
 
+/**
+ * An empty profile tab, said with a next step rather than a dead end:
+ * an icon, a line, a sentence, one action. The founder: "what do we do
+ * about profiles who dont have flares? thinking of a CTA on their page".
+ */
+export function ProfileEmpty({
+  icon,
+  title,
+  body,
+  action,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+  action?: ReactNode;
+}) {
+  return (
+    <View
+      style={{
+        alignItems: "center",
+        gap: spacing(2),
+        paddingTop: spacing(8),
+        paddingHorizontal: PROFILE_INSET + spacing(2),
+      }}
+    >
+      <View
+        style={{
+          width: 52,
+          height: 52,
+          borderRadius: 26,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name={icon} size={24} color={colors.accent} />
+      </View>
+      <Text
+        style={{
+          color: colors.textPrimary,
+          fontSize: 17,
+          fontWeight: "700",
+          textAlign: "center",
+        }}
+      >
+        {title}
+      </Text>
+      <Text
+        style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20, textAlign: "center" }}
+      >
+        {body}
+      </Text>
+      {action ? <View style={{ alignSelf: "stretch", marginTop: spacing(2) }}>{action}</View> : null}
+    </View>
+  );
+}
+
 export function ProfileFlares({
   flares,
   yours,
   onPost,
+  ownerName,
+  following = false,
+  onAsk,
+  followButton,
 }: {
   flares: ProfileFlare[];
   yours: boolean;
   /** The Flare tab, for the owner's empty state. */
   onPost?: () => void;
+  /** Whose they are, for a visitor's empty state. */
+  ownerName?: string;
+  /** The visitor follows them: their next Flare reaches the Feed. */
+  following?: boolean;
+  /** "Ask what they're after": a message with the question already in it. */
+  onAsk?: () => void;
+  /** The Follow button, for a visitor who does not follow them yet. */
+  followButton?: ReactNode;
 }) {
   const window = useWindowDimensions();
   /* The grid is as wide as the pane it sits in, measured; until the
@@ -80,20 +152,29 @@ export function ProfileFlares({
           the grid runs to it. */}
       {flares.length === 0 ? (
         yours ? (
-          <View style={{ gap: spacing(1), paddingHorizontal: PROFILE_INSET }}>
-            <Muted>No Flares yet. Tap + on the Feed to post one.</Muted>
-            {onPost ? (
-              <Tap onPress={onPost} accessibilityLabel="Post a Flare">
-                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-                  Post a Flare
-                </Text>
-              </Tap>
-            ) : null}
-          </View>
+          <ProfileEmpty
+            icon="flame-outline"
+            title="What are you hunting?"
+            body="Post a Flare for a card you want, and players near you who have it can raise a hand."
+            action={onPost ? <Button label="Post a Flare" onPress={onPost} /> : undefined}
+          />
         ) : (
-          <View style={{ paddingHorizontal: PROFILE_INSET }}>
-            <Muted>No Flares yet.</Muted>
-          </View>
+          <ProfileEmpty
+            icon="flame-outline"
+            title={`${ownerName ?? "They"} ${ownerName ? "isn’t" : "aren’t"} looking for anything right now.`}
+            body={
+              following
+                ? "When they post a Flare, you’ll see it in your Following feed."
+                : `Follow ${ownerName ?? "them"} to see their next Flare in your feed.`
+            }
+            action={
+              following
+                ? onAsk
+                  ? <Button label="Ask what they’re after" variant="secondary" onPress={onAsk} />
+                  : undefined
+                : followButton
+            }
+          />
         )
       ) : (
         /* A grid the way a social profile draws one: three across, a
