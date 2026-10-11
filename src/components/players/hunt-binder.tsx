@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Crosshair, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import {
   AddPocket,
@@ -38,7 +38,6 @@ import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { wantsLine } from "@/lib/feed/offer-copy";
 import { removeHuntCardAction } from "@/lib/players/hunt-actions";
-import { huntRowLine } from "@/lib/players/hunt-copy";
 import type { HuntView } from "@/lib/players/hunts";
 
 /**
@@ -135,7 +134,6 @@ export function HuntBinder({
   const looking = cards.filter((card) => !card.found).length;
   const neededCopies = cards.reduce((sum, card) => sum + card.needed, 0);
   const foundCopies = cards.reduce((sum, card) => sum + card.foundCopies, 0);
-  const line = hunt.description || huntRowLine(cards.length, looking);
 
   /* The pocket the owner has open, read from the live rows so the
      numbers in the sheet move with the stepper. */
@@ -219,12 +217,15 @@ export function HuntBinder({
   return (
     <div className="flex w-full flex-col gap-4">
       {/*
-       * THE RING, THE NAME, WHOSE IT IS. This was the crosshair, the name
-       * and small grey lines over a hairline bar; the founder: "the block
-       * on top needs to change ... make it more pretty". The progress is
-       * the ring, the name is the biggest thing on the page, the owner is
-       * a face with their worn ring, and the crosshair rides in the "to
-       * go" pill. The app's hunt-binder.tsx draws the same header.
+       * THE RING, THE NAME, WHOSE IT IS - AND NOTHING SAID TWICE. This was
+       * the crosshair, the name and small grey lines over a hairline bar;
+       * the founder: "the block on top needs to change ... make it more
+       * pretty", then, of a first ring with count pills: "says 3 to go
+       * and 4 cards twice ... just looks so jumbled". So the progress is
+       * the ring and only the ring, the name is the biggest thing on the
+       * page, the owner is one line - a face with their worn ring, and
+       * their name - and their words appear only when they wrote some.
+       * The app's hunt-binder.tsx draws the same header.
        */}
       <div className="flex items-center gap-3">
         <HuntRing found={foundCopies} needed={neededCopies} />
@@ -247,9 +248,8 @@ export function HuntBinder({
                 ring={hunt.owner?.ring ?? null}
                 size="sm"
               />
-              <span className="truncate">
-                <span className="font-bold text-text-primary">{hunt.ownerName}</span>
-                &rsquo;s hunt
+              <span className="truncate text-[15px] font-bold text-text-primary">
+                {hunt.ownerName}
               </span>
             </Link>
           )}
@@ -274,28 +274,14 @@ export function HuntBinder({
         </div>
       </div>
 
-      {/* What it's for, in the owner's words: a quote set off by the
-          accent rule. A hunt with no words says what it holds instead. */}
-      <p className="border-l-2 border-accent pl-3 text-[15px] leading-snug text-text-secondary">
-        {line}
-      </p>
-
-      {/* The two numbers worth reading at a glance. */}
-      <div className="flex flex-wrap gap-2 tabular-nums">
-        {neededCopies > 0 && foundCopies >= neededCopies ? (
-          <span className="flex items-center gap-1 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[13px] font-bold text-accent">
-            Complete
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[13px] font-bold text-accent">
-            <Crosshair className="size-3.5" aria-hidden="true" />
-            {Math.max(0, neededCopies - foundCopies)} to go
-          </span>
-        )}
-        <span className="rounded-full border border-border bg-elevated px-3 py-1 text-[13px] font-bold text-text-secondary">
-          {cards.length === 1 ? "1 card" : `${cards.length} cards`}
-        </span>
-      </div>
+      {/* The owner's own words, only when they wrote some. No stand-in
+          line and no count pills: the ring already says what it holds,
+          and the founder found it said three times "so jumbled". */}
+      {hunt.description && (
+        <p className="text-[15px] leading-snug text-text-secondary">
+          {hunt.description}
+        </p>
+      )}
 
       {progress.error && (
         <p role="alert" className="text-sm text-danger">
@@ -352,7 +338,7 @@ export function HuntBinder({
                 ) : yours ? (
                   <AddPocket href={`/flare?hunt=${encodeURIComponent(hunt.id)}`} />
                 ) : (
-                  <EmptyPocket />
+                  <EmptyPocket faint />
                 )}
               </li>
             ))}

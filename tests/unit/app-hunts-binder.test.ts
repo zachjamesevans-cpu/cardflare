@@ -220,14 +220,12 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.huntScreen).not.toContain("HuntExpanded");
   });
 
-  it("heads with the crosshair, the name, the description or the row's line, and the owner's controls", () => {
-    /* The crosshair rides in the "to go" pill; the name is the page's
-       biggest line; the description, or the row's line, is a quote. */
-    expect(src.page).toContain('icon="locate-outline"');
+  it("heads with the ring, the name, the owner, their words when written, and the owner's controls", () => {
+    /* Each fact once: the ring is the progress, the name the page's
+       biggest line, the description only when there is one. */
     expect(src.page).toContain("{hunt.name}");
-    expect(src.page).toContain(
-      "{hunt.description || huntRowLine(hunt.looking + hunt.found, hunt.looking)}",
-    );
+    expect(src.page).toContain("{hunt.description ? (");
+    expect(src.page).not.toContain("huntRowLine(");
     /* The pencil opens the same sheet that starts a hunt; Share is beside it. */
     expect(src.page).toContain('accessibilityLabel="Edit hunt"');
     expect(src.page).toContain('name="pencil-outline"');
@@ -238,7 +236,7 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.page).toContain("huntUrl(hunt.id)");
     /* A visitor sees the owner's face and name, a link to their profile. */
     expect(src.page).toContain("accessibilityLabel={`${owner}'s profile`}");
-    expect(src.page).toContain('{"\'s hunt"}');
+    expect(src.page).not.toContain('{"\'s hunt"}');
     expect(src.page).toContain("avatarUrl={hunt.owner?.avatarUrl ?? null}");
     /* The progress is the ring in the header, above the pages. */
     expect(src.page).toContain("<HuntRing found={totalFound} needed={totalNeeded} />");

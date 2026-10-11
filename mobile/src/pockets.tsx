@@ -177,7 +177,34 @@ export function Pocket({
 }
 
 /** A visitor's empty pocket: plain black, nothing to do. */
-export function EmptyPocket({ width, height }: { width: number; height: number }) {
+export function EmptyPocket({
+  width,
+  height,
+  faint = false,
+}: {
+  width: number;
+  height: number;
+  /**
+   * A dashed outline on the page instead of a solid black pocket: a
+   * visitor's view of a hunt, where five black slots under four cards
+   * read as "9 boxes, mostly black" rather than "4 cards".
+   */
+  faint?: boolean;
+}) {
+  if (faint) {
+    return (
+      <View
+        style={{
+          width,
+          height,
+          borderRadius: 5,
+          borderWidth: 1,
+          borderStyle: "dashed",
+          borderColor: "rgba(255,255,255,0.08)",
+        }}
+      />
+    );
+  }
   return (
     <View
       style={{

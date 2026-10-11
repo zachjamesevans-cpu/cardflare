@@ -30,8 +30,7 @@ import {
   setRequestFound,
 } from "./api";
 import { POCKETS_PER_PAGE } from "./binder-covers";
-import { cardsLabel, printingLabel } from "./flare-copy";
-import { huntRowLine } from "./hunt-copy";
+import { printingLabel } from "./flare-copy";
 import { HuntSheet } from "./hunt-sheet";
 import {
   HuntOfferFooter,
@@ -328,15 +327,18 @@ export function HuntBinder({
   return (
     <View style={{ gap: spacing(3) }}>
       {/*
-       * THE RING, THE NAME, WHOSE IT IS.
+       * THE RING, THE NAME, WHOSE IT IS - AND NOTHING SAID TWICE.
        *
        * This was the crosshair, the name, and three small grey lines over
        * a hairline bar, all one weight - the founder: "the block on top
-       * needs to change ... make it more pretty". Now the progress is the
-       * ring on the left, the name is the biggest thing on the page, and
-       * a visitor sees the owner as a face with their worn ring, which
-       * opens their profile. The crosshair, the hunts mark, rides in the
-       * "to go" pill below. The pencil and Share stay top right.
+       * needs to change ... make it more pretty". The first ring added a
+       * "to go" pill, a cards pill and a fallback line, and a hunt with
+       * no description said its count three times: "says 3 to go and 4
+       * cards twice ... just looks so jumbled". So each fact lives in one
+       * place: progress is the ring and only the ring, the owner is one
+       * line - their face and name, which opens their profile - and the
+       * owner's own words appear only when they wrote some. The ring is
+       * the page's one accent. The pencil and Share stay top right.
        */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
         <HuntRing found={totalFound} needed={totalNeeded} />
@@ -369,12 +371,14 @@ export function HuntBinder({
               />
               <Text
                 numberOfLines={1}
-                style={{ color: colors.textMuted, fontSize: 14, flexShrink: 1 }}
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: "700",
+                  flexShrink: 1,
+                }}
               >
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  {owner}
-                </Text>
-                {"'s hunt"}
+                {owner}
               </Text>
             </Tap>
           ) : (
@@ -410,34 +414,13 @@ export function HuntBinder({
         onSaved={() => onChanged?.()}
       />
 
-      {/* What it's for, in the owner's own words: a quote set off by the
-          accent rule, rather than one more grey line. A hunt with no
-          words says what it holds instead, in the same place. */}
-      <View
-        style={{
-          borderLeftWidth: 2,
-          borderLeftColor: colors.accent,
-          paddingLeft: spacing(3),
-        }}
-      >
+      {/* The owner's own words, only when they wrote some. No stand-in
+          line when they did not: the ring already says what it holds. */}
+      {hunt.description ? (
         <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21 }}>
-          {hunt.description || huntRowLine(hunt.looking + hunt.found, hunt.looking)}
+          {hunt.description}
         </Text>
-      </View>
-
-      {/* The two numbers worth reading at a glance. */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-        {totalNeeded > 0 && totalFound >= totalNeeded ? (
-          <HuntPill label="Complete" strong />
-        ) : (
-          <HuntPill
-            icon="locate-outline"
-            label={`${Math.max(0, totalNeeded - totalFound)} to go`}
-            strong
-          />
-        )}
-        <HuntPill label={cardsLabel(cards.length)} />
-      </View>
+      ) : null}
 
       {copies.undoLabel ? (
         <UndoLine label={copies.undoLabel} onUndo={copies.undoLast} />
@@ -474,6 +457,7 @@ export function HuntBinder({
                         key={`empty-${slot}`}
                         width={geometry.pocketWidth}
                         height={geometry.pocketHeight}
+                        faint
                       />
                     );
                   }
@@ -907,50 +891,6 @@ function HuntPocketSheet({
  * undone: the outline and the word in `colors.danger`, nothing filled,
  * so it reads as a warning and not as the page's main action.
  */
-/**
- * A count under a hunt's header: "7 to go" in the accent's wash with
- * the hunts crosshair, the number of cards quiet beside it, "Complete"
- * with a check once every copy is in.
- */
-function HuntPill({
-  label,
-  icon,
-  strong = false,
-}: {
-  label: string;
-  icon?: "locate-outline";
-  strong?: boolean;
-}) {
-  const tone = strong ? colors.accent : colors.textSecondary;
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 4,
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1),
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: strong ? `${colors.accent}59` : colors.border,
-        backgroundColor: strong ? colors.accentTint : colors.elevated,
-      }}
-    >
-      {icon ? <Ionicons name={icon} size={14} color={tone} /> : null}
-      <Text
-        style={{
-          color: tone,
-          fontSize: 13,
-          fontWeight: "700",
-          fontVariant: ["tabular-nums"],
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 function DangerButton({
   label,
   busy,

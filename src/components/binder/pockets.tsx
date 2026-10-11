@@ -96,8 +96,20 @@ export function PocketTile({
   );
 }
 
-/** A visitor's empty pocket: black, and nothing to press. */
-export function EmptyPocket() {
+/**
+ * A visitor's empty pocket: black, and nothing to press. `faint` draws
+ * a dashed outline instead, for a visitor's hunt, where solid black
+ * slots under a few cards read as "9 boxes, mostly black".
+ */
+export function EmptyPocket({ faint = false }: { faint?: boolean }) {
+  if (faint) {
+    return (
+      <div
+        aria-hidden="true"
+        className="aspect-[63/88] w-full rounded-[5px] border border-dashed border-white/[0.08]"
+      />
+    );
+  }
   return <div aria-hidden="true" className={POCKET} />;
 }
 

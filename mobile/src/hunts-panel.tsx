@@ -423,7 +423,8 @@ export function HuntRing({
         }}
       >
         {/* No check when it is done: the founder wants found said one way,
-            and the ring says it by closing, "9/9" all in the accent. */}
+            and the ring says it by closing, "9/9" all in the accent. The
+            word under the count is what makes it the page's only count. */}
         <Text style={{ fontVariant: ["tabular-nums"] }}>
           <Text style={{ color: colors.accent, fontSize: 22, fontWeight: "800" }}>
             {found}
@@ -437,6 +438,17 @@ export function HuntRing({
           >
             {`/${needed}`}
           </Text>
+        </Text>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 10,
+            fontWeight: "700",
+            letterSpacing: 0.6,
+            marginTop: -2,
+          }}
+        >
+          FOUND
         </Text>
       </View>
     </View>
