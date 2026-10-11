@@ -10,6 +10,8 @@ import { dealWallShare, FREE_WALL_SHARE } from "./wall-share";
 import { counterAvailability } from "@/lib/singles/repository";
 import { intermissionFor, startNextRound } from "./auto-mode";
 import type { LayoutChoice } from "./layout";
+import { isOpenNow, pollDelayMs, type IdlePanel } from "./idle-rules";
+import { parseHours } from "@/lib/stores/hours";
 import {
   listTimers,
   logTimerEvent,
@@ -83,6 +85,23 @@ export interface DisplayPayload {
   joinUrl: string | null;
   timers: HubTimer[];
   flares: DisplayFlare[];
+  /** No timer on the screen: the clock, the way in, and these panels. */
+  idleMode: boolean;
+  idlePanels: IdlePanel[];
+  /** The store's time zone, for the idle clock and the nights' times. */
+  timeZone: string;
+  /**
+   * Open by the store's posted hours (unknown hours count as open), or
+   * running a room right now. Closed, an idle screen dims to a quiet
+   * clock.
+   */
+  storeOpen: boolean;
+  /**
+   * How long the screen waits before asking again: every 3 seconds with
+   * a timer on it, every 30 without, every 5 minutes after hours. The
+   * server says so, so a change of plan never needs a new screen.
+   */
+  pollMs: number;
   /**
    * The server's clock when this was built.
    *
@@ -205,6 +224,20 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
 
   const timers = await settleAutoRounds(rawTimers);
 
+  /*
+   * Open or closed decides how often an idle screen asks. Only worth a
+   * second look when the posted hours say closed: a room running late
+   * past them keeps the screen awake.
+   */
+  const timeZone = store?.timezone ?? "UTC";
+  let storeOpen = store
+    ? isOpenNow(parseHours(store.hours), timeZone, Date.now())
+    : true;
+  if (!storeOpen && store?.join_code) {
+    const live = await resolveCode(store.join_code);
+    storeOpen = live.outcome === "room" && live.room.status === "open";
+  }
+
   /** The one game this screen is running, or null for a mixed wall. */
   function singleGameOf(list: { game: string }[]): string | null {
     const games = [...new Set(list.map((timer) => timer.game))];
@@ -235,6 +268,15 @@ export async function displayPayload(display: HubDisplay): Promise<DisplayPayloa
       controlledAt: null,
     })),
     flares: [],
+    idleMode: display.idleMode,
+    idlePanels: display.idlePanels,
+    timeZone,
+    storeOpen,
+    pollMs: pollDelayMs({
+      timers: timers.length,
+      idleMode: display.idleMode,
+      open: storeOpen,
+    }),
     serverNow: Date.now(),
   };
 

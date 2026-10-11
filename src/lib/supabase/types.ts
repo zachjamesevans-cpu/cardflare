@@ -1780,6 +1780,10 @@ export type EventHubDisplayRow = {
   show_flares: boolean;
   show_qr: boolean;
   sound_enabled: boolean;
+  /** No timer on the screen: the clock, the way in and the idle panels. */
+  idle_mode: boolean;
+  /** Which idle panels rotate: nights, wanted, trades, posts. */
+  idle_panels: string[];
 };
 
 /** Everything the table defaults is optional here, and only `store_id` is not. */

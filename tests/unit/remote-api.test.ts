@@ -94,6 +94,10 @@ const DISPLAY = {
   showFlares: true,
   showQr: true,
   soundEnabled: false,
+  idleMode: true,
+  idlePanels: ["nights", "wanted", "trades", "posts"] as (
+    "nights" | "wanted" | "trades" | "posts"
+  )[],
 };
 
 const TIMER = {

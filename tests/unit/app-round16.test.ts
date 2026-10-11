@@ -310,7 +310,9 @@ describe("the full list is one tap from the carousel", () => {
        carousel: the strip shows the cards themselves, and a post the
        Feed only carried part of ends in a "+N more" tile that opens the
        full list. */
-    expect(src.pager).toContain("accessibilityLabel={seeAllLabel(total ?? cards.length)}");
+    expect(src.pager).toContain(
+      "accessibilityLabel={seeAllLabel(total ?? cards.length)}",
+    );
     expect(src.pager).toContain("{more > 0 && onSeeAll ? (");
     /* The same sheet the menu opens; the menu entry stays. */
     expect(src.card).toContain("onSeeAll={onViewAll}");

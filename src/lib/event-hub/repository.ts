@@ -1,4 +1,5 @@
 import "server-only";
+import { checkIdlePanels, IDLE_PANELS, type IdlePanel } from "./idle-rules";
 
 import type { EventHubDisplayRow, EventHubTimerRow } from "@/lib/supabase/types";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -28,6 +29,9 @@ export interface HubDisplay {
   showFlares: boolean;
   showQr: boolean;
   soundEnabled: boolean;
+  /** No timer on the screen: the clock, the way in, and these panels. */
+  idleMode: boolean;
+  idlePanels: IdlePanel[];
 }
 
 function toDisplay(row: EventHubDisplayRow): HubDisplay {
@@ -42,6 +46,9 @@ function toDisplay(row: EventHubDisplayRow): HubDisplay {
     showFlares: row.show_flares,
     showQr: row.show_qr,
     soundEnabled: row.sound_enabled,
+    /* Missing before the idle migration runs: on, with every panel. */
+    idleMode: row.idle_mode ?? true,
+    idlePanels: checkIdlePanels(row.idle_panels ?? [...IDLE_PANELS]),
   };
 }
 
@@ -205,6 +212,8 @@ export async function updateDisplay(
     showFlares: boolean;
     showQr: boolean;
     soundEnabled: boolean;
+    idleMode: boolean;
+    idlePanels: IdlePanel[];
     /** Rotating the token is how a store retires a television. */
     token: string;
   }>,
@@ -223,6 +232,8 @@ export async function updateDisplay(
       ...(patch.soundEnabled !== undefined
         ? { sound_enabled: patch.soundEnabled }
         : {}),
+      ...(patch.idleMode !== undefined ? { idle_mode: patch.idleMode } : {}),
+      ...(patch.idlePanels !== undefined ? { idle_panels: patch.idlePanels } : {}),
       ...(patch.token !== undefined ? { token: patch.token } : {}),
       updated_at: new Date().toISOString(),
     })

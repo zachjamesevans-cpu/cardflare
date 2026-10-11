@@ -52,6 +52,10 @@ const DISPLAY = {
   showFlares: true,
   showQr: true,
   soundEnabled: false,
+  idleMode: true,
+  idlePanels: ["nights", "wanted", "trades", "posts"] as (
+    "nights" | "wanted" | "trades" | "posts"
+  )[],
 };
 
 function flare(overrides: Record<string, unknown> = {}) {
@@ -103,15 +107,20 @@ describe("the display payload", () => {
           "announcement",
           "displayId",
           "flares",
+          "idleMode",
+          "idlePanels",
           "joinCode",
           "joinUrl",
           "layout",
           "nightTitle",
+          "pollMs",
           "serverNow",
           "showFlares",
           "showQr",
           "soundEnabled",
           "storeName",
+          "storeOpen",
+          "timeZone",
           "timers",
         ].sort(),
       );

@@ -92,7 +92,8 @@ export interface UpcomingNight {
   phase: NightPhase | null;
 }
 
-async function upcomingFor(
+/** Exported for FlareCast's idle screen, which shows the same nights. */
+export async function upcomingFor(
   storeId: string,
   earlyBoardHours: number,
   timeZone: string,
