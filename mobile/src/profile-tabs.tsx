@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Pressable,
+  Text,
   View,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -59,17 +60,18 @@ export const TABS: Record<
   embers: { label: "Embers", icon: "storefront-outline" },
 };
 
-/** Your own profile: all six. Trades and Embers are nobody else's. */
-export const OWN_TABS: ProfileTab[] = [
-  "flares",
-  "hunts",
-  "binders",
-  "showcase",
-  "trades",
-  "embers",
-];
-/** Somebody else's: the four anybody may see. */
-export const THEIR_TABS: ProfileTab[] = ["flares", "hunts", "binders", "showcase"];
+/*
+ * Flares, Hunts, Trades: three, labelled. There were six icons; the
+ * founder cut Binders ("it's listed twice basically" - the row of
+ * covers above the strip is the binders), Showcase (a PC binder "does
+ * the same thing") and Embers (its shop is behind the wand and the
+ * Embers chip now). The other panes stay in ProfileTab so an old link
+ * that names one lands on Flares rather than nowhere.
+ */
+/** Your own profile. Trades is nobody else's. */
+export const OWN_TABS: ProfileTab[] = ["flares", "hunts", "trades"];
+/** Somebody else's: what anybody may see. */
+export const THEIR_TABS: ProfileTab[] = ["flares", "hunts"];
 
 /** The first tab, on both profiles. */
 export const DEFAULT_TAB: ProfileTab = "flares";
@@ -232,13 +234,31 @@ export function ProfileTabs({
               accessibilityRole="tab"
               accessibilityLabel={TABS[pane.key].label}
               accessibilityState={{ selected }}
-              style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: spacing(1.5),
+              }}
             >
               <Ionicons
                 name={TABS[pane.key].icon}
                 size={ICON}
                 color={selected ? colors.textPrimary : colors.textMuted}
               />
+              {/* Words beside the glyphs: with three tabs there is room,
+                  and a storefront that meant "Embers" was a guess. */}
+              <Text
+                maxFontSizeMultiplier={1.3}
+                style={{
+                  color: selected ? colors.textPrimary : colors.textMuted,
+                  fontSize: 14,
+                  fontWeight: selected ? "700" : "500",
+                }}
+              >
+                {TABS[pane.key].label}
+              </Text>
             </Pressable>
           );
         })}

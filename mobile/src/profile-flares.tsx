@@ -32,6 +32,14 @@ import { CardImage, Muted, Tap, type ZoomCard } from "./ui";
 const GAP = 2;
 const ACROSS = 3;
 
+/**
+ * The Flares a profile shows: the cards still being looked for. The
+ * server sends offers in the same list; those are the TRADES binder's
+ * business now, and found cards never arrive (they are Trades' history).
+ */
+export const stillWanted = (flares: ProfileFlare[] | null | undefined): ProfileFlare[] =>
+  (flares ?? []).filter((flare) => flare.direction === "want");
+
 export function ProfileFlares({
   flares,
   yours,

@@ -120,20 +120,16 @@ describe("the strip: six tabs for the owner, four for anyone else, Flares first"
     );
   });
 
-  it("gives the owner all six and a visitor the first four", () => {
+  it("gives the owner Flares, Hunts and Trades, and a visitor the first two", () => {
+    /* Six became three: Binders are the row of covers above the strip,
+       Showcase went with them, the Embers shop is behind the wand. */
     expect(web.tabs).toMatch(
-      /const OWN: ProfileTab\[\] = \[\s*"flares",\s*"hunts",\s*"binders",\s*"showcase",\s*"trades",\s*"embers",?\s*\];/,
+      /const OWN: ProfileTab\[\] = \["flares", "hunts", "trades"\];/,
     );
-    expect(web.tabs).toMatch(
-      /const THEIRS: ProfileTab\[\] = \[\s*"flares",\s*"hunts",\s*"binders",\s*"showcase",?\s*\];/,
-    );
+    expect(web.tabs).toMatch(/const THEIRS: ProfileTab\[\] = \["flares", "hunts"\];/);
     expect(web.tabs).toContain("return yours ? OWN : THEIRS;");
-    expect(app.tabs).toMatch(
-      /\[\s*"flares",\s*"hunts",\s*"binders",\s*"showcase",\s*"trades",\s*"embers",?\s*\]/,
-    );
-    expect(app.tabs).toMatch(
-      /\[\s*"flares",\s*"hunts",\s*"binders",\s*"showcase",?\s*\]/,
-    );
+    expect(app.tabs).toContain('export const OWN_TABS: ProfileTab[] = ["flares", "hunts", "trades"];');
+    expect(app.tabs).toContain('export const THEIR_TABS: ProfileTab[] = ["flares", "hunts"];');
     /* The app's screens hand the strip the panes they own; the two
        lists say which. */
     expect(app.ownProfile).toMatch(/OWN_TABS|"trades"/);

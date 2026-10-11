@@ -35,7 +35,7 @@ import { formatHandle } from "../handle";
 import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
-import { ProfileFlares } from "../profile-flares";
+import { ProfileFlares, stillWanted } from "../profile-flares";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import {
   PROFILE_INSET,
@@ -402,7 +402,7 @@ export function PlayerProfileScreen() {
       switch (tab) {
         case "flares":
           /* Every Flare they have up, newest first, three across. */
-          return <ProfileFlares flares={profile.flares ?? []} yours={false} />;
+          return <ProfileFlares flares={stillWanted(profile.flares)} yours={false} />;
         case "hunts":
           /* The panel the Hunts screen draws for a visitor: a row opens
              the hunt's own screen. */

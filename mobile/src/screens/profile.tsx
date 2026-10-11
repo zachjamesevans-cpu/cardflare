@@ -53,8 +53,8 @@ import { CreateBinderSheet } from "../create-binder-sheet";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
-import { OwnPosts } from "../own-posts";
-import { ProfileFlares } from "../profile-flares";
+import { ProfileFlares, stillWanted } from "../profile-flares";
+import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
@@ -175,6 +175,9 @@ export function ProfileScreen() {
 
   /* The list open over the page: the followers or following number. */
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
+
+  /* The wand's two doors - your look, and the Embers shop - when open. */
+  const [wandMenu, setWandMenu] = useState<ActionItem[] | null>(null);
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -780,21 +783,17 @@ export function ProfileScreen() {
     content: (() => {
       switch (tab) {
         case "flares":
-          /* Every Flare up right now, newest first, three across: the
-             same list the Flares number counts. */
+          /* The cards you are still looking for, three across, and
+             nothing else: no list of posts above them (the founder: "it
+             would literally just show cards im still actively looking
+             for"), no found cards (those are in Trades' history), no
+             offers (the TRADES binder is the standing for-trade list). */
           return (
-            <>
-              {/* Your posts, each a door to its own screen where it is
-                  managed: what the Feed's My Flares tab used to be. */}
-              <OwnPosts
-                onOpen={(postId) => navigation.navigate("FlarePost", { postId })}
-              />
-              <ProfileFlares
-                flares={profile.flares ?? []}
-                yours
-                onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-              />
-            </>
+            <ProfileFlares
+              flares={stillWanted(profile.flares)}
+              yours
+              onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+            />
           );
         case "hunts":
           /* The panel the Hunts screen draws, with exactly its wiring:
@@ -925,11 +924,29 @@ export function ProfileScreen() {
           }}
         >
           <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+          {/* The wand: your look, and the Embers shop that pays for it.
+              The shop was a tab of its own until the strip went to three. */}
           <HeaderButton
             icon="color-wand"
-            label="Customize your profile"
-            onPress={() => navigation.navigate("Customize", { area: "profile" })}
+            label="Customize and Embers shop"
+            onPress={() =>
+              setWandMenu([
+                {
+                  key: "customize",
+                  label: "Customize your look",
+                  icon: "color-wand-outline",
+                  onPress: () => navigation.navigate("Customize", { area: "profile" }),
+                },
+                {
+                  key: "store",
+                  label: `Embers shop · ${profile.embersBalance.toLocaleString()}`,
+                  icon: "storefront-outline",
+                  onPress: () => navigation.navigate("Store"),
+                },
+              ])
+            }
           />
+          <ActionSheet items={wandMenu} onClose={() => setWandMenu(null)} />
           <HeaderButton
             icon="settings-outline"
             label="Settings"

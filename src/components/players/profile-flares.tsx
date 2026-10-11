@@ -38,7 +38,7 @@ import type { ProfileFlare } from "@/lib/players/profile";
 const INSET = "px-4 sm:px-0";
 
 export function ProfileFlares({
-  flares,
+  flares: sent,
   yours,
   imagesEnabled,
   heading = true,
@@ -49,6 +49,9 @@ export function ProfileFlares({
   /** False under the tab strip, where the tab already says Flares. */
   heading?: boolean;
 }) {
+  /* The cards still looked for, and nothing else: offers are the TRADES
+     binder's, found cards are Trades' history. The app's stillWanted. */
+  const flares = sent.filter((flare) => flare.direction === "want");
   const shelf: ZoomCard[] = flares.map((flare) => ({
     imageUrl: flare.imageUrl,
     exactName: flare.cardName,

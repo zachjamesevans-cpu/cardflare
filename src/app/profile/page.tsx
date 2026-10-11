@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flame, Settings, Wand2 } from "lucide-react";
+import { ChevronRight, Flame, Settings, Store, Wand2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
@@ -208,6 +208,16 @@ export default async function ProfilePage({
               >
                 <Wand2 className="size-5" aria-hidden="true" />
                 <span className="sr-only">Customize your profile</span>
+              </Link>
+              {/* The Embers shop: a tab until the strip went to three. The
+                  app puts it behind the wand; a link beside it here. */}
+              <Link
+                href="/profile/store"
+                title="Embers shop"
+                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <Store className="size-5" aria-hidden="true" />
+                <span className="sr-only">Embers shop</span>
               </Link>
               <Link
                 href="/profile/settings"
