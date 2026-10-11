@@ -6,12 +6,7 @@ import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
 import type { FeedEntry } from "./api";
 import { cardsLabel } from "./flare-copy";
-import {
-  FlareCardSlide,
-  FlareCarousel,
-  remainingOf,
-  shelfFor,
-} from "./flare-deck-pager";
+import { FlareCardSlide, FlareStrip, remainingOf, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
@@ -32,7 +27,7 @@ import { Button, Tap, type ZoomPicks } from "./ui";
  * Every piece of behaviour is the one the Feed already had: the tap on
  * the card opens the same zoom with "I have this card" inside it, the
  * heart and the bubble are the post's own, and the paper plane opens
- * the same conversation Local opens. New here: "Offer cards" for
+ * the same conversation Local opens. New here: "I have these" for
  * several at once, "Update progress" on your own, and the hunt a post
  * belongs to.
  *
@@ -151,32 +146,6 @@ export function FlareStatus({
 }
 
 /**
- * The one button under a post's cards, decided by whose post it is and
- * which way it points. Shared with the post's own screen so the two
- * never offer different things.
- */
-export function FlareActions({
-  yours,
-  direction,
-  completed,
-  onOffer,
-}: {
-  yours: boolean;
-  direction: "want" | "showcase";
-  completed: boolean;
-  onOffer?: () => void;
-}) {
-  if (direction === "showcase") return null;
-  /* Your own post has no button here: "Update progress" waits behind
-     the three dots in the corner, with the full list. */
-  if (yours) return null;
-  /* Nothing left to offer on, and no row saying so: the status line at
-     the top already reads "found it". */
-  if (completed) return null;
-  return onOffer ? <Button label="Offer cards" onPress={onOffer} /> : null;
-}
-
-/**
  * What waits behind the three dots: the full list when there is more
  * than one card, the progress ticks on your own want, and last, on
  * your own post whichever way it points, "Take down". Shared with the
@@ -266,9 +235,7 @@ export function FlareFeedCard({
   onOpenProfile,
   onLike,
   onOpenThread,
-  onMessage,
-  onEnterRoom,
-  onOffer,
+  onShare,
   onViewAll,
   onProgress,
   onTakeDown,
@@ -286,11 +253,8 @@ export function FlareFeedCard({
   onOpenProfile: (playerId: string) => void;
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
-  /** Absent on your own post: there is nobody to message. */
-  onMessage?: () => void;
-  onEnterRoom: (code: string) => void;
-  /** "Offer cards": the full list, in select mode. Never shown to the owner. */
-  onOffer?: () => void;
+  /** The paper plane: send this post to people you follow. */
+  onShare?: () => void;
   /** "View all 3": the full list, to read. */
   onViewAll?: () => void;
   /** "Update progress", on your own post. */
@@ -324,9 +288,6 @@ export function FlareFeedCard({
     onReport,
     onBlock,
   });
-  /* A Flare posted to a room names it up here, where the time is, and
-     not only on the button at the foot: "at Mox Valley · 2h ago". */
-  const atStore = item.code && item.storeName ? `at ${item.storeName}` : null;
 
   return (
     <View
@@ -336,6 +297,7 @@ export function FlareFeedCard({
         borderWidth: 1,
         borderRadius: radius.panel,
         padding: spacing(3),
+        paddingBottom: spacing(2),
         gap: spacing(2.5),
       }}
     >
@@ -417,10 +379,10 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: the room, the time and the
-            distance as muted facts with dots between, then the three
-            dots when the post has extras to offer. The room's name may
-            shrink; the name column beside it keeps its half. */}
+        {/* One line, not a stacked block: the time and the distance as
+            muted facts with dots between, then the three dots when the
+            post has extras to offer. The room moved to the line above
+            the actions, where it has the width to be read whole. */}
         <View
           style={{
             flexDirection: "row",
@@ -430,17 +392,6 @@ export function FlareFeedCard({
             maxWidth: "50%",
           }}
         >
-          {atStore ? (
-            <Text
-              numberOfLines={1}
-              style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}
-            >
-              {atStore}
-            </Text>
-          ) : null}
-          {atStore && item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
-          ) : null}
           {item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>
               {agoFrom(item.postedAt)}
@@ -484,13 +435,15 @@ export function FlareFeedCard({
           onPicks={onPicks}
         />
       ) : (
-        <FlareCarousel
+        <FlareStrip
           cards={item.cards}
+          total={item.total}
           direction={direction}
           post={post}
           picks={picks}
           onPicks={onPicks}
           onSeeAll={onViewAll}
+          bleed={spacing(3)}
         />
       )}
 
@@ -560,14 +513,17 @@ export function FlareFeedCard({
         </Text>
       ) : null}
 
-      {/* The hunt this post is part of, and the door to it. */}
+      {/* The hunt it is part of, and the door to it. No room line: the
+          store a post was made in used to be named here, and before
+          that as a full-width "Go to Mox Valley Games"; the founder:
+          "kinda redundant. remove that type of... CTA everywhere". */}
       {item.hunt ? (
         <Tap
           onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
           accessibilityLabel={`View hunt ${item.hunt.name}`}
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
         >
-          <Ionicons name="locate-outline" size={14} color={colors.accent} />
+          <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
           <Text
             numberOfLines={1}
             style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
@@ -575,20 +531,16 @@ export function FlareFeedCard({
             {item.hunt.name}
           </Text>
           {onOpenHunt ? (
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
               · View hunt
             </Text>
           ) : null}
         </Tap>
       ) : null}
 
-      <FlareActions
-        yours={item.yours}
-        direction={direction}
-        completed={completed}
-        onOffer={onOffer}
-      />
-
+      {/* No offer button: a tap on any card opens the zoom with "I have
+          this card" in it, as on compact. The founder: "no need for i
+          have these button at all". */}
       <PostSocialRow
         likes={item.likes ?? 0}
         liked={item.liked ?? false}
@@ -596,17 +548,8 @@ export function FlareFeedCard({
         offers={item.offers ?? 0}
         onLike={onLike}
         onOpenThread={onOpenThread}
-        onMessage={onMessage}
+        onShare={onShare}
       />
-
-      {/* Every post that HAS a place ends in one. */}
-      {item.code && item.storeName ? (
-        <Button
-          label={`Go to ${item.storeName}`}
-          variant="secondary"
-          onPress={() => onEnterRoom(item.code ?? "")}
-        />
-      ) : null}
     </View>
   );
 }

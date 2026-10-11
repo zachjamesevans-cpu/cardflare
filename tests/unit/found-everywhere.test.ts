@@ -163,9 +163,8 @@ describe("found, everywhere", () => {
     expect(read("src/components/feed/flare-feed-card-compact.tsx")).toContain(
       "if (done) return null;",
     );
-    expect(read("mobile/src/flare-feed-card-compact.tsx")).toContain(
-      "if (done) return null;",
-    );
+    /* The app's NeedBadge, shared by compact and the classic strip. */
+    expect(read("mobile/src/flare-deck-pager.tsx")).toContain("if (done) return null;");
     const foil = read("mobile/src/foil.tsx");
     expect(foil).toContain("function Greyed(");
     expect(foil).toContain("<ColorMatrix matrix={GREY} />");

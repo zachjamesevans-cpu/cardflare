@@ -48,8 +48,10 @@ import { chatTimeLine } from "../chat-time";
 import { MESSAGE_MAX_LENGTH } from "../local-shared";
 import { COMPOSER_MAX_LINES, messageRuns, tidyMessage } from "../message-runs";
 import { PlayerAvatar } from "../player-avatar";
+import { splitPostLink } from "../post-link";
 import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
+import { SharedPostBubble } from "../shared-post-bubble";
 import { Stepper } from "../stepper";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -643,6 +645,7 @@ export function ThreadScreen() {
               : item.card
                 ? [item.card]
                 : [];
+          const shared = splitPostLink(item.body);
           return (
             <View style={{ marginBottom: flags.joinsNext ? 2 : spacing(3) }}>
               {/* A time line where the talk started or picked up again
@@ -703,23 +706,33 @@ export function ThreadScreen() {
                       onOpen={(cardId) => navigation.navigate("Card", { cardId })}
                     />
                   ))}
-                  <View
-                    style={{
-                      backgroundColor: item.yours ? colors.accent : colors.elevated,
-                      borderRadius: radius.card,
-                      paddingHorizontal: spacing(3),
-                      paddingVertical: spacing(2),
-                    }}
-                  >
-                    <Text
+                  {/* A post sent from the Feed's share sheet: the post
+                      itself, a tap into it, above whatever was written. */}
+                  {shared.postId ? (
+                    <SharedPostBubble
+                      postId={shared.postId}
+                      onOpen={(postId) => navigation.navigate("FlarePost", { postId })}
+                    />
+                  ) : null}
+                  {shared.text ? (
+                    <View
                       style={{
-                        color: item.yours ? colors.accentContrast : colors.textPrimary,
-                        fontSize: 15,
+                        backgroundColor: item.yours ? colors.accent : colors.elevated,
+                        borderRadius: radius.card,
+                        paddingHorizontal: spacing(3),
+                        paddingVertical: spacing(2),
                       }}
                     >
-                      {item.body}
-                    </Text>
-                  </View>
+                      <Text
+                        style={{
+                          color: item.yours ? colors.accentContrast : colors.textPrimary,
+                          fontSize: 15,
+                        }}
+                      >
+                        {shared.text}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             </View>

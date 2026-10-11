@@ -40,17 +40,23 @@ export interface PostRef {
  * post.
  */
 /**
- * Each count's tap box: at least 44pt tall and wide, Apple's minimum,
+ * Each count's tap box: 44pt tall and wide to a thumb, Apple's minimum,
  * so a thumb that lands a little off the heart still likes the post.
+ *
+ * Drawn at 32 and made up to 44 with `HIT`, not drawn at 44: the drawn
+ * box was 10pt of empty band above and below the icons, and the founder
+ * read it as "a little too much dead space above and below the
+ * like/comment bar".
  */
 const TARGET = {
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   gap: spacing(1.5),
-  minHeight: 44,
-  minWidth: 44,
+  minHeight: 32,
+  minWidth: 32,
 } as const;
+const HIT = 6;
 
 export function haveFor(
   card: FeedCard | PostCard,
@@ -83,6 +89,7 @@ export function PostSocialRow({
   onLike,
   onOpenThread,
   onMessage,
+  onShare,
   threadOpen = false,
 }: {
   likes: number;
@@ -94,6 +101,11 @@ export function PostSocialRow({
   onOpenThread: () => void;
   /** The third action: message the poster. Absent on your own post. */
   onMessage?: () => void;
+  /**
+   * The paper plane as Instagram's: send the post to people you follow.
+   * The Feed passes this; where it is given, it is what the plane does.
+   */
+  onShare?: () => void;
   /** On the post's own screen the bubble is a label, not a door. */
   threadOpen?: boolean;
 }) {
@@ -157,69 +169,73 @@ export function PostSocialRow({
 
   return (
     <View style={{ gap: spacing(1) }}>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
-      <Tap
-        onPress={toggle}
-        hitSlop={6}
-        accessibilityLabel={liked ? "Unlike" : "Like"}
-        style={TARGET}
-      >
-        <Ionicons
-          name={liked ? "heart" : "heart-outline"}
-          size={22}
-          color={liked ? colors.accent : colors.textSecondary}
-        />
-        <Text
-          style={{
-            color: liked ? colors.accent : colors.textSecondary,
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          {likes}
-        </Text>
-      </Tap>
-      <Tap
-        onPress={onOpenThread}
-        disabled={threadOpen}
-        hitSlop={6}
-        accessibilityLabel="Show comments"
-        style={TARGET}
-      >
-        <Ionicons
-          name={threadOpen ? "chatbubble" : "chatbubble-outline"}
-          size={21}
-          color={threadOpen ? colors.textPrimary : colors.textSecondary}
-        />
-        <Text
-          style={{
-            color: threadOpen ? colors.textPrimary : colors.textSecondary,
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          {comments}
-        </Text>
-      </Tap>
-      {onMessage ? (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         <Tap
-          onPress={onMessage}
-          hitSlop={6}
-          accessibilityLabel="Message them"
+          onPress={toggle}
+          hitSlop={HIT}
+          accessibilityLabel={liked ? "Unlike" : "Like"}
           style={TARGET}
         >
-          <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
-          {offers !== undefined ? (
-            <Text
-              style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
-            >
-              {offers}
-            </Text>
-          ) : null}
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={22}
+            color={liked ? colors.accent : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: liked ? colors.accent : colors.textSecondary,
+              fontSize: 14,
+              fontWeight: "600",
+            }}
+          >
+            {likes}
+          </Text>
         </Tap>
-      ) : null}
-    </View>
-    <ErrorLine message={error} />
+        <Tap
+          onPress={onOpenThread}
+          disabled={threadOpen}
+          hitSlop={HIT}
+          accessibilityLabel="Show comments"
+          style={TARGET}
+        >
+          <Ionicons
+            name={threadOpen ? "chatbubble" : "chatbubble-outline"}
+            size={21}
+            color={threadOpen ? colors.textPrimary : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: threadOpen ? colors.textPrimary : colors.textSecondary,
+              fontSize: 14,
+              fontWeight: "600",
+            }}
+          >
+            {comments}
+          </Text>
+        </Tap>
+        {onShare || onMessage ? (
+          <Tap
+            onPress={onShare ?? onMessage}
+            hitSlop={HIT}
+            accessibilityLabel={onShare ? "Share" : "Message them"}
+            style={TARGET}
+          >
+            <Ionicons
+              name="paper-plane-outline"
+              size={21}
+              color={colors.textSecondary}
+            />
+            {offers !== undefined ? (
+              <Text
+                style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
+              >
+                {offers}
+              </Text>
+            ) : null}
+          </Tap>
+        ) : null}
+      </View>
+      <ErrorLine message={error} />
     </View>
   );
 }

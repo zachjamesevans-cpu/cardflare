@@ -13,7 +13,6 @@ import {
 import { GuestChip } from "@/components/feed/feed-person";
 import { PostSocial } from "@/components/feed/post-social";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { buttonStyles } from "@/components/ui/button";
 import { cn } from "@/lib/cn";
 import { cardCountLabel, postSubject } from "@/lib/feed/card-copy";
 import type { ZoomCard } from "@/components/cards/card-image-zoom";
@@ -220,14 +219,6 @@ export function FlareFeedCard({
                   Your Flare
                 </span>
               )}
-              {/* A post from a board names its room on the line, not
-                  only on the button at the foot: "Kaito · at Card
-                  Cavern · 2h ago" is the sentence a reader wants. */}
-              {item.code && item.storeName && (
-                <span className="min-w-0 truncate text-[13px] font-medium text-text-muted">
-                  <span aria-hidden="true">· </span>at {item.storeName}
-                </span>
-              )}
             </span>
             <span className="flex flex-wrap items-center gap-1.5">
               <FlareStatus
@@ -372,12 +363,9 @@ export function FlareFeedCard({
         />
       )}
 
-      {/* Every post that HAS a place ends in one. */}
-      {item.code && item.storeName ? (
-        <Link href={`/e/${item.code}`} className={buttonStyles("secondary", "sm")}>
-          Go to {item.storeName}
-        </Link>
-      ) : null}
+      {/* No room on the post, neither "at Card Cavern" on the name line
+          nor "Go to Card Cavern" at the foot; the founder: "kinda
+          redundant. remove that type of... CTA everywhere". */}
     </article>
   );
 

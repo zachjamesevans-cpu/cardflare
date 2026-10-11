@@ -23,7 +23,6 @@ import {
   likePost,
   offerItemsOnPost,
   POST_COMMENT_MAX,
-  rememberRoom,
   restorePost,
   takeDownPost,
   type PostComment,
@@ -34,10 +33,9 @@ import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
-import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
-import { FlareActions, postActions, statusLabel } from "../flare-feed-card";
+import { FlareCardSlide, FlareStrip, shelfFor } from "../flare-deck-pager";
+import { postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
-import { openRoom } from "../open-room";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
@@ -45,7 +43,6 @@ import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
   AsyncButton,
-  Button,
   ErrorLine,
   Input,
   Loading,
@@ -266,7 +263,12 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
       >
         <ErrorLine message={loadError} />
-        <AsyncButton label="Retry" pendingLabel="Retrying…" variant="secondary" onPress={load} />
+        <AsyncButton
+          label="Retry"
+          pendingLabel="Retrying…"
+          variant="secondary"
+          onPress={load}
+        />
       </View>
     );
   }
@@ -455,7 +457,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                 onPicks={setPicks}
               />
             ) : (
-              <FlareCarousel
+              <FlareStrip
                 cards={post.cards}
                 direction={direction}
                 post={ref}
@@ -492,19 +494,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           </Tap>
         ) : null}
 
-        {post.store ? null : (
-          <>
-            <FlareActions
-              yours={post.yours}
-              direction={direction}
-              completed={post.completed ?? false}
-              onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
-            />
-            {!post.yours && direction === "want" && !post.completed ? (
-              <Muted>Tap a card to offer it, or offer several at once.</Muted>
-            ) : null}
-          </>
-        )}
+        {/* No offer button, as on the Feed: a card's tap is the offer. */}
+        {!post.store && !post.yours && direction === "want" && !post.completed ? (
+          <Muted>Tap a card to offer it.</Muted>
+        ) : null}
 
         <PostSocialRow
           likes={post.likes}
@@ -603,7 +596,9 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   </Text>
                 </View>
                 <DotsButton
-                  onPress={commentActions(comment) ? () => setCommentMenu(comment) : null}
+                  onPress={
+                    commentActions(comment) ? () => setCommentMenu(comment) : null
+                  }
                   label="More about this comment"
                 />
               </View>
@@ -611,16 +606,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           )}
         </View>
 
-        {!post.store && post.code && post.storeName ? (
-          <Button
-            label={`Go to ${post.storeName}`}
-            onPress={() => {
-              void rememberRoom((post.code ?? "").trim().toUpperCase()).then(() =>
-                openRoom(navigation),
-              );
-            }}
-          />
-        ) : null}
+        {/* No "Go to <store>" at the foot: the founder, "kinda redundant.
+            remove that type of... CTA everywhere". */}
       </ScrollView>
 
       <View

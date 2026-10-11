@@ -128,7 +128,9 @@ export function Tap({
       hitSlop={hitSlop}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={disabled ? { ...accessibilityState, disabled: true } : accessibilityState}
+      accessibilityState={
+        disabled ? { ...accessibilityState, disabled: true } : accessibilityState
+      }
       onPressIn={() => {
         Animated.spring(scale, {
           toValue: 0.95,
@@ -735,7 +737,10 @@ export function NoArt({
         {name}
       </Text>
       {cardNumber ? (
-        <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textMuted, fontSize: large ? 14 : 11 }}>
+        <Text
+          maxFontSizeMultiplier={1.3}
+          style={{ color: colors.textMuted, fontSize: large ? 14 : 11 }}
+        >
           {cardNumber}
         </Text>
       ) : null}
@@ -1025,74 +1030,88 @@ export function CardImage({
         onLongPress={onLongPress}
         accessibilityLabel={`View ${ownName}`}
       >
+        {/* The card's own box, clipped to its corners, so the band below
+            covers the whole foot. It used to sit on the Tap with corners
+            of its own, and the Skia art (square, unclipped) and the 1pt
+            border showed grey at both bottom corners and down one side -
+            the founder: "the 'found' block doesn't cover the full bottom
+            of the card". */}
         <View
-          style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.6 : 1 }}
+          style={{
+            width: frame.width,
+            height: frame.height,
+            borderRadius: frame.borderRadius,
+            overflow: "hidden",
+          }}
         >
-          {/* Found: full black and white, drawn by Skia when it is in
+          <View
+            style={{ opacity: state === "offered" ? 0.5 : state === "found" ? 0.6 : 1 }}
+          >
+            {/* Found: full black and white, drawn by Skia when it is in
               this binary, dimmed colour when it is not. The band under
               it says the word either way. */}
-          {!ownImageUrl ? (
-            <NoArt
-              name={ownName}
-              cardNumber={ownCardNumber}
-              style={{ ...frame, backgroundColor: colors.elevated }}
-            />
-          ) : greyKit ? (
-            <View style={frame}>
-              <greyKit.Greyed
-                imageUrl={ownImageUrl}
-                width={frame.width}
-                height={frame.height}
+            {!ownImageUrl ? (
+              <NoArt
+                name={ownName}
+                cardNumber={ownCardNumber}
+                style={{ ...frame, backgroundColor: colors.elevated }}
               />
-            </View>
-          ) : (
-            <RemoteImage
-              uri={ownImageUrl}
-              style={frame}
-              /*
-               * CONTAIN, NOT COVER - the frame above is the physical
-               * card's ratio (63 x 88 = 0.716), but a scan carries a
-               * margin and arrives at 600x825 = 0.727. Cover filled the
-               * height and cut the sides off, taking the card's own
-               * border with them. The website had the identical fault in
-               * `feed-tile.tsx`, and the founder caught it there: "the
-               * images for the cards are quite pixelated and distorted...
-               * it is clearly rendering incorrectly."
-               */
-              contentFit="contain"
-            />
-          )}
-        </View>
-        {state !== "open" ? (
-          /* The one-word state, pinned to the foot of the card so the
+            ) : greyKit ? (
+              <View style={frame}>
+                <greyKit.Greyed
+                  imageUrl={ownImageUrl}
+                  width={frame.width}
+                  height={frame.height}
+                />
+              </View>
+            ) : (
+              <RemoteImage
+                uri={ownImageUrl}
+                style={frame}
+                /*
+                 * CONTAIN, NOT COVER - the frame above is the physical
+                 * card's ratio (63 x 88 = 0.716), but a scan carries a
+                 * margin and arrives at 600x825 = 0.727. Cover filled the
+                 * height and cut the sides off, taking the card's own
+                 * border with them. The website had the identical fault in
+                 * `feed-tile.tsx`, and the founder caught it there: "the
+                 * images for the cards are quite pixelated and distorted...
+                 * it is clearly rendering incorrectly."
+                 */
+                contentFit="contain"
+              />
+            )}
+          </View>
+          {state !== "open" ? (
+            /* The one-word state, pinned to the foot of the card so the
              art above it still reads as the card it is. */
-          <View
-            pointerEvents="none"
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              paddingVertical: 2,
-              alignItems: "center",
-              backgroundColor: state === "found" ? colors.accent : colors.scrim,
-              borderBottomLeftRadius: radius.control / 2,
-              borderBottomRightRadius: radius.control / 2,
-            }}
-          >
-            <Text
-              maxFontSizeMultiplier={1.3}
+            <View
+              pointerEvents="none"
               style={{
-                color: state === "found" ? colors.accentContrast : colors.textSecondary,
-                fontSize: 11,
-                fontWeight: "800",
-                letterSpacing: 1,
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                paddingVertical: 2,
+                alignItems: "center",
+                backgroundColor: state === "found" ? colors.accent : colors.scrim,
               }}
             >
-              {state.toUpperCase()}
-            </Text>
-          </View>
-        ) : null}
+              <Text
+                maxFontSizeMultiplier={1.3}
+                style={{
+                  color:
+                    state === "found" ? colors.accentContrast : colors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: "800",
+                  letterSpacing: 1,
+                }}
+              >
+                {state.toUpperCase()}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </Tap>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>

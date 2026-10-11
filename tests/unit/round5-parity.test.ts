@@ -210,10 +210,14 @@ describe("the small bugs", () => {
     expect(app.historyScreen).toContain('{ text: "Cancel", style: "cancel" }');
   });
 
-  it("names the room on the post's header line, keeping the footer button, on both", () => {
-    expect(web.feedCard).toContain("at {item.storeName}");
-    expect(web.feedCard).toContain("Go to {item.storeName}");
-    expect(app.feedCard).toMatch(/at \$\{item\.storeName\}|at \{item\.storeName\}/);
+  it("puts no room on a post, neither its name nor a door to it, on both", () => {
+    /* Round 5 named the room on the header line and kept a "Go to
+       <store>" button at the foot. Both went: the founder, "kinda
+       redundant. remove that type of notification / CTA everywhere". */
+    for (const card of [web.feedCard, app.feedCard]) {
+      expect(card).not.toContain("at {item.storeName}");
+      expect(card).not.toMatch(/Go to \{item\.storeName\}|Go to \$\{/);
+    }
   });
 });
 

@@ -43,7 +43,7 @@ export interface FlareSheetPost {
  * Every card on a Flare, in a sheet from the bottom.
  *
  * "View all 3" (and "See all 3 cards" on the carousel) opens it to
- * read; "Offer cards" opens it to pick. The two are one sheet because
+ * read; "I have these" opens it to pick. The two are one sheet because
  * the second is the first with a toggle on every row, reading
  * "I have this card" and then "Added to your offer" with the check,
  * how many, then "Review offer · N cards" into the review
@@ -94,9 +94,10 @@ export function FlareCardsSheet({
    * on opening and the list is the post's own. The website's sheet does
    * the same.
    */
-  const [fullCards, setFullCards] = useState<{ postId: string; cards: FeedCard[] } | null>(
-    null,
-  );
+  const [fullCards, setFullCards] = useState<{
+    postId: string;
+    cards: FeedCard[];
+  } | null>(null);
   const partial = open ? (open.total ?? 0) > open.cards.length : false;
   const openPostId = open?.postId ?? null;
   useEffect(() => {
@@ -400,7 +401,10 @@ export function FlareCardsSheet({
                   </View>
                 </View>
               ) : canOffer ? (
-                <Button label="Offer cards" onPress={() => setSelecting(true)} />
+                <Button
+                  label={offerLabel(cards.length)}
+                  onPress={() => setSelecting(true)}
+                />
               ) : open.completed && open.direction === "want" ? (
                 <Muted>All found. Nothing left to offer on.</Muted>
               ) : null}
@@ -410,4 +414,13 @@ export function FlareCardsSheet({
       </KeyboardAvoidingView>
     </Modal>
   );
+}
+
+/**
+ * The sheet's pick button. It was "Offer cards", which read like
+ * posting a listing of your own; it now speaks the way each row's
+ * toggle does ("I have this card").
+ */
+function offerLabel(cardCount: number): string {
+  return cardCount === 1 ? "I have it" : "I have these";
 }

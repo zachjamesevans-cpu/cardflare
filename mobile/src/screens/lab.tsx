@@ -255,7 +255,6 @@ export function LabScreen() {
                  could post is a screen that could post by accident. */
             onLike={async () => {}}
             onOpenThread={() => {}}
-            onEnterRoom={() => {}}
             picks={{}}
             onPicks={() => {}}
           />

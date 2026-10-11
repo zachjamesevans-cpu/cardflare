@@ -2157,6 +2157,9 @@ export interface FollowedPlayer {
   displayName: string;
   avatarUrl: string | null;
   frame: string | null;
+  /** Worn cosmetics, as the server already sends them. */
+  ring?: string | null;
+  aura?: string | null;
   partners: boolean;
 }
 

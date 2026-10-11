@@ -195,13 +195,15 @@ describe("a Flare posted with no board still reaches your feed", () => {
      * error would not have caught it - both were template strings.
      */
     /* The post is its own component on both platforms now. Its status
-       line never names the event, and the door to a room is guarded. */
+       line never names the event, and there is no door to a room on a
+       post at all any more (the founder: "kinda redundant"). */
     const items = await readFile("src/components/feed/flare-feed-card.tsx", "utf8");
     const app = await readFile("mobile/src/flare-feed-card.tsx", "utf8");
 
     for (const source of [items, app]) {
       expect(source).not.toMatch(/\$\{item\.eventName\}/);
-      expect(source).toMatch(/item\.code && item\.storeName \?/);
+      expect(source).not.toMatch(/\/e\/\$\{item\.code\}/);
+      expect(source).not.toContain("onEnterRoom");
     }
   });
 });
