@@ -53,6 +53,7 @@ import { CreateBinderSheet } from "../create-binder-sheet";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
+import { OwnPosts } from "../own-posts";
 import { ProfileFlares } from "../profile-flares";
 import { HeaderButton } from "../header";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
@@ -782,11 +783,18 @@ export function ProfileScreen() {
           /* Every Flare up right now, newest first, three across: the
              same list the Flares number counts. */
           return (
-            <ProfileFlares
-              flares={profile.flares ?? []}
-              yours
-              onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-            />
+            <>
+              {/* Your posts, each a door to its own screen where it is
+                  managed: what the Feed's My Flares tab used to be. */}
+              <OwnPosts
+                onOpen={(postId) => navigation.navigate("FlarePost", { postId })}
+              />
+              <ProfileFlares
+                flares={profile.flares ?? []}
+                yours
+                onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+              />
+            </>
           );
         case "hunts":
           /* The panel the Hunts screen draws, with exactly its wiring:

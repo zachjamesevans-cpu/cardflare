@@ -6,11 +6,12 @@ import { colors, radius, spacing } from "./theme";
 import { Tap } from "./ui";
 
 /**
- * Following | Nearby | My Flares, under the wordmark.
+ * Following | Nearby, under the wordmark.
  *
- * Three rounded segments, each an equal third of the row - the
- * founder: "bring back the my flares tab so everything is equally
- * split into 3 tabs at the top." The one that is on wears the accent
+ * Rounded segments, each an equal share of the row (there were three,
+ * with My Flares, until the founder asked "is my flares even useful
+ * anymore now that they're displaying in your own profile?" and the
+ * answer was no). The one that is on wears the accent
  * as a border and a faint glow, the CardFlare green kept for the
  * active state; the others sit in muted grey. Same words and order as
  * the website's tabs, which read the same `tab` off every item.
@@ -21,7 +22,14 @@ const ICONS: Record<FeedTab, keyof typeof Ionicons.glyphMap> = {
   mine: "flame-outline",
 };
 
-export const FEED_TABS: FeedTab[] = FEED_TAB_VALUES;
+/*
+ * Following and Nearby. My Flares went: everything in it was already in
+ * Following and on your profile, and its actions sit on every post's
+ * three dots. Two tabs swipe as pages (feed-pager.tsx). `mine` stays a
+ * FeedTab the server and an old link may still name; it lands on
+ * Following.
+ */
+export const FEED_TABS: FeedTab[] = FEED_TAB_VALUES.filter((tab) => tab !== "mine");
 
 export function FeedFilterTabs({
   value,

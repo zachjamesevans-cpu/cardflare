@@ -1,5 +1,5 @@
 import { apiPlayer, apiSession } from "@/lib/api/auth";
-import { guestSampleFeed, listFeed } from "@/lib/feed/repository";
+import { feedRadiusFor, guestSampleFeed, listFeed } from "@/lib/feed/repository";
 import { sessionForPlayer } from "@/lib/players/accounts";
 import { absoluteAvatars } from "@/lib/api/absolute-avatars";
 import { pointFromCoords } from "@/lib/geo/zip";
@@ -54,7 +54,11 @@ export async function GET(request: Request): Promise<Response> {
    * refuses falls back to the ZIP on their profile, which the server
    * reads itself - see originForPlayer.
    */
-  const items = await listFeed(account.playerId, session?.id ?? null, device);
+  const [items, radius] = await Promise.all([
+    listFeed(account.playerId, session?.id ?? null, device),
+    /* The Nearby tab's reach, for its "Near you · 25 mi" line. */
+    feedRadiusFor(account.playerId).catch(() => null),
+  ]);
 
-  return Response.json({ items: items.map(absoluteAvatars) });
+  return Response.json({ items: items.map(absoluteAvatars), radius });
 }

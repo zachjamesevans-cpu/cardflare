@@ -67,13 +67,20 @@ describe("goingLine", () => {
 });
 
 describe("the dock", () => {
-  it("gives Room's slot to Nights, labelled Rooms, with the storefront glyphs and the QR icon", () => {
-    /* Store days (2026-10-09): the route keeps its name, the label and
-       the glyph say Rooms. */
+  it("gives Rooms' slot to Nearby, and keeps the Nights route with no slot", () => {
+    /* 2026-10-11: Nearby took the second slot; the founder, "i really
+       dont think the nights tab will be used as much". The Nights route
+       stays, labelled Rooms with its QR, hidden from the bar the way
+       Post a Flare is, and the QR moved to Nearby's top left. */
     expect(app).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
+    expect(app).toContain('name="Nearby"');
+    expect(app).toContain('{() => <HomeScreen mode="nearby" />}');
     expect(app).toContain('<Tab.Screen\n          name="Nights"');
     expect(app).toMatch(
-      /options=\{\{\s*title: "Rooms",\s*tabBarLabel: "Rooms",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*\}\}/,
+      /options=\{\{\s*title: "Rooms",\s*tabBarLabel: "Rooms",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*tabBarItemStyle: \{ display: "none" \},\s*\}\}/,
+    );
+    expect(read("mobile/src/screens/home.tsx")).toContain(
+      'left={tab === "nearby" ? <NightsCodeButton /> : undefined}',
     );
     expect(app).toContain(
       'Nights: { idle: "storefront-outline", focused: "storefront" }',
@@ -126,7 +133,9 @@ describe("the Nights screen", () => {
     expect(nights).toContain(
       '{tab === "going" ? GOING_EMPTY : tab === "past" ? PAST_EMPTY : NO_NIGHTS}',
     );
-    expect(nights).toContain('params: { tab: "nearby", at: Date.now() },');
+    /* Nearby is its own tab now: "Find stores near you" lands there. */
+    expect(nights).toContain('screen: "Nearby",');
+    expect(nights).toContain("params: { at: Date.now() },");
   });
 
   it("keeps the code door behind the QR icon, named the old way for a screen reader", () => {

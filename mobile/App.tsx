@@ -141,6 +141,9 @@ export type TabParams = {
   Search: undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
+  /** Flares near you, the stores and the nights: the second slot. */
+  Nearby: { at?: number } | undefined;
+  /** Rooms: no slot in the bar any more, but the route still answers. */
   Nights: undefined;
   /* `hunt` is the id of the hunt the composer opens into, so "Add
      cards" on a profile row lands here with the hunt already chosen.
@@ -294,6 +297,7 @@ const TAB_ICONS: Partial<
   /* The website's dock draws lucide Search. */
   Search: { idle: "search-outline", focused: "search" },
   Local: { idle: "location-outline" },
+  Nearby: { idle: "location-outline", focused: "location" },
   /* Rooms, on the Nights route: the website's dock draws lucide Store,
        and the storefront fills in when it is the open tab. The store is
        the room (the founder, 2026-10-09). */
@@ -418,7 +422,7 @@ function Tabs() {
            app navigates to it) but has no slot in the bar: it opens from
            the + at the top left of the Feed. */
         tabBarButton: (props) =>
-          route.name === "Flare" ? null : <TabButton {...props} />,
+          route.name === "Flare" || route.name === "Nights" ? null : <TabButton {...props} />,
         /*
          * LIQUID GLASS, which means the bar stops being a floor and
          * starts being a surface the list runs under.
@@ -536,19 +540,20 @@ function Tabs() {
           src/local-enabled.ts for the Local call. */}
       {LOCAL_ENABLED ? (
         <Tab.Screen name="Local" component={LocalScreen} options={{ title: "Local" }} />
-      ) : (
-        <Tab.Screen
-          name="Nights"
-          component={NightsScreen}
-          /* The QR icon at the header's end: Scan QR, or Enter event
-             code. The giant "Scan or enter a code" button is gone. */
-          options={{
-            title: "Rooms",
-            tabBarLabel: "Rooms",
-            headerRight: () => <NightsCodeButton />,
-          }}
-        />
-      )}
+      ) : null}
+      {/* Nearby, second: Flares near you, the stores, the nights, and the
+          QR into a store's room at its top left. It took the Rooms slot
+          (2026-10-11); the founder: "i really dont think the nights tab
+          will be used as much, and this nearby feature, if it works,
+          could be extremely helpful for people looking for cards." The
+          Feed's own screen, drawing its Nearby half, with its own
+          floating header. */}
+      <Tab.Screen
+        name="Nearby"
+        options={{ title: "Nearby", tabBarLabel: "Nearby", headerShown: false }}
+      >
+        {() => <HomeScreen mode="nearby" />}
+      </Tab.Screen>
       {/* The conversations, the screen the Inbox's Messages row used to
           open, now a tab of its own with a dot while anything is
           unread. Local, while it is on, keeps its own list too. */}
@@ -573,6 +578,23 @@ function Tabs() {
         options={{ title: "Search", tabBarLabel: "Search" }}
       />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* Rooms, kept as a route with no slot in the bar, as Post a Flare
+          is below: links, pushes and Nearby's "All nights" still land
+          here while it is decided whether it goes for good. */}
+      {LOCAL_ENABLED ? null : (
+        <Tab.Screen
+          name="Nights"
+          component={NightsScreen}
+          /* The QR icon at the header's end: Scan QR, or Enter event
+             code. The giant "Scan or enter a code" button is gone. */
+          options={{
+            title: "Rooms",
+            tabBarLabel: "Rooms",
+            headerRight: () => <NightsCodeButton />,
+            tabBarItemStyle: { display: "none" },
+          }}
+        />
+      )}
       {/* Post a Flare: no slot in the bar (see tabBarButton above); the +
           at the Feed's top left opens it. Last, so it never shifts the
           visible tabs. */}

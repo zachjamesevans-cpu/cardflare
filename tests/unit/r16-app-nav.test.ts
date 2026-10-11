@@ -53,12 +53,15 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
   it("draws the five in order, and the Inbox is no longer one of them", () => {
     /* The founder: "Tabs should be in this order left to right. Feed -
        nights - messages - search - profile". */
+    /* Nearby took Nights' slot on 2026-10-11; the Nights route follows
+       Profile now, with no slot of its own. */
     inOrder(tabs, [
       'name="Feed"',
-      'name="Nights"',
+      'name="Nearby"',
       'name="Messages"',
       'name="Search"',
       'name="Profile"',
+      'name="Nights"',
     ]);
     expect(tabs).toMatch(/name="Search"\s*component=\{SearchScreen\}/);
     expect(tabs).not.toContain('name="Inbox"');
@@ -70,7 +73,9 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
   it("keeps Post a Flare's route but gives it no slot: the Feed's + opens it", () => {
     /* The founder: "Not a fan of the big plus... move the + to top left
        and messages bottom middle." */
-    expect(tabs).toContain('route.name === "Flare" ? null : <TabButton {...props} />');
+    expect(tabs).toContain(
+      'route.name === "Flare" || route.name === "Nights" ? null : <TabButton {...props} />',
+    );
     expect(tabs).toMatch(/name="Flare"\s*component=\{HubScreen\}/);
     /* Its box goes too, or the bar keeps an empty slot: "Missing a
        whole tab at the bottom." */
