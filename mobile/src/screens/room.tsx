@@ -93,7 +93,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { PlayerPeekModal } from "../player-peek";
 import { QuantityBadge } from "../quantity-badge";
 import { useTabBarInset } from "../glass";
-import { colors, gutter, radius, spacing } from "../theme";
+import { colors, gutter, radius, spacing, accentGlow } from "../theme";
 import { refreshTick } from "../refresh-tick";
 
 /*
@@ -2208,7 +2208,7 @@ function CarouselFlare({
                  */
                 borderRadius: radius.control / 2 + 2,
                 shadowColor: colors.accent,
-                shadowOpacity: 0.35,
+                shadowOpacity: 0.35 * accentGlow,
                 shadowRadius: 6,
                 shadowOffset: { width: 0, height: 0 },
                 zIndex: 5,

@@ -1,6 +1,6 @@
 import { Text, type TextStyle } from "react-native";
 
-import { colors } from "./theme";
+import { colors, accentGlow } from "./theme";
 
 /**
  * PRO, in the brand's own lime, glowing: the founder (2026-10-09) asked
@@ -19,7 +19,7 @@ export function ProMark({ size = 14, style }: { size?: number; style?: TextStyle
           fontWeight: "800",
           letterSpacing: size * 0.08,
           textShadowColor: colors.accent,
-          textShadowRadius: Math.max(6, size * 0.6),
+          textShadowRadius: Math.max(6, size * 0.6) * accentGlow,
           textShadowOffset: { width: 0, height: 0 },
         },
         style,

@@ -12,7 +12,7 @@ import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
-import { colors, radius, spacing } from "./theme";
+import { colors, radius, spacing, accentGlow } from "./theme";
 import { Button, Tap, type ZoomPicks } from "./ui";
 
 /**
@@ -127,7 +127,7 @@ export function FlareStatus({
         <View
           style={{
             shadowColor: colors.accent,
-            shadowOpacity: 0.7,
+            shadowOpacity: 0.7 * accentGlow,
             shadowRadius: 5,
             shadowOffset: { width: 0, height: 0 },
           }}

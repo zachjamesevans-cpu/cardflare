@@ -21,7 +21,7 @@ import {
 } from "./night-copy";
 import { HeldRing } from "./held-ring";
 import { PlayerAvatar } from "./player-avatar";
-import { colors, radius, spacing } from "./theme";
+import { colors, radius, spacing, accentGlow } from "./theme";
 import { Button, CardImage, ErrorLine, Tap, type ZoomCard } from "./ui";
 
 /**
@@ -56,7 +56,7 @@ export function MutualMatchBlock({
         padding: spacing(3.5),
         gap: spacing(2.5),
         shadowColor: colors.accent,
-        shadowOpacity: 0.25,
+        shadowOpacity: 0.25 * accentGlow,
         shadowRadius: 10,
         shadowOffset: { width: 0, height: 0 },
       }}

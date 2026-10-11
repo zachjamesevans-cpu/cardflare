@@ -37,7 +37,7 @@ import {
   Tap,
   Title,
 } from "../ui";
-import { colors, radius, spacing } from "../theme";
+import { BRAND, colors, radius, spacing } from "../theme";
 
 /**
  * The first thing a fresh install shows: the pitch, then the whole
@@ -61,6 +61,9 @@ const SEEN_KEY = "cf-welcome-seen";
    future master with different proportions stays correctly shaped. */
 const WORDMARK = require("../../assets/wordmark.png");
 const WORDMARK_SOURCE = Image.resolveAssetSource(WORDMARK);
+/* The CF mark, the logo while BRAND is "soft". */
+const CF_MARK = require("../../assets/cf-mark.png");
+const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
 
 export async function hasSeenWelcome(): Promise<boolean> {
   try {
@@ -209,23 +212,40 @@ function Splash({
        * is a plain image and always was; this is the app catching up to
        * it rather than drifting from it.
        */}
-      <Image
-        source={require("../../assets/cardflare-mark.png")}
-        style={{ height: 140, width: 140, resizeMode: "contain" }}
-      />
+      {BRAND === "soft" ? (
+        /* The founder's CF mark, flat and alone: the logo "for now", in
+           place of the flame card and the glowing wordmark. See BRAND in
+           theme.ts. */
+        <Image
+          source={CF_MARK}
+          style={{
+            height: 72,
+            width: 72 * (CF_MARK_SOURCE.width / CF_MARK_SOURCE.height),
+            resizeMode: "contain",
+          }}
+          accessibilityLabel="cardflare"
+        />
+      ) : (
+        <>
+          <Image
+            source={require("../../assets/cardflare-mark.png")}
+            style={{ height: 140, width: 140, resizeMode: "contain" }}
+          />
 
-      {/* The name is the founder's wordmark art, never a font — BRAND.md:
-          "Just put this everywhere." Height set, width follows the file's
-          own ratio, same as the header. */}
-      <Image
-        source={WORDMARK}
-        style={{
-          height: 44,
-          width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
-          resizeMode: "contain",
-        }}
-        accessibilityLabel="cardflare"
-      />
+          {/* The name is the founder's wordmark art, never a font — BRAND.md:
+              "Just put this everywhere." Height set, width follows the file's
+              own ratio, same as the header. */}
+          <Image
+            source={WORDMARK}
+            style={{
+              height: 44,
+              width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
+              resizeMode: "contain",
+            }}
+            accessibilityLabel="cardflare"
+          />
+        </>
+      )}
       {/* Smaller, and sitting closer to the mark it belongs to. Three
           short lines under a wordmark do not need to be nearly the size
           of the wordmark, and the shared gap held them apart as though

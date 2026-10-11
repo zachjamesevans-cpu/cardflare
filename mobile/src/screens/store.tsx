@@ -347,7 +347,7 @@ function Shelf({
                       right: 2,
                       bottom: 2,
                       borderRadius: 999,
-                      backgroundColor: "rgba(21, 26, 33, 0.9)",
+                      backgroundColor: `${colors.surface}e6`,
                       padding: 3,
                     }}
                   >
