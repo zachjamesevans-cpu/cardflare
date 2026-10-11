@@ -36,6 +36,45 @@ const ACCENTS: Record<
   },
 };
 
+/*
+ * The surfaces and the quiet text, by BRAND. "lime" keeps the navy the
+ * app was built in; "soft" is the CF logo's own ground, #1B1B1B, sampled
+ * off the founder's image (every region of it reads #1B1B1B), with the
+ * raised steps, the borders and the grey text in the same neutral family
+ * so nothing navy is left beside it. The founder: "see how in the feed
+ * it's a navy color for all the flares? what if it was that exact dark
+ * gray/green color. make sure to color match it exactly." The page
+ * itself stays true black on both.
+ */
+const SURFACES: Record<
+  "soft" | "lime",
+  {
+    surface: string;
+    elevated: string;
+    border: string;
+    borderStrong: string;
+    textSecondary: string;
+    textMuted: string;
+  }
+> = {
+  lime: {
+    surface: "#151a21",
+    elevated: "#1d242d",
+    border: "#2a323d",
+    borderStrong: "#3a4553",
+    textSecondary: "#b3becc",
+    textMuted: "#8593a4",
+  },
+  soft: {
+    surface: "#1b1b1b",
+    elevated: "#242424",
+    border: "#2e2e2e",
+    borderStrong: "#3d3d3d",
+    textSecondary: "#bdbdbd",
+    textMuted: "#8c8c8c",
+  },
+};
+
 /**
  * How strongly anything glows in the accent: a held card's ring, the
  * status crosshair, a mutual match, the PRO mark. Full on "lime", a
@@ -54,10 +93,10 @@ export const colors = {
    * background, and pure black on that lime is harsher.
    */
   canvas: "#000000",
-  surface: "#151a21",
-  elevated: "#1d242d",
-  border: "#2a323d",
-  borderStrong: "#3a4553",
+  surface: SURFACES[BRAND].surface,
+  elevated: SURFACES[BRAND].elevated,
+  border: SURFACES[BRAND].border,
+  borderStrong: SURFACES[BRAND].borderStrong,
   /* The accent, its hover, its dim and (below) its wash: from BRAND. */
   accent: ACCENTS[BRAND].accent,
   accentHover: ACCENTS[BRAND].accentHover,
@@ -72,8 +111,8 @@ export const colors = {
   /* What dims the page behind a card, a badge or a sheet, one strength. */
   scrim: "rgba(0,0,0,0.75)",
   textPrimary: "#f2f5f7",
-  textSecondary: "#b3becc",
-  textMuted: "#8593a4",
+  textSecondary: SURFACES[BRAND].textSecondary,
+  textMuted: SURFACES[BRAND].textMuted,
   success: "#6ee7a8",
   warning: "#fbc85a",
   danger: "#ff8f8f",
