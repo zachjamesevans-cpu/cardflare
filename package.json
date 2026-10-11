@@ -24,7 +24,9 @@
     "cards:scrape:bandai": "tsx scripts/scrape-bandai.ts",
     "cards:sync:onepiece": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/sync-onepiece.ts",
     "cards:import": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/import-catalogue.ts",
-    "scan:compare": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/scan-compare.ts"
+    "scan:compare": "tsx --conditions=react-server --env-file-if-exists=.env.local scripts/scan-compare.ts",
+    "demo": "tsx --conditions=react-server --env-file=.env.demo scripts/demo.ts",
+    "demo:web": "node scripts/copy-rive-wasm.mjs && node --env-file=.env.demo node_modules/next/dist/bin/next dev -p 3000"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
@@ -56,6 +58,7 @@
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^9",
     "eslint-config-next": "16.2.12",
+    "postgres": "^3.4.9",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",

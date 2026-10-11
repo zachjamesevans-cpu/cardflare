@@ -1,0 +1,60 @@
+# The five App Store screenshots, from the demo world.
+#
+# The founder (2026-10-11), making the store listing: the room with
+# matches, a Flare in the Feed, a full binder, the profile, and a trade
+# closed in Messages. supabase/demo/README.md sets the world up; this
+# walks it and leaves five pictures in shots/app-store/.
+#
+# In its own folder on purpose: `maestro test .maestro` runs the
+# visual-pass flows (config.yaml, "0*.yaml") and never this one.
+#
+#   maestro test .maestro/app-store -e EMAIL=hero@demo.cardflare.gg -e PASSWORD=...
+#
+# Run `npm run demo -- seed` right before it: "here now" in the room
+# means seen in the last fifteen minutes.
+appId: gg.cardflare.app
+---
+- launchApp:
+    clearState: false
+- runFlow: ../sign-in.yaml
+
+# 1. The live room, with the hero's matches. The live night comes first
+#    in Rooms; a night later this week has the same name.
+- tapOn: "Rooms"
+- tapOn:
+    text: "One Piece Locals"
+    index: 0
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: shots/app-store/1-room
+- back
+
+# 2. Flares from the people the hero follows, newest first.
+- tapOn: "Feed"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: shots/app-store/2-feed
+
+# 3. The trade binder, full of card art.
+- tapOn: "Profile"
+- tapOn: "Trade binder"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: shots/app-store/3-binder
+- back
+
+# 4. The profile, scrolled to the top, wearing what the hero bought.
+- scrollUntilVisible:
+    element: "Profile"
+    direction: UP
+    timeout: 5000
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: shots/app-store/4-profile
+
+# 5. The conversation that ends in "We traded".
+- tapOn: "Messages"
+- tapOn: "Jordan Kim"
+- waitForAnimationToEnd:
+    timeout: 8000
+- takeScreenshot: shots/app-store/5-trade
