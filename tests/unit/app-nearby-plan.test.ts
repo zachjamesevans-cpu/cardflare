@@ -44,14 +44,18 @@ describe("the Nearby tab is a trade room", () => {
   });
 
   it("asks for a location when the server has none", () => {
-    const plan = planNearby([item({ kind: "nearbyStores", stores: [], needsLocation: true })]);
+    const plan = planNearby([
+      item({ kind: "nearbyStores", stores: [], needsLocation: true }),
+    ]);
     expect(plan.ask).not.toBeNull();
     expect(plan.items).toEqual([]);
   });
 
   it("is what the Nearby tab draws, in the Feed's own view, with the reach a tap away", () => {
     const home = read("mobile/src/screens/home.tsx");
-    expect(home).toContain('const plan = tab === "nearby" && !guest ? planNearby(all) : null;');
+    expect(home).toContain(
+      'const plan = tab === "nearby" && !guest ? planNearby(all) : null;',
+    );
     expect(home).toContain("const shown = plan ? plan.items : all;");
     expect(home).toContain("<NearbyHeader");
     expect(home).toContain("void setLocalRadius(miles)");
@@ -68,7 +72,9 @@ describe("Flares near you, from the server", () => {
   const repo = read("src/lib/feed/repository.ts");
 
   it("files posts by people near you that you do not follow under around", () => {
-    expect(repo).toContain('return item.yours ? "yours" : item.around ? "around" : "people";');
+    expect(repo).toContain(
+      'return item.yours ? "yours" : item.around ? "around" : "people";',
+    );
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(
       "await nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",

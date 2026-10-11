@@ -27,7 +27,11 @@ import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
 import { storePostsForFollowers } from "@/lib/stores/posts";
 import { milesApart, pointForPostalCode, zipsWithin, type Point } from "@/lib/geo/zip";
-import { DEFAULT_LOCAL_RADIUS, isLocalRadius, type LocalRadius } from "@/lib/local/shared";
+import {
+  DEFAULT_LOCAL_RADIUS,
+  isLocalRadius,
+  type LocalRadius,
+} from "@/lib/local/shared";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { blockedSet } from "@/lib/players/safety";
