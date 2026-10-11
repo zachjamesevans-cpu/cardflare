@@ -22,9 +22,31 @@ import { AsyncButton, Button, ErrorLine, Input, SheetClose, Tap } from "./ui";
  * zero reason to keep a hunt private - it's the whole point of a hunt".
  */
 
-/** What a hunt is, in the sheet and behind "What's a hunt?". */
+/** What a hunt is, in a line: the New hunt sheet and an empty Hunts tab. */
 export const HUNT_EXPLAINER =
-  "A hunt is a goal you’re collecting toward, like every Green Zoro printing or a full Ace alt-art set. Add the cards you need, tick them off as you find them, and post a Flare from it so players who have them can find you.";
+  "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.";
+
+/**
+ * What a hunt is, in full, behind "What's a hunt?": why it exists and how
+ * it differs from a Flare. The founder: "the goal of a hunt is that
+ * perhaps you don't want a bunch of flares out when you join a room or
+ * someone's on your profile - it's basically a way to have an organized
+ * list of grails you're looking for, decks you're building, etc."
+ */
+export const HUNT_ABOUT: { title: string; body: string }[] = [
+  {
+    title: "A hunt is one home for the cards you’re after.",
+    body: "Group the cards you’re after: your grails, the deck you’re building, the set you’re finishing. Tick them off as they come in and it keeps track of what’s left.",
+  },
+  {
+    title: "How is it different from a Flare?",
+    body: "A Flare is a quick ask that goes out right now: it lands in feeds and rooms so someone nearby can raise a hand. A hunt is the bigger picture, one calm page on your profile, so you don’t need a dozen Flares out every time you walk into a room.",
+  },
+  {
+    title: "Use them together.",
+    body: "When you’re ready for help, post a Flare from your hunt for just the cards you want today.",
+  },
+];
 
 /** Tap to fill the name: what a hunt is usually called. */
 const EXAMPLES = ["Green Zoro", "Ace alt arts", "OP-09 set"];
@@ -165,7 +187,22 @@ function HuntSheetBody({
 
             {/* The explanation, wherever someone is about to start one or
                 asked. Editing a hunt you made needs no lesson. */}
-            {editing ? null : (
+            {/* The line when starting one; the whole story when asked.
+                Editing a hunt you made needs neither. */}
+            {mode.kind === "about" ? (
+              <View style={{ gap: spacing(3) }}>
+                {HUNT_ABOUT.map((point) => (
+                  <View key={point.title} style={{ gap: spacing(1) }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "700" }}>
+                      {point.title}
+                    </Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
+                      {point.body}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : editing ? null : (
               <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
                 {HUNT_EXPLAINER}
               </Text>

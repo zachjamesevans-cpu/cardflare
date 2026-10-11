@@ -185,7 +185,7 @@ describe("the Hunts tab: one binder row per hunt", () => {
       src.panel.indexOf("{hunts.map((hunt) => ("),
     );
     expect(src.panel).not.toContain('placeholder={\'Name it, like "Green Zoro"\'}');
-    expect(sheet).toContain('A hunt is a goal you’re collecting toward, like every Green Zoro printing or a full Ace alt-art set. Add the cards you need, tick them off as you find them, and post a Flare from it so players who have them can find you.');
+    expect(sheet).toContain('One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.');
     expect(sheet).toContain('<Modal visible transparent animationType="fade"');
     expect(sheet).toContain("createHunt({");
     expect(sheet).not.toContain("visibility");

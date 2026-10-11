@@ -210,7 +210,7 @@ describe("the Hunts tab: one binder row per hunt", () => {
 
   it("says the empty state the same way on both", () => {
     /* What a hunt is: the app's sheet and empty pane, the web's pane. */
-    const OWNER = 'A hunt is a goal you’re collecting toward, like every Green Zoro printing or a full Ace alt-art set. Add the cards you need, tick them off as you find them, and post a Flare from it so players who have them can find you.';
+    const OWNER = 'One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.';
     expect(web.panel).toContain(OWNER);
     expect(read("mobile/src/hunt-sheet.tsx")).toContain(OWNER);
     expect(app.panel).toContain("HUNT_EXPLAINER");

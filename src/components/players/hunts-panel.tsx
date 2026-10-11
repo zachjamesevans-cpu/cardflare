@@ -104,7 +104,7 @@ export function HuntsPanel({
       {hunts.length === 0 ? (
         <p className="text-sm text-text-secondary">
           {yours
-            ? "A hunt is a goal you’re collecting toward, like every Green Zoro printing or a full Ace alt-art set. Add the cards you need, tick them off as you find them, and post a Flare from it so players who have them can find you."
+            ? "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares."
             : "No hunts yet."}
         </p>
       ) : (
