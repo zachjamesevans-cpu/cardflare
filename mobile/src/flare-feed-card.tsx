@@ -32,7 +32,7 @@ import { Button, Tap, type ZoomPicks } from "./ui";
  * Every piece of behaviour is the one the Feed already had: the tap on
  * the card opens the same zoom with "I have this card" inside it, the
  * heart and the bubble are the post's own, and the paper plane opens
- * the same conversation Local opens. New here: "Offer cards" for
+ * the same conversation Local opens. New here: "I have these" for
  * several at once, "Update progress" on your own, and the hunt a post
  * belongs to.
  *
@@ -160,11 +160,17 @@ export function FlareActions({
   direction,
   completed,
   onOffer,
+  cardCount,
+  compact = false,
 }: {
   yours: boolean;
   direction: "want" | "showcase";
   completed: boolean;
   onOffer?: () => void;
+  /** How many cards the post asks for: "I have it" for one. */
+  cardCount: number;
+  /** The Feed's pill at the end of the social row, not a full button. */
+  compact?: boolean;
 }) {
   if (direction === "showcase") return null;
   /* Your own post has no button here: "Update progress" waits behind
@@ -173,7 +179,35 @@ export function FlareActions({
   /* Nothing left to offer on, and no row saying so: the status line at
      the top already reads "found it". */
   if (completed) return null;
-  return onOffer ? <Button label="Offer cards" onPress={onOffer} /> : null;
+  if (!onOffer) return null;
+  const label = offerLabel(cardCount);
+  if (!compact) return <Button label={label} onPress={onOffer} />;
+  return (
+    <Tap
+      onPress={onOffer}
+      accessibilityLabel={label}
+      style={{
+        backgroundColor: colors.accent,
+        borderRadius: 999,
+        paddingHorizontal: spacing(3.5),
+        minHeight: 34,
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ color: colors.accentContrast, fontSize: 14, fontWeight: "700" }}>
+        {label}
+      </Text>
+    </Tap>
+  );
+}
+
+/**
+ * The offer button's words. It was "Offer cards", which read like
+ * posting a listing of your own; the viewer and the full list already
+ * say "I have this card", so the post says the same thing.
+ */
+export function offerLabel(cardCount: number): string {
+  return cardCount === 1 ? "I have it" : "I have these";
 }
 
 /**
@@ -325,8 +359,10 @@ export function FlareFeedCard({
     onBlock,
   });
   /* A Flare posted to a room names it up here, where the time is, and
-     not only on the button at the foot: "at Mox Valley · 2h ago". */
-  const atStore = item.code && item.storeName ? `at ${item.storeName}` : null;
+     the name is the way in. There used to be a full-width "Go to Mox
+     Valley Games" at the foot of every such post as well; the founder:
+     "it's wack and can probably just go". */
+  const store = item.code && item.storeName ? item.storeName : null;
 
   return (
     <View
@@ -430,15 +466,28 @@ export function FlareFeedCard({
             maxWidth: "50%",
           }}
         >
-          {atStore ? (
-            <Text
-              numberOfLines={1}
-              style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}
+          {store ? (
+            <Tap
+              onPress={() => onEnterRoom(item.code ?? "")}
+              hitSlop={8}
+              accessibilityLabel={`Go to ${store}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 2,
+                flexShrink: 1,
+              }}
             >
-              {atStore}
-            </Text>
+              <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}
+              >
+                {store}
+              </Text>
+            </Tap>
           ) : null}
-          {atStore && item.postedAt ? (
+          {store && item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
           ) : null}
           {item.postedAt ? (
@@ -582,14 +631,17 @@ export function FlareFeedCard({
         </Tap>
       ) : null}
 
-      <FlareActions
-        yours={item.yours}
-        direction={direction}
-        completed={completed}
-        onOffer={onOffer}
-      />
-
       <PostSocialRow
+        trailing={
+          <FlareActions
+            yours={item.yours}
+            direction={direction}
+            completed={completed}
+            onOffer={onOffer}
+            cardCount={item.total}
+            compact
+          />
+        }
         likes={item.likes ?? 0}
         liked={item.liked ?? false}
         comments={item.comments ?? 0}
@@ -598,15 +650,6 @@ export function FlareFeedCard({
         onOpenThread={onOpenThread}
         onMessage={onMessage}
       />
-
-      {/* Every post that HAS a place ends in one. */}
-      {item.code && item.storeName ? (
-        <Button
-          label={`Go to ${item.storeName}`}
-          variant="secondary"
-          onPress={() => onEnterRoom(item.code ?? "")}
-        />
-      ) : null}
     </View>
   );
 }

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Text, View } from "react-native";
 
 import {
@@ -84,6 +84,7 @@ export function PostSocialRow({
   onOpenThread,
   onMessage,
   threadOpen = false,
+  trailing,
 }: {
   likes: number;
   liked: boolean;
@@ -96,6 +97,12 @@ export function PostSocialRow({
   onMessage?: () => void;
   /** On the post's own screen the bubble is a label, not a door. */
   threadOpen?: boolean;
+  /**
+   * The post's one action, at the far end of this row rather than a
+   * full-width button on a row of its own. The founder, on classic
+   * mode: "look at how massive the UI is".
+   */
+  trailing?: ReactNode;
 }) {
   const [liked, setLiked] = useState(initialLiked);
   const [likes, setLikes] = useState(initialLikes);
@@ -157,69 +164,74 @@ export function PostSocialRow({
 
   return (
     <View style={{ gap: spacing(1) }}>
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
-      <Tap
-        onPress={toggle}
-        hitSlop={6}
-        accessibilityLabel={liked ? "Unlike" : "Like"}
-        style={TARGET}
-      >
-        <Ionicons
-          name={liked ? "heart" : "heart-outline"}
-          size={22}
-          color={liked ? colors.accent : colors.textSecondary}
-        />
-        <Text
-          style={{
-            color: liked ? colors.accent : colors.textSecondary,
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          {likes}
-        </Text>
-      </Tap>
-      <Tap
-        onPress={onOpenThread}
-        disabled={threadOpen}
-        hitSlop={6}
-        accessibilityLabel="Show comments"
-        style={TARGET}
-      >
-        <Ionicons
-          name={threadOpen ? "chatbubble" : "chatbubble-outline"}
-          size={21}
-          color={threadOpen ? colors.textPrimary : colors.textSecondary}
-        />
-        <Text
-          style={{
-            color: threadOpen ? colors.textPrimary : colors.textSecondary,
-            fontSize: 14,
-            fontWeight: "600",
-          }}
-        >
-          {comments}
-        </Text>
-      </Tap>
-      {onMessage ? (
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         <Tap
-          onPress={onMessage}
+          onPress={toggle}
           hitSlop={6}
-          accessibilityLabel="Message them"
+          accessibilityLabel={liked ? "Unlike" : "Like"}
           style={TARGET}
         >
-          <Ionicons name="paper-plane-outline" size={21} color={colors.textSecondary} />
-          {offers !== undefined ? (
-            <Text
-              style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
-            >
-              {offers}
-            </Text>
-          ) : null}
+          <Ionicons
+            name={liked ? "heart" : "heart-outline"}
+            size={22}
+            color={liked ? colors.accent : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: liked ? colors.accent : colors.textSecondary,
+              fontSize: 14,
+              fontWeight: "600",
+            }}
+          >
+            {likes}
+          </Text>
         </Tap>
-      ) : null}
-    </View>
-    <ErrorLine message={error} />
+        <Tap
+          onPress={onOpenThread}
+          disabled={threadOpen}
+          hitSlop={6}
+          accessibilityLabel="Show comments"
+          style={TARGET}
+        >
+          <Ionicons
+            name={threadOpen ? "chatbubble" : "chatbubble-outline"}
+            size={21}
+            color={threadOpen ? colors.textPrimary : colors.textSecondary}
+          />
+          <Text
+            style={{
+              color: threadOpen ? colors.textPrimary : colors.textSecondary,
+              fontSize: 14,
+              fontWeight: "600",
+            }}
+          >
+            {comments}
+          </Text>
+        </Tap>
+        {onMessage ? (
+          <Tap
+            onPress={onMessage}
+            hitSlop={6}
+            accessibilityLabel="Message them"
+            style={TARGET}
+          >
+            <Ionicons
+              name="paper-plane-outline"
+              size={21}
+              color={colors.textSecondary}
+            />
+            {offers !== undefined ? (
+              <Text
+                style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
+              >
+                {offers}
+              </Text>
+            ) : null}
+          </Tap>
+        ) : null}
+        {trailing ? <View style={{ marginLeft: "auto" }}>{trailing}</View> : null}
+      </View>
+      <ErrorLine message={error} />
     </View>
   );
 }

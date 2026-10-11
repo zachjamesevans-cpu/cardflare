@@ -266,7 +266,12 @@ export function FlarePostScreen({ postId }: { postId: string }) {
         }}
       >
         <ErrorLine message={loadError} />
-        <AsyncButton label="Retry" pendingLabel="Retrying…" variant="secondary" onPress={load} />
+        <AsyncButton
+          label="Retry"
+          pendingLabel="Retrying…"
+          variant="secondary"
+          onPress={load}
+        />
       </View>
     );
   }
@@ -499,6 +504,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
               direction={direction}
               completed={post.completed ?? false}
               onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
+              cardCount={total}
             />
             {!post.yours && direction === "want" && !post.completed ? (
               <Muted>Tap a card to offer it, or offer several at once.</Muted>
@@ -603,7 +609,9 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   </Text>
                 </View>
                 <DotsButton
-                  onPress={commentActions(comment) ? () => setCommentMenu(comment) : null}
+                  onPress={
+                    commentActions(comment) ? () => setCommentMenu(comment) : null
+                  }
                   label="More about this comment"
                 />
               </View>
