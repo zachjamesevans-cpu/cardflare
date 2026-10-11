@@ -135,13 +135,43 @@ export function FlareStatus({
   hunt?: { id: string; name: string } | null;
   onOpenHunt?: (huntId: string) => void;
 }) {
-  const huntName = hunt ? (
-    <Text
-      numberOfLines={1}
-      style={{ color: colors.accent, fontSize: 14, fontWeight: "800", flexShrink: 1 }}
+  /*
+   * THE HUNT AS A PILL, NOT AS WORDS.
+   *
+   * Hunts are named like cards - "Green Zoro", "Sabo" - so "is hunting
+   * Green Zoro" in plain bold read as wanting one Green Zoro. A pill
+   * says it is the name of a thing, and that it opens. The founder
+   * asked whether "looking for" and "is hunting" would blur together
+   * under one icon. The icon stays: the crosshair IS the hunts mark
+   * (the hunts-as-binders round), and both lines mean "tap a card to
+   * offer". The pill is the difference.
+   */
+  const huntPill = hunt ? (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 2,
+        borderWidth: 1,
+        borderColor: `${colors.accent}59`,
+        backgroundColor: colors.accentTint,
+        borderRadius: 999,
+        paddingLeft: spacing(2),
+        paddingRight: onOpenHunt ? spacing(1) : spacing(2),
+        paddingVertical: 1,
+        minWidth: 0,
+      }}
     >
-      {done ? `· ${hunt.name}` : hunt.name}
-    </Text>
+      <Text
+        numberOfLines={1}
+        style={{ color: colors.accent, fontSize: 13, fontWeight: "800", flexShrink: 1 }}
+      >
+        {hunt.name}
+      </Text>
+      {onOpenHunt ? (
+        <Ionicons name="chevron-forward" size={12} color={colors.accent} />
+      ) : null}
+    </View>
   ) : null;
 
   return (
@@ -171,19 +201,21 @@ export function FlareStatus({
         {label}
       </Text>
       {hunt && onOpenHunt ? (
-        /* Its own tap, inside the header's: the name opens the hunt,
-           the rest of the header still opens the profile. */
-        <Tap
-          onPress={() => onOpenHunt(hunt.id)}
-          accessibilityLabel={`View hunt ${hunt.name}`}
-          hitSlop={6}
-          style={{ flexShrink: 1, minWidth: 0 }}
-        >
-          {huntName}
-        </Tap>
-      ) : (
-        huntName
-      )}
+        /* Its own tap, inside the header's: the pill opens the hunt,
+           the rest of the header still opens the profile. The shrink
+           lives on this wrapper - Tap puts its style on an inner view. */
+        <View style={{ flexShrink: 1, minWidth: 0 }}>
+          <Tap
+            onPress={() => onOpenHunt(hunt.id)}
+            accessibilityLabel={`View hunt ${hunt.name}`}
+            hitSlop={6}
+          >
+            {huntPill}
+          </Tap>
+        </View>
+      ) : hunt ? (
+        <View style={{ flexShrink: 1, minWidth: 0 }}>{huntPill}</View>
+      ) : null}
       {detail ? (
         <Text style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}>
           {`· ${detail}`}

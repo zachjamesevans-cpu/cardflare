@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { CheckCircle2, Crosshair, Heart, MessageCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Crosshair,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareCarousel, SingleFlare } from "@/components/feed/flare-carousel";
@@ -142,18 +148,22 @@ export function FlareStatus({
         />
       )}
       <span className="shrink-0">{label}</span>
+      {/* The hunt as a pill, not as words: hunts are named like cards
+          ("Green Zoro"), and in plain bold "is hunting Green Zoro" read
+          as wanting one card. The app draws the same pill. */}
       {hunt &&
         (linkHunt ? (
           <Link
             href={`/hunts/${hunt.id}`}
             aria-label={`View hunt ${hunt.name}`}
-            className="truncate font-extrabold hover:underline"
+            className="flex min-w-0 items-center gap-0.5 rounded-full border border-accent/35 bg-accent/10 py-px pr-1 pl-2 text-[13px] font-extrabold transition-colors hover:bg-accent/20"
           >
-            {done ? `· ${hunt.name}` : hunt.name}
+            <span className="truncate">{hunt.name}</span>
+            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
           </Link>
         ) : (
-          <span className="truncate font-extrabold">
-            {done ? `· ${hunt.name}` : hunt.name}
+          <span className="flex min-w-0 items-center rounded-full border border-accent/35 bg-accent/10 px-2 py-px text-[13px] font-extrabold">
+            <span className="truncate">{hunt.name}</span>
           </span>
         ))}
     </span>
