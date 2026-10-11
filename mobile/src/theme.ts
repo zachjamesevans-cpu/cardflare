@@ -9,7 +9,7 @@
  * the logo across the app.
  *
  * "soft" is the founder's CF logo (assets/cf-mark.png): its pale green
- * #CFFA86 as the accent, the glows turned right down, and the CF mark
+ * #CEFC84 as the accent, the glows turned right down, and the CF mark
  * where the glowing wordmark was. The founder: "trying to reduce the
  * 'gamer' glow/look from the logo... if i dont like it, i can quickly
  * switch back." "lime" is everything as it was. The app icon and splash
@@ -29,22 +29,23 @@ const ACCENTS: Record<
     accentTint: "rgba(198,238,79,0.1)",
   },
   soft: {
-    accent: "#cffa86",
-    accentHover: "#dcfda3",
-    accentMuted: "#94ad66",
-    accentTint: "rgba(207,250,134,0.1)",
+    accent: "#cefc84",
+    accentHover: "#dbfda2",
+    accentMuted: "#93ae63",
+    accentTint: "rgba(206,252,132,0.1)",
   },
 };
 
 /*
  * The surfaces and the quiet text, by BRAND. "lime" keeps the navy the
- * app was built in; "soft" is the CF logo's own ground, #1B1B1B, sampled
- * off the founder's image (every region of it reads #1B1B1B), with the
- * raised steps, the borders and the grey text in the same neutral family
- * so nothing navy is left beside it. The founder: "see how in the feed
- * it's a navy color for all the flares? what if it was that exact dark
- * gray/green color. make sure to color match it exactly." The page
- * itself stays true black on both.
+ * app was built in; "soft" is the CF logo's own ground, #111710, a deep
+ * green-black sampled off the founder's second logo (its regions read
+ * #10160F to #121810), with the raised steps, the borders and the grey
+ * text in the same green family so nothing navy is left beside it. The
+ * founder: "see how in the feed it's a navy color for all the flares?
+ * what if it was that exact dark gray/green color. make sure to color
+ * match it exactly", then, of the greener logo: "the tint in the
+ * background is more green". The page itself stays true black on both.
  */
 const SURFACES: Record<
   "soft" | "lime",
@@ -66,12 +67,12 @@ const SURFACES: Record<
     textMuted: "#8593a4",
   },
   soft: {
-    surface: "#1b1b1b",
-    elevated: "#242424",
-    border: "#2e2e2e",
-    borderStrong: "#3d3d3d",
-    textSecondary: "#bdbdbd",
-    textMuted: "#8c8c8c",
+    surface: "#111710",
+    elevated: "#1a2118",
+    border: "#242d22",
+    borderStrong: "#333e30",
+    textSecondary: "#bcc4b8",
+    textMuted: "#8a9386",
   },
 };
 
