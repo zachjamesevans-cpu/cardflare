@@ -172,8 +172,20 @@ export function CollapsingHeader({
 }) {
   const insets = useSafeAreaInsets();
 
+  /*
+   * The bar is the status-bar strip AND the row, so it travels both to
+   * leave. It used to travel the row's height alone and an empty pane of
+   * glass the height of the status bar stayed up top - the founder: "it
+   * leaves still the liquid glass element at top, showing no info. it
+   * should disappear completely". `hidden` still counts 0…row height, and
+   * the bar moves in proportion, so the snap and the fade keep their
+   * thresholds.
+   */
+  const full = insets.top + HEADER_CONTENT_HEIGHT;
   const bar = useAnimatedStyle(() => ({
-    transform: [{ translateY: -state.hidden.value }],
+    transform: [
+      { translateY: -(state.hidden.value / HEADER_CONTENT_HEIGHT) * full },
+    ],
   }));
 
   /*
