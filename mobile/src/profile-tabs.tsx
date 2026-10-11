@@ -306,6 +306,11 @@ export function ProfileTabs({
                   paddingHorizontal: EDGE_TO_EDGE.includes(pane.key)
                     ? 0
                     : PROFILE_INSET,
+                  /* Room under the strip for the panes that are rows, not
+                     a grid: Hunts' first row sat on the underline - the
+                     founder: "look how close the top of that text box is
+                     to the actual hunts tab. it's wild." */
+                  paddingTop: EDGE_TO_EDGE.includes(pane.key) ? 0 : spacing(4),
                 }}
                 accessibilityElementsHidden={index !== active}
                 importantForAccessibility={

@@ -175,7 +175,8 @@ describe("the Hunts tab: one binder row per hunt", () => {
     /* The app. */
     expect(app.panel).toContain("<BinderCover");
     expect(app.panel).toContain("huntCover(hunt.id");
-    expect(app.panel).toContain('size="sm"');
+    /* The app's row is compact: a small cover and found over a bar. */
+    expect(app.panel).toContain('size="xs"');
     expect(app.panel).toContain("huntRowLine(");
     expect(app.panel).toContain('name="chevron-forward"');
     expect(app.panel).toContain("onOpen?: (huntId: string) => void");
@@ -191,12 +192,14 @@ describe("the Hunts tab: one binder row per hunt", () => {
     expect(web.page).toContain("<HuntBinder");
   });
 
-  it("says Private, muted, on the owner's private hunt alone", () => {
-    expect(web.panel).toMatch(
-      /yours && hunt\.visibility === "private" && \(\s*<span className="shrink-0 text-xs text-text-muted">Private<\/span>/,
-    );
-    expect(app.panel).toMatch(/>\s*Private\s*</);
-    expect(app.panel).toContain('visibility === "private"');
+  it("never says Private, on either: every hunt is public", () => {
+    /* The founder: "hunts should default to public and only be public." */
+    for (const source of [web.panel, app.panel]) {
+      expect(source).not.toContain('visibility === "private"');
+      expect(source).not.toMatch(/>\s*Private\s*</);
+    }
+    expect(web.binder).not.toContain("Who can see it");
+    expect(read("src/lib/players/hunts.ts")).toContain('visibility: "public",');
   });
 
   it("keeps the owner's New hunt control and the limit line", () => {
@@ -206,10 +209,12 @@ describe("the Hunts tab: one binder row per hunt", () => {
   });
 
   it("says the empty state the same way on both", () => {
-    const OWNER =
-      "Start a hunt and add the cards you are after. Post a Flare into it and the whole hunt follows you, with what is found and what is left.";
+    /* What a hunt is: the app's sheet and empty pane, the web's pane. */
+    const OWNER = 'A hunt is a goal you’re collecting toward, like every Green Zoro printing or a full Ace alt-art set. Add the cards you need, tick them off as you find them, and post a Flare from it so players who have them can find you.';
+    expect(web.panel).toContain(OWNER);
+    expect(read("mobile/src/hunt-sheet.tsx")).toContain(OWNER);
+    expect(app.panel).toContain("HUNT_EXPLAINER");
     for (const source of [web.panel, app.panel]) {
-      expect(source).toContain(OWNER);
       expect(source).toContain("No hunts yet.");
     }
   });
@@ -242,7 +247,8 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toContain("<HuntEditForm");
     expect(web.binder).toContain('label="Share hunt"');
     expect(web.binder).toContain("href={`/p/${hunt.playerId}`}");
-    expect(app.binder).toContain("HuntEditForm");
+    /* The app edits in the sheet that starts a hunt. */
+    expect(app.binder).toContain("<HuntSheet");
   });
 
   it("links back to the Hunts tab the row came from, on the web", () => {
