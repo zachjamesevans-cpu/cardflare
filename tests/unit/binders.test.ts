@@ -18,16 +18,23 @@ const actions = read("src/lib/binder/actions.ts");
 const migration = read("supabase/migrations/20261027090000_binders_for_trade.sql");
 
 describe("every binder is one of the player's own", () => {
-  it("has one switch, up for trade, and public means the same thing", () => {
+  it("has up for trade, and public as its own switch that trade implies", () => {
     expect(migration).toContain(
       "add column if not exists for_trade boolean not null default false",
     );
     expect(migration).toContain("update public.binders set is_public = for_trade");
-    expect(lib).toContain("isPublic: row.for_trade,");
+    expect(lib).toContain("isPublic: shownToOthers(row),");
     expect(lib).toContain("forTrade: row.for_trade,");
-    /* Toggling writes both columns together. */
+    expect(lib).toContain("return row.for_trade || row.is_public;");
+    /* For trade is public, private is not for trade: whichever turned,
+       the other follows. 20261114 lined the two up before they split. */
+    expect(lib).toContain("if (patch.isPublic === false) forTrade = false;");
+    expect(lib).toContain("if (forTrade) isPublic = true;");
+    expect(read("supabase/migrations/20261114090000_binder_public.sql")).toContain(
+      "set is_public = for_trade",
+    );
     expect(lib).toContain(
-      "row.for_trade = patch.forTrade;\n    row.is_public = patch.forTrade;",
+      "is_public: forTrade || input.isPublic === true,",
     );
     /* New binders are private unless the switch was on. */
     expect(lib).toContain("const forTrade = input.forTrade === true;");
@@ -53,11 +60,13 @@ describe("every binder is one of the player's own", () => {
     );
   });
 
-  it("is listed in the owner's order; a visitor sees only those up for trade", () => {
-    /* The one door past that is a night's, opened only by night-binders.ts. */
+  it("is listed in the owner's order; a visitor sees only those shown", () => {
+    /* Shown: public, or up for trade. The one door past that is a
+       night's, opened only by night-binders.ts. */
     expect(lib).toContain(
-      "if (!yours && !row.for_trade && !sharedForNight) return null;",
+      "if (!yours && !shownToOthers(row) && !sharedForNight) return null;",
     );
+    expect(lib).toContain("const visible = rows.filter((row) => yours || shownToOthers(row));");
     expect(lib).toContain('.order("position")');
     expect(lib).not.toContain("[trade, ...customs]");
   });
@@ -89,7 +98,7 @@ describe("the Have list is derived from the binders up for trade", () => {
     const settings = lib.slice(
       lib.indexOf("export async function saveBinderSettings("),
     );
-    expect(settings).toContain("patch.forTrade !== before.for_trade");
+    expect(settings).toContain("if (forTrade !== before.for_trade) {");
     expect(settings).toContain("syncTradeBinderCards(");
     const del = lib.slice(
       lib.indexOf("export async function deleteBinder("),
@@ -171,8 +180,8 @@ describe("a profile's binder list, read as summaries", () => {
     const { summarizeBinders } = await import("@/lib/binder/binder");
     const summaries = summarizeBinders(
       [
-        { id: "b1", name: "Trade", for_trade: true, cover: "lime" },
-        { id: "b2", name: "Playables", for_trade: true, cover: "not-a-cover" },
+        { id: "b1", name: "Trade", for_trade: true, is_public: true, cover: "lime" },
+        { id: "b2", name: "Playables", for_trade: true, is_public: true, cover: "not-a-cover" },
       ],
       [
         { binder_id: "b1", card_id: "c1" },

@@ -53,6 +53,7 @@ export function CreateBinderSheet({
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
   const [forTrade, setForTrade] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!visible) return null;
@@ -65,10 +66,16 @@ export function CreateBinderSheet({
     }
     setError(null);
     try {
-      const { binder } = await createBinder({ name: trimmed, cover, forTrade });
+      const { binder } = await createBinder({
+        name: trimmed,
+        cover,
+        forTrade,
+        isPublic: isPublic || forTrade,
+      });
       setName("");
       setCover(DEFAULT_BINDER_COVER);
       setForTrade(false);
+      setIsPublic(false);
       onCreated(binder.id);
     } catch (caught) {
       setError(
@@ -181,8 +188,34 @@ export function CreateBinderSheet({
               </ScrollView>
             </View>
 
-            {/* The one switch. On: public to signed-in players, and the
-                cards are there to be traded. Off: private. */}
+            {/* Two switches. Shown: anyone who opens your profile can
+                look through it. Up for trade: shown too, and its cards
+                are there to be traded. Both off: private. */}
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
+            >
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text
+                  style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
+                >
+                  Show on your profile
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {forTrade
+                    ? "Always shown while it is up for trade."
+                    : "Anyone who opens your profile can look through it."}
+                </Text>
+              </View>
+              <Switch
+                value={isPublic || forTrade}
+                disabled={forTrade}
+                onValueChange={setIsPublic}
+                trackColor={{ true: colors.accent, false: colors.borderStrong }}
+                thumbColor={colors.textPrimary}
+                accessibilityLabel="Show on your profile"
+              />
+            </View>
+
             <View
               style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
             >

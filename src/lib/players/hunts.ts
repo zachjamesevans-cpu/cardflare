@@ -384,7 +384,11 @@ export async function createHunt(
       player_id: playerId,
       name,
       description: input.description?.trim().slice(0, HUNT_DESCRIPTION_MAX) || null,
-      visibility: input.visibility ?? "public",
+      /* Always public: a hunt exists to be seen. The founder: "there is
+         zero reason to keep a hunt private - it's the whole point of a
+         hunt." `visibility` is still accepted and ignored, for the builds
+         that send it. */
+      visibility: "public",
     })
     .select("id")
     .single();
@@ -396,7 +400,7 @@ export async function createHunt(
   return { ok: true, huntId: data.id, created: true };
 }
 
-/** Renames, describes or hides a hunt. The owner only. */
+/** Renames or describes a hunt. The owner only. Hunts are never hidden. */
 export async function updateHunt(
   playerId: string,
   huntId: string,
@@ -422,7 +426,8 @@ export async function updateHunt(
     update.description =
       patch.description?.trim().slice(0, HUNT_DESCRIPTION_MAX) || null;
   }
-  if (patch.visibility !== undefined) update.visibility = patch.visibility;
+  /* `patch.visibility` is ignored: every hunt is public. */
+  void patch.visibility;
 
   const { data, error } = await getSupabaseAdmin()
     .from("hunts")

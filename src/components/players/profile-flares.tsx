@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Layers, PackageCheck } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
+import { buttonStyles } from "@/components/ui/button";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { cn } from "@/lib/cn";
 import type { ProfileFlare } from "@/lib/players/profile";
@@ -38,17 +39,23 @@ import type { ProfileFlare } from "@/lib/players/profile";
 const INSET = "px-4 sm:px-0";
 
 export function ProfileFlares({
-  flares,
+  flares: sent,
   yours,
   imagesEnabled,
   heading = true,
+  ownerName,
 }: {
   flares: ProfileFlare[];
   yours: boolean;
   imagesEnabled: boolean;
   /** False under the tab strip, where the tab already says Flares. */
   heading?: boolean;
+  /** Whose they are, for a visitor's empty state. */
+  ownerName?: string;
 }) {
+  /* The cards still looked for, and nothing else: offers are the TRADES
+     binder's, found cards are Trades' history. The app's stillWanted. */
+  const flares = sent.filter((flare) => flare.direction === "want");
   const shelf: ZoomCard[] = flares.map((flare) => ({
     imageUrl: flare.imageUrl,
     exactName: flare.cardName,
@@ -80,21 +87,30 @@ export function ProfileFlares({
       }
 
       {flares.length === 0 ? (
-        <p className={cn("text-sm text-text-muted", !heading && INSET)}>
-          {yours ? (
-            <>
-              No Flares yet. Tap + on the Feed to post one.{" "}
-              <Link
-                href="/flare"
-                className="font-semibold text-accent underline-offset-4 hover:underline"
-              >
-                Post a Flare
-              </Link>
-            </>
-          ) : (
-            "No Flares yet."
+        /* An empty profile says what to do next, as the app's does
+           (ProfileEmpty in mobile/src/profile-flares.tsx). */
+        <div
+          className={cn(
+            "flex flex-col items-center gap-2 py-8 text-center",
+            !heading && INSET,
           )}
-        </p>
+        >
+          <p className="text-lg font-bold text-text-primary">
+            {yours
+              ? "What are you hunting?"
+              : `${ownerName ?? "They"} ${ownerName ? "isn’t" : "aren’t"} looking for anything right now.`}
+          </p>
+          <p className="max-w-sm text-sm text-text-secondary">
+            {yours
+              ? "Post a Flare for a card you want, and players near you who have it can raise a hand."
+              : "When they post a Flare, you’ll see it in your Following feed."}
+          </p>
+          {yours && (
+            <Link href="/flare" className={cn(buttonStyles("primary", "sm"), "mt-2")}>
+              Post a Flare
+            </Link>
+          )}
+        </div>
       ) : (
         /*
          * A grid the way a social profile draws one: three across,

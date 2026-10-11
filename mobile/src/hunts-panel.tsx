@@ -11,19 +11,18 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
-  createHunt,
   friendlyError,
   type Hunt,
   type HuntCard,
   offerOnHunt,
   serverMessage,
-  updateHunt,
 } from "./api";
 import { BinderCover } from "./binder-cover";
 import { huntCover } from "./binder-covers";
 import { API_BASE } from "./config";
 import { cardsLabel, copiesLabel, printingLabel } from "./flare-copy";
 import { huntRowLine } from "./hunt-copy";
+import { HUNT_EXPLAINER, HuntSheet, type HuntSheetMode } from "./hunt-sheet";
 import { reviewLabel, selectionSummary } from "./offer-copy";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
@@ -100,36 +99,21 @@ export function HuntsPanel({
 }) {
   void onTick;
   void onAdd;
-  void ownerName;
-  const [naming, setNaming] = useState(false);
-  const [name, setName] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  /* New hunt, Edit hunt or What's a hunt?, as a sheet from the bottom
+     (hunt-sheet.tsx). It was a bare name field in the pane's top row. */
+  const [sheet, setSheet] = useState<HuntSheetMode | null>(null);
 
   const atLimit = typeof limit === "number" && hunts.length >= limit;
-
-  const create = async () => {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("Give the hunt a name.");
-      return;
-    }
-    setError(null);
-    try {
-      const result = await createHunt({ name: trimmed });
-      setName("");
-      setNaming(false);
-      onChanged?.();
-      onOpen?.(result.huntId);
-    } catch (caught) {
-      setError(`Could not start the hunt. ${friendlyError(caught)}`);
-    }
-  };
 
   const Shell = bare ? BareShell : Card;
 
   return (
     <Shell>
-      {bare ? null : (
+      {/*
+       * One slim row: how many of your allowance, the way to ask what a
+       * hunt is, and New hunt at its end - not a full-width green bar.
+       * A visitor's pane says only what there is.
+       */}
       <View
         style={{
           flexDirection: "row",
@@ -138,80 +122,66 @@ export function HuntsPanel({
           gap: spacing(2),
         }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          {/* The crosshair, the mark the Hunts tab already wears. */}
-          <Ionicons name="locate-outline" size={16} color={colors.accent} />
-          <Title>Hunts</Title>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), flexShrink: 1 }}
+        >
+          {bare ? null : (
+            <Ionicons name="locate-outline" size={16} color={colors.accent} />
+          )}
+          {bare ? null : <Title>Hunts</Title>}
+          {yours && limit ? (
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              {`${hunts.length} of ${limit} hunts`}
+            </Text>
+          ) : null}
+          {yours ? (
+            <Tap
+              onPress={() => setSheet({ kind: "about" })}
+              hitSlop={8}
+              accessibilityLabel="What's a hunt?"
+            >
+              <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
+                {"· What’s a hunt?"}
+              </Text>
+            </Tap>
+          ) : null}
         </View>
-        {limit ? (
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {hunts.length} of {limit}
-          </Text>
+        {yours ? (
+          <Tap
+            onPress={() => setSheet({ kind: "new" })}
+            disabled={atLimit}
+            accessibilityLabel="New hunt"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(1),
+              borderRadius: 999,
+              borderWidth: 1,
+              borderColor: atLimit ? colors.border : colors.accent,
+              paddingHorizontal: spacing(3),
+              paddingVertical: spacing(1.5),
+              opacity: atLimit ? 0.5 : 1,
+            }}
+          >
+            <Ionicons name="add" size={16} color={colors.accent} />
+            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+              New hunt
+            </Text>
+          </Tap>
         ) : null}
       </View>
-      )}
-
-      {/* The owner's way in, above the rows, where the binders tab has
-          its New binder. */}
-      {yours ? (
-        naming ? (
-          <View style={{ gap: spacing(2) }}>
-            <Input
-              value={name}
-              onChangeText={setName}
-              placeholder={'Name it, like "Green Zoro"'}
-              maxLength={40}
-              autoCapitalize="words"
-              autoFocus
-            />
-            <View style={{ flexDirection: "row", gap: spacing(2) }}>
-              <View style={{ flex: 1 }}>
-                <AsyncButton
-                  label="Start hunt"
-                  pendingLabel="Starting…"
-                  onPress={create}
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Button
-                  label="Cancel"
-                  variant="secondary"
-                  onPress={() => {
-                    setNaming(false);
-                    setError(null);
-                  }}
-                />
-              </View>
-            </View>
-            <ErrorLine message={error} />
-          </View>
-        ) : (
-          <View style={{ gap: spacing(1) }}>
-            <Button
-              label="New hunt"
-              disabled={atLimit}
-              onPress={() => setNaming(true)}
-            />
-            {atLimit ? (
-              <Muted>{`You are at ${limit} hunts. Finish or remove one to start another.`}</Muted>
-            ) : null}
-          </View>
-        )
+      {yours && atLimit ? (
+        <Muted>{`You are at ${limit} hunts. Finish one to start another.`}</Muted>
       ) : null}
 
       {hunts.length === 0 ? (
-        <Body>
-          {yours
-            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole hunt follows you, with what is found and what is left."
-            : "No hunts yet."}
-        </Body>
+        <Body>{yours ? HUNT_EXPLAINER : ownerName ? `${ownerName} has no hunts yet.` : "No hunts yet."}</Body>
       ) : (
         <View style={{ gap: spacing(2) }}>
           {hunts.map((hunt) => (
             <HuntRow
               key={keyOf(hunt)}
               hunt={hunt}
-              yours={Boolean(yours)}
               onOpen={() => {
                 if (hunt.id) onOpen?.(hunt.id);
               }}
@@ -219,6 +189,17 @@ export function HuntsPanel({
           ))}
         </View>
       )}
+
+      <HuntSheet
+        mode={sheet}
+        onClose={() => setSheet(null)}
+        onNew={() => setSheet({ kind: "new" })}
+        onStarted={(huntId) => {
+          onChanged?.();
+          onOpen?.(huntId);
+        }}
+        onSaved={() => onChanged?.()}
+      />
     </Shell>
   );
 }
@@ -235,25 +216,19 @@ function keyOf(hunt: Hunt | undefined): string | null {
 }
 
 /**
- * One hunt as the binder's row (binder-list.tsx), exactly: the small
- * cover with the name on it, the name, the line, and on the owner's
- * own rows "Private" in muted text when the hunt is. A public hunt
- * carries no chip. A tap opens the hunt.
+ * One hunt as a compact row: a small cover with its name on it, the
+ * name, and how far along - "3 of 17 found" over a slim bar - which is
+ * the whole reason a hunt exists. A row was a binder-sized cover and a
+ * line, a screen and a half for two hunts. No visibility chip: every hunt is
+ * public. A tap opens the hunt.
  */
-function HuntRow({
-  hunt,
-  yours,
-  onOpen,
-}: {
-  hunt: Hunt;
-  yours: boolean;
-  onOpen: () => void;
-}) {
+function HuntRow({ hunt, onOpen }: { hunt: Hunt; onOpen: () => void }) {
   const cards = hunt.looking + hunt.found;
+  const share = cards > 0 ? hunt.found / cards : 0;
   return (
     <Tap
       onPress={onOpen}
-      accessibilityLabel={hunt.name}
+      accessibilityLabel={`${hunt.name}, ${huntRowLine(cards, hunt.looking)}`}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -262,30 +237,40 @@ function HuntRow({
         borderWidth: 1,
         borderColor: colors.border,
         backgroundColor: colors.surface,
-        padding: spacing(3),
+        padding: spacing(2.5),
       }}
     >
-      <BinderCover
-        cover={huntCover(hunt.id ?? hunt.name)}
-        label={hunt.name}
-        size="sm"
-      />
-      <View style={{ flex: 1, minWidth: 0, gap: spacing(1) }}>
+      <BinderCover cover={huntCover(hunt.id ?? hunt.name)} label={hunt.name} size="xs" />
+      <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
         <Text
           numberOfLines={1}
           style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
         >
           {hunt.name}
         </Text>
-        {/* The chip rides the count line, so the name keeps the row's width. */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-            {huntRowLine(cards, hunt.looking)}
-          </Text>
-          {yours && hunt.visibility === "private" ? (
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Private</Text>
-          ) : null}
-        </View>
+        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+          {cards === 0 ? "No cards yet" : `${hunt.found} of ${cardsLabel(cards)} found`}
+        </Text>
+        {cards > 0 ? (
+          <View
+            accessibilityRole="progressbar"
+            accessibilityValue={{ min: 0, max: cards, now: hunt.found }}
+            style={{
+              height: 5,
+              borderRadius: 3,
+              backgroundColor: colors.elevated,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                width: `${Math.round(share * 100)}%`,
+                height: "100%",
+                backgroundColor: colors.accent,
+              }}
+            />
+          </View>
+        ) : null}
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
     </Tap>
@@ -648,90 +633,4 @@ export function huntOfferSentLine(
     parts.push(`Not taken: ${outcome.refused.join(", ")}.`);
   }
   return { text: parts.join(" "), threadId: outcome.threadId };
-}
-
-/** Name, description, who can see it. Saved as one patch. */
-export function HuntEditForm({ hunt, onSaved }: { hunt: Hunt; onSaved: () => void }) {
-  const [name, setName] = useState(hunt.name);
-  const [description, setDescription] = useState(hunt.description ?? "");
-  const [visibility, setVisibility] = useState<"public" | "private">(
-    hunt.visibility ?? "public",
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  const save = async () => {
-    if (!hunt.id) return;
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setError("A hunt needs a name.");
-      return;
-    }
-    setError(null);
-    try {
-      await updateHunt(hunt.id, {
-        name: trimmed,
-        description: description.trim() || null,
-        visibility,
-      });
-      onSaved();
-    } catch (caught) {
-      setError(`Could not save. ${friendlyError(caught)}`);
-    }
-  };
-
-  return (
-    <View
-      style={{
-        gap: spacing(2),
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        padding: spacing(3),
-      }}
-    >
-      <Input value={name} onChangeText={setName} placeholder="Name" maxLength={40} />
-      <Input
-        value={description}
-        onChangeText={setDescription}
-        placeholder="What this hunt is for (optional)"
-        maxLength={280}
-        multiline
-        style={{ minHeight: 64, textAlignVertical: "top" }}
-      />
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>
-        {(["public", "private"] as const).map((option) => {
-          const on = visibility === option;
-          return (
-            <Tap
-              key={option}
-              onPress={() => setVisibility(option)}
-              accessibilityLabel={option === "public" ? "Public" : "Private"}
-              style={{
-                flex: 1,
-                alignItems: "center",
-                paddingVertical: spacing(2),
-                borderRadius: radius.control,
-                borderWidth: on ? 2 : 1,
-                borderColor: on ? colors.accent : colors.border,
-                backgroundColor: colors.elevated,
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.textPrimary : colors.textMuted,
-                  fontSize: 13,
-                  fontWeight: on ? "700" : "500",
-                }}
-              >
-                {option === "public" ? "Public" : "Private"}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
-      <AsyncButton label="Save" pendingLabel="Saving…" onPress={save} />
-      <ErrorLine message={error} />
-    </View>
-  );
 }

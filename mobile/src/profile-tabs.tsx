@@ -2,7 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Pressable,
+  Text,
   View,
+  useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
@@ -59,17 +61,18 @@ export const TABS: Record<
   embers: { label: "Embers", icon: "storefront-outline" },
 };
 
-/** Your own profile: all six. Trades and Embers are nobody else's. */
-export const OWN_TABS: ProfileTab[] = [
-  "flares",
-  "hunts",
-  "binders",
-  "showcase",
-  "trades",
-  "embers",
-];
-/** Somebody else's: the four anybody may see. */
-export const THEIR_TABS: ProfileTab[] = ["flares", "hunts", "binders", "showcase"];
+/*
+ * Flares, Hunts, Trades: three, labelled. There were six icons; the
+ * founder cut Binders ("it's listed twice basically" - the row of
+ * covers above the strip is the binders), Showcase (a PC binder "does
+ * the same thing") and Embers (its shop is behind the wand and the
+ * Embers chip now). The other panes stay in ProfileTab so an old link
+ * that names one lands on Flares rather than nowhere.
+ */
+/** Your own profile. Trades is nobody else's. */
+export const OWN_TABS: ProfileTab[] = ["flares", "hunts", "trades"];
+/** Somebody else's: what anybody may see. */
+export const THEIR_TABS: ProfileTab[] = ["flares", "hunts"];
 
 /** The first tab, on both profiles. */
 export const DEFAULT_TAB: ProfileTab = "flares";
@@ -111,6 +114,17 @@ export function ProfileTabs({
   const count = panes.length;
   /* The screen's width, edge to edge: one page of the pager, measured. */
   const [width, setWidth] = useState(0);
+  /*
+   * Where the panes start on screen, for the least height they take: down
+   * to the bottom of the screen. A pane is as tall as what is in it, and a
+   * profile with no Flares was one line tall - the founder: "the only way
+   * for me to swipe between them is to swipe where there is text. make it
+   * so the full page below the words is swipable."
+   */
+  const window = useWindowDimensions();
+  const root = useRef<View>(null);
+  const [top, setTop] = useState(0);
+  const fill = top > 0 ? Math.max(0, Math.round(window.height - top)) : 0;
   const [active, setActive] = useState(() =>
     Math.max(
       0,
@@ -209,8 +223,17 @@ export function ProfileTabs({
 
   return (
     <View
+      ref={root}
       style={{ gap: 0 }}
-      onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))}
+      onLayout={(event) => {
+        setWidth(Math.round(event.nativeEvent.layout.width));
+        /* Once, at rest: the strip's foot is where the panes begin. */
+        if (top === 0) {
+          root.current?.measureInWindow((_x, y) => {
+            if (y > 0) setTop(y + STRIP_HEIGHT);
+          });
+        }
+      }}
     >
       {/* The strip: evenly spaced icon tabs, a hairline under the row,
           and the one underline that slides to the tab in front. */}
@@ -232,13 +255,31 @@ export function ProfileTabs({
               accessibilityRole="tab"
               accessibilityLabel={TABS[pane.key].label}
               accessibilityState={{ selected }}
-              style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: spacing(1.5),
+              }}
             >
               <Ionicons
                 name={TABS[pane.key].icon}
                 size={ICON}
                 color={selected ? colors.textPrimary : colors.textMuted}
               />
+              {/* Words beside the glyphs: with three tabs there is room,
+                  and a storefront that meant "Embers" was a guess. */}
+              <Text
+                maxFontSizeMultiplier={1.3}
+                style={{
+                  color: selected ? colors.textPrimary : colors.textMuted,
+                  fontSize: 14,
+                  fontWeight: selected ? "700" : "500",
+                }}
+              >
+                {TABS[pane.key].label}
+              </Text>
             </Pressable>
           );
         })}
@@ -283,9 +324,17 @@ export function ProfileTabs({
                 key={pane.key}
                 style={{
                   width,
+                  /* At least down to the screen's foot, so an empty pane
+                     still turns on a swipe anywhere below the strip. */
+                  minHeight: fill,
                   paddingHorizontal: EDGE_TO_EDGE.includes(pane.key)
                     ? 0
                     : PROFILE_INSET,
+                  /* Room under the strip for the panes that are rows, not
+                     a grid: Hunts' first row sat on the underline - the
+                     founder: "look how close the top of that text box is
+                     to the actual hunts tab. it's wild." */
+                  paddingTop: EDGE_TO_EDGE.includes(pane.key) ? 0 : spacing(4),
                 }}
                 accessibilityElementsHidden={index !== active}
                 importantForAccessibility={

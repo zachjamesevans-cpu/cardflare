@@ -99,19 +99,23 @@ describe("the binder page", () => {
     }
   });
 
-  it("has one switch, Up for trade, that is on for up for trade, on both platforms", () => {
-    /* Round 2: the Private switch is gone. The founder: "a toggle to
-       enable it as a public / trade binder. Anything that's public is
-       up for trade." The switch writes forTrade as it reads: on is on. */
+  it("has Up for trade, and Show on your profile beside it, on both platforms", () => {
+    /* Round 2 made it one switch: "Anything that's public is up for
+       trade." Then public split from trade - the founder: "sometimes you
+       don't necessarily want something up for trade, but also want it
+       visible on your profile". Each switch reads as it writes: on is on,
+       and nothing inverts. */
     for (const [name, page] of [
       ["web", web.page],
       ["app", app.page],
     ] as const) {
       expect(page, name).toContain("forTrade");
       expect(page, name).not.toContain("isPublic: !");
-      expect(page, name).not.toContain("isPublic:");
     }
-    expect(web.settings).toContain("save({ forTrade: on })");
+    expect(web.settings).toContain(
+      "save(on ? { forTrade: true, isPublic: true } : { forTrade: false })",
+    );
+    expect(web.settings).toContain("save({ isPublic: on })");
     expect(read("src/components/binder/for-trade-switch.tsx")).toContain(
       "checked={on}",
     );

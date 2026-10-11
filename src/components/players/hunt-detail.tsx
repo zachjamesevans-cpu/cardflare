@@ -6,7 +6,7 @@ import { Check, Undo2 } from "lucide-react";
 
 import { useSelection, type OfferLine } from "@/components/flares/offer-review";
 import { Button } from "@/components/ui/button";
-import { Select, TextInput, Textarea } from "@/components/ui/controls";
+import { TextInput, Textarea } from "@/components/ui/controls";
 import { reviewLabel, selectionSummary } from "@/lib/feed/offer-copy";
 import { setRequestFoundAction, updateHuntAction } from "@/lib/players/hunt-actions";
 import { offerOnHuntAction } from "@/lib/players/hunt-offer-actions";
@@ -291,11 +291,12 @@ export function HuntOfferFooter({
   );
 }
 
-/** Name, description and who can see it. The owner only. */
+/** Name and description. The owner only. Every hunt is public: no
+    "who can see it" - the founder, "there is zero reason to keep a hunt
+    private - it's the whole point of a hunt". */
 export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void }) {
   const [name, setName] = useState(hunt.name);
   const [description, setDescription] = useState(hunt.description ?? "");
-  const [visibility, setVisibility] = useState(hunt.visibility);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -309,7 +310,6 @@ export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void 
           const result = await updateHuntAction(hunt.id, {
             name,
             description: description || null,
-            visibility,
           });
           if (!result.ok) {
             setError(result.error);
@@ -340,18 +340,6 @@ export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void 
           rows={2}
           className="min-h-0"
         />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Who can see it</span>
-        <Select
-          value={visibility}
-          onChange={(event) =>
-            setVisibility(event.target.value === "private" ? "private" : "public")
-          }
-        >
-          <option value="public">Public</option>
-          <option value="private">Private</option>
-        </Select>
       </label>
       {error && (
         <p role="alert" className="text-sm text-danger">

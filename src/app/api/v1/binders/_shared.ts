@@ -10,6 +10,8 @@ export const settingsSchema = z.object({
   name: z.string().trim().min(1).max(BINDER_NAME_MAX).optional(),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
+  /* Shown on your profile; for trade is always public. */
+  isPublic: z.boolean().optional(),
 });
 
 export const addCardSchema = z.object({
@@ -22,6 +24,8 @@ export const createSchema = z.object({
   name: z.string().trim().min(1).max(BINDER_NAME_MAX),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
+  /* Shown on your profile; for trade is always public. */
+  isPublic: z.boolean().optional(),
 });
 
 /**

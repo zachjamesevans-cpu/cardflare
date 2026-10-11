@@ -32,8 +32,8 @@ import {
 import { POCKETS_PER_PAGE } from "./binder-covers";
 import { printingLabel } from "./flare-copy";
 import { huntRowLine } from "./hunt-copy";
+import { HuntSheet } from "./hunt-sheet";
 import {
-  HuntEditForm,
   HuntOfferFooter,
   HuntOfferReview,
   HuntProgress,
@@ -349,16 +349,8 @@ export function HuntBinder({
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
           {yours && hunt.id ? (
-            <Tap
-              onPress={() => setEditing((value) => !value)}
-              hitSlop={8}
-              accessibilityLabel={editing ? "Cancel" : "Edit hunt"}
-            >
-              <Ionicons
-                name={editing ? "close-outline" : "pencil-outline"}
-                size={22}
-                color={colors.textPrimary}
-              />
+            <Tap onPress={() => setEditing(true)} hitSlop={8} accessibilityLabel="Edit hunt">
+              <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
             </Tap>
           ) : null}
           {hunt.id ? (
@@ -369,15 +361,13 @@ export function HuntBinder({
         </View>
       </View>
 
-      {yours && editing && hunt.id ? (
-        <HuntEditForm
-          hunt={hunt}
-          onSaved={() => {
-            setEditing(false);
-            onChanged?.();
-          }}
-        />
-      ) : null}
+      {/* Name and what it's for, in the same sheet that starts a hunt;
+          there is no Private - every hunt is public. */}
+      <HuntSheet
+        mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}
+        onClose={() => setEditing(false)}
+        onSaved={() => onChanged?.()}
+      />
 
       <HuntProgress found={totalFound} needed={totalNeeded} />
 

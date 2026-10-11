@@ -29,7 +29,10 @@ export function BinderList({
   query = "",
   eventOnly,
 }: {
-  binders: Pick<BinderSummary, "id" | "name" | "cover" | "count" | "forTrade">[];
+  binders: (Pick<BinderSummary, "id" | "name" | "cover" | "count" | "forTrade"> & {
+    /** Shown on the profile without being up for trade. */
+    isPublic?: boolean;
+  })[];
   yours: boolean;
   /** Where the binder pages live: "/profile", or "/p/<id>". */
   base: string;
@@ -63,7 +66,9 @@ export function BinderList({
                     Up for trade
                   </span>
                 ) : yours ? (
-                  <span className="shrink-0 text-xs text-text-muted">Private</span>
+                  <span className="shrink-0 text-xs text-text-muted">
+                    {binder.isPublic ? "On profile" : "Private"}
+                  </span>
                 ) : null}
               </span>
             </span>

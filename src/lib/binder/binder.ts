@@ -75,7 +75,7 @@ export interface Binder {
   name: string;
   /** Up for trade: public, and its cards are on the Have list. */
   forTrade: boolean;
-  /** The same fact as forTrade, in the word the screens have used. */
+  /** Anybody may see it: shown on the profile, or up for trade. */
   isPublic: boolean;
   ownerId: string;
   ownerName: string;
@@ -108,7 +108,20 @@ export type BinderSettingsPatch = {
   name?: string;
   cover?: BinderCoverId;
   forTrade?: boolean;
+  /** Shown on your profile to anyone. For trade is always public. */
+  isPublic?: boolean;
 };
+
+/**
+ * Whether anybody but the owner may see a binder: public, or up for
+ * trade (a trade binder is public by definition - people have to see it
+ * to offer on it). The two were one switch until the founder: "sometimes
+ * you don't necessarily want something up for trade, but also want it
+ * visible on your profile".
+ */
+export function shownToOthers(row: { for_trade: boolean; is_public: boolean }): boolean {
+  return row.for_trade || row.is_public;
+}
 
 export type BinderWriteResult =
   | { ok: true }
@@ -323,7 +336,7 @@ async function assemble(
   sharedForNight = false,
 ): Promise<Binder | null> {
   const yours = viewerId === row.player_id;
-  if (!yours && !row.for_trade && !sharedForNight) return null;
+  if (!yours && !shownToOthers(row) && !sharedForNight) return null;
   const [rows, wanted] = await Promise.all([
     cardRows(row.id),
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
@@ -351,7 +364,7 @@ async function assemble(
     id: row.id,
     name: row.name,
     forTrade: row.for_trade,
-    isPublic: row.for_trade,
+    isPublic: shownToOthers(row),
     ownerId: row.player_id,
     ownerName: name,
     yours,
@@ -460,7 +473,7 @@ export async function listBinders(
   const [name, rows] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
   if (!name) return [];
   const yours = viewerId === ownerId;
-  const visible = rows.filter((row) => yours || row.for_trade);
+  const visible = rows.filter((row) => yours || shownToOthers(row));
   if (visible.length === 0) return [];
 
   /*
@@ -501,7 +514,7 @@ async function binderCardIds(
 
 /** The summaries, in the binders' own order, from their card ids. */
 export function summarizeBinders(
-  rows: Pick<BinderRow, "id" | "name" | "for_trade" | "cover">[],
+  rows: Pick<BinderRow, "id" | "name" | "for_trade" | "is_public" | "cover">[],
   cards: { binder_id: string; card_id: string }[],
   wanted: Set<string>,
 ): BinderSummary[] {
@@ -516,7 +529,7 @@ export function summarizeBinders(
     id: row.id,
     name: row.name,
     forTrade: row.for_trade,
-    isPublic: row.for_trade,
+    isPublic: shownToOthers(row),
     count: counts.get(row.id)?.count ?? 0,
     layout: DEFAULT_BINDER_LAYOUT,
     cover: isBinderCover(row.cover) ? row.cover : DEFAULT_BINDER_COVER,
@@ -719,7 +732,7 @@ function cleanName(name: string): string | null {
 /** A new binder, last in the row. Private unless asked for. */
 export async function createBinder(
   playerId: string,
-  input: { name: string; cover?: BinderCoverId; forTrade?: boolean },
+  input: { name: string; cover?: BinderCoverId; forTrade?: boolean; isPublic?: boolean },
 ): Promise<
   { ok: true; id: string } | { ok: false; reason: "at-cap" | "invalid" | "unavailable" }
 > {
@@ -744,7 +757,7 @@ export async function createBinder(
             ? input.cover
             : DEFAULT_BINDER_COVER,
         layout: DEFAULT_BINDER_LAYOUT,
-        is_public: forTrade,
+        is_public: forTrade || input.isPublic === true,
         for_trade: forTrade,
         position: count ?? 0,
         share_code: newShareCode(),
@@ -801,10 +814,14 @@ export async function saveBinderSettings(
     row.name = name;
   }
   if (patch.cover !== undefined && isBinderCover(patch.cover)) row.cover = patch.cover;
-  if (patch.forTrade !== undefined) {
-    row.for_trade = patch.forTrade;
-    row.is_public = patch.forTrade;
-  }
+  /* For trade is public, and private is not for trade: whichever the
+     owner just turned, the other follows. */
+  let forTrade = patch.forTrade ?? before.for_trade;
+  let isPublic = patch.isPublic ?? before.is_public;
+  if (patch.isPublic === false) forTrade = false;
+  if (forTrade) isPublic = true;
+  if (forTrade !== before.for_trade) row.for_trade = forTrade;
+  if (isPublic !== before.is_public) row.is_public = isPublic;
   const { error } = await getSupabaseAdmin()
     .from("binders")
     .update(row as never)
@@ -814,7 +831,7 @@ export async function saveBinderSettings(
     console.error("Could not save the binder settings", error);
     return { ok: false, reason: "unavailable" };
   }
-  if (patch.forTrade !== undefined && patch.forTrade !== before.for_trade) {
+  if (forTrade !== before.for_trade) {
     await syncTradeBinderCards(playerId, displayName, await cardRows(binderId));
   }
   return { ok: true };

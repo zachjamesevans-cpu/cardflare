@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState } from "react";
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { StackParams } from "../../App";
 import { ActionSheet, DotsButton, SheetBackdrop } from "../action-menu";
 import {
@@ -35,7 +37,7 @@ import { formatHandle } from "../handle";
 import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
-import { ProfileFlares } from "../profile-flares";
+import { ProfileFlares, stillWanted } from "../profile-flares";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import {
   PROFILE_INSET,
@@ -124,6 +126,18 @@ export function PlayerProfileScreen() {
     if (handle) navigation.setOptions({ title: formatHandle(handle) });
   }, [handle, navigation]);
   /*
+   * Full screen once there is a profile to show, as your own runs: the
+   * cover goes up behind the status bar and a round back button rides
+   * it. The founder: "should do the same when looking at someone
+   * else's profile". While it loads or fails, the bar and its back
+   * arrow stay, so there is always a way out.
+   */
+  const insets = useSafeAreaInsets();
+  const shown = profile !== null;
+  useEffect(() => {
+    navigation.setOptions({ headerShown: !shown });
+  }, [shown, navigation]);
+  /*
    * Message, beside Follow. The founder: "I should be able to go on
    * someone's profile and message them directly about anything." The
    * server opens (or finds) the one direct conversation between the
@@ -132,14 +146,15 @@ export function PlayerProfileScreen() {
    */
   const [messaging, setMessaging] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
-  const message = async () => {
+  /** `draft`: words to start with, from "Ask what they're after". */
+  const message = async (draft?: string) => {
     if (messaging) return;
     setMessaging(true);
     setMessageError(null);
     try {
       const result = await openDirectThread(playerId);
       if (result.ok && result.threadId) {
-        navigation.navigate("LocalThread", { threadId: result.threadId });
+        navigation.navigate("LocalThread", { threadId: result.threadId, draft });
         return;
       }
       setMessageError(result.message ?? "Could not start the conversation.");
@@ -402,7 +417,23 @@ export function PlayerProfileScreen() {
       switch (tab) {
         case "flares":
           /* Every Flare they have up, newest first, three across. */
-          return <ProfileFlares flares={profile.flares ?? []} yours={false} />;
+          return (
+            <ProfileFlares
+              flares={stillWanted(profile.flares)}
+              yours={false}
+              ownerName={profile.displayName}
+              /* An empty grid says what to do next: ask, if you follow
+                 them (Message is already up top; this one starts the
+                 conversation for you), or follow, if you do not. */
+              following={profile.follow?.following ?? false}
+              onAsk={() => void message("What are you hunting for right now?")}
+              followButton={
+                profile.follow ? (
+                  <FollowButton playerId={profile.playerId} initial={profile.follow} fill />
+                ) : undefined
+              }
+            />
+          );
         case "hunts":
           /* The panel the Hunts screen draws for a visitor: a row opens
              the hunt's own screen. */
@@ -451,10 +482,11 @@ export function PlayerProfileScreen() {
         paddingBottom: spacing(4),
       }}
     >
-      {/* The profile block: cover, picture, name, badge, shelf. */}
+      {/* The profile block: cover, picture, name, badge, shelf. Full
+          screen, so it starts under the status bar, as your own does. */}
       <View
         style={{
-          paddingTop: spacing(6),
+          paddingTop: spacing(6) + insets.top,
           paddingBottom: spacing(4),
           gap: spacing(4),
           /* No overflow clip: the cover stretches up out of the block
@@ -472,7 +504,7 @@ export function PlayerProfileScreen() {
             profile shows: what you see is what they see. */}
         <CoverBanner
           coverUrl={profile.coverUrl}
-          height={COVER_HEIGHT}
+          height={COVER_HEIGHT + insets.top}
           fade
           corner={0}
           pull={pull}
@@ -491,10 +523,33 @@ export function PlayerProfileScreen() {
         {/* Share, top right over the cover: the same corner your own
             profile keeps its icons in. The three dots sit beside it
             on somebody else's profile, with Report and Block behind. */}
+        {/* Back, top left over the cover: the bar that held it is
+            gone. The same round chip as the dots across the way. */}
+        <Tap
+          onPress={() => navigation.goBack()}
+          accessibilityLabel="Back"
+          hitSlop={6}
+          style={{
+            position: "absolute",
+            top: insets.top + spacing(3),
+            left: spacing(3),
+            width: 40,
+            height: 40,
+            borderRadius: 999,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+        </Tap>
+
         <View
           style={{
             position: "absolute",
-            top: spacing(3),
+            top: insets.top + spacing(3),
             right: spacing(3),
             flexDirection: "row",
             alignItems: "center",

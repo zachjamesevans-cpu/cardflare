@@ -2,7 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { followCounts } from "./follows";
-import { countOfferings, doneWantKeys, wantKey } from "./wants";
+import { doneWantKeys, wantKey } from "./wants";
 
 /**
  * The three numbers on a profile: Flares, followers, following.
@@ -24,15 +24,15 @@ export async function profileStats(
 ): Promise<ProfileStats> {
   if (!isSupabaseConfigured()) return { flares: 0, followers: 0, following: 0 };
 
-  /* Wants plus offerings: exactly what the profile's Flares grid draws,
-     so the number over the grid and the grid agree. The second audit
-     read 9 over a grid of 13, because this counted wants alone. */
-  const [wants, offerings, counts, done] = await Promise.all([
+  /* Exactly what the profile's Flares grid draws, so the number over
+     the grid and the grid agree (the second audit read 9 over a grid
+     of 13). The grid is the cards still looked for and nothing else
+     now - offers are the TRADES binder's - so this is wants alone. */
+  const [wants, counts, done] = await Promise.all([
     getSupabaseAdmin()
       .from("player_wants")
       .select("card_id, printing_id")
       .eq("player_id", playerId),
-    countOfferings(playerId),
     followCounts(playerId, viewerId),
     doneWantKeys(playerId),
   ]);
@@ -45,5 +45,5 @@ export async function profileStats(
     (row) => !done.has(wantKey(row.card_id, row.printing_id)),
   ).length;
 
-  return { flares: open + offerings, ...counts };
+  return { flares: open, ...counts };
 }

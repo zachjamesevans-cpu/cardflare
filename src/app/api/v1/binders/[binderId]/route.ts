@@ -50,7 +50,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
   const id = binderIdSchema.safeParse((await params).binderId);
   if (!id.success) return Response.json({ error: "not-found" }, { status: 404 });
   const parsed = settingsSchema.safeParse(await readJsonPayload(request));
-  if (!parsed.success) return badRequest("name, cover or forTrade");
+  if (!parsed.success) return badRequest("name, cover, forTrade or isPublic");
   const saved = await saveBinderSettings(
     player.playerId,
     player.displayName,

@@ -2347,8 +2347,13 @@ export const peekPlayer = (playerId: string) =>
  * carries `forTrade`: on, it is public to signed-in players and its
  * cards are available to trade (they feed nearby matching and the
  * room); off, it is private, only the owner opens it, and its cards
- * take no part in anything. `isPublic` is the same fact, read back.
- * A player can have several up for trade at once.
+ * take no part in anything. A player can have several up for trade.
+ *
+ * `isPublic` is its own switch now: shown on the profile to anyone,
+ * without the cards being up for trade. The founder: "sometimes you
+ * don't necessarily want something up for trade, but also want it
+ * visible on your profile". For trade is always public, and private is
+ * never for trade.
  */
 
 export type { BinderCoverId };
@@ -2418,6 +2423,8 @@ export type BinderSettingsPatch = {
   name?: string;
   cover?: BinderCoverId;
   forTrade?: boolean;
+  /** Shown on your profile. For trade is always public; private is never for trade. */
+  isPublic?: boolean;
 };
 
 /*
@@ -2476,6 +2483,7 @@ export const createBinder = (input: {
   name: string;
   cover?: BinderCoverId;
   forTrade?: boolean;
+  isPublic?: boolean;
 }) => call<{ binder: Binder }>("POST", "/api/v1/binders", input);
 
 /** A binder, gone with its cards. Any of them, the last one too. */

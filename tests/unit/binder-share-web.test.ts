@@ -59,9 +59,11 @@ describe("Share, at the top of the binder", () => {
     expect(share).toContain("setTimeout(() => setCopied(false), 2000)");
   });
 
-  it("follows the live Up for trade switch, for the owner and for visitors", () => {
-    expect(view).toContain("{(binder.yours || settings.forTrade) && (");
-    expect(view).toContain("forTrade={settings.forTrade}");
+  it("follows the live switches, for the owner and for visitors", () => {
+    /* Shown is enough for a link: public, or up for trade. */
+    expect(view).toContain("const shareable = settings.forTrade || settings.isPublic;");
+    expect(view).toContain("{(binder.yours || shareable) && (");
+    expect(view).toContain("forTrade={shareable}");
     expect(view).toContain(
       "const shareTitle = `${binder.ownerName}'s ${settings.name}`;",
     );
@@ -69,12 +71,12 @@ describe("Share, at the top of the binder", () => {
 
   it("says why on the owner's private binder, and shares nothing", () => {
     expect(view).toContain(
-      'const PRIVATE_SHARE_LINE = "Turn on Up for trade to share this binder.";',
+      'const PRIVATE_SHARE_LINE = "Turn on Show on your profile to share this binder.";',
     );
     const refused = share.slice(share.indexOf("if (!forTrade) {"));
     expect(refused.indexOf("onPrivate();")).toBeLessThan(refused.indexOf("return;"));
     expect(refused.indexOf("return;")).toBeLessThan(refused.indexOf("navigator.share"));
-    expect(view).toContain("{shareRefused && !settings.forTrade && (");
+    expect(view).toContain("{shareRefused && !shareable && (");
     expect(view).toContain("{PRIVATE_SHARE_LINE}");
   });
 });

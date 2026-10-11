@@ -12,15 +12,11 @@
 export type ProfileTab =
   "flares" | "hunts" | "binders" | "showcase" | "trades" | "embers";
 
-const OWN: ProfileTab[] = [
-  "flares",
-  "hunts",
-  "binders",
-  "showcase",
-  "trades",
-  "embers",
-];
-const THEIRS: ProfileTab[] = ["flares", "hunts", "binders", "showcase"];
+/* Flares, Hunts, Trades - the app's three (mobile/src/profile-tabs.tsx).
+   Binders are the row of covers above the strip, Showcase went with
+   them, and the Embers shop is behind the wand and the Embers chip. */
+const OWN: ProfileTab[] = ["flares", "hunts", "trades"];
+const THEIRS: ProfileTab[] = ["flares", "hunts"];
 
 export const DEFAULT_PROFILE_TAB: ProfileTab = "flares";
 
