@@ -135,8 +135,9 @@ describe("the Hunts tab: one binder row per hunt", () => {
       '{yours && hunt.visibility === "private" ? (\n            <Text style={{ color: colors.textMuted, fontSize: 12 }}>Private</Text>\n          ) : null}',
     );
     expect(src.binderList).toContain(
-      "<Text style={{ color: colors.textMuted, fontSize: 12 }}>Private</Text>",
+      "<Text style={{ color: colors.textMuted, fontSize: 12 }}>",
     );
+    expect(src.binderList).toContain('binder.isPublic ? "On profile" : "Private"');
     /* No chip on a public hunt, and no Public / Private pill on the row. */
     const row = between(src.panel, "function HuntRow(", "export const neededOf");
     expect(row.length).toBeGreaterThan(0);

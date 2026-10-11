@@ -213,6 +213,8 @@ const bannerStyle = {
 
 /** Under the Up for trade switch, the create sheet's line word for word. */
 const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";
+const PUBLIC_LINE = "Anyone who opens your profile can look through it.";
+const PUBLIC_FOR_TRADE_LINE = "Always shown while it is up for trade.";
 
 type Filter = "all" | "hunts";
 
@@ -563,8 +565,9 @@ export function BinderScreen({
    * handed a link that opens for nobody.
    */
   const share = () => {
-    if (!binder.forTrade) {
-      Alert.alert("Turn on Up for trade to share this binder.");
+    /* Shown is enough for a link: public, or up for trade. */
+    if (!binder.forTrade && !binder.isPublic) {
+      Alert.alert("Turn on Show on your profile to share this binder.");
       return;
     }
     const url = binderShareUrl(binder.shareCode ?? binder.id);
@@ -1027,6 +1030,10 @@ function binderLine(binder: Binder): string {
     return binder.yours
       ? "Up for trade. Somebody nearby hunting one of these hears about it."
       : `Cards ${binder.ownerName} will trade.`;
+  }
+  /* Shown on the profile but not up for trade: a binder to look at. */
+  if (binder.isPublic) {
+    return binder.yours ? "On your profile. Not up for trade." : `${binder.ownerName}'s binder.`;
   }
   /* A visitor sees a private binder only when its owner brought it to
      a night and showed it to that night's attendees. */
@@ -1866,6 +1873,28 @@ function BinderSettings({
         />
       </View>
 
+      {/* Public, then for trade: you can show a binder without putting
+          its cards up, but anything up for trade is shown, so the first
+          switch holds on while the second is on. */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
+            Show on your profile
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+            {binder.forTrade ? PUBLIC_FOR_TRADE_LINE : PUBLIC_LINE}
+          </Text>
+        </View>
+        <Switch
+          value={binder.isPublic || binder.forTrade}
+          disabled={binder.forTrade}
+          onValueChange={(next) => onSave({ isPublic: next })}
+          trackColor={{ true: colors.accent, false: colors.borderStrong }}
+          thumbColor={colors.textPrimary}
+          accessibilityLabel="Show on your profile"
+        />
+      </View>
+
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
@@ -1877,7 +1906,11 @@ function BinderSettings({
         </View>
         <Switch
           value={binder.forTrade}
-          onValueChange={(next) => onSave({ forTrade: next })}
+          /* Up for trade is shown too: the patch says so, so the first
+             switch reads on before the server answers. */
+          onValueChange={(next) =>
+            onSave(next ? { forTrade: true, isPublic: true } : { forTrade: false })
+          }
           trackColor={{ true: colors.accent, false: colors.borderStrong }}
           thumbColor={colors.textPrimary}
           accessibilityLabel="Up for trade"

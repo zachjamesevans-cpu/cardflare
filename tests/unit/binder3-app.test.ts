@@ -179,7 +179,7 @@ describe("share", () => {
       "const url = binderShareUrl(binder.shareCode ?? binder.id);",
     );
     expect(src.binder).toContain(
-      'Alert.alert("Turn on Up for trade to share this binder.");',
+      'Alert.alert("Turn on Show on your profile to share this binder.");',
     );
     expect(src.config).toContain("export const binderShareUrl = (code: string)");
   });

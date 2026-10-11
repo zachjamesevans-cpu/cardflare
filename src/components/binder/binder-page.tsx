@@ -148,12 +148,14 @@ import { cn } from "@/lib/cn";
 type Settings = {
   cover: BinderCoverId;
   forTrade: boolean;
+  isPublic: boolean;
   name: string;
 };
 
 const settingsOf = (binder: Binder): Settings => ({
   cover: binder.cover,
   forTrade: binder.forTrade,
+  isPublic: binder.isPublic,
   name: binder.name,
 });
 
@@ -167,12 +169,15 @@ function binderLine(
   forTrade: boolean,
   yours: boolean,
   ownerName: string,
+  isPublic = false,
 ): string | null {
   if (forTrade) {
     return yours
       ? "Up for trade. Somebody nearby hunting one of these hears about it."
       : `Cards ${ownerName} will trade.`;
   }
+  /* Shown on the profile but not up for trade: a binder to look at. */
+  if (isPublic) return yours ? "On your profile. Not up for trade." : `${ownerName}'s binder.`;
   /* A visitor sees a private binder only when its owner brought it to
      a night and showed it to that night's attendees. */
   return yours ? "Private. Only you can open it." : nightSharedLine(ownerName);
@@ -451,7 +456,14 @@ export function BinderView({
   };
 
   const countLine = `${binder.count} ${binder.count === 1 ? "card" : "cards"}`;
-  const line = binderLine(settings.forTrade, binder.yours, binder.ownerName);
+  const line = binderLine(
+    settings.forTrade,
+    binder.yours,
+    binder.ownerName,
+    settings.isPublic,
+  );
+  /* A link opens for anyone once the binder is shown: public, or up. */
+  const shareable = settings.forTrade || settings.isPublic;
 
   /* The name a share sheet and a chat preview give the link. */
   const shareTitle = `${binder.ownerName}'s ${settings.name}`;
@@ -474,12 +486,12 @@ export function BinderView({
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {(binder.yours || settings.forTrade) && (
+          {(binder.yours || shareable) && (
             <ShareBinder
               binderId={binder.id}
               shareCode={binder.shareCode}
               title={shareTitle}
-              forTrade={settings.forTrade}
+              forTrade={shareable}
               onPrivate={() => setShareRefused(true)}
             />
           )}
@@ -498,7 +510,7 @@ export function BinderView({
 
       {/* Share on a private binder: no link to give, so the reason,
           inline, until Up for trade is on. */}
-      {shareRefused && !settings.forTrade && (
+      {shareRefused && !shareable && (
         <p role="status" className="text-sm text-text-secondary">
           {PRIVATE_SHARE_LINE}
         </p>
@@ -777,6 +789,7 @@ export function BinderView({
               name={settings.name}
               count={binder.count}
               forTrade={settings.forTrade}
+              isPublic={settings.isPublic || settings.forTrade}
               cover={settings.cover}
               onChange={paint}
             />
@@ -816,7 +829,7 @@ export function BinderView({
 }
 
 /** What the owner of a private binder is told when they press Share. */
-const PRIVATE_SHARE_LINE = "Turn on Up for trade to share this binder.";
+const PRIVATE_SHARE_LINE = "Turn on Show on your profile to share this binder.";
 
 /**
  * SHARE, at the top of the binder, in its own round button: the
@@ -842,7 +855,7 @@ function ShareBinder({
   /** The short link's code; null for a binder that has none yet. */
   shareCode: string | null;
   title: string;
-  /** The live Up for trade setting, not the one the page loaded with. */
+  /** Shown to others (public or up for trade), as the page holds it live. */
   forTrade: boolean;
   /** Pressed on a private binder: the page says why there is no link. */
   onPrivate: () => void;

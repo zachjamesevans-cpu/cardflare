@@ -276,10 +276,13 @@ describe("the binder's model in the app", () => {
     );
     expect(highlights).toContain("binder.forTrade");
     expect(list).toContain("Up for trade");
-    expect(list).toContain(">Private<");
+    /* Private, or On profile when it is shown without being up. */
+    expect(list).toContain('binder.isPublic ? "On profile" : "Private"');
     expect(list).not.toContain("kind");
     expect(create).toContain("Up for trade");
-    expect(create).toContain("createBinder({ name: trimmed, cover, forTrade })");
+    /* Two switches since public split from trade: shown, and up. */
+    expect(create).toContain("Show on your profile");
+    expect(create).toContain("isPublic: isPublic || forTrade,");
     expect(create).toContain(
       'export const FOR_TRADE_LINE = "People nearby hunting one of these cards hear about it.";',
     );
@@ -331,9 +334,13 @@ describe("the binder's model in the app", () => {
     expect(page).toContain("Delete binder");
     expect(page).toContain("deleteBinder(");
     expect(page).not.toContain('kind === "custom"');
-    expect(page).toContain("onSave({ forTrade: next })");
-    /* The switch writes forTrade; isPublic is only read back as the same fact. */
+    /* Up for trade turns shown on with it; Show on your profile is its
+       own switch, held on while the binder is up for trade. */
+    expect(page).toContain(
+      "onSave(next ? { forTrade: true, isPublic: true } : { forTrade: false })",
+    );
+    expect(page).toContain("onSave({ isPublic: next })");
+    expect(page).toContain("value={binder.isPublic || binder.forTrade}");
     expect(page).not.toContain("isPublic: !");
-    expect(page).not.toContain("onSave({ isPublic");
   });
 });

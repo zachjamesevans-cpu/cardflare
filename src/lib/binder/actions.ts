@@ -64,6 +64,7 @@ const settingsSchema = z.object({
   name: z.string().trim().min(1).max(BINDER_NAME_MAX).optional(),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export async function saveBinderSettingsAction(
@@ -302,6 +303,7 @@ const createSchema = z.object({
   name: z.string().trim().min(1, "Give it a name.").max(BINDER_NAME_MAX),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
 });
 
 /** A new binder, private unless the switch was on. */

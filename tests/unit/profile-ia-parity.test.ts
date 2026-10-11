@@ -338,7 +338,8 @@ describe("the Binders tab", () => {
       expect(source.list, name).toContain("binder.forTrade");
       expect(source.list, name).not.toContain("binder.kind");
       expect(source.list, name).toMatch(/>\s*Up for trade\s*</);
-      expect(source.list, name).toMatch(/>\s*Private\s*</);
+      /* Private, or On profile: shown without being up for trade. */
+      expect(source.list, name).toContain('binder.isPublic ? "On profile" : "Private"');
       expect(source.list, name).not.toContain("Private, only you");
     }
     /* "12 cards": inline on the web, inline or through the app's own
