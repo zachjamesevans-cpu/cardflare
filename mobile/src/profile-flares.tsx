@@ -198,7 +198,7 @@ export function ProfileFlares({
               {/* A want in your binder. Inset, because the grid runs tile
                   to tile; the icon top right, because the copies tag owns
                   top left. */}
-              <HeldRing match={flare.match} inset corner="right" />
+              <HeldRing match={flare.match} inset />
               <QuantityBadge
                 quantity={flare.quantity}
                 style={{ position: "absolute", top: 4, left: 4 }}

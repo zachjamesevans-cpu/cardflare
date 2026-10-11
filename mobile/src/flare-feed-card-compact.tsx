@@ -194,7 +194,7 @@ export function FlareFeedCardCompact({
               position={index}
             />
             {/* The copies tag owns the top left. */}
-            <HeldRing match={card.match} corner="right" />
+            <HeldRing match={card.match} />
             <NeedBadge card={card} offering={offering} />
           </View>
         ))}
