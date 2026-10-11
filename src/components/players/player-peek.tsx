@@ -5,7 +5,6 @@ import Link from "next/link";
 import { X } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
-import { CosmeticCard } from "@/components/players/cosmetic-card";
 import { EmberBadge } from "@/components/players/ember-badge";
 import { FollowButton, type FollowStateJson } from "@/components/players/follow-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -75,9 +74,17 @@ interface PeekProfile {
     frame: string | null;
     holo: string | null;
   }[];
+  /** Their Flares, as the profile's grid reads them. */
+  flares?: {
+    id: string;
+    cardName: string;
+    cardNumber: string;
+    imageUrl: string | null;
+    direction: "want" | "offering";
+  }[];
 }
 
-/** The mini profile shows exactly this many showcase slots, always. */
+/** The mini profile shows exactly this many slots, always. */
 const PEEK_SHELF = 5;
 
 export function PlayerPeek({
@@ -286,15 +293,20 @@ export function PlayerPeek({
 
   const worn = profile;
 
-  /* The five slots as one shelf, in the order they are drawn. */
-  const shelf: ZoomCard[] = (worn?.showcase ?? [])
-    .slice(0, PEEK_SHELF)
-    .map((entry) => ({
-      imageUrl: entry.imageUrl,
-      exactName: entry.name,
-      cardNumber: entry.number,
-      direction: "showcase" as const,
-    }));
+  /*
+   * What they are looking for, five across: the glimpse a trade starts
+   * from. It was their Showcase until the profile's Showcase tab went;
+   * the founder chose this over a pinned binder. Same as the app.
+   */
+  const wanted = (worn?.flares ?? [])
+    .filter((flare) => flare.direction === "want")
+    .slice(0, PEEK_SHELF);
+  const shelf: ZoomCard[] = wanted.map((entry) => ({
+    imageUrl: entry.imageUrl,
+    exactName: entry.cardName,
+    cardNumber: entry.cardNumber,
+    direction: "want" as const,
+  }));
 
   return (
     <>
@@ -411,19 +423,18 @@ export function PlayerPeek({
             />
           )}
 
-          {/* The same rounded showcase panel the profile pages draw. */}
           <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-3">
-            <p className="text-sm font-semibold text-text-primary">Showcase</p>
+            <p className="text-sm font-semibold text-text-primary">Looking for</p>
 
             {failed ? (
               <p className="text-sm text-text-muted">
-                Could not load their showcase right now. Their full profile may still
+                Could not load what they want right now. Their full profile may still
                 work.
               </p>
             ) : !worn ? (
-              <p className="text-sm text-text-muted">Loading their showcase…</p>
-            ) : worn.showcase.length === 0 ? (
-              <p className="text-sm text-text-muted">Nothing on their shelf yet.</p>
+              <p className="text-sm text-text-muted">Loading what they want…</p>
+            ) : wanted.length === 0 ? (
+              <p className="text-sm text-text-muted">No Flares up right now.</p>
             ) : (
               /*
                * Exactly five slots, always — the founder's spec for the
@@ -434,15 +445,14 @@ export function PlayerPeek({
                * cards and two cards occupy the same, evenly spaced row.
                */
               <ul className="grid grid-cols-5 gap-2">
-                {worn.showcase.slice(0, PEEK_SHELF).map((entry, index) => (
+                {wanted.map((entry, index) => (
                   <li key={entry.id}>
-                    {/* The board's viewer again, opened from the dressed
-                        card — the same tap does the same thing here as
-                        everywhere else. */}
+                    {/* The board's viewer again - the same tap does the
+                        same thing here as everywhere else. */}
                     <CardImageZoom
                       imageUrl={entry.imageUrl}
-                      exactName={entry.name}
-                      cardNumber={entry.number}
+                      exactName={entry.cardName}
+                      cardNumber={entry.cardNumber}
                       enabled={imagesEnabled}
                       /* A shelf is a set: tapping one card opens on it and
                          swipes along the rest, rather than making somebody
@@ -450,23 +460,11 @@ export function PlayerPeek({
                       siblings={shelf}
                       position={index}
                       thumbClassName="w-full"
-                      thumb={
-                        <CosmeticCard
-                          imageUrl={entry.imageUrl}
-                          name={entry.name}
-                          number={entry.number}
-                          imagesEnabled={imagesEnabled}
-                          frame={entry.frame}
-                          holo={entry.holo}
-                          effect={worn.effect}
-                          className="w-full"
-                        />
-                      }
                     />
                   </li>
                 ))}
                 {Array.from({
-                  length: Math.max(0, PEEK_SHELF - worn.showcase.length),
+                  length: Math.max(0, PEEK_SHELF - wanted.length),
                 }).map((_, index) => (
                   <li key={`empty-${index}`} aria-hidden="true">
                     <span className="block aspect-[60/84] w-full rounded-[6px] border border-dashed border-border" />

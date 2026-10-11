@@ -144,6 +144,9 @@ interface CachedProfile {
 
 export function ProfileScreen() {
   const tabInset = useTabBarInset();
+  /* No navigator header on this tab: the cover runs up behind the
+     status bar, so everything at the top steps down by its height. */
+  const insets = useSafeAreaInsets();
   /* The scroll offset, which stretches the cover on a pull past the top. */
   const pull = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -357,6 +360,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -398,6 +402,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -437,6 +442,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -871,9 +877,14 @@ export function ProfileScreen() {
           profile where they see Follow. The founder's rule: what you
           see is what they see. One block, no panels inside it: the
           founder, "fewer giant bordered boxes". */}
+      {/* Full screen: no "Profile" bar above, so the block starts under
+          the status bar and the cover reaches up behind it. The founder:
+          "what if the profile block at the top of the screen was full
+          screen and went all the way to the top?" Somebody else's
+          profile keeps its back bar, and so its plain padding. */}
       <View
         style={{
-          paddingTop: spacing(6),
+          paddingTop: spacing(6) + insets.top,
           paddingBottom: spacing(4),
           gap: spacing(4),
           /* No overflow clip: the cover stretches up out of the block
@@ -891,7 +902,7 @@ export function ProfileScreen() {
             mockup, and the same shape the website draws. */}
         <CoverBanner
           coverUrl={profile.coverUrl}
-          height={COVER_HEIGHT}
+          height={COVER_HEIGHT + insets.top}
           fade
           corner={0}
           pull={pull}
@@ -918,7 +929,7 @@ export function ProfileScreen() {
         <View
           style={{
             position: "absolute",
-            top: spacing(1),
+            top: insets.top + spacing(1),
             right: spacing(1),
             flexDirection: "row",
           }}

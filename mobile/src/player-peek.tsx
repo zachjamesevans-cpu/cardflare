@@ -11,11 +11,13 @@ import {
 
 import { ApiError, peekPlayer, type PeekProfile } from "./api";
 import { readCache, writeCache } from "./cache";
-import { CosmeticCard } from "./cosmetic-card";
 import { WornBadge, WornName } from "./worn-name";
 import { EmberBadge } from "./ember-badge";
 import { FollowButton } from "./follow-button";
 import { PlayerAvatar } from "./player-avatar";
+import { stillWanted } from "./profile-flares";
+import { QuantityBadge } from "./quantity-badge";
+import { RemoteImage } from "./remote-image";
 import { CoverBanner, ShowcaseZoom, type ZoomedCard } from "./showcase-zoom";
 import { Button } from "./ui";
 import { colors, radius, spacing } from "./theme";
@@ -81,7 +83,7 @@ export function PlayerPeekModal({
         /* Prefetch the five shelf images, but only briefly: cached art
            is instant and the rest fades in. */
         const warm = Promise.all(
-          result.showcase
+          stillWanted(result.flares)
             .slice(0, PEEK_SHELF)
             .map((entry) =>
               entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
@@ -114,7 +116,13 @@ export function PlayerPeekModal({
     (panelWidth - spacing(4) * 2 - spacing(1.5) * (PEEK_SHELF - 1)) / PEEK_SHELF,
   );
 
-  const shelf = profile?.showcase.slice(0, PEEK_SHELF) ?? [];
+  /*
+   * What they are looking for, five across: the glimpse a trade starts
+   * from. It was their Showcase until the profile's Showcase tab went;
+   * the founder chose this over a pinned binder, which would have meant
+   * making a private binder public.
+   */
+  const shelf = stillWanted(profile?.flares).slice(0, PEEK_SHELF);
   const emptySlots = Math.max(0, PEEK_SHELF - shelf.length);
 
   return (
@@ -225,12 +233,12 @@ export function PlayerPeekModal({
                 <Text
                   style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}
                 >
-                  Showcase
+                  Looking for
                 </Text>
 
-                {profile.showcase.length === 0 ? (
+                {shelf.length === 0 ? (
                   <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                    Nothing on their shelf yet.
+                    No Flares up right now.
                   </Text>
                 ) : !shelfReady ? (
                   <View
@@ -243,7 +251,7 @@ export function PlayerPeekModal({
                   >
                     <ActivityIndicator color={colors.accent} size="small" />
                     <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                      Loading their showcase…
+                      Loading what they want…
                     </Text>
                   </View>
                 ) : (
@@ -251,25 +259,47 @@ export function PlayerPeekModal({
                     {shelf.map((entry) => (
                       <Pressable
                         key={entry.id}
+                        accessibilityLabel={`${entry.cardName}, larger`}
                         onPress={() =>
                           setZoomed({
-                            name: entry.name,
+                            name: entry.cardName,
+                            number: entry.cardNumber,
                             imageUrl: entry.imageUrl,
-                            frame: entry.frame,
-                            holo: entry.holo,
-                            effect: profile.effect,
-                            border: profile.equips?.border ?? null,
+                            frame: null,
+                            holo: null,
+                            effect: null,
                           })
                         }
                       >
-                        <CosmeticCard
-                          imageUrl={entry.imageUrl}
-                          width={slotWidth}
-                          frame={entry.frame}
-                          holo={entry.holo}
-                          effect={profile.effect}
-                          border={profile.equips?.border ?? null}
-                        />
+                        <View>
+                          <RemoteImage
+                            uri={entry.imageUrl}
+                            contentFit="contain"
+                            style={{
+                              width: slotWidth,
+                              height: Math.round((slotWidth * 88) / 63),
+                              borderRadius: 6,
+                              backgroundColor: colors.canvas,
+                            }}
+                          />
+                          {/* Their HeldRing's cousin: you hold it. */}
+                          {entry.match ? (
+                            <View
+                              pointerEvents="none"
+                              style={{
+                                position: "absolute",
+                                inset: -2,
+                                borderRadius: 8,
+                                borderWidth: 2,
+                                borderColor: colors.accent,
+                              }}
+                            />
+                          ) : null}
+                          <QuantityBadge
+                            quantity={entry.quantity}
+                            style={{ position: "absolute", top: 2, left: 2 }}
+                          />
+                        </View>
                       </Pressable>
                     ))}
                     {Array.from({ length: emptySlots }).map((_, index) => (

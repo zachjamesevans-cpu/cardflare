@@ -70,10 +70,13 @@ describe("the app's profile runs edge to edge", () => {
       expect(block).toContain("radius={0}");
       expect(block).toContain("paddingHorizontal: PROFILE_INSET");
     }
-    /* Same block on both screens: what you see is what they see. */
-    expect(appBlock(app.theirs).block.replace(/\s+/g, "")).toContain(
-      appBlock(app.own).block.replace(/\s+/g, "").slice(0, 200),
-    );
+    /* Same block on both screens: what you see is what they see. Your
+       own runs full screen under the status bar, which is the one
+       difference: its padding and cover add the inset. */
+    const own = appBlock(app.own)
+      .block.replace(/\s+/g, "")
+      .replace(/\+insets\.top/g, "");
+    expect(appBlock(app.theirs).block.replace(/\s+/g, "")).toContain(own.slice(0, 200));
   });
 
   it("insets every pane's words but lets the Flares grid meet the sides", () => {
