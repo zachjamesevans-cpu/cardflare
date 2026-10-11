@@ -4,6 +4,7 @@ import type { FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
 import { HeldRing } from "./held-ring";
+import { QuantityBadge } from "./quantity-badge";
 import { haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap, type ZoomCard, type ZoomHave, type ZoomPicks } from "./ui";
@@ -187,12 +188,58 @@ export function FlareCardSlide({
   );
 }
 
+/**
+ * How many are still wanted, as the small black ×N tag every other count
+ * of copies wears - the binder's "lowkey black and white box" - top left.
+ * Compact's tiles and the classic strip both wear it, so the two modes
+ * say a count the same way.
+ *
+ * This was a green "1x" chip, bottom right, made half again as big when
+ * the founder asked. With one copy on almost every card it was mostly
+ * noise, sat over the art and covered the OFFERED band ("OFFE 3x"). The
+ * founder, on the Feed: "seems to take up a lot of the screen", then,
+ * after trying stacked copies: "just stick to the black quantity thing
+ * tbh that we have elsewhere". So one copy draws nothing, as everywhere.
+ * The classic strip printed "Wants 4" under every card until the founder:
+ * "should just list quantity wanted somewhere... that's how it is in
+ * compact".
+ *
+ * It says what is STILL wanted, not what was asked for - a card three
+ * of four found is a card somebody needs one of, and the number that
+ * helps is the one you could answer today.
+ */
+export function NeedBadge({
+  card,
+  offering,
+  size = "sm",
+}: {
+  card: FeedCard;
+  offering: boolean;
+  size?: "sm" | "md";
+}) {
+  const wanted = card.remaining ?? card.quantity ?? 1;
+  const done = card.state === "found" || (!offering && wanted <= 0);
+
+  /* The tile's own foot says FOUND; a second tick on top of it was
+     the founder's "overlapping gray checkmark thing". */
+  if (done) return null;
+
+  return (
+    <QuantityBadge
+      quantity={wanted}
+      size={size}
+      style={{ position: "absolute", top: 4, left: 4 }}
+    />
+  );
+}
+
 /** A strip tile's width: two and a half across a phone, so it scrolls. */
 export const STRIP_TILE = 108;
 
 /**
- * A multi-card Flare, as a strip: every card's art at once with its
- * name and what is asked under it, swiped sideways.
+ * A multi-card Flare, as a strip: every card's art at once, the count
+ * still wanted as compact's black ×N tag on it, the name under it,
+ * swiped sideways.
  *
  * This was a carousel of one wide slide at a time, inside a panel of its
  * own, with a dot per card and "See all 17 cards" under it. A seventeen-
@@ -243,14 +290,8 @@ export function FlareStrip({
       }}
     >
       {cards.map((card, index) => {
-        const remaining = remainingOf(card);
-        const done = card.state === "found" || remaining === 0;
-        const count =
-          direction === "showcase"
-            ? card.state === "found"
-              ? GONE_LABEL
-              : availableLabel(copiesOf(card))
-            : wantsLine(copiesOf(card), remaining);
+        const done =
+          card.state === "found" || (direction === "want" && remainingOf(card) === 0);
         return (
           <View key={card.cardId} style={{ width: STRIP_TILE, gap: 3 }}>
             <View>
@@ -269,6 +310,7 @@ export function FlareStrip({
                 onPicks={onPicks}
               />
               <HeldRing match={card.match} corner="right" />
+              <NeedBadge card={card} offering={direction === "showcase"} size="md" />
             </View>
             <Text
               numberOfLines={1}
@@ -280,15 +322,6 @@ export function FlareStrip({
               }}
             >
               {card.cardName}
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: done ? colors.textMuted : colors.textSecondary,
-                fontSize: 12,
-              }}
-            >
-              {card.youOffered ? `${count} · You offered` : count}
             </Text>
           </View>
         );

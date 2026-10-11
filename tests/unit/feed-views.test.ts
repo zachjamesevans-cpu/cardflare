@@ -88,14 +88,18 @@ describe("feed views", () => {
      * to the black quantity thing tbh that we have elsewhere". The
      * shared tag draws nothing for one copy.
      */
-    const app = await read("mobile/src/flare-feed-card-compact.tsx");
+    /* The app's tag lives beside the classic strip, which wears it too,
+       and compact imports it from there. */
+    const appCompact = await read("mobile/src/flare-feed-card-compact.tsx");
+    const app = await read("mobile/src/flare-deck-pager.tsx");
     const web = await read("src/components/feed/flare-feed-card-compact.tsx");
+    expect(appCompact).toContain("<NeedBadge card={card} offering={offering} />");
 
     for (const source of [app, web]) {
       expect(source).toContain("function NeedBadge");
       /* What is STILL wanted, not what was asked for. */
       expect(source).toContain("card.remaining ?? card.quantity ?? 1");
-      expect(source).toContain("<QuantityBadge quantity={wanted}");
+      expect(source).toMatch(/<QuantityBadge\s+quantity=\{wanted\}/);
       /* No green chip. */
       expect(source).not.toMatch(/\{wanted\}x|\$\{wanted\}x/);
     }
