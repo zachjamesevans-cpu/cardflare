@@ -231,9 +231,10 @@ export function FlareFeedCard({
 
   const article = (
     <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+      {/* The header: face, then the name with when and how far beside it,
+          then the status line; the three dots at the right. "Your Flare"
+          is a small label inside the name's row, never a line between
+          posts. */}
       {/*
        * The face and the name open the profile; the status line sits
        * outside that link, because the hunt's name in it is a link of
@@ -257,20 +258,30 @@ export function FlareFeedCard({
             />
           </Link>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <Link
-              href={`/p/${item.playerId}`}
-              className="flex min-w-0 items-center gap-1.5 hover:underline"
-            >
-              <span className="truncate text-base font-extrabold text-text-primary">
-                {item.displayName}
-              </span>
-              {!item.playerId && <GuestChip />}
-              {item.yours && !preview && (
-                <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
-                  Your Flare
+            {/* When and how far sit on the name's line, the way Instagram
+                writes "name • 2h", so the status line below has the width
+                for a hunt's pill. The app draws the same. */}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Link
+                href={`/p/${item.playerId}`}
+                className="flex min-w-0 items-center gap-1.5 hover:underline"
+              >
+                <span className="truncate text-base font-extrabold text-text-primary">
+                  {item.displayName}
                 </span>
-              )}
-            </Link>
+                {!item.playerId && <GuestChip />}
+                {item.yours && !preview && (
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
+                    Your Flare
+                  </span>
+                )}
+              </Link>
+              <span className="shrink-0 text-[13px] text-text-muted">
+                · {agoFrom(item.postedAt)}
+                {typeof item.milesAway === "number" &&
+                  ` · ${awayLabel(item.milesAway)}`}
+              </span>
+            </span>
             <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <FlareStatus
                 label={statusLabel(item)}
@@ -287,21 +298,14 @@ export function FlareFeedCard({
             </span>
           </span>
         </div>
-        <div className="flex shrink-0 items-center gap-2 text-[13px] text-text-muted">
-          <span className="flex items-center gap-1">
-            <span>{agoFrom(item.postedAt)}</span>
-            {typeof item.milesAway === "number" && (
-              <span className="flex items-center gap-1">
-                <span aria-hidden="true">·</span>
-                {awayLabel(item.milesAway)}
-              </span>
-            )}
-          </span>
-          {/* The three dots: the full list and, on your own post, the
-              progress ticks. Nothing renders when there is nothing to
-              offer. */}
-          {!preview && <PostMenu post={shape} />}
-        </div>
+        {/* The three dots alone at the right: the full list and, on your
+            own post, the progress ticks. Nothing renders when there is
+            nothing to offer. */}
+        {!preview && (
+          <div className="flex shrink-0 items-center">
+            <PostMenu post={shape} />
+          </div>
+        )}
       </div>
 
       {/* What they wrote with it. Nothing at all when they wrote nothing. */}
