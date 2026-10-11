@@ -6,12 +6,7 @@ import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
 import type { FeedEntry } from "./api";
 import { cardsLabel } from "./flare-copy";
-import {
-  FlareCardSlide,
-  FlareCarousel,
-  remainingOf,
-  shelfFor,
-} from "./flare-deck-pager";
+import { FlareCardSlide, FlareStrip, remainingOf, shelfFor } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
@@ -453,10 +448,10 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: the room, the time and the
-            distance as muted facts with dots between, then the three
-            dots when the post has extras to offer. The room's name may
-            shrink; the name column beside it keeps its half. */}
+        {/* One line, not a stacked block: the time and the distance as
+            muted facts with dots between, then the three dots when the
+            post has extras to offer. The room moved to the line above
+            the actions, where it has the width to be read whole. */}
         <View
           style={{
             flexDirection: "row",
@@ -466,30 +461,6 @@ export function FlareFeedCard({
             maxWidth: "50%",
           }}
         >
-          {store ? (
-            <Tap
-              onPress={() => onEnterRoom(item.code ?? "")}
-              hitSlop={8}
-              accessibilityLabel={`Go to ${store}`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 2,
-                flexShrink: 1,
-              }}
-            >
-              <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textMuted, fontSize: 13, flexShrink: 1 }}
-              >
-                {store}
-              </Text>
-            </Tap>
-          ) : null}
-          {store && item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
-          ) : null}
           {item.postedAt ? (
             <Text style={{ color: colors.textMuted, fontSize: 13 }}>
               {agoFrom(item.postedAt)}
@@ -533,13 +504,15 @@ export function FlareFeedCard({
           onPicks={onPicks}
         />
       ) : (
-        <FlareCarousel
+        <FlareStrip
           cards={item.cards}
+          total={item.total}
           direction={direction}
           post={post}
           picks={picks}
           onPicks={onPicks}
           onSeeAll={onViewAll}
+          bleed={spacing(3)}
         />
       )}
 
@@ -609,26 +582,63 @@ export function FlareFeedCard({
         </Text>
       ) : null}
 
-      {/* The hunt this post is part of, and the door to it. */}
-      {item.hunt ? (
-        <Tap
-          onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
-          accessibilityLabel={`View hunt ${item.hunt.name}`}
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+      {/* Where it was posted and the hunt it is part of: one quiet line
+          of doors. The room was squeezed into the header beside the time
+          and read "Mox Valley Ga…"; here it has the width. */}
+      {store || item.hunt ? (
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "center",
+            columnGap: spacing(4),
+            rowGap: spacing(1.5),
+          }}
         >
-          <Ionicons name="locate-outline" size={14} color={colors.accent} />
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
-          >
-            {item.hunt.name}
-          </Text>
-          {onOpenHunt ? (
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-              · View hunt
-            </Text>
+          {store ? (
+            <Tap
+              onPress={() => onEnterRoom(item.code ?? "")}
+              hitSlop={8}
+              accessibilityLabel={`Go to ${store}`}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
+            >
+              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textSecondary, fontSize: 13 }}
+              >
+                {store}
+              </Text>
+            </Tap>
           ) : null}
-        </Tap>
+          {item.hunt ? (
+            <Tap
+              onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
+              accessibilityLabel={`View hunt ${item.hunt.name}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(1),
+                flexShrink: 1,
+              }}
+            >
+              <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
+              >
+                {item.hunt.name}
+              </Text>
+              {onOpenHunt ? (
+                <Text
+                  style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}
+                >
+                  · View hunt
+                </Text>
+              ) : null}
+            </Tap>
+          ) : null}
+        </View>
       ) : null}
 
       <PostSocialRow

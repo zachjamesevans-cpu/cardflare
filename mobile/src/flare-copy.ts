@@ -19,9 +19,33 @@ export const availableLabel = (n: number): string => `${n} available`;
 /** An offered card with nothing left to give. */
 export const GONE_LABEL = "Gone";
 
-/** The printing somebody asked for, or the honest default. */
-export const printingLabel = (label: string | null | undefined): string =>
-  label ?? "Any printing";
+/** A card number on its own: "OP14-009", "EB02-028". */
+const CARD_NUMBER = /^[a-z]{1,4}\d{2,}-\d+[a-z]*$/i;
+
+/**
+ * The printing somebody asked for, or the honest default.
+ *
+ * Tidied on the way out, because the label is stored: rows written
+ * before the website's `printingVariantMark` learned to drop "- OP14-009"
+ * still carry it, and the Feed read "OP14-009 · OP14-EB04 · SR · -
+ * OP14-0…" (the number is already printed in front of the label). So
+ * each part loses lone dashes and card numbers, and a part said twice
+ * is said once.
+ */
+export function printingLabel(label: string | null | undefined): string {
+  if (!label) return "Any printing";
+  const parts = label
+    .split("·")
+    .map((part) =>
+      part
+        .split(/\s+/)
+        .filter((word) => word.length > 0 && !/^[-–—:]+$/.test(word))
+        .filter((word) => !CARD_NUMBER.test(word))
+        .join(" "),
+    )
+    .filter((part, index, all) => part.length > 0 && all.indexOf(part) === index);
+  return parts.length > 0 ? parts.join(" · ") : "Any printing";
+}
 
 /**
  * What a message about a post is about, for "About your <this>: ".

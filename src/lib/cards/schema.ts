@@ -111,10 +111,19 @@ export function printingVariantMark(
    * printing recognisable as base.
    */
   const groups = [...suffix.matchAll(/\(([^()]*)\)/g)].map((m) => m[1].trim());
+  /*
+   * Outside the brackets, a word at a time: a lone dash and a card
+   * number go too. "Trafalgar Law - OP14-009" left "- OP14-009", which
+   * the whole-part number check below never matched, and the Feed read
+   * "OP14-009 · OP14-EB04 · SR · - OP14-0…".
+   */
   const outside = suffix
     .replace(/\(([^()]*)\)/g, " ")
     .replace(/[()]/g, " ")
-    .replace(/\s+/g, " ")
+    .split(/\s+/)
+    .filter((word) => word.length > 0 && !/^[-–—:·]+$/.test(word))
+    .filter((word) => !CARD_NUMBER_SHAPE.test(word))
+    .join(" ")
     .trim();
 
   const kept = [outside, ...groups].filter(

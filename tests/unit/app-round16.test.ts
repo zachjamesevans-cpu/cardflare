@@ -305,11 +305,13 @@ describe("the next step stands out and nothing jumps", () => {
 });
 
 describe("the full list is one tap from the carousel", () => {
-  it("draws See all N cards on the dots row, for more than one card", () => {
-    expect(src.pager).toContain("{seeAllLabel(cards.length)}");
-    expect(src.pager).toContain("accessibilityLabel={seeAllLabel(cards.length)}");
-    expect(src.pager).toContain("{onSeeAll && cards.length > 1 ? (");
-    expect(src.pager).toContain('justifyContent: "space-between"');
+  it("shows every card it has on the strip, and a +N tile for the rest", () => {
+    /* The carousel's dots row and "See all N cards" went with the
+       carousel: the strip shows the cards themselves, and a post the
+       Feed only carried part of ends in a "+N more" tile that opens the
+       full list. */
+    expect(src.pager).toContain("accessibilityLabel={seeAllLabel(total ?? cards.length)}");
+    expect(src.pager).toContain("{more > 0 && onSeeAll ? (");
     /* The same sheet the menu opens; the menu entry stays. */
     expect(src.card).toContain("onSeeAll={onViewAll}");
     expect(src.card).toContain("View all ${total} cards");

@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import type { FeedCard } from "./api";
@@ -10,7 +9,9 @@ import { colors, radius, spacing } from "./theme";
 import { CardImage, Tap, type ZoomCard, type ZoomHave, type ZoomPicks } from "./ui";
 
 /**
- * A multi-card Flare on the Feed: compact slides, one card each.
+ * A Flare's cards on the Feed: one card as a row (`FlareCardSlide`),
+ * several as a strip (`FlareStrip`, below, which replaced the carousel
+ * this note goes on to describe).
  *
  * The first pager was the founder's concept render, a hero card with
  * its neighbours peeking and a strip of thumbnails under it. It stood
@@ -33,8 +34,6 @@ import { CardImage, Tap, type ZoomCard, type ZoomHave, type ZoomPicks } from "./
  */
 
 const GAP = spacing(2);
-/** How much of the next slide shows, so a swipe is discoverable. */
-const PEEK = 28;
 
 /** Copies wanted or on offer for one card, whichever field arrived. */
 export const copiesOf = (card: FeedCard): number => Math.max(1, card.quantity ?? 1);
@@ -157,10 +156,12 @@ export function FlareCardSlide({
         </Text>
         <Text
           style={{
+            /* White, not the accent: green is kept for the status line
+               and the one action, so it still means something. */
             color:
               card.state === "found" || remaining === 0
                 ? colors.textMuted
-                : colors.accent,
+                : colors.textPrimary,
             fontSize: 13,
             fontWeight: "700",
           }}
@@ -186,105 +187,133 @@ export function FlareCardSlide({
   );
 }
 
-export function FlareCarousel({
+/** A strip tile's width: two and a half across a phone, so it scrolls. */
+export const STRIP_TILE = 108;
+
+/**
+ * A multi-card Flare, as a strip: every card's art at once with its
+ * name and what is asked under it, swiped sideways.
+ *
+ * This was a carousel of one wide slide at a time, inside a panel of its
+ * own, with a dot per card and "See all 17 cards" under it. A seventeen-
+ * card hunt showed one card and a sliver; the founder: "compact is great
+ * because it just shows the cards simply". So classic is compact, bigger:
+ * the art first, the words beneath, no inner panel and no dots. The strip
+ * runs to the post's edges (`bleed`) so the card that peeks in is cut by
+ * the post, not by a box inside it. The printing lives in the zoom a tap
+ * away, and the full list behind the three dots, as before.
+ */
+export function FlareStrip({
   cards,
+  total,
   direction,
   post,
   picks,
   onPicks,
   onSeeAll,
+  bleed = 0,
 }: {
   cards: FeedCard[];
+  /** Cards on the post, when the Feed only carried some of them. */
+  total?: number;
   direction: "want" | "showcase";
   post?: PostRef;
   /** The post's offer in progress, handed through to the zoom. */
   picks?: ZoomPicks;
   onPicks?: (picks: ZoomPicks) => void;
-  /** "See all 4 cards": the full-list sheet, the one the menu opens. */
+  /** The full-list sheet, the one the menu opens: the "+N" tile's door. */
   onSeeAll?: () => void;
+  /** The parent's side padding, so the strip can run to its edges. */
+  bleed?: number;
 }) {
-  const [at, setAt] = useState(0);
-  const [width, setWidth] = useState(0);
-  const slide = Math.max(0, width - PEEK - GAP);
-  const page = slide + GAP;
   const shelf = shelfFor(cards, post);
+  const more = Math.max(0, (total ?? cards.length) - cards.length);
+  const height = Math.round((STRIP_TILE * 88) / 63);
 
   return (
-    <View
-      style={{
-        borderRadius: radius.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: spacing(3),
-        gap: spacing(2.5),
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={{ marginHorizontal: -bleed }}
+      contentContainerStyle={{
+        gap: GAP,
+        paddingHorizontal: bleed,
+        /* Room for a held card's ring, which sits just outside. */
+        paddingVertical: 4,
       }}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width - spacing(6))}
     >
-      {width > 0 ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          snapToInterval={page}
-          snapToAlignment="start"
-          decelerationRate="fast"
-          disableIntervalMomentum
-          contentContainerStyle={{ gap: GAP, paddingRight: PEEK + GAP }}
-          onMomentumScrollEnd={(event) => {
-            const landed = Math.round(event.nativeEvent.contentOffset.x / page);
-            if (landed >= 0 && landed < cards.length) setAt(landed);
+      {cards.map((card, index) => {
+        const remaining = remainingOf(card);
+        const done = card.state === "found" || remaining === 0;
+        const count =
+          direction === "showcase"
+            ? card.state === "found"
+              ? GONE_LABEL
+              : availableLabel(copiesOf(card))
+            : wantsLine(copiesOf(card), remaining);
+        return (
+          <View key={card.cardId} style={{ width: STRIP_TILE, gap: 3 }}>
+            <View>
+              <CardImage
+                imageUrl={card.imageUrl}
+                width={STRIP_TILE}
+                name={card.cardName}
+                cardNumber={card.cardNumber}
+                caption={card.printingLabel ?? null}
+                youHave={card.match ? { kind: card.match, count: 0 } : undefined}
+                state={card.state}
+                have={haveWithCap(card, post)}
+                siblings={shelf}
+                position={index}
+                picks={picks}
+                onPicks={onPicks}
+              />
+              <HeldRing match={card.match} corner="right" />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: done ? colors.textMuted : colors.textPrimary,
+                fontSize: 13,
+                fontWeight: "700",
+                marginTop: 3,
+              }}
+            >
+              {card.cardName}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: done ? colors.textMuted : colors.textSecondary,
+                fontSize: 12,
+              }}
+            >
+              {card.youOffered ? `${count} · You offered` : count}
+            </Text>
+          </View>
+        );
+      })}
+      {more > 0 && onSeeAll ? (
+        <Tap
+          onPress={onSeeAll}
+          accessibilityLabel={seeAllLabel(total ?? cards.length)}
+          style={{
+            width: STRIP_TILE,
+            height,
+            borderRadius: radius.control / 2,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.elevated,
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {cards.map((card, index) => (
-            <FlareCardSlide
-              key={card.cardId}
-              card={card}
-              direction={direction}
-              post={post}
-              siblings={shelf}
-              position={index}
-              width={slide}
-              picks={picks}
-              onPicks={onPicks}
-            />
-          ))}
-        </ScrollView>
+          <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+            +{more}
+          </Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 12 }}>more</Text>
+        </Tap>
       ) : null}
-
-      {/* The dots on the left, the door to the full list on the right. */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: spacing(2),
-        }}
-      >
-        <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
-          {cards.map((card, index) => (
-            <View
-              key={card.cardId}
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: index === at ? colors.accent : colors.borderStrong,
-              }}
-            />
-          ))}
-        </View>
-        {onSeeAll && cards.length > 1 ? (
-          <Tap
-            onPress={onSeeAll}
-            hitSlop={8}
-            accessibilityLabel={seeAllLabel(cards.length)}
-          >
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-              {seeAllLabel(cards.length)}
-            </Text>
-          </Tap>
-        ) : null}
-      </View>
-    </View>
+    </ScrollView>
   );
 }

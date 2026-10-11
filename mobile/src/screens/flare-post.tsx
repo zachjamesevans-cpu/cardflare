@@ -34,7 +34,7 @@ import { markFeedStale } from "../feed-refresh";
 import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
-import { FlareCardSlide, FlareCarousel, shelfFor } from "../flare-deck-pager";
+import { FlareCardSlide, FlareStrip, shelfFor } from "../flare-deck-pager";
 import { FlareActions, postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
@@ -460,7 +460,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                 onPicks={setPicks}
               />
             ) : (
-              <FlareCarousel
+              <FlareStrip
                 cards={post.cards}
                 direction={direction}
                 post={ref}

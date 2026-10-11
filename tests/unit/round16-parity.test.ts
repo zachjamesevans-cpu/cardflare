@@ -362,7 +362,9 @@ describe("the full list is one tap from the carousel", () => {
     expect(WEB.feedCard).toContain("post={preview ? null : shape}");
     /* The menu entry stays. */
     expect(WEB.actions).toContain("label: `View all ${post.total} cards`,");
-    expect(APP.pager).toContain("seeAllLabel(cards.length)");
+    /* The app's strip shows the cards outright; its "+N more" tile is
+       the door to the rest. */
+    expect(APP.pager).toContain("seeAllLabel(total ?? cards.length)");
     expect(APP.card).toContain("View all ${total} cards");
   });
 });
