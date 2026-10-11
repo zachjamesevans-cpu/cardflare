@@ -85,6 +85,8 @@ export function statusLabel(item: {
   /** How many cards: `total` on a Feed post, the cards themselves on the post screen. */
   total?: number;
   cards?: unknown[];
+  /** The hunt the post went up in: "is hunting", and the hunt's name after it. */
+  hunt?: { id: string; name: string } | null;
 }): string {
   const offering = item.direction === "showcase";
   if (item.completed) {
@@ -93,7 +95,11 @@ export function statusLabel(item: {
       ? "found it"
       : "found them all";
   }
-  return offering ? "is offering" : "is looking for";
+  if (offering) return "is offering";
+  /* The founder: "soupie posted 17 cards to her ace hunt. but it just
+     says 'is looking for' with a little tiny ace 'view hunt' button
+     below". A post in a hunt says so, and names it (see FlareStatus). */
+  return item.hunt ? "is hunting" : "is looking for";
 }
 
 /**
@@ -112,15 +118,41 @@ export function FlareStatus({
   label = "is looking for",
   detail,
   done = false,
+  hunt,
+  onOpenHunt,
 }: {
   label?: string;
   /** "3 cards", in the quiet colour after the status. */
   detail?: string | null;
   /** Every copy in hand or given away: the check instead of the crosshair. */
   done?: boolean;
+  /**
+   * The hunt the post went up in, named after the words - "is hunting
+   * Ace <3" - and the door to it. This replaced the small "◇ Ace <3 ·
+   * View hunt" row under the cards, which was the only sign a post
+   * belonged to a hunt, and the easiest thing on it to miss.
+   */
+  hunt?: { id: string; name: string } | null;
+  onOpenHunt?: (huntId: string) => void;
 }) {
+  const huntName = hunt ? (
+    <Text
+      numberOfLines={1}
+      style={{ color: colors.accent, fontSize: 14, fontWeight: "800", flexShrink: 1 }}
+    >
+      {done ? `· ${hunt.name}` : hunt.name}
+    </Text>
+  ) : null;
+
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(1.5),
+        minWidth: 0,
+      }}
+    >
       {done ? (
         <Ionicons name="checkmark-circle" size={17} color={colors.accent} />
       ) : (
@@ -138,8 +170,24 @@ export function FlareStatus({
       <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
         {label}
       </Text>
+      {hunt && onOpenHunt ? (
+        /* Its own tap, inside the header's: the name opens the hunt,
+           the rest of the header still opens the profile. */
+        <Tap
+          onPress={() => onOpenHunt(hunt.id)}
+          accessibilityLabel={`View hunt ${hunt.name}`}
+          hitSlop={6}
+          style={{ flexShrink: 1, minWidth: 0 }}
+        >
+          {huntName}
+        </Tap>
+      ) : (
+        huntName
+      )}
       {detail ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{`· ${detail}`}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}>
+          {`· ${detail}`}
+        </Text>
       ) : null}
     </View>
   );
@@ -375,6 +423,8 @@ export function FlareFeedCard({
                 label={statusLabel(item)}
                 done={completed}
                 detail={item.total > 1 ? cardsLabel(item.total) : null}
+                hunt={item.hunt}
+                onOpenHunt={onOpenHunt}
               />
             </View>
           </Tap>
@@ -513,30 +563,10 @@ export function FlareFeedCard({
         </Text>
       ) : null}
 
-      {/* The hunt it is part of, and the door to it. No room line: the
-          store a post was made in used to be named here, and before
-          that as a full-width "Go to Mox Valley Games"; the founder:
+      {/* No hunt row: the hunt is named in the status line and opens
+          from there ("is hunting Ace <3"). No room line either: the
+          store a post was made in used to be named here; the founder:
           "kinda redundant. remove that type of... CTA everywhere". */}
-      {item.hunt ? (
-        <Tap
-          onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
-          accessibilityLabel={`View hunt ${item.hunt.name}`}
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-        >
-          <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
-          >
-            {item.hunt.name}
-          </Text>
-          {onOpenHunt ? (
-            <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
-              · View hunt
-            </Text>
-          ) : null}
-        </Tap>
-      ) : null}
 
       {/* No offer button: a tap on any card opens the zoom with "I have
           this card" in it, as on compact. The founder: "no need for i

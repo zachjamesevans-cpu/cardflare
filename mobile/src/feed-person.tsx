@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { View, Text } from "react-native";
 
 import { PlayerAvatar } from "./player-avatar";
@@ -37,7 +38,8 @@ export function FeedPerson({
   frame: string | null;
   ring: string | null;
   aura?: string | null;
-  detail: string;
+  /** A line of muted words, or a line of its own (a post's FlareStatus). */
+  detail: ReactNode;
   size?: number;
   onOpen: (playerId: string) => void;
 }) {
@@ -62,7 +64,7 @@ export function FeedPerson({
           <Title>{name}</Title>
           {guest ? <GuestChip /> : null}
         </View>
-        <Muted>{detail}</Muted>
+        {typeof detail === "string" ? <Muted>{detail}</Muted> : detail}
       </View>
     </>
   );
