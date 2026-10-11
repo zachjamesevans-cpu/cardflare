@@ -136,15 +136,16 @@ export function FlareStatus({
   onOpenHunt?: (huntId: string) => void;
 }) {
   /*
-   * THE HUNT AS A PILL, NOT AS WORDS.
+   * THE HUNT AS A NAME, NOT A BUTTON.
    *
-   * Hunts are named like cards - "Green Zoro", "Sabo" - so "is hunting
-   * Green Zoro" in plain bold read as wanting one Green Zoro. A pill
-   * says it is the name of a thing, and that it opens. The founder
-   * asked whether "looking for" and "is hunting" would blur together
-   * under one icon. The icon stays: the crosshair IS the hunts mark
-   * (the hunts-as-binders round), and both lines mean "tap a card to
-   * offer". The pill is the difference.
+   * Hunts are named like cards - "Green Zoro", "Sabo" - so the name
+   * has to read as a thing that opens, not as the card wanted. It was
+   * an accent pill, and the founder: "still dont think that big button
+   * for straw hat crew is the best option", then "lets try option a":
+   * plain words in white, then a small grey chevron. The chevron does
+   * the pill's job - this is a place, it opens - at a fraction of the
+   * weight, and the line reads as one sentence: "is hunting Straw Hat
+   * Crew ›". The crosshair stays the mark of both lines.
    */
   const huntPill = hunt ? (
     <View
@@ -152,24 +153,22 @@ export function FlareStatus({
         flexDirection: "row",
         alignItems: "center",
         gap: 2,
-        borderWidth: 1,
-        borderColor: `${colors.accent}59`,
-        backgroundColor: colors.accentTint,
-        borderRadius: 999,
-        paddingLeft: spacing(2),
-        paddingRight: onOpenHunt ? spacing(1) : spacing(2),
-        paddingVertical: 1,
         minWidth: 0,
       }}
     >
       <Text
         numberOfLines={1}
-        style={{ color: colors.accent, fontSize: 13, fontWeight: "800", flexShrink: 1 }}
+        style={{
+          color: colors.textPrimary,
+          fontSize: 14,
+          fontWeight: "700",
+          flexShrink: 1,
+        }}
       >
         {hunt.name}
       </Text>
       {onOpenHunt ? (
-        <Ionicons name="chevron-forward" size={12} color={colors.accent} />
+        <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
       ) : null}
     </View>
   ) : null;

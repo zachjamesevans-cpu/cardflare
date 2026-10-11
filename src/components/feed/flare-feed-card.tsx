@@ -148,21 +148,26 @@ export function FlareStatus({
         />
       )}
       <span className="shrink-0">{label}</span>
-      {/* The hunt as a pill, not as words: hunts are named like cards
-          ("Green Zoro"), and in plain bold "is hunting Green Zoro" read
-          as wanting one card. The app draws the same pill. */}
+      {/* The hunt as a name, not a button: white words and a small grey
+          chevron, so it reads as a place that opens rather than the card
+          wanted ("Green Zoro"), without the weight of a pill. The founder:
+          "still dont think that big button for straw hat crew is the best
+          option" - "lets try option a". The app draws the same. */}
       {hunt &&
         (linkHunt ? (
           <Link
             href={`/hunts/${hunt.id}`}
             aria-label={`View hunt ${hunt.name}`}
-            className="flex min-w-0 items-center gap-0.5 rounded-full border border-accent/35 bg-accent/10 py-px pr-1 pl-2 text-[13px] font-extrabold transition-colors hover:bg-accent/20"
+            className="flex min-w-0 items-center gap-0.5 font-bold text-text-primary hover:underline"
           >
             <span className="truncate">{hunt.name}</span>
-            <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
+            <ChevronRight
+              className="size-3.5 shrink-0 text-text-muted"
+              aria-hidden="true"
+            />
           </Link>
         ) : (
-          <span className="flex min-w-0 items-center rounded-full border border-accent/35 bg-accent/10 px-2 py-px text-[13px] font-extrabold">
+          <span className="flex min-w-0 items-center font-bold text-text-primary">
             <span className="truncate">{hunt.name}</span>
           </span>
         ))}
