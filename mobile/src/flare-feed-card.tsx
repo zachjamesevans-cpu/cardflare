@@ -236,7 +236,6 @@ export function FlareFeedCard({
   onLike,
   onOpenThread,
   onShare,
-  onEnterRoom,
   onViewAll,
   onProgress,
   onTakeDown,
@@ -256,7 +255,6 @@ export function FlareFeedCard({
   onOpenThread: () => void;
   /** The paper plane: send this post to people you follow. */
   onShare?: () => void;
-  onEnterRoom: (code: string) => void;
   /** "View all 3": the full list, to read. */
   onViewAll?: () => void;
   /** "Update progress", on your own post. */
@@ -290,11 +288,6 @@ export function FlareFeedCard({
     onReport,
     onBlock,
   });
-  /* A Flare posted to a room names it up here, where the time is, and
-     the name is the way in. There used to be a full-width "Go to Mox
-     Valley Games" at the foot of every such post as well; the founder:
-     "it's wack and can probably just go". */
-  const store = item.code && item.storeName ? item.storeName : null;
 
   return (
     <View
@@ -520,63 +513,29 @@ export function FlareFeedCard({
         </Text>
       ) : null}
 
-      {/* Where it was posted and the hunt it is part of: one quiet line
-          of doors. The room was squeezed into the header beside the time
-          and read "Mox Valley Ga…"; here it has the width. */}
-      {store || item.hunt ? (
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            alignItems: "center",
-            columnGap: spacing(4),
-            rowGap: spacing(1.5),
-          }}
+      {/* The hunt it is part of, and the door to it. No room line: the
+          store a post was made in used to be named here, and before
+          that as a full-width "Go to Mox Valley Games"; the founder:
+          "kinda redundant. remove that type of... CTA everywhere". */}
+      {item.hunt ? (
+        <Tap
+          onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
+          accessibilityLabel={`View hunt ${item.hunt.name}`}
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
         >
-          {store ? (
-            <Tap
-              onPress={() => onEnterRoom(item.code ?? "")}
-              hitSlop={8}
-              accessibilityLabel={`Go to ${store}`}
-              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-            >
-              <Ionicons name="location-outline" size={14} color={colors.textMuted} />
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textSecondary, fontSize: 13 }}
-              >
-                {store}
-              </Text>
-            </Tap>
+          <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
+          <Text
+            numberOfLines={1}
+            style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
+          >
+            {item.hunt.name}
+          </Text>
+          {onOpenHunt ? (
+            <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
+              · View hunt
+            </Text>
           ) : null}
-          {item.hunt ? (
-            <Tap
-              onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
-              accessibilityLabel={`View hunt ${item.hunt.name}`}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: spacing(1),
-                flexShrink: 1,
-              }}
-            >
-              <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
-              <Text
-                numberOfLines={1}
-                style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
-              >
-                {item.hunt.name}
-              </Text>
-              {onOpenHunt ? (
-                <Text
-                  style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}
-                >
-                  · View hunt
-                </Text>
-              ) : null}
-            </Tap>
-          ) : null}
-        </View>
+        </Tap>
       ) : null}
 
       {/* No offer button: a tap on any card opens the zoom with "I have

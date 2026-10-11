@@ -23,7 +23,6 @@ import {
   likePost,
   offerItemsOnPost,
   POST_COMMENT_MAX,
-  rememberRoom,
   restorePost,
   takeDownPost,
   type PostComment,
@@ -37,7 +36,6 @@ import { cardsLabel } from "../flare-copy";
 import { FlareCardSlide, FlareStrip, shelfFor } from "../flare-deck-pager";
 import { postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
-import { openRoom } from "../open-room";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { PostSocialRow, type PostRef } from "../post-social";
@@ -45,7 +43,6 @@ import { StorePostBody, StorePostHeader } from "../store-post-card";
 import { colors, gutter, radius, spacing } from "../theme";
 import {
   AsyncButton,
-  Button,
   ErrorLine,
   Input,
   Loading,
@@ -609,16 +606,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           )}
         </View>
 
-        {!post.store && post.code && post.storeName ? (
-          <Button
-            label={`Go to ${post.storeName}`}
-            onPress={() => {
-              void rememberRoom((post.code ?? "").trim().toUpperCase()).then(() =>
-                openRoom(navigation),
-              );
-            }}
-          />
-        ) : null}
+        {/* No "Go to <store>" at the foot: the founder, "kinda redundant.
+            remove that type of... CTA everywhere". */}
       </ScrollView>
 
       <View

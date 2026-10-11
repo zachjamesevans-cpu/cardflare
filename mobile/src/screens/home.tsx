@@ -1433,7 +1433,6 @@ export function HomeScreen() {
                   }}
                   onOpenThread={toSignUp}
                   onShare={toSignUp}
-                  onEnterRoom={toSignUp}
                   onReport={toSignUp}
                   picks={NO_PICKS}
                   onPicks={() => {}}
@@ -1496,7 +1495,6 @@ export function HomeScreen() {
                       subject: postSubject(item),
                     })
                   }
-                  onEnterRoom={(code) => void enter(code)}
                   onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
                   onProgress={
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined

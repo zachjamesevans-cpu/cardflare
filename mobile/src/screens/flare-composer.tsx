@@ -1340,7 +1340,6 @@ export function FlareComposerPreview({
         onOpenProfile={() => undefined}
         onLike={async () => undefined}
         onOpenThread={() => undefined}
-        onEnterRoom={() => undefined}
         /* Your own post, not yet posted: nothing to pick, nowhere to keep it. */
         picks={{}}
         onPicks={() => undefined}

@@ -210,15 +210,14 @@ describe("the small bugs", () => {
     expect(app.historyScreen).toContain('{ text: "Cancel", style: "cancel" }');
   });
 
-  it("names the room on the post's header line, on both", () => {
-    expect(web.feedCard).toContain("at {item.storeName}");
-    expect(web.feedCard).toContain("Go to {item.storeName}");
-    /* The app's header name is the door itself: the full-width footer
-       button went, the founder on classic mode: "it's wack and can
-       probably just go". */
-    expect(app.feedCard).toContain("item.code && item.storeName ? item.storeName : null");
-    expect(app.feedCard).toContain("accessibilityLabel={`Go to ${store}`}");
-    expect(app.feedCard).toContain('onPress={() => onEnterRoom(item.code ?? "")}');
+  it("puts no room on a post, neither its name nor a door to it, on both", () => {
+    /* Round 5 named the room on the header line and kept a "Go to
+       <store>" button at the foot. Both went: the founder, "kinda
+       redundant. remove that type of notification / CTA everywhere". */
+    for (const card of [web.feedCard, app.feedCard]) {
+      expect(card).not.toContain("at {item.storeName}");
+      expect(card).not.toMatch(/Go to \{item\.storeName\}|Go to \$\{/);
+    }
   });
 });
 
