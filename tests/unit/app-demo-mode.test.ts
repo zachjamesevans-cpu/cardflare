@@ -2,7 +2,26 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { demoAnswer, demoSaw } from "../../mobile/src/demo/demo-server";
+/*
+ * Loaded at run time from a path TypeScript does not follow. The demo
+ * server's world borrows its shapes from the app's api.ts with type-only
+ * imports - nothing at run time, so Vitest loads it happily - but the
+ * website's type check walks every import it can see, and from api.ts
+ * reached React Native, which the website does not install. Vercel's
+ * build failed on exactly that. The app's own tsc still checks these
+ * files in full.
+ */
+type DemoAnswerFn = (
+  method: string,
+  path: string,
+  body: unknown,
+) => { value: unknown } | null;
+type DemoSawFn = (method: string, path: string, value: unknown) => unknown;
+const DEMO_SERVER = "../../mobile/src/demo/demo-server";
+const { demoAnswer, demoSaw } = (await import(/* @vite-ignore */ DEMO_SERVER)) as {
+  demoAnswer: DemoAnswerFn;
+  demoSaw: DemoSawFn;
+};
 
 /**
  * Demo mode: the app answering itself for screenshots. The founder
