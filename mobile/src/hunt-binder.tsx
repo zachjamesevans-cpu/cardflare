@@ -30,13 +30,13 @@ import {
   setRequestFound,
 } from "./api";
 import { POCKETS_PER_PAGE } from "./binder-covers";
-import { printingLabel } from "./flare-copy";
+import { cardsLabel, printingLabel } from "./flare-copy";
 import { huntRowLine } from "./hunt-copy";
 import { HuntSheet } from "./hunt-sheet";
 import {
   HuntOfferFooter,
   HuntOfferReview,
-  HuntProgress,
+  HuntRing,
   UndoLine,
   foundOf,
   huntOfferSentLine,
@@ -55,6 +55,7 @@ import {
   pocketLabel,
   type Geometry,
 } from "./pockets";
+import { PlayerAvatar } from "./player-avatar";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
@@ -107,7 +108,12 @@ export function HuntBinder({
   onOwner,
 }: {
   /** The Hunt screen passes its HuntView, which already names the owner. */
-  hunt: Hunt & { ownerName?: string };
+  hunt: Hunt & {
+    ownerName?: string;
+    playerId?: string;
+    /** The owner's face and ring, for a visitor's header. */
+    owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
+  };
   yours: boolean;
   ownerName?: string;
   /** Add cards to this hunt: the composer, with the hunt preselected. */
@@ -310,44 +316,68 @@ export function HuntBinder({
 
   return (
     <View style={{ gap: spacing(3) }}>
-      {/* The header: the crosshair, the name, the description or the
-          row's line under it, and the owner's pencil and Share to the
-          right. A visitor sees the owner's name, a link to their
-          profile, and Share. */}
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(2) }}>
-        <Ionicons
-          name="locate-outline"
-          size={18}
-          color={colors.accent}
-          style={{ marginTop: 2 }}
-        />
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Title>{hunt.name}</Title>
-          {hunt.description ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              {hunt.description}
-            </Text>
-          ) : (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              {huntRowLine(hunt.looking + hunt.found, hunt.looking)}
-            </Text>
-          )}
+      {/*
+       * THE RING, THE NAME, WHOSE IT IS.
+       *
+       * This was the crosshair, the name, and three small grey lines over
+       * a hairline bar, all one weight - the founder: "the block on top
+       * needs to change ... make it more pretty". Now the progress is the
+       * ring on the left, the name is the biggest thing on the page, and
+       * a visitor sees the owner as a face with their worn ring, which
+       * opens their profile. The crosshair, the hunts mark, rides in the
+       * "to go" pill below. The pencil and Share stay top right.
+       */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+        <HuntRing found={totalFound} needed={totalNeeded} />
+        <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: colors.textPrimary,
+              fontSize: 24,
+              lineHeight: 28,
+              fontWeight: "800",
+            }}
+          >
+            {hunt.name}
+          </Text>
           {!yours ? (
             <Tap
               onPress={onOwner}
               accessibilityLabel={`${owner}'s profile`}
               hitSlop={6}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
             >
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                <Text style={{ color: colors.textSecondary, fontWeight: "600" }}>
+              <PlayerAvatar
+                displayName={owner}
+                seed={hunt.playerId ?? owner}
+                avatarUrl={hunt.owner?.avatarUrl ?? null}
+                frame={hunt.owner?.frame ?? null}
+                ring={hunt.owner?.ring ?? null}
+                size={22}
+              />
+              <Text
+                numberOfLines={1}
+                style={{ color: colors.textMuted, fontSize: 14, flexShrink: 1 }}
+              >
+                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
                   {owner}
                 </Text>
                 {"'s hunt"}
               </Text>
             </Tap>
-          ) : null}
+          ) : (
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>Your hunt</Text>
+          )}
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+            alignSelf: "flex-start",
+          }}
+        >
           {yours && hunt.id ? (
             <Tap onPress={() => setEditing(true)} hitSlop={8} accessibilityLabel="Edit hunt">
               <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
@@ -369,7 +399,34 @@ export function HuntBinder({
         onSaved={() => onChanged?.()}
       />
 
-      <HuntProgress found={totalFound} needed={totalNeeded} />
+      {/* What it's for, in the owner's own words: a quote set off by the
+          accent rule, rather than one more grey line. A hunt with no
+          words says what it holds instead, in the same place. */}
+      <View
+        style={{
+          borderLeftWidth: 2,
+          borderLeftColor: colors.accent,
+          paddingLeft: spacing(3),
+        }}
+      >
+        <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21 }}>
+          {hunt.description || huntRowLine(hunt.looking + hunt.found, hunt.looking)}
+        </Text>
+      </View>
+
+      {/* The two numbers worth reading at a glance. */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+        {totalNeeded > 0 && totalFound >= totalNeeded ? (
+          <HuntPill icon="checkmark" label="Complete" strong />
+        ) : (
+          <HuntPill
+            icon="locate-outline"
+            label={`${Math.max(0, totalNeeded - totalFound)} to go`}
+            strong
+          />
+        )}
+        <HuntPill label={cardsLabel(cards.length)} />
+      </View>
 
       {copies.undoLabel ? (
         <UndoLine label={copies.undoLabel} onUndo={copies.undoLast} />
@@ -840,6 +897,50 @@ function HuntPocketSheet({
  * undone: the outline and the word in `colors.danger`, nothing filled,
  * so it reads as a warning and not as the page's main action.
  */
+/**
+ * A count under a hunt's header: "7 to go" in the accent's wash with
+ * the hunts crosshair, the number of cards quiet beside it, "Complete"
+ * with a check once every copy is in.
+ */
+function HuntPill({
+  label,
+  icon,
+  strong = false,
+}: {
+  label: string;
+  icon?: "locate-outline" | "checkmark";
+  strong?: boolean;
+}) {
+  const tone = strong ? colors.accent : colors.textSecondary;
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 4,
+        paddingHorizontal: spacing(3),
+        paddingVertical: spacing(1),
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: strong ? `${colors.accent}59` : colors.border,
+        backgroundColor: strong ? colors.accentTint : colors.elevated,
+      }}
+    >
+      {icon ? <Ionicons name={icon} size={14} color={tone} /> : null}
+      <Text
+        style={{
+          color: tone,
+          fontSize: 13,
+          fontWeight: "700",
+          fontVariant: ["tabular-nums"],
+        }}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 function DangerButton({
   label,
   busy,

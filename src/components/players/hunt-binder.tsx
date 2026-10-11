@@ -24,13 +24,14 @@ import { OfferReview } from "@/components/flares/offer-review";
 import {
   HuntEditForm,
   HuntOfferFooter,
-  HuntProgress,
+  HuntRing,
   HuntSentLine,
   UndoLine,
   useHuntOffer,
   useHuntProgress,
   type LiveHuntCard,
 } from "@/components/players/hunt-detail";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
@@ -203,21 +204,44 @@ export function HuntBinder({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      {/* The title row: the crosshair and the name on the left; on the
-          right the owner's pencil and Share, or the owner's name and
-          Share for a visitor. */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <Crosshair className="mt-1 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h1 className="truncate text-xl leading-tight font-extrabold text-text-primary">
-              {hunt.name}
-            </h1>
-            <p className="text-sm text-text-secondary">{line}</p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      {/*
+       * THE RING, THE NAME, WHOSE IT IS. This was the crosshair, the name
+       * and small grey lines over a hairline bar; the founder: "the block
+       * on top needs to change ... make it more pretty". The progress is
+       * the ring, the name is the biggest thing on the page, the owner is
+       * a face with their worn ring, and the crosshair rides in the "to
+       * go" pill. The app's hunt-binder.tsx draws the same header.
+       */}
+      <div className="flex items-center gap-3">
+        <HuntRing found={foundCopies} needed={neededCopies} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <h1 className="line-clamp-2 text-2xl leading-tight font-extrabold text-text-primary">
+            {hunt.name}
+          </h1>
           {yours ? (
+            <p className="text-sm text-text-muted">Your hunt</p>
+          ) : (
+            <Link
+              href={`/p/${hunt.playerId}`}
+              className="flex min-w-0 items-center gap-2 text-sm text-text-muted hover:underline"
+            >
+              <PlayerAvatar
+                displayName={hunt.ownerName}
+                seed={hunt.playerId}
+                avatarUrl={hunt.owner?.avatarUrl ?? null}
+                frame={hunt.owner?.frame ?? null}
+                ring={hunt.owner?.ring ?? null}
+                size="sm"
+              />
+              <span className="truncate">
+                <span className="font-bold text-text-primary">{hunt.ownerName}</span>
+                &rsquo;s hunt
+              </span>
+            </Link>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 self-start">
+          {yours && (
             <button
               type="button"
               aria-label="Edit hunt"
@@ -226,13 +250,6 @@ export function HuntBinder({
             >
               <Pencil className={HEADER_ICON} aria-hidden="true" />
             </button>
-          ) : (
-            <Link
-              href={`/p/${hunt.playerId}`}
-              className="max-w-32 truncate text-sm font-semibold text-text-secondary hover:text-text-primary hover:underline"
-            >
-              {hunt.ownerName}
-            </Link>
           )}
           <ShareProfileButton
             url={`/hunts/${hunt.id}`}
@@ -243,7 +260,29 @@ export function HuntBinder({
         </div>
       </div>
 
-      <HuntProgress found={foundCopies} needed={neededCopies} />
+      {/* What it's for, in the owner's words: a quote set off by the
+          accent rule. A hunt with no words says what it holds instead. */}
+      <p className="border-l-2 border-accent pl-3 text-[15px] leading-snug text-text-secondary">
+        {line}
+      </p>
+
+      {/* The two numbers worth reading at a glance. */}
+      <div className="flex flex-wrap gap-2 tabular-nums">
+        {neededCopies > 0 && foundCopies >= neededCopies ? (
+          <span className="flex items-center gap-1 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[13px] font-bold text-accent">
+            <Check className="size-3.5" aria-hidden="true" />
+            Complete
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[13px] font-bold text-accent">
+            <Crosshair className="size-3.5" aria-hidden="true" />
+            {Math.max(0, neededCopies - foundCopies)} to go
+          </span>
+        )}
+        <span className="rounded-full border border-border bg-elevated px-3 py-1 text-[13px] font-bold text-text-secondary">
+          {cards.length === 1 ? "1 card" : `${cards.length} cards`}
+        </span>
+      </div>
 
       {progress.error && (
         <p role="alert" className="text-sm text-danger">

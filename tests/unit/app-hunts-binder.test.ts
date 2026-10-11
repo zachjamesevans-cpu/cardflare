@@ -180,12 +180,16 @@ describe("the Hunts tab: one binder row per hunt", () => {
     expect(src.panel).toContain('onPress={() => setSheet({ kind: "new" })}');
     expect(src.panel).toContain('onPress={() => setSheet({ kind: "about" })}');
     expect(src.panel).toContain("`${hunts.length} of ${limit} hunts`");
-    expect(src.panel).toContain("`You are at ${limit} hunts. Finish one to start another.`");
+    expect(src.panel).toContain(
+      "`You are at ${limit} hunts. Finish one to start another.`",
+    );
     expect(src.panel.indexOf('accessibilityLabel="New hunt"')).toBeLessThan(
       src.panel.indexOf("{hunts.map((hunt) => ("),
     );
-    expect(src.panel).not.toContain('placeholder={\'Name it, like "Green Zoro"\'}');
-    expect(sheet).toContain('One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.');
+    expect(src.panel).not.toContain("placeholder={'Name it, like \"Green Zoro\"'}");
+    expect(sheet).toContain(
+      "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.",
+    );
     expect(sheet).toContain('<Modal visible transparent animationType="fade"');
     expect(sheet).toContain("createHunt({");
     expect(sheet).not.toContain("visibility");
@@ -217,28 +221,28 @@ describe("the hunt page is the open binder, minus hold to move", () => {
   });
 
   it("heads with the crosshair, the name, the description or the row's line, and the owner's controls", () => {
-    expect(src.page).toContain('name="locate-outline"');
-    expect(src.page).toContain("<Title>{hunt.name}</Title>");
-    expect(src.page).toContain("{hunt.description}");
+    /* The crosshair rides in the "to go" pill; the name is the page's
+       biggest line; the description, or the row's line, is a quote. */
+    expect(src.page).toContain('icon="locate-outline"');
+    expect(src.page).toContain("{hunt.name}");
     expect(src.page).toContain(
-      "{huntRowLine(hunt.looking + hunt.found, hunt.looking)}",
+      "{hunt.description || huntRowLine(hunt.looking + hunt.found, hunt.looking)}",
     );
     /* The pencil opens the same sheet that starts a hunt; Share is beside it. */
     expect(src.page).toContain('accessibilityLabel="Edit hunt"');
     expect(src.page).toContain('name="pencil-outline"');
     expect(src.page).toContain('accessibilityLabel="Share hunt"');
-    expect(src.page).toContain('mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}');
+    expect(src.page).toContain(
+      'mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}',
+    );
     expect(src.page).toContain("huntUrl(hunt.id)");
-    /* A visitor sees the owner's name, a link to their profile. */
+    /* A visitor sees the owner's face and name, a link to their profile. */
     expect(src.page).toContain("accessibilityLabel={`${owner}'s profile`}");
     expect(src.page).toContain('{"\'s hunt"}');
-    /* The progress bar stays, above the pages. */
-    expect(src.page).toContain(
-      "<HuntProgress found={totalFound} needed={totalNeeded} />",
-    );
-    expect(src.page.indexOf("<HuntProgress")).toBeLessThan(
-      src.page.indexOf("<PageFrame"),
-    );
+    expect(src.page).toContain("avatarUrl={hunt.owner?.avatarUrl ?? null}");
+    /* The progress is the ring in the header, above the pages. */
+    expect(src.page).toContain("<HuntRing found={totalFound} needed={totalNeeded} />");
+    expect(src.page.indexOf("<HuntRing")).toBeLessThan(src.page.indexOf("<PageFrame"));
   });
 
   it("draws the binder's pages: the shared frame, nine pockets, the dots", () => {

@@ -210,7 +210,8 @@ describe("the Hunts tab: one binder row per hunt", () => {
 
   it("says the empty state the same way on both", () => {
     /* What a hunt is: the app's sheet and empty pane, the web's pane. */
-    const OWNER = 'One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.';
+    const OWNER =
+      "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.";
     expect(web.panel).toContain(OWNER);
     expect(read("mobile/src/hunt-sheet.tsx")).toContain(OWNER);
     expect(app.panel).toContain("HUNT_EXPLAINER");
@@ -226,7 +227,8 @@ describe("the Hunts tab: one binder row per hunt", () => {
       expect(source, `web ${name}`).not.toContain("ListChecks");
     }
     expect(app.panel).toContain('name="locate-outline"');
-    expect(app.binder).toContain('name="locate-outline"');
+    /* The hunt page wears it in the "to go" pill under the ring. */
+    expect(app.binder).toContain('icon="locate-outline"');
     for (const [name, source] of Object.entries(app)) {
       expect(source, `app ${name}`).not.toContain("format-list-checks");
     }
@@ -239,6 +241,26 @@ describe("the hunt page: the open binder", () => {
       "hunt.description || huntRowLine(cards.length, looking)",
     );
     expect(app.binder).toContain("huntRowLine(");
+  });
+
+  it("heads with the ring, the name, the owner's face, a quote and two pills", () => {
+    /* The founder: "the block on top needs to change ... make it more
+       pretty". Both platforms draw the same header. */
+    for (const [name, source] of [
+      ["web", web.binder],
+      ["app", app.binder],
+    ] as const) {
+      expect(source, name).toContain("<HuntRing");
+      expect(source, name).toContain("<PlayerAvatar");
+      expect(source, name).toContain("Your hunt");
+      expect(source, name).toContain("to go");
+      expect(source, name).toContain("Complete");
+    }
+    expect(web.binder).toContain("border-l-2 border-accent");
+    expect(app.binder).toContain("borderLeftColor: colors.accent");
+    /* The owner's face comes with the hunt, nested so the app API makes
+       its path whole. */
+    expect(read("src/lib/players/hunts.ts")).toContain("owner: {");
   });
 
   it("gives the owner the pencil and Share, and a visitor the owner's name and Share", () => {
@@ -267,13 +289,18 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toContain('side="prev"');
     expect(web.binder).toContain('side="next"');
     expect(web.binder).toContain("<PageDots");
-    expect(web.binder).toContain("<HuntProgress");
+    /* The progress is the ring in the header (2026-10-11), not a bar. */
+    expect(web.binder).toContain(
+      "<HuntRing found={foundCopies} needed={neededCopies} />",
+    );
     /* No hold to move: a hunt has no order of its own. */
     expect(web.binder).not.toContain("draggable");
     expect(web.binder).not.toContain("onDragStart");
     expect(app.binder).toContain("POCKETS_PER_PAGE");
     expect(app.binder).toContain("<PageDots");
-    expect(app.binder).toContain("<HuntProgress");
+    expect(app.binder).toContain(
+      "<HuntRing found={totalFound} needed={totalNeeded} />",
+    );
     expect(app.binder).not.toContain("onLongPress");
   });
 
