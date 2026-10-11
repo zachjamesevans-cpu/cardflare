@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { HeaderButton } from "./header";
 import { HEADER } from "./header-metrics";
-import { colors } from "./theme";
+import { BRAND, colors } from "./theme";
 
 /**
  * The name is the founder's ARTWORK, not text in a font. He supplied
@@ -25,8 +25,11 @@ import { colors } from "./theme";
  * renders taller than the letters look; 24 points puts the lettering
  * where the old 20-point text sat.
  */
-const wordmark = require("../assets/wordmark.png");
-const WORDMARK_HEIGHT = 24;
+/* "soft": the founder's CF mark, flat, no glow; "lime": the glowing
+   wordmark it replaced. See BRAND in theme.ts. */
+const wordmark =
+  BRAND === "soft" ? require("../assets/cf-mark.png") : require("../assets/wordmark.png");
+const WORDMARK_HEIGHT = BRAND === "soft" ? 22 : 24;
 const WORDMARK_SOURCE = Image.resolveAssetSource(wordmark);
 const WORDMARK_ASPECT = WORDMARK_SOURCE.width / WORDMARK_SOURCE.height;
 

@@ -4,6 +4,45 @@
  * value changes there, it changes here. One dark look on both clients —
  * the app should feel like the room page, not like a second product.
  */
+/*
+ * WHICH LOOK: "soft" or "lime". One switch for the green, the glows and
+ * the logo across the app.
+ *
+ * "soft" is the founder's CF logo (assets/cf-mark.png): its pale green
+ * #CFFA86 as the accent, the glows turned right down, and the CF mark
+ * where the glowing wordmark was. The founder: "trying to reduce the
+ * 'gamer' glow/look from the logo... if i dont like it, i can quickly
+ * switch back." "lime" is everything as it was. The app icon and splash
+ * are native files: the lime ones are kept in assets/brand-lime/ and go
+ * back with a copy and a build.
+ */
+export const BRAND: "soft" | "lime" = "soft";
+
+const ACCENTS: Record<
+  "soft" | "lime",
+  { accent: string; accentHover: string; accentMuted: string; accentTint: string }
+> = {
+  lime: {
+    accent: "#c6ee4f",
+    accentHover: "#d3fa5f",
+    accentMuted: "#8ba635",
+    accentTint: "rgba(198,238,79,0.1)",
+  },
+  soft: {
+    accent: "#cffa86",
+    accentHover: "#dcfda3",
+    accentMuted: "#94ad66",
+    accentTint: "rgba(207,250,134,0.1)",
+  },
+};
+
+/**
+ * How strongly anything glows in the accent: a held card's ring, the
+ * status crosshair, a mutual match, the PRO mark. Full on "lime", a
+ * whisper on "soft".
+ */
+export const accentGlow = BRAND === "soft" ? 0.25 : 1;
+
 export const colors = {
   /*
    * True black, matching the website's --color-canvas. The founder:
@@ -19,16 +58,17 @@ export const colors = {
   elevated: "#1d242d",
   border: "#2a323d",
   borderStrong: "#3a4553",
-  accent: "#c6ee4f",
-  accentHover: "#d3fa5f",
-  accentMuted: "#8ba635",
+  /* The accent, its hover, its dim and (below) its wash: from BRAND. */
+  accent: ACCENTS[BRAND].accent,
+  accentHover: ACCENTS[BRAND].accentHover,
+  accentMuted: ACCENTS[BRAND].accentMuted,
   accentContrast: "#0e1116",
   /*
    * The accent as a wash: a selected row, a chip that is on, the Embers
    * badge. One strength, so "selected" reads the same on every screen
    * instead of at 8, 10, 12 or 15 percent depending on who wrote it.
    */
-  accentTint: "rgba(198,238,79,0.1)",
+  accentTint: ACCENTS[BRAND].accentTint,
   /* What dims the page behind a card, a badge or a sheet, one strength. */
   scrim: "rgba(0,0,0,0.75)",
   textPrimary: "#f2f5f7",

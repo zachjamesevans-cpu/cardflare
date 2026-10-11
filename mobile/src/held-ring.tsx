@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { View } from "react-native";
 
-import { colors, radius } from "./theme";
+import { colors, radius, accentGlow } from "./theme";
 
 /**
  * The green ring on a card you hold, and the corner icon that says which
@@ -53,7 +53,7 @@ export function HeldRing({
              ring's inner curve lands on the picture's edge. */
           borderRadius: radius.control / 2 + (inset ? 0 : 2),
           shadowColor: colors.accent,
-          shadowOpacity: 0.35,
+          shadowOpacity: 0.35 * accentGlow,
           shadowRadius: 6,
           shadowOffset: { width: 0, height: 0 },
           zIndex: 5,
