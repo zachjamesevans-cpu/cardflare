@@ -179,7 +179,12 @@ export function FlareStatus({
       style={{
         flexDirection: "row",
         alignItems: "center",
-        gap: spacing(1.5),
+        /* Wraps rather than squeezing: a hunt named "Straw Hat Crew"
+           beside "· 8 cards" shrank the pill to "S…" on a phone. Now the
+           count goes to the next line and the name stays readable. */
+        flexWrap: "wrap",
+        columnGap: spacing(1.5),
+        rowGap: 2,
         minWidth: 0,
       }}
     >
@@ -204,7 +209,7 @@ export function FlareStatus({
         /* Its own tap, inside the header's: the pill opens the hunt,
            the rest of the header still opens the profile. The shrink
            lives on this wrapper - Tap puts its style on an inner view. */
-        <View style={{ flexShrink: 1, minWidth: 0 }}>
+        <View style={{ flexShrink: 1, minWidth: 0, maxWidth: "100%" }}>
           <Tap
             onPress={() => onOpenHunt(hunt.id)}
             accessibilityLabel={`View hunt ${hunt.name}`}
@@ -214,7 +219,7 @@ export function FlareStatus({
           </Tap>
         </View>
       ) : hunt ? (
-        <View style={{ flexShrink: 1, minWidth: 0 }}>{huntPill}</View>
+        <View style={{ flexShrink: 1, minWidth: 0, maxWidth: "100%" }}>{huntPill}</View>
       ) : null}
       {detail ? (
         <Text style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}>
@@ -454,7 +459,9 @@ export function FlareFeedCard({
               <FlareStatus
                 label={statusLabel(item)}
                 done={completed}
-                detail={item.total > 1 ? cardsLabel(item.total) : null}
+                /* No count beside a hunt's pill: the two did not fit one
+                   line, and the strip under the post shows the cards. */
+                detail={item.total > 1 && !item.hunt ? cardsLabel(item.total) : null}
                 hunt={item.hunt}
                 onOpenHunt={onOpenHunt}
               />

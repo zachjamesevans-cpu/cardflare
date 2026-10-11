@@ -271,7 +271,7 @@ export function FlareFeedCard({
                 </span>
               )}
             </Link>
-            <span className="flex min-w-0 items-center gap-1.5">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <FlareStatus
                 label={statusLabel(item)}
                 glow={direction === "want"}
@@ -279,7 +279,7 @@ export function FlareFeedCard({
                 hunt={item.hunt}
                 linkHunt={!preview}
               />
-              {item.total > 1 && (
+              {item.total > 1 && !item.hunt && (
                 <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
                   {item.total} cards
                 </span>

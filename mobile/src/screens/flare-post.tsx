@@ -434,7 +434,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                       label={statusLabel(post)}
                       done={Boolean(post.completed)}
                       detail={
-                        [total > 1 ? cardsLabel(total) : null, post.eventName ?? null]
+                        [total > 1 && !post.hunt ? cardsLabel(total) : null, post.eventName ?? null]
                           .filter(Boolean)
                           .join(" · ") || null
                       }
