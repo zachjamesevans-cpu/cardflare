@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 
 import {
@@ -40,17 +40,23 @@ export interface PostRef {
  * post.
  */
 /**
- * Each count's tap box: at least 44pt tall and wide, Apple's minimum,
+ * Each count's tap box: 44pt tall and wide to a thumb, Apple's minimum,
  * so a thumb that lands a little off the heart still likes the post.
+ *
+ * Drawn at 32 and made up to 44 with `HIT`, not drawn at 44: the drawn
+ * box was 10pt of empty band above and below the icons, and the founder
+ * read it as "a little too much dead space above and below the
+ * like/comment bar".
  */
 const TARGET = {
   flexDirection: "row",
   alignItems: "center",
   justifyContent: "center",
   gap: spacing(1.5),
-  minHeight: 44,
-  minWidth: 44,
+  minHeight: 32,
+  minWidth: 32,
 } as const;
+const HIT = 6;
 
 export function haveFor(
   card: FeedCard | PostCard,
@@ -84,7 +90,6 @@ export function PostSocialRow({
   onOpenThread,
   onMessage,
   threadOpen = false,
-  trailing,
 }: {
   likes: number;
   liked: boolean;
@@ -97,12 +102,6 @@ export function PostSocialRow({
   onMessage?: () => void;
   /** On the post's own screen the bubble is a label, not a door. */
   threadOpen?: boolean;
-  /**
-   * The post's one action, at the far end of this row rather than a
-   * full-width button on a row of its own. The founder, on classic
-   * mode: "look at how massive the UI is".
-   */
-  trailing?: ReactNode;
 }) {
   const [liked, setLiked] = useState(initialLiked);
   const [likes, setLikes] = useState(initialLikes);
@@ -167,7 +166,7 @@ export function PostSocialRow({
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
         <Tap
           onPress={toggle}
-          hitSlop={6}
+          hitSlop={HIT}
           accessibilityLabel={liked ? "Unlike" : "Like"}
           style={TARGET}
         >
@@ -189,7 +188,7 @@ export function PostSocialRow({
         <Tap
           onPress={onOpenThread}
           disabled={threadOpen}
-          hitSlop={6}
+          hitSlop={HIT}
           accessibilityLabel="Show comments"
           style={TARGET}
         >
@@ -211,7 +210,7 @@ export function PostSocialRow({
         {onMessage ? (
           <Tap
             onPress={onMessage}
-            hitSlop={6}
+            hitSlop={HIT}
             accessibilityLabel="Message them"
             style={TARGET}
           >
@@ -229,7 +228,6 @@ export function PostSocialRow({
             ) : null}
           </Tap>
         ) : null}
-        {trailing ? <View style={{ marginLeft: "auto" }}>{trailing}</View> : null}
       </View>
       <ErrorLine message={error} />
     </View>

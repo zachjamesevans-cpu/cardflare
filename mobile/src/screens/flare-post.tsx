@@ -35,7 +35,7 @@ import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
 import { FlareCardSlide, FlareStrip, shelfFor } from "../flare-deck-pager";
-import { FlareActions, postActions, statusLabel } from "../flare-feed-card";
+import { postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { openRoom } from "../open-room";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
@@ -497,20 +497,10 @@ export function FlarePostScreen({ postId }: { postId: string }) {
           </Tap>
         ) : null}
 
-        {post.store ? null : (
-          <>
-            <FlareActions
-              yours={post.yours}
-              direction={direction}
-              completed={post.completed ?? false}
-              onOffer={() => setCardsSheet({ ...sheetPost, mode: "offer" })}
-              cardCount={total}
-            />
-            {!post.yours && direction === "want" && !post.completed ? (
-              <Muted>Tap a card to offer it, or offer several at once.</Muted>
-            ) : null}
-          </>
-        )}
+        {/* No offer button, as on the Feed: a card's tap is the offer. */}
+        {!post.store && !post.yours && direction === "want" && !post.completed ? (
+          <Muted>Tap a card to offer it.</Muted>
+        ) : null}
 
         <PostSocialRow
           likes={post.likes}

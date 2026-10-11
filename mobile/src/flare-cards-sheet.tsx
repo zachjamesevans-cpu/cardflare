@@ -16,7 +16,6 @@ import { SwipeToClose } from "./sheet-swipe";
 import { getPost, type FeedCard } from "./api";
 import { copiesOf, remainingOf } from "./flare-deck-pager";
 import { availableLabel, cardsLabel, GONE_LABEL, printingLabel } from "./flare-copy";
-import { offerLabel } from "./flare-feed-card";
 import { reviewLabel, selectionSummary, wantsLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
@@ -415,4 +414,13 @@ export function FlareCardsSheet({
       </KeyboardAvoidingView>
     </Modal>
   );
+}
+
+/**
+ * The sheet's pick button. It was "Offer cards", which read like
+ * posting a listing of your own; it now speaks the way each row's
+ * toggle does ("I have this card").
+ */
+function offerLabel(cardCount: number): string {
+  return cardCount === 1 ? "I have it" : "I have these";
 }

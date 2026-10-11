@@ -146,66 +146,6 @@ export function FlareStatus({
 }
 
 /**
- * The one button under a post's cards, decided by whose post it is and
- * which way it points. Shared with the post's own screen so the two
- * never offer different things.
- */
-export function FlareActions({
-  yours,
-  direction,
-  completed,
-  onOffer,
-  cardCount,
-  compact = false,
-}: {
-  yours: boolean;
-  direction: "want" | "showcase";
-  completed: boolean;
-  onOffer?: () => void;
-  /** How many cards the post asks for: "I have it" for one. */
-  cardCount: number;
-  /** The Feed's pill at the end of the social row, not a full button. */
-  compact?: boolean;
-}) {
-  if (direction === "showcase") return null;
-  /* Your own post has no button here: "Update progress" waits behind
-     the three dots in the corner, with the full list. */
-  if (yours) return null;
-  /* Nothing left to offer on, and no row saying so: the status line at
-     the top already reads "found it". */
-  if (completed) return null;
-  if (!onOffer) return null;
-  const label = offerLabel(cardCount);
-  if (!compact) return <Button label={label} onPress={onOffer} />;
-  return (
-    <Tap
-      onPress={onOffer}
-      accessibilityLabel={label}
-      style={{
-        backgroundColor: colors.accent,
-        borderRadius: 999,
-        paddingHorizontal: spacing(3.5),
-        minHeight: 34,
-        justifyContent: "center",
-      }}
-    >
-      <Text style={{ color: colors.accentContrast, fontSize: 14, fontWeight: "700" }}>
-        {label}
-      </Text>
-    </Tap>
-  );
-}
-
-/**
- * The offer button's words. It was "Offer cards", which read like
- * posting a listing of your own; the viewer and the full list already
- * say "I have this card", so the post says the same thing.
- */
-export function offerLabel(cardCount: number): string {
-  return cardCount === 1 ? "I have it" : "I have these";
-}
-
-/**
  * What waits behind the three dots: the full list when there is more
  * than one card, the progress ticks on your own want, and last, on
  * your own post whichever way it points, "Take down". Shared with the
@@ -297,7 +237,6 @@ export function FlareFeedCard({
   onOpenThread,
   onMessage,
   onEnterRoom,
-  onOffer,
   onViewAll,
   onProgress,
   onTakeDown,
@@ -318,8 +257,6 @@ export function FlareFeedCard({
   /** Absent on your own post: there is nobody to message. */
   onMessage?: () => void;
   onEnterRoom: (code: string) => void;
-  /** "Offer cards": the full list, in select mode. Never shown to the owner. */
-  onOffer?: () => void;
   /** "View all 3": the full list, to read. */
   onViewAll?: () => void;
   /** "Update progress", on your own post. */
@@ -367,6 +304,7 @@ export function FlareFeedCard({
         borderWidth: 1,
         borderRadius: radius.panel,
         padding: spacing(3),
+        paddingBottom: spacing(2),
         gap: spacing(2.5),
       }}
     >
@@ -641,17 +579,10 @@ export function FlareFeedCard({
         </View>
       ) : null}
 
+      {/* No offer button: a tap on any card opens the zoom with "I have
+          this card" in it, as on compact. The founder: "no need for i
+          have these button at all". */}
       <PostSocialRow
-        trailing={
-          <FlareActions
-            yours={item.yours}
-            direction={direction}
-            completed={completed}
-            onOffer={onOffer}
-            cardCount={item.total}
-            compact
-          />
-        }
         likes={item.likes ?? 0}
         liked={item.liked ?? false}
         comments={item.comments ?? 0}

@@ -1503,11 +1503,6 @@ export function HomeScreen() {
                           })
                   }
                   onEnterRoom={(code) => void enter(code)}
-                  onOffer={
-                    item.yours
-                      ? undefined
-                      : () => setCardsSheet({ ...sheetPost(item), mode: "offer" })
-                  }
                   onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
                   onProgress={
                     item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
