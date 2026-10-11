@@ -45,6 +45,8 @@ interface UpcomingFields {
   nextEventCode: string | null;
   timeZone: string;
   walkIn: boolean;
+  /** You said you are going: the night leads "Coming up". */
+  youGoing?: boolean;
 }
 interface NearbyStoresFields {
   kind: "nearbyStores";
@@ -92,6 +94,8 @@ export function planNearby<Item extends { kind: string }>(
   let ask: Item | null = null;
   const lead: Item[] = [];
   const around: Item[] = [];
+  const going: Item[] = [];
+  const nights: Item[] = [];
   const after: Item[] = [];
   const stores: StoreTile[] = [];
   const seen = new Set<string>();
@@ -146,8 +150,10 @@ export function planNearby<Item extends { kind: string }>(
           code: upcoming.nextEventCode ?? upcoming.joinCode,
         });
         /* A night on the calendar keeps its card, with Going on it; a
-           store that only takes walk-ins is just its tile now. */
-        if (upcoming.nextEventAt) after.push(item);
+           store that only takes walk-ins is just its tile now. The
+           nights you said you are going to lead, as the Rooms tab's
+           Going list did before Nearby took its slot. */
+        if (upcoming.nextEventAt) (upcoming.youGoing ? going : nights).push(item);
         break;
       }
       case "nearbyStores": {
@@ -175,5 +181,10 @@ export function planNearby<Item extends { kind: string }>(
     }
   }
 
-  return { ask, before: [...lead, ...around], after, stores };
+  return {
+    ask,
+    before: [...lead, ...around],
+    after: [...going, ...nights, ...after],
+    stores,
+  };
 }

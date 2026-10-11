@@ -53,6 +53,16 @@ describe("the Nearby tab's layout", () => {
     ]);
   });
 
+  it("leads Coming up with the nights you said you are going to", () => {
+    const night = (storeId: string, youGoing: boolean) =>
+      item({ ...(upcoming(storeId, "2026-10-17T02:00:00Z") as object), youGoing });
+    const plan = planNearby([night("maybe", false), night("going", true)]);
+    expect(plan.after.map((each) => (each as { storeId: string }).storeId)).toEqual([
+      "going",
+      "maybe",
+    ]);
+  });
+
   it("shows a room open at your store as live, and drops rooms far away", () => {
     const board = (yours: boolean) =>
       item({

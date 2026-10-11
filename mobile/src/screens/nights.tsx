@@ -448,8 +448,8 @@ export function NightsScreen() {
                 variant="secondary"
                 onPress={() =>
                   navigation.navigate("Tabs", {
-                    screen: "Feed",
-                    params: { tab: "nearby", at: Date.now() },
+                    screen: "Nearby",
+                    params: { at: Date.now() },
                   })
                 }
               />

@@ -57,8 +57,8 @@ import { FlareFeedCardCompact } from "../flare-feed-card-compact";
 import { feedViewFrom } from "../feed-views";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { FlareProgressSheet } from "../flare-progress-sheet";
-import { FEED_TABS, FeedFilterTabs } from "../feed-filter-tabs";
-import { FeedPager } from "../feed-pager";
+
+import { NightsCodeButton } from "./nights";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { SharePostSheet, type SharedPost } from "../share-post-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
@@ -390,27 +390,21 @@ interface CachedFeed {
   items: FeedEntry[];
 }
 
-export function HomeScreen() {
+export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
   /* What is on at the places you go, and who needs what you have. The
      website's Feed, from the same server answer. */
   const [feed, setFeed] = useState<FeedEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  /* Following | Nearby. The server files every item under one; an older
-     server that sent no `tab` shows everything on each. */
-  const [tab, setTab] = useState<FeedTab>("following");
+  /* Which half of the server's feed this screen is: the Feed tab draws
+     Following, the Nearby tab draws Nearby. They were two tabs at the
+     top of one screen until Nearby took the Rooms slot in the bar; the
+     founder: "this nearby feature, if it works, could be extremely
+     helpful for people looking for cards." */
+  const tab: FeedTab = mode;
   /* Nearby's reach in miles, from the server; null until it says. */
   const [nearbyMiles, setNearbyMiles] = useState<number | null>(null);
-  /* Another screen asking for a tab - Nights' "Find stores near you"
-     lands on Nearby. The tab stays mounted, so this follows the
-     param rather than reading it once. */
-  const askedFor = useRoute<RouteProp<TabParams, "Feed">>().params;
-  const asked = askedFor?.tab;
-  const askedAt = askedFor?.at;
-  useEffect(() => {
-    if (asked) setTab(asked);
-  }, [asked, askedAt]);
   /* How this player wants the Feed drawn. Anything this build does not
      recognise reads as the original card - see feedViewFrom. */
   const view = feedViewFrom(me?.player.feedView);
@@ -1737,6 +1731,19 @@ export function HomeScreen() {
             })}
             {/* No nights after the posts: the store row closes the tab. */}
             {plan && storeAt >= shown.length ? storeRow : null}
+            {/* The Rooms screen lost its slot in the bar, not its door:
+                every night, Going, Nearby and Past, from here. */}
+            {plan ? (
+              <Tap
+                onPress={() => navigation.navigate("Tabs", { screen: "Nights" })}
+                accessibilityLabel="All nights"
+                style={{ alignSelf: "flex-start" }}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>
+                  All nights ›
+                </Text>
+              </Tap>
+            ) : null}
 
             {/*
              * The explainer, for a screen that has not filled up yet.
@@ -1803,6 +1810,9 @@ export function HomeScreen() {
         /* No + for a guest: posting needs an account, and a button that
            only says so is a dead end at the top of the first screen. */
         onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}
+        /* Nearby's top left is the way into a store's room - Scan QR or
+           Enter event code - which lived on the Rooms tab it replaced. */
+        left={tab === "nearby" ? <NightsCodeButton /> : undefined}
         onInbox={guest ? toSignUp : () => navigation.navigate("Inbox")}
         unread={unread}
       />
@@ -1881,16 +1891,13 @@ export function HomeScreen() {
             never joined by itself (src/youre-here.tsx). */}
         <YoureHereBanner />
 
-        {/* The three filters, first thing under the wordmark. */}
-        {guest ? null : <FeedFilterTabs value={tab} onChange={setTab} />}
-
         {/*
          * A guest's first screen says what this is and offers the two
          * real ways in: an account, or the code at a store's counter
          * (rooms work without one). The sample below is what people
          * are posting, read-only.
          */}
-        {guest ? (
+        {guest && tab === "following" ? (
           <Card>
             <Title>How cardflare works</Title>
             <Body>
@@ -1952,19 +1959,9 @@ export function HomeScreen() {
             </View>
           </Tap>
         )}
-        {/* Following | Nearby as pages, swiped left and right; a guest
-            has no tabs and reads the one sample list. */}
-        {guest ? (
-          tabContent("following")
-        ) : (
-          <FeedPager
-            tabs={FEED_TABS}
-            active={tab}
-            onChange={setTab}
-            render={tabContent}
-            gutter={gutter}
-          />
-        )}
+        {/* This screen's half of the feed; a guest reads the one sample
+            list on either. */}
+        {tabContent(guest ? "following" : tab)}
 
         {/* The paper plane: send the post to people you follow, the way
             Instagram's share sheet does. It used to open a note to the

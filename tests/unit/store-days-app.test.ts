@@ -144,8 +144,9 @@ describe("the API client", () => {
 describe("the Rooms tab", () => {
   it("is labelled Rooms with a storefront, on the Nights route", () => {
     expect(src.root).toContain('name="Nights"');
+    /* No slot in the bar since Nearby took it; the route still answers. */
     expect(src.root).toMatch(
-      /options=\{\{\s*title: "Rooms",\s*tabBarLabel: "Rooms",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*\}\}/,
+      /options=\{\{\s*title: "Rooms",\s*tabBarLabel: "Rooms",\s*headerRight: \(\) => <NightsCodeButton \/>,\s*tabBarItemStyle: \{ display: "none" \},\s*\}\}/,
     );
     expect(src.root).toContain(
       'Nights: { idle: "storefront-outline", focused: "storefront" }',
@@ -277,8 +278,13 @@ describe("the Feed", () => {
     expect(src.home).toMatch(/item\.topic === "store"\s*\?\s*openPlanVisit\(\)/);
   });
 
-  it("wears the You're-here banner at the top, above the filters", () => {
-    expectInOrder(src.home, ["<YoureHereBanner />", "<FeedFilterTabs"], "the Feed");
+  it("wears the You're-here banner at the top, above the list", () => {
+    /* No filters under the wordmark any more: Nearby is its own tab. */
+    expectInOrder(
+      src.home,
+      ["<YoureHereBanner />", '{tabContent(guest ? "following" : tab)}'],
+      "the Feed",
+    );
   });
 });
 

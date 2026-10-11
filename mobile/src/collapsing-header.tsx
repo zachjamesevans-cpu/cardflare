@@ -1,4 +1,5 @@
 import { BlurView } from "expo-blur";
+import type { ReactNode } from "react";
 import { Image, type ViewStyle } from "react-native";
 import Animated, {
   interpolate,
@@ -149,6 +150,7 @@ export function settleHeader(state: HeaderScroll): void {
 export function CollapsingHeader({
   state,
   onPost,
+  left,
   onInbox,
   unread,
 }: {
@@ -158,6 +160,8 @@ export function CollapsingHeader({
    * Absent for a guest, who has no account to post with.
    */
   onPost?: () => void;
+  /** Something else for the top left, in place of the +: Nearby's QR. */
+  left?: ReactNode;
   /** The bell: the notices, which used to be the Inbox tab. */
   onInbox: () => void;
   /** Unread notices; above zero, the bell wears the accent dot. */
@@ -269,9 +273,10 @@ export function CollapsingHeader({
             contents,
           ]}
         >
-          {onPost ? (
-            <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
-          ) : null}
+          {left ??
+            (onPost ? (
+              <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+            ) : null)}
         </Animated.View>
 
         {/*
