@@ -52,6 +52,8 @@ import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
+import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
+import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
 import { NightMatchesScreen } from "./src/screens/night-matches";
@@ -214,6 +216,8 @@ export type StackParams = {
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
+  /** Demo mode's shot list: development builds only (src/demo/demo-mode.ts). */
+  DemoShots: undefined;
   /** The Embers store, the website's /profile/store. */
   Store: undefined;
   /** Getting dressed, the website's /profile/customize. Two wands, two
@@ -932,6 +936,14 @@ function AppGates() {
           void Notifications.getLastNotificationResponseAsync()
             .then(openNotificationLink)
             .catch(() => {});
+          /* Demo mode's queued shot, development builds only: launch
+             straight onto one screen of the shot list. */
+          if (__DEV__) {
+            void takeQueuedShot().then((index) => {
+              const shot = index === null ? undefined : SHOTS[index];
+              if (shot) setTimeout(() => shot.go(navigationRef as never), 600);
+            });
+          }
         }}
       >
         <StatusBar style="light" />
@@ -1020,6 +1032,13 @@ function AppGates() {
               name="Lab"
               component={LabScreen}
               options={{ title: "Design lab" }}
+            />
+          ) : null}
+          {__DEV__ ? (
+            <Stack.Screen
+              name="DemoShots"
+              component={DemoShotsScreen}
+              options={{ title: "Demo mode" }}
             />
           ) : null}
           <Stack.Screen

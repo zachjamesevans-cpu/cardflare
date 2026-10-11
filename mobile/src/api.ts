@@ -6,6 +6,8 @@ import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
+import { demoReady, demoOn } from "./demo/demo-mode";
+import { demoAnswer, demoSaw } from "./demo/demo-server";
 import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
@@ -539,6 +541,19 @@ async function call<T>(
      probe below has seen a body arrive on this network. */
   asBody = false,
 ): Promise<T> {
+  /*
+   * Demo mode, in a development build only: the phone answers itself
+   * and no write ever leaves it. A read it has not scripted still goes
+   * out below, and what comes back is noted for the writes that need
+   * it (src/demo/demo-mode.ts).
+   */
+  await demoReady();
+  const demo = demoOn();
+  if (demo) {
+    const answer = demoAnswer(method, path, body);
+    if (answer) return answer.value as T;
+  }
+
   const headers: Record<string, string> = {};
 
   const access = await freshAccessToken();
@@ -621,11 +636,13 @@ async function call<T>(
   /* A 200 that is not JSON is a captive portal or a CDN error page,
      not our server. Named, so the screen says "bad-json" rather than
      "JSON Parse error: Unexpected character: <". */
+  let parsed: T;
   try {
-    return (await response.json()) as T;
+    parsed = (await response.json()) as T;
   } catch {
     throw new ApiError(response.status, "bad-json");
   }
+  return demo ? (demoSaw(method, path, parsed) as T) : parsed;
 }
 
 /* ------------------------------------------------------------------ */

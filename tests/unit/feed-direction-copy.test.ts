@@ -20,8 +20,27 @@ describe("which way a Flare points", () => {
     const card = read("src/components/feed/flare-feed-card.tsx");
     expect(card).toContain('"is looking for"');
     expect(card).toContain('"is offering"');
-    expect(card).not.toMatch(/hunting/i);
+    /* "Hunting" is no direction word: it says only that the post went up
+       in a named hunt, with the name after it. The founder (2026-10-11):
+       "soupie posted 17 cards to her ace hunt. but it just says 'is
+       looking for' with a little tiny ace 'view hunt' button below". */
+    expect(card).toContain('return item.hunt ? "is hunting" : "is looking for"');
+    /* Never the old direction words: a want is not "hunting for" a card. */
+    expect(card).not.toMatch(/hunting for|"Hunting"|is hunted/i);
+    expect(card).not.toContain("View hunt</");
     expect(card).not.toContain('"Want"');
+  });
+
+  it("names the hunt in the status line, on both platforms", () => {
+    const app = read("mobile/src/flare-feed-card.tsx");
+    expect(app).toContain('return item.hunt ? "is hunting" : "is looking for"');
+    /* The tiny row under the cards is gone from both. */
+    expect(app).not.toContain("· View hunt");
+    expect(read("mobile/src/screens/flare-post.tsx")).not.toContain("· View hunt");
+    expect(app).toContain("hunt={item.hunt}");
+    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
+      "hunt={item.hunt}",
+    );
   });
 
   it("says it once, in the status line, on both platforms", () => {

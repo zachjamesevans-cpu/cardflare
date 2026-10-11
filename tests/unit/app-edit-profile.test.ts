@@ -146,7 +146,8 @@ describe("a finished post", () => {
     );
     expect(status).toContain('return "offered it all"');
     expect(status).toMatch(/=== 1\s*\? "found it"\s*: "found them all"/);
-    expect(status).toContain('"is offering" : "is looking for"');
+    expect(status).toContain('if (offering) return "is offering"');
+    expect(status).toContain('return item.hunt ? "is hunting" : "is looking for"');
   });
 
   it("swaps the crosshair for a check and drops the glow", () => {

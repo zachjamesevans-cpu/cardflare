@@ -177,7 +177,19 @@ describe("swiping a zoomed card", () => {
     expect(zoom).toMatch(
       /styles\.title,\s*\{ textAlign: "center", paddingHorizontal: spacing\(9\) \}/,
     );
-    expect(zoom).toMatch(/styles\.muted, \{ textAlign: "center" \}/);
+    expect(zoom).toMatch(
+      /styles\.muted,\s*\{ textAlign: "center", paddingHorizontal: spacing\(9\) \}/,
+    );
+  });
+
+  it("holds the panel still while the shelf is swiped", () => {
+    /* "when swiping between cards in this view, the top and bottom of
+       the 'block' can sometimes shift in height depending on the card
+       name, which is kinda disorienting." One line each above the card,
+       the status line held on every card, the space under it sticky. */
+    expect(zoom).toContain("statusOnShelf");
+    expect(zoom).toContain("minHeight: belowMin");
+    expect(zoom).toContain("setBelowMin((current) => Math.max(current, height))");
   });
 
   it("still closes on a tap anywhere, including on the card", () => {

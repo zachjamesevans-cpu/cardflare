@@ -25,11 +25,17 @@ import { BRAND, colors } from "./theme";
  * renders taller than the letters look; 24 points puts the lettering
  * where the old 20-point text sat.
  */
-/* "soft": the founder's CF mark, flat, no glow; "lime": the glowing
-   wordmark it replaced. See BRAND in theme.ts. */
+/* "soft": the founder's flat "cardflare" wordmark (2026-10-11, "make
+   this a png and make it the new header on the feed"), cut off its
+   ground in the accent, no glow; it took the place of the CF mark the
+   header wore before. "lime": the glowing wordmark. See BRAND in
+   theme.ts. The cut-out is cropped close, so its height is the
+   letters' own; 20 sits it level with the + and the bell. */
 const wordmark =
-  BRAND === "soft" ? require("../assets/cf-mark.png") : require("../assets/wordmark.png");
-const WORDMARK_HEIGHT = BRAND === "soft" ? 22 : 24;
+  BRAND === "soft"
+    ? require("../assets/wordmark-soft.png")
+    : require("../assets/wordmark.png");
+const WORDMARK_HEIGHT = BRAND === "soft" ? 20 : 24;
 const WORDMARK_SOURCE = Image.resolveAssetSource(wordmark);
 const WORDMARK_ASPECT = WORDMARK_SOURCE.width / WORDMARK_SOURCE.height;
 

@@ -896,6 +896,23 @@ export function CardImage({
   const youHave = shown ? (shown.youHave ?? null) : ownYouHave;
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
+
+  /* What keeps the panel one size while the shelf is swiped: the status
+     line held on every card if any card has one, and the space under
+     the picture never shrinking while the viewer is open. */
+  const statusOnShelf = Boolean(
+    shelf?.some((card) => card.lookingFor != null || card.youHave),
+  );
+  const hasBelow = Boolean(
+    offer || have || Object.keys(picks).length > 0 || note || terms || pledges.length,
+  );
+  const belowOnShelf = Boolean(
+    shelf?.some(
+      (card) =>
+        card.have || card.offer || card.note || card.terms || card.pledges?.length,
+    ),
+  );
+  const [belowMin, setBelowMin] = useState(0);
   /* Every card of a post carries the same door, so a card with nothing
      to offer (found, already yours) can still open the review for the
      cards added elsewhere on the shelf. */
@@ -954,6 +971,7 @@ export function CardImage({
       if (!owned) setOwnPicks({});
       setReviewing(false);
       setSent(null);
+      setBelowMin(0);
       after?.();
     });
   };
@@ -1156,11 +1174,26 @@ export function CardImage({
                 ]}
               >
                 <Pressable style={{ alignSelf: "stretch" }} onPress={close}>
-                  {/* Centred over the card they name. The founder: "center
-                    the text. so, for example, fire first and op15-020
-                    should be centered on that screen." Only these two -
-                    a note runs to several lines and centred prose is
-                    harder to read than the tidiness is worth. */}
+                  {/*
+                   * THREE LINES, CENTRED, THE SAME THREE ON EVERY CARD.
+                   *
+                   * Centred over the card they name. The founder: "center
+                   * the text. so, for example, fire first and op15-020
+                   * should be centered on that screen." Then, of the line
+                   * under them: "'you have this'. but it's not really
+                   * centered with anything", and of swiping: "the top and
+                   * bottom of the 'block' can sometimes shift in height
+                   * depending on the card name, which is kinda
+                   * disorienting".
+                   *
+                   * So the name, the number and the status are one line
+                   * each and never wrap, and the status line holds its
+                   * place on every card of the shelf if any card has one.
+                   * Anything that runs long or only some cards carry -
+                   * a note, pledges, terms - sits under the picture,
+                   * where the space is reserved (`belowMin`). The card
+                   * stays still; only the words on it change.
+                   */}
                   {/* Padded clear of the close in the corner. */}
                   <Text
                     style={[
@@ -1171,80 +1204,63 @@ export function CardImage({
                   >
                     {name}
                   </Text>
-                  <Text style={[styles.muted, { textAlign: "center" }]}>
+                  <Text
+                    style={[
+                      styles.muted,
+                      { textAlign: "center", paddingHorizontal: spacing(9) },
+                    ]}
+                    numberOfLines={1}
+                  >
                     {cardNumber}
                     {caption ? ` · ${caption}` : ""}
                   </Text>
-                  {/* Said in words here even though the tile draws it as a
-                    stack, for anyone who cannot read the layers. Both
-                    truths when hands are up: the ask, and the gap. */}
-                  {lookingFor != null ? (
-                    <Text style={styles.zoomLooking}>
-                      {direction === "showcase"
-                        ? lookingFor === 1
-                          ? "Offering this"
-                          : `Offering ${lookingFor}`
-                        : `Looking for ${lookingFor}${
-                            stillNeeds != null && stillNeeds !== lookingFor
-                              ? stillNeeds === 0
-                                ? " · all spoken for"
-                                : ` · still needs ${stillNeeds}`
-                              : ""
-                          }`}
-                    </Text>
-                  ) : null}
-                  {/* Who is bringing what - the founder's ask: tap the
-                    card, see "Kaito is bringing 3". */}
-                  {pledges.map((pledge, index) => (
-                    <Text
-                      key={index}
-                      style={{
-                        color: colors.textSecondary,
-                        fontSize: 13,
-                        marginTop: 2,
-                      }}
-                    >
-                      <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-                        {pledge.name}
-                      </Text>
-                      {` is bringing ${pledge.quantity}`}
-                    </Text>
-                  ))}
-                  {terms ? <Text style={styles.zoomLooking}>{terms}</Text> : null}
-                  {/* Your own binder's answer, in the same green the ring on
-                    the tile is drawn in. Same three phrases as the web. */}
-                  {youHave ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(1),
-                        marginTop: 2,
-                      }}
-                    >
-                      <MaterialCommunityIcons
-                        name={
-                          youHave.kind === "exact"
-                            ? "package-variant-closed-check"
-                            : "layers-outline"
-                        }
-                        size={15}
-                        color={colors.success}
-                      />
-                      <Text
-                        style={{
-                          color: colors.success,
-                          fontSize: 13,
-                          fontWeight: "600",
-                        }}
-                      >
-                        {youHaveLabel(youHave.kind, youHave.count)}
-                      </Text>
+                  {/*
+                   * THE STATUS LINE: the ask, and your own binder's answer,
+                   * side by side and centred. "You have this" was a row of
+                   * its own, left-aligned under centred lines, in a green
+                   * the ring on the tile is not drawn in; now it is the
+                   * ring's accent, after a dot. Said in words even though
+                   * the tile draws it, for anyone who cannot read the
+                   * ring. Same three phrases as the web.
+                   */}
+                  {lookingFor != null || youHave || statusOnShelf ? (
+                    <View style={styles.zoomStatus}>
+                      {lookingFor != null ? (
+                        <Text style={styles.zoomLooking} numberOfLines={1}>
+                          {direction === "showcase"
+                            ? lookingFor === 1
+                              ? "Offering this"
+                              : `Offering ${lookingFor}`
+                            : `Looking for ${lookingFor}${
+                                stillNeeds != null && stillNeeds !== lookingFor
+                                  ? stillNeeds === 0
+                                    ? " · all spoken for"
+                                    : ` · still needs ${stillNeeds}`
+                                  : ""
+                              }`}
+                        </Text>
+                      ) : null}
+                      {lookingFor != null && youHave ? (
+                        <Text style={styles.zoomLooking}>·</Text>
+                      ) : null}
+                      {youHave ? (
+                        <>
+                          <MaterialCommunityIcons
+                            name={
+                              youHave.kind === "exact"
+                                ? "package-variant-closed-check"
+                                : "layers-outline"
+                            }
+                            size={14}
+                            color={colors.accent}
+                          />
+                          <Text style={styles.zoomLooking} numberOfLines={1}>
+                            {youHaveLabel(youHave.kind, youHave.count)}
+                          </Text>
+                        </>
+                      ) : null}
                     </View>
                   ) : null}
-                  {/* The tile has no room for the note; the zoom is where
-                    it gets read. */}
-                  {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
 
                   {/*
                    * NOTHING BUT THE CARDS.
@@ -1445,21 +1461,58 @@ export function CardImage({
                     )}
                   </Pressable>
                 )}
-                {/* Last, under the picture, where the thumb is. Keyed on
-                    the shelf position so a half-typed note does not ride
-                    along to the next card. */}
-                {offer ? (
-                  <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
-                ) : null}
-                {have || Object.keys(picks).length > 0 ? (
-                  <ZoomHaveForm
-                    key={`have-${shelf ? at : "own"}`}
-                    have={have}
-                    picks={picks}
-                    onPicks={setPicks}
-                    sent={sent}
-                    onReview={() => setReviewing(true)}
-                  />
+                {/*
+                 * UNDER THE PICTURE: what only some cards carry, then the
+                 * forms, where the thumb is.
+                 *
+                 * Its height only ever grows while the viewer is open
+                 * (`belowMin`), so swiping from a card with a note and a
+                 * button to one with neither leaves the panel the size it
+                 * was instead of snapping it shorter - the panel is
+                 * centred, so a change here moved its top as well.
+                 */}
+                {belowOnShelf || hasBelow ? (
+                  <View
+                    style={[styles.zoomBelow, { minHeight: belowMin }]}
+                    onLayout={(event) => {
+                      const height = Math.ceil(event.nativeEvent.layout.height);
+                      setBelowMin((current) => Math.max(current, height));
+                    }}
+                  >
+                    {/* Who is bringing what - the founder's ask: tap the
+                      card, see "Kaito is bringing 3". */}
+                    {pledges.map((pledge, index) => (
+                      <Text key={index} style={styles.zoomPledge}>
+                        <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                          {pledge.name}
+                        </Text>
+                        {` is bringing ${pledge.quantity}`}
+                      </Text>
+                    ))}
+                    {terms ? (
+                      <Text style={[styles.zoomLooking, { textAlign: "center" }]}>
+                        {terms}
+                      </Text>
+                    ) : null}
+                    {/* The tile has no room for the note; the zoom is where
+                      it gets read. */}
+                    {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
+                    {/* Keyed on the shelf position so a half-typed note
+                      does not ride along to the next card. */}
+                    {offer ? (
+                      <ZoomOfferForm key={shelf ? at : "own"} offer={offer} />
+                    ) : null}
+                    {have || Object.keys(picks).length > 0 ? (
+                      <ZoomHaveForm
+                        key={`have-${shelf ? at : "own"}`}
+                        have={have}
+                        picks={picks}
+                        onPicks={setPicks}
+                        sent={sent}
+                        onReview={() => setReviewing(true)}
+                      />
+                    ) : null}
+                  </View>
                 ) : null}
                 {/*
                  * A quiet X in the corner, last so it sits over the title.
@@ -1858,12 +1911,31 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontStyle: "italic",
-    marginTop: spacing(1),
+    textAlign: "center",
   },
   zoomLooking: {
     color: colors.accent,
     fontSize: 13,
     fontWeight: "600",
+    flexShrink: 1,
+  },
+  /* One line, centred, its height held even when it is empty. */
+  zoomStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(1),
+    minHeight: 18,
     marginTop: spacing(1),
+    paddingHorizontal: spacing(2),
+  },
+  zoomBelow: {
+    alignSelf: "stretch",
+    gap: spacing(2),
+  },
+  zoomPledge: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    textAlign: "center",
   },
 });

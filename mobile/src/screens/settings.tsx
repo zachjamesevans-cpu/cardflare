@@ -397,6 +397,20 @@ export function SettingsScreen() {
           />
         </Card>
       )}
+      {__DEV__ && (
+        <Card>
+          <Title>Demo mode</Title>
+          <Body>
+            Made-up people, posts and messages for screenshots, with a shot list.
+            Nothing you do in it reaches the server.
+          </Body>
+          <Button
+            label="Open demo mode"
+            variant="secondary"
+            onPress={() => navigation.navigate("DemoShots")}
+          />
+        </Card>
+      )}
 
       <AccountCard
         email={me?.player.email ?? null}
