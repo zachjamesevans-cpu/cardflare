@@ -742,6 +742,9 @@ const linking: LinkingOptions<StackParams> = {
     initialRouteName: "Tabs",
     screens: {
       Binder: "b/:binderId",
+      /* A shared post's line (post-link.ts), when it is tapped
+         somewhere other than a chat that draws it. */
+      FlarePost: "post/:postId",
     },
   },
 };

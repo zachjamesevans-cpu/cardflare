@@ -34,9 +34,6 @@ export async function GET(
 
 const sendSchema = z.object({
   body: z.string().trim().min(1).max(MESSAGE_MAX_LENGTH),
-  /* A post shared from the Feed's paper plane: its cards ride on the
-     message, drawn as the small cards a binder offer already shows. */
-  postId: z.string().uuid().optional(),
 });
 
 export async function POST(
@@ -57,9 +54,7 @@ export async function POST(
   if (!parsed.success) return badRequest("a message is needed");
 
   const { threadId } = await params;
-  const outcome = await sendThreadMessage(threadId, player.playerId, parsed.data.body, {
-    postId: parsed.data.postId,
-  });
+  const outcome = await sendThreadMessage(threadId, player.playerId, parsed.data.body);
 
   if (!outcome.ok) {
     const status = outcome.reason === "closed" ? 409 : 404;

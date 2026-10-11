@@ -20,6 +20,7 @@ import {
   sendLocalMessage,
 } from "./api";
 import { PlayerAvatar } from "./player-avatar";
+import { postLink } from "./post-link";
 import { SwipeToClose } from "./sheet-swipe";
 import { colors, radius, spacing } from "./theme";
 import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
@@ -36,14 +37,14 @@ import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
  * since each person gets their own conversation, not a group).
  *
  * Each send opens (or finds) the one-to-one conversation and posts the
- * note with the post's id; the server hangs the post's cards on the
- * message, so it arrives as the cards and the words. Search reaches past
- * the people you follow to anyone by name, as Instagram's does.
+ * note with the post's line under it (see post-link.ts); the chat draws
+ * that line as the post itself, a tap into it. With no note the post is
+ * the whole message, as on Instagram. Search reaches past the people you
+ * follow to anyone by name, as Instagram's does.
  */
 
 export interface SharedPost {
   postId: string;
-  /** Whose post it is, for the line a share with no note carries. */
   posterName: string;
   /** "Portgas.D.Ace" or the hunt's name: what the post is about. */
   subject: string;
@@ -56,11 +57,6 @@ interface Person {
   frame: string | null;
   ring?: string | null;
   aura?: string | null;
-}
-
-/** What a share says when the sender writes nothing. */
-export function shareLine(post: SharedPost): string {
-  return `${post.posterName}'s Flare: ${post.subject}`;
 }
 
 const FACE = 68;
@@ -140,13 +136,14 @@ export function SharePostSheet({
     if (picked.length === 0 || sending) return;
     setSending(true);
     setError(null);
-    const body = note.trim() || shareLine(post);
+    const link = postLink(post.postId);
+    const body = note.trim() ? `${note.trim()}\n${link}` : link;
     const missed: string[] = [];
     for (const person of picked) {
       try {
         const opened = await openDirectThread(person.playerId);
         if (!opened.ok || !opened.threadId) throw new Error("closed");
-        const answer = await sendLocalMessage(opened.threadId, body, post.postId);
+        const answer = await sendLocalMessage(opened.threadId, body);
         if (!answer.ok) throw new Error("unsent");
       } catch {
         missed.push(person.displayName);

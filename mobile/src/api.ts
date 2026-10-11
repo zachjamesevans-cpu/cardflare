@@ -4627,16 +4627,11 @@ export function threadTradeFailureMessage(caught: unknown): string {
   }
 }
 
-/**
- * One message into a conversation. `postId` is a post shared from the
- * Feed's paper plane: the server puts its cards on the message, and a
- * server that does not know the field yet sends the words alone.
- */
-export const sendLocalMessage = (threadId: string, body: string, postId?: string) =>
+export const sendLocalMessage = (threadId: string, body: string) =>
   call<{ ok: boolean }>(
     "POST",
     `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
-    postId ? { body, postId } : { body },
+    { body },
   );
 
 /**

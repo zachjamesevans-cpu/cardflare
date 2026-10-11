@@ -35,6 +35,7 @@ import {
   Title,
   type ZoomCard,
 } from "../ui";
+import { previewWithoutPostLink } from "../post-link";
 import { refreshTick } from "../refresh-tick";
 import { setUnreadMessages, totalUnread } from "../unread-messages";
 
@@ -441,7 +442,9 @@ function ThreadRow({ thread, onOpen }: { thread: LocalThread; onOpen: () => void
   const unread = thread.unread > 0;
   /* One line: a message can run to five now, and its line breaks would
      otherwise cut the preview off at the first of them. */
-  const preview = (thread.lastMessagePreview ?? "").replace(/\s+/g, " ").trim();
+  const preview = previewWithoutPostLink(
+    (thread.lastMessagePreview ?? "").replace(/\s+/g, " ").trim(),
+  );
   return (
     <Tap onPress={onOpen}>
       <View
