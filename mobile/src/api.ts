@@ -3504,6 +3504,8 @@ export type FeedSection =
      'following' there's a big gap? close that gap." */
   | "yours"
   | "people"
+  /* Posts by people near you that you do not follow: Nearby's heart. */
+  | "around"
   | "walkin"
   | "nearby"
   | "store";
@@ -3514,6 +3516,7 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   tonight: "Coming up",
   yours: "Your flares",
   people: "People you follow",
+  around: "Flares near you",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -3638,6 +3641,8 @@ export type FeedItem =
       youCanAnswer: number;
       /** The viewer's own post. */
       yours: boolean;
+      /** Somebody near you whom you do not follow: Nearby's post. */
+      around?: boolean;
     }
   /**
    * A store you have saved, with something to come.
@@ -3919,7 +3924,8 @@ export const getFeed = (coords?: { latitude: number; longitude: number } | null)
     ? `?lat=${encodeURIComponent(coords.latitude)}&lng=${encodeURIComponent(coords.longitude)}`
     : "";
 
-  return call<{ items: FeedEntry[] }>("GET", `/api/v1/feed${query}`);
+  /* `radius`: the Nearby tab's reach in miles; absent from an older server. */
+  return call<{ items: FeedEntry[]; radius?: number | null }>("GET", `/api/v1/feed${query}`);
 };
 
 /** A player found by name search: enough for a row and a door. */

@@ -32,6 +32,7 @@ import {
   belongsToTab,
   blockPlayer,
   getFeed,
+  setLocalRadius,
   sectionHeading,
   type FeedEntry,
   type FeedTab,
@@ -92,6 +93,8 @@ import {
   useHeaderScroll,
 } from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
+import { NearbyHeader, StoreRow } from "../nearby-parts";
+import { planNearby } from "../nearby-plan";
 import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
 import { VerifiedMark } from "../verified-mark";
@@ -397,6 +400,8 @@ export function HomeScreen() {
   /* Following | Nearby. The server files every item under one; an older
      server that sent no `tab` shows everything on each. */
   const [tab, setTab] = useState<FeedTab>("following");
+  /* Nearby's reach in miles, from the server; null until it says. */
+  const [nearbyMiles, setNearbyMiles] = useState<number | null>(null);
   /* Another screen asking for a tab - Nights' "Find stores near you"
      lands on Nearby. The tab stays mounted, so this follows the
      param rather than reading it once. */
@@ -679,6 +684,7 @@ export function HomeScreen() {
       if (alive()) {
         setFeed(fresh.items);
         setFeedFailed(false);
+        if (typeof fresh.radius === "number") setNearbyMiles(fresh.radius);
       }
 
       /* Written after a load that worked, so the cache can only ever
@@ -944,12 +950,38 @@ export function HomeScreen() {
    * of the pager, so each tab keeps its items and its place.
    */
   const tabContent = (tab: FeedTab) => {
-    const shown = shownFor(tab);
+    /* Nearby is laid out rather than listed: see nearby-parts.tsx. The
+       store row sits after the posts, before the nights. */
+    const all = shownFor(tab);
+    const plan = tab === "nearby" && !guest ? planNearby(all) : null;
+    const shown = plan
+      ? [...(plan.ask ? [plan.ask] : []), ...plan.before, ...plan.after]
+      : all;
+    const storeAt = plan ? (plan.ask ? 1 : 0) + plan.before.length : -1;
+    const storeRow = plan ? (
+      <StoreRow
+        stores={plan.stores}
+        bleed={gutter}
+        onOpen={(tile) => {
+          if (tile.storeId) navigation.navigate("StoreProfile", { storeId: tile.storeId });
+          else if (tile.code) void enter(tile.code);
+        }}
+      />
+    ) : null;
     const sectionsShown = new Set(shown.map((item) => item.section)).size;
     /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
     const shownKeys = feedKeys(shown);
     return (
       <View style={{ gap: spacing(4) }}>
+        {plan ? (
+          <NearbyHeader
+            miles={nearbyMiles}
+            onRadius={(miles) => {
+              setNearbyMiles(miles);
+              void setLocalRadius(miles).then(() => load(() => true));
+            }}
+          />
+        ) : null}
             {/*
              * The Feed leads. Everything here is derived - nobody posts to it -
              * so a pilot with six players still opens something worth reading.
@@ -1676,6 +1708,7 @@ export function HomeScreen() {
 
               return (
                 <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
+                  {index === storeAt ? storeRow : null}
                   {opensSection ? (
                     <Text
                       style={{
@@ -1702,6 +1735,8 @@ export function HomeScreen() {
                 </View>
               );
             })}
+            {/* No nights after the posts: the store row closes the tab. */}
+            {plan && storeAt >= shown.length ? storeRow : null}
 
             {/*
              * The explainer, for a screen that has not filled up yet.

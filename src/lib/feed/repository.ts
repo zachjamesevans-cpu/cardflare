@@ -26,7 +26,8 @@ import { listWants } from "@/lib/players/wants";
 import { originForPlayer } from "@/lib/players/location";
 import { storesNear } from "@/lib/stores/nearby";
 import { storePostsForFollowers } from "@/lib/stores/posts";
-import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
+import { milesApart, pointForPostalCode, zipsWithin, type Point } from "@/lib/geo/zip";
+import { DEFAULT_LOCAL_RADIUS, isLocalRadius, type LocalRadius } from "@/lib/local/shared";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { blockedSet } from "@/lib/players/safety";
@@ -384,6 +385,12 @@ export interface HuntItem {
    * live in one place.
    */
   yours: boolean;
+  /**
+   * Posted by somebody near you whom you do not follow: the Nearby
+   * tab's "Flares near you". The founder: "let's bring back nearby as
+   * a kinda flares near me vibe".
+   */
+  around?: boolean;
 }
 
 /**
@@ -827,7 +834,16 @@ async function embersBalance(playerId: string): Promise<number> {
  * than as an empty app.
  */
 export type FeedSection =
-  "wanted" | "tonight" | "yours" | "people" | "walkin" | "nearby" | "store";
+  | "wanted"
+  | "tonight"
+  | "yours"
+  | "people"
+  /* Posts by people near you that you do not follow: the Nearby tab's
+     "Flares near me". */
+  | "around"
+  | "walkin"
+  | "nearby"
+  | "store";
 
 /** The heading each section is drawn under, on both platforms. */
 export const SECTION_TITLES: Record<FeedSection, string> = {
@@ -835,6 +851,7 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   tonight: "Coming up",
   yours: "Your flares",
   people: "People you follow",
+  around: "Flares near you",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -865,8 +882,9 @@ function sectionFor(item: FeedItem): FeedSection {
     case "upcoming":
       return item.nextEventAt ? "tonight" : "walkin";
     case "hunt":
-      /* Your own post is not news about somebody else. */
-      return item.yours ? "yours" : "people";
+      /* Your own post is not news about somebody else; a post from
+         somebody near you that you do not follow is the Nearby tab's. */
+      return item.yours ? "yours" : item.around ? "around" : "people";
     /* A shop you follow, under the same heading as the people you
        follow: it is the same relationship, and the founder's whole
        point was that following a store should read like following a
@@ -912,6 +930,7 @@ function reasonFor(item: FeedItem): string {
       /* Drawn as a small label inside the post's header, never as a
          line between cards - the founder: "do not interrupt the feed
          with separate text between cards." */
+      if (item.around) return "Near you";
       return item.yours ? "Your Flare" : "Because you follow them";
     case "added":
       return "Because you follow them";
@@ -2241,6 +2260,102 @@ const NO_FACE: FeedFace = {
  * wears your ring and aura exactly as it does on everybody else's
  * screen.
  */
+/** How many strangers' posts the Nearby tab reads at most, by author. */
+const AROUND_AUTHORS = 20;
+/** Postal codes per query, the Local feed's own chunking. */
+const AROUND_ZIP_CHUNK = 150;
+
+/** The viewer's chosen reach for Nearby, 10/25/50/100 miles. */
+export async function feedRadiusFor(playerId: string): Promise<LocalRadius> {
+  const { data } = await getSupabaseAdmin()
+    .from("players")
+    .select("local_radius_miles")
+    .eq("id", playerId)
+    .maybeSingle();
+  const stored = data?.local_radius_miles ?? DEFAULT_LOCAL_RADIUS;
+  return isLocalRadius(stored) ? stored : DEFAULT_LOCAL_RADIUS;
+}
+
+/**
+ * The people posting near the viewer whom the viewer does not follow,
+ * as authors for the hunt builder: the Nearby tab's "Flares near you".
+ *
+ * Found the way the Local feed finds an area Flare - the radius turned
+ * into postal codes, Flares posted from them - newest poster first, and
+ * capped so one busy town cannot flood the tab. Nobody blocked either
+ * way, nobody already followed, never the viewer.
+ */
+async function nearbyAuthorsFor(
+  viewerId: string,
+  origin: Point | null,
+  exclude: Set<string>,
+): Promise<Map<string, FollowedPlayer>> {
+  const out = new Map<string, FollowedPlayer>();
+  if (!origin) return out;
+
+  const zips = zipsWithin(origin, await feedRadiusFor(viewerId));
+  if (zips.length === 0) return out;
+
+  const chunks: string[][] = [];
+  for (let at = 0; at < zips.length; at += AROUND_ZIP_CHUNK) {
+    chunks.push(zips.slice(at, at + AROUND_ZIP_CHUNK));
+  }
+  const [pages, blocked] = await Promise.all([
+    Promise.all(
+      chunks.map((chunk) =>
+        getSupabaseAdmin()
+          .from("flares")
+          .select("player_id, created_at")
+          .in("posted_postal_code", chunk)
+          .not("player_id", "is", null)
+          .is("event_id", null)
+          .eq("status", "open")
+          .in("intent", ["want", "showcase"])
+          .gte("created_at", since(FLARE_DAYS))
+          .order("created_at", { ascending: false })
+          .limit(RECENT_READ),
+      ),
+    ),
+    blockedSet(viewerId),
+  ]);
+
+  const newest = new Map<string, string>();
+  for (const page of pages) {
+    for (const row of page.data ?? []) {
+      const id = row.player_id as string | null;
+      if (!id || id === viewerId || exclude.has(id) || blocked.has(id)) continue;
+      const at = row.created_at as string;
+      if (!newest.has(id) || newest.get(id)! < at) newest.set(id, at);
+    }
+  }
+  const ids = [...newest.entries()]
+    .sort((a, b) => (a[1] < b[1] ? 1 : -1))
+    .slice(0, AROUND_AUTHORS)
+    .map(([id]) => id);
+  if (ids.length === 0) return out;
+
+  const [{ data: players }, faces] = await Promise.all([
+    getSupabaseAdmin().from("players").select("id, display_name").in("id", ids),
+    facesFor(ids),
+  ]);
+  for (const player of players ?? []) {
+    if (!player.display_name) continue;
+    const face = faces.get(player.id);
+    out.set(player.id, {
+      playerId: player.id,
+      displayName: player.display_name,
+      avatarUrl: face?.avatarUrl ?? null,
+      frame: face?.frame ?? null,
+      ring: face?.ring ?? null,
+      aura: face?.aura ?? null,
+      ringArt: null,
+      auraArt: null,
+      partners: false,
+    });
+  }
+  return out;
+}
+
 async function viewerAsAuthor(playerId: string): Promise<FollowedPlayer | null> {
   const [{ data }, faces] = await Promise.all([
     getSupabaseAdmin()
@@ -2797,6 +2912,17 @@ export async function listFeed(
      per-local like everything else. */
   const areaHunts = await areaHuntsFor(authors, playerId, held, origin);
 
+  /* And the posts of people near you whom you do not follow, for the
+     Nearby tab: the same builder, fed the authors found by distance. */
+  const aroundHunts = (
+    await areaHuntsFor(
+      await nearbyAuthorsFor(playerId, origin, new Set(authors.keys())),
+      playerId,
+      held,
+      origin,
+    )
+  ).map((hunt) => ({ ...hunt, around: true }));
+
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -2909,6 +3035,8 @@ export async function listFeed(
        it is the one item that can turn into a trade this week. */
     ...nearbyItems,
     ...wantedFromYou,
+    /* Flares near you, newest first: the heart of the Nearby tab. */
+    ...byPostedAt<HuntItem>(aroundHunts),
     ...notices.map((notice): AnnouncementItem => ({
       kind: "announcement",
       id: notice.id,

@@ -232,6 +232,7 @@ describe("how long a Flare stays in the Feed", () => {
       const window = read.slice(0, 900);
       expect(window).not.toContain("since(RECENT_DAYS)");
     }
-    expect(feed.match(/since\(FLARE_DAYS\)/g)).toHaveLength(4);
+    /* Five: the fifth finds who is posting near you, for Nearby. */
+    expect(feed.match(/since\(FLARE_DAYS\)/g)).toHaveLength(5);
   });
 });
