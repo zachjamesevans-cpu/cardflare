@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Crosshair, Pencil } from "lucide-react";
+import { Crosshair, Pencil } from "lucide-react";
 
 import {
   AddPocket,
@@ -96,7 +96,21 @@ export function HuntBinder({
    * of that is this screen's concern beyond the words.
    */
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
-  const cards = progress.cards.filter((card) => !removed.has(card.requestId));
+  /*
+   * Found cards last, on the last pages: the founder, "found cards in
+   * hunts need to filter to the bottom / last pages". Ordered by what
+   * the server last said (hunt.cards), not by a tick this second, so a
+   * card does not jump pages under the pointer; it moves on the
+   * refresh. Otherwise the server's order stands. The app does the same.
+   */
+  const foundBefore = new Set(
+    (hunt.cards ?? []).filter((card) => card.found).map((card) => card.requestId),
+  );
+  const cards = progress.cards
+    .filter((card) => !removed.has(card.requestId))
+    .map((card, at) => ({ card, at, done: foundBefore.has(card.requestId) }))
+    .sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)
+    .map(({ card }) => card);
   const offer = useHuntOffer(hunt, cards);
   const [at, setAt] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -270,7 +284,6 @@ export function HuntBinder({
       <div className="flex flex-wrap gap-2 tabular-nums">
         {neededCopies > 0 && foundCopies >= neededCopies ? (
           <span className="flex items-center gap-1 rounded-full border border-accent/35 bg-accent/10 px-3 py-1 text-[13px] font-bold text-accent">
-            <Check className="size-3.5" aria-hidden="true" />
             Complete
           </span>
         ) : (
@@ -581,11 +594,10 @@ function HuntPocket({
       dim={card.found}
     >
       {card.found ? (
-        <span
-          aria-label="Found"
-          className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-accent text-accent-contrast ring-1 ring-canvas/60"
-        >
-          <Check className="size-3" aria-hidden="true" />
+        /* The Feed's FOUND band (FeedTile), not a check: one way of
+           saying found across the product. */
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[9px] font-bold tracking-wider text-accent-contrast uppercase">
+          found
         </span>
       ) : card.needed > 1 ? (
         <span className="absolute right-1 bottom-1 rounded-full bg-canvas/85 px-1.5 py-px text-[9px] font-bold text-text-primary tabular-nums ring-1 ring-border-strong">

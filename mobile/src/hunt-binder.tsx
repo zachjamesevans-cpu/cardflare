@@ -64,8 +64,10 @@ import {
   Button,
   CardImage,
   ErrorLine,
+  FoundArt,
   Muted,
   SheetClose,
+  StateBand,
   Tap,
   Title,
   type ZoomCard,
@@ -131,9 +133,18 @@ export function HuntBinder({
    * what the server removes.
    */
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
-  const cards = (hunt.cards ?? []).filter(
-    (card) => !card.requestId || !removed.has(card.requestId),
-  );
+  /*
+   * Found cards last, on the last pages: the founder, "found cards in
+   * hunts need to filter to the bottom / last pages". Ordered by what
+   * the server last said, not by a tap this second, so a card marked
+   * found does not jump pages under the finger; it moves on the
+   * re-read. Otherwise the server's order stands (a stable sort).
+   */
+  const cards = (hunt.cards ?? [])
+    .filter((card) => !card.requestId || !removed.has(card.requestId))
+    .map((card, at) => ({ card, at, done: foundOf(card) >= neededOf(card) }))
+    .sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)
+    .map(({ card }) => card);
   const owner = ownerName ?? hunt.ownerName ?? "them";
 
   /*
@@ -417,7 +428,7 @@ export function HuntBinder({
       {/* The two numbers worth reading at a glance. */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
         {totalNeeded > 0 && totalFound >= totalNeeded ? (
-          <HuntPill icon="checkmark" label="Complete" strong />
+          <HuntPill label="Complete" strong />
         ) : (
           <HuntPill
             icon="locate-outline"
@@ -565,11 +576,15 @@ export function HuntBinder({
 }
 
 /**
- * A card the hunt wants, in its pocket. Found: dimmed, with a small
- * accent check at the top right. More than one copy wanted and not
+ * A card the hunt wants, in its pocket. Found: black and white with the
+ * green FOUND band at its foot, the same mark the Feed's cards wear -
+ * it used to be dimmed with a small check at the top right, and the
+ * founder: "make sure that it has the green found thing at bottom like
+ * there is elsewhere in the app ... see how there's also checkmarks
+ * here in this screen? delete those." More than one copy wanted and not
  * all found: a chip at the bottom right, found over needed. Otherwise
- * nothing on it. The owner's tap opens the progress sheet; a
- * visitor's opens the viewer, with the picks the hunt holds.
+ * nothing on it. The owner's tap opens the progress sheet; a visitor's
+ * opens the viewer, with the picks the hunt holds.
  */
 function HuntPocket({
   card,
@@ -603,28 +618,8 @@ function HuntPocket({
     <Pocket
       geometry={geometry}
       accessibilityLabel={pocketLabel(card.cardName, index, done ? ", found" : "")}
-      dimmed={done}
       corner={
         <>
-          {done ? (
-            <View
-              pointerEvents="none"
-              accessibilityLabel="All found"
-              style={{
-                position: "absolute",
-                top: 4,
-                right: 4,
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                backgroundColor: colors.accent,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="checkmark" size={12} color={colors.accentContrast} />
-            </View>
-          ) : null}
           {!done && needed > 1 ? (
             <View
               pointerEvents="none"
@@ -655,16 +650,30 @@ function HuntPocket({
           accessibilityLabel={`Update progress on ${card.cardName}`}
           style={{ width: inner, height: innerHeight }}
         >
-          <RemoteImage
-            uri={card.imageUrl}
-            contentFit="contain"
+          <View
             style={{
               width: inner,
               height: innerHeight,
               borderRadius: radius.control / 2,
-              backgroundColor: colors.canvas,
+              overflow: "hidden",
             }}
-          />
+          >
+            {done ? (
+              <FoundArt uri={card.imageUrl} width={inner} height={innerHeight} />
+            ) : (
+              <RemoteImage
+                uri={card.imageUrl}
+                contentFit="contain"
+                style={{
+                  width: inner,
+                  height: innerHeight,
+                  borderRadius: radius.control / 2,
+                  backgroundColor: colors.canvas,
+                }}
+              />
+            )}
+            {done ? <StateBand state="found" /> : null}
+          </View>
         </Tap>
       ) : (
         <CardImage
@@ -673,6 +682,7 @@ function HuntPocket({
           name={card.cardName}
           cardNumber={card.cardNumber}
           caption={card.printingLabel ?? null}
+          state={done ? "found" : "open"}
           lookingFor={needed}
           stillNeeds={Math.max(0, needed - found)}
           siblings={shelf}
@@ -908,7 +918,7 @@ function HuntPill({
   strong = false,
 }: {
   label: string;
-  icon?: "locate-outline" | "checkmark";
+  icon?: "locate-outline";
   strong?: boolean;
 }) {
   const tone = strong ? colors.accent : colors.textSecondary;

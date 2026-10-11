@@ -287,14 +287,14 @@ export function HuntRing({ found, needed }: { found: number; needed: number }) {
         )}
       </svg>
       <span className="absolute inset-0 flex items-center justify-center tabular-nums">
-        {complete ? (
-          <Check className="size-8 text-accent" aria-hidden="true" />
-        ) : (
-          <>
-            <span className="text-[22px] font-extrabold text-accent">{found}</span>
-            <span className="text-[15px] font-bold text-text-muted">/{needed}</span>
-          </>
-        )}
+        {/* No check when done: the ring says it by closing, all in the
+            accent. Found is said one way across the product. */}
+        <span className="text-[22px] font-extrabold text-accent">{found}</span>
+        <span
+          className={`text-[15px] font-bold ${complete ? "text-accent" : "text-text-muted"}`}
+        >
+          /{needed}
+        </span>
       </span>
     </div>
   );

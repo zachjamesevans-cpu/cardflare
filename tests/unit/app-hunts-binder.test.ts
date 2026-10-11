@@ -287,24 +287,22 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.page).not.toContain('label="Add cards"');
   });
 
-  it("dims a found pocket with a check, chips a partly found one, leaves the rest bare", () => {
+  it("marks a found pocket with the FOUND band, chips a partly found one, leaves the rest bare", () => {
     const pocket = between(
       src.page,
       "function HuntPocket(",
       "function HuntPocketSheet(",
     );
     expect(pocket).toContain("const done = found >= needed;");
-    expect(pocket).toContain("dimmed={done}");
-    expect(src.pockets).toContain("opacity: dimmed ? 0.5 : 1");
-    /* The check: accent, top right, only when done. */
-    const check = between(pocket, "{done ? (", ") : null}");
-    expect(check).toContain('accessibilityLabel="All found"');
-    expect(check).toContain("top: 4,");
-    expect(check).toContain("right: 4,");
-    expect(check).toContain("backgroundColor: colors.accent");
-    expect(check).toContain(
-      '<Ionicons name="checkmark" size={12} color={colors.accentContrast} />',
-    );
+    /* The founder: "make sure that it has the green found thing at
+       bottom like there is elsewhere in the app ... see how there's also
+       checkmarks here in this screen? delete those." Black and white
+       with the Feed's band; no check, no plain dimming. */
+    expect(pocket).toContain('{done ? <StateBand state="found" /> : null}');
+    expect(pocket).toContain("<FoundArt");
+    expect(pocket).toContain('state={done ? "found" : "open"}');
+    expect(pocket).not.toContain('name="checkmark"');
+    expect(pocket).not.toContain("dimmed={done}");
     /* The chip: found over needed, bottom right, only when more than one
        is wanted and not all are found. */
     const chip = between(pocket, "{!done && needed > 1 ? (", ") : null}");

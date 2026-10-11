@@ -304,11 +304,13 @@ describe("the hunt page: the open binder", () => {
     expect(app.binder).not.toContain("onLongPress");
   });
 
-  it("dims a found pocket with a check, chips found/needed when more than one is wanted", () => {
+  it("marks a found pocket with the FOUND band, chips found/needed when more than one is wanted", () => {
+    /* One way of saying found across the product (2026-10-11): black
+       and white with the Feed's green band, never a check. */
     expect(web.binder).toContain("dim={card.found}");
-    expect(web.pockets).toContain('dim && "opacity-50"');
+    expect(web.pockets).toContain('dim && "opacity-60 grayscale"');
     expect(web.binder).toMatch(
-      /card\.found \? \(\s*<span\s+aria-label="Found"[\s\S]*?<Check /,
+      /card\.found \? \([\s\S]*?bg-accent py-0\.5[\s\S]*?found\s*<\/span>/,
     );
     expect(web.binder).toMatch(
       /card\.needed > 1 \? \(\s*<span[^>]*>\s*\{card\.foundCopies\}\/\{card\.needed\}/,
@@ -317,10 +319,19 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toMatch(
       /\{card\.foundCopies\}\/\{card\.needed\}\s*<\/span>\s*\) : null\}/,
     );
-    expect(app.binder).toContain("dimmed={done}");
-    expect(app.pockets).toContain("opacity: dimmed ? 0.5 : 1");
-    expect(app.binder).toContain('name="checkmark"');
+    expect(app.binder).toContain('{done ? <StateBand state="found" /> : null}');
+    expect(app.binder).not.toContain('name="checkmark"');
     expect(app.binder).toContain("{`${found}/${needed}`}");
+  });
+
+  it("puts found cards last, on the last pages, on both platforms", () => {
+    /* The founder: "found cards in hunts need to filter to the bottom /
+       last pages." Ordered by what the server last said, stably. */
+    for (const source of [web.binder, app.binder]) {
+      expect(source).toContain(
+        ".sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)",
+      );
+    }
   });
 
   it("gives the owner + pockets into the Flare composer, and a visitor empty ones", () => {

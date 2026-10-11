@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,7 +12,7 @@ import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
 import { useCopiesFound } from "./use-copies-found";
-import { Button, ErrorLine, Muted, SheetClose, Title } from "./ui";
+import { Button, ErrorLine, FoundArt, Muted, SheetClose, StateBand, Title } from "./ui";
 
 /**
  * "Update progress" on your own Flare: copies found, per card.
@@ -27,7 +26,7 @@ import { Button, ErrorLine, Muted, SheetClose, Title } from "./ui";
  *
  * Every write asks the Feed to reload, so the post behind the sheet
  * reads the new count when the sheet closes rather than on the next
- * pull. A finished card stays in the list, dimmed and ticked, because
+ * pull. A finished card stays in the list, wearing the FOUND band, because
  * a list that hid its finished rows would only ever show unfinished
  * work.
  */
@@ -136,10 +135,22 @@ export function FlareProgressSheet({
                       backgroundColor: colors.surface,
                     }}
                   >
-                    <RemoteImage
-                      uri={card.imageUrl}
-                      style={{ width: "100%", height: "100%" }}
-                    />
+                    {/* Found reads the same everywhere: black and white,
+                        the green band at the foot. */}
+                    {finished ? (
+                      <FoundArt
+                        uri={card.imageUrl}
+                        width={40}
+                        height={56}
+                        borderRadius={4}
+                      />
+                    ) : (
+                      <RemoteImage
+                        uri={card.imageUrl}
+                        style={{ width: "100%", height: "100%" }}
+                      />
+                    )}
+                    {finished ? <StateBand state="found" small /> : null}
                   </View>
                   <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                     <View
@@ -149,13 +160,6 @@ export function FlareProgressSheet({
                         gap: spacing(1),
                       }}
                     >
-                      {finished ? (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={14}
-                          color={colors.accent}
-                        />
-                      ) : null}
                       <Text
                         numberOfLines={1}
                         style={{

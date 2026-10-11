@@ -748,6 +748,90 @@ export function NoArt({
   );
 }
 
+/**
+ * The one-word state on a card, pinned to its foot: FOUND in the accent,
+ * OFFERED quiet. ONE band for every surface that ticks a card off - the
+ * Feed, a hunt's pockets, the progress sheet. The founder: "please make
+ * sure that it has the green found thing at bottom like there is
+ * elsewhere in the app. it's important we have a universal language
+ * across the app." Its parent is the card's own box, positioned.
+ * `small` is for a thumbnail too narrow for the full size.
+ */
+export function StateBand({
+  state,
+  small = false,
+}: {
+  state: "found" | "offered";
+  small?: boolean;
+}) {
+  const found = state === "found";
+  return (
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingVertical: small ? 1 : 2,
+        alignItems: "center",
+        backgroundColor: found ? colors.accent : colors.scrim,
+      }}
+    >
+      <Text
+        maxFontSizeMultiplier={1.3}
+        style={{
+          color: found ? colors.accentContrast : colors.textSecondary,
+          fontSize: small ? 7 : 11,
+          fontWeight: "800",
+          letterSpacing: small ? 0.4 : 1,
+        }}
+      >
+        {state.toUpperCase()}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A card's art in black and white, as a found card wears it everywhere:
+ * the Skia kit's grey when it has loaded, faded colour until then.
+ */
+export function FoundArt({
+  uri,
+  width,
+  height,
+  borderRadius = radius.control / 2,
+}: {
+  uri: string | null;
+  width: number;
+  height: number;
+  borderRadius?: number;
+}) {
+  const kit = uri ? getFoilKit() : null;
+  return (
+    <View
+      style={{
+        width,
+        height,
+        borderRadius,
+        overflow: "hidden",
+        backgroundColor: colors.canvas,
+      }}
+    >
+      {kit && uri ? (
+        <kit.Greyed imageUrl={uri} width={width} height={height} />
+      ) : (
+        <RemoteImage
+          uri={uri}
+          contentFit="contain"
+          style={{ width, height, opacity: 0.5 }}
+        />
+      )}
+    </View>
+  );
+}
+
 export function CardImage({
   imageUrl: ownImageUrl,
   width,
@@ -1100,35 +1184,7 @@ export function CardImage({
               />
             )}
           </View>
-          {state !== "open" ? (
-            /* The one-word state, pinned to the foot of the card so the
-             art above it still reads as the card it is. */
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 0,
-                paddingVertical: 2,
-                alignItems: "center",
-                backgroundColor: state === "found" ? colors.accent : colors.scrim,
-              }}
-            >
-              <Text
-                maxFontSizeMultiplier={1.3}
-                style={{
-                  color:
-                    state === "found" ? colors.accentContrast : colors.textSecondary,
-                  fontSize: 11,
-                  fontWeight: "800",
-                  letterSpacing: 1,
-                }}
-              >
-                {state.toUpperCase()}
-              </Text>
-            </View>
-          ) : null}
+          {state !== "open" ? <StateBand state={state} /> : null}
         </View>
       </Tap>
 

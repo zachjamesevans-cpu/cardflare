@@ -422,18 +422,22 @@ export function HuntRing({
           justifyContent: "center",
         }}
       >
-        {complete ? (
-          <Ionicons name="checkmark" size={30} color={colors.accent} />
-        ) : (
-          <Text style={{ fontVariant: ["tabular-nums"] }}>
-            <Text style={{ color: colors.accent, fontSize: 22, fontWeight: "800" }}>
-              {found}
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "700" }}>
-              {`/${needed}`}
-            </Text>
+        {/* No check when it is done: the founder wants found said one way,
+            and the ring says it by closing, "9/9" all in the accent. */}
+        <Text style={{ fontVariant: ["tabular-nums"] }}>
+          <Text style={{ color: colors.accent, fontSize: 22, fontWeight: "800" }}>
+            {found}
           </Text>
-        )}
+          <Text
+            style={{
+              color: complete ? colors.accent : colors.textMuted,
+              fontSize: 15,
+              fontWeight: "700",
+            }}
+          >
+            {`/${needed}`}
+          </Text>
+        </Text>
       </View>
     </View>
   );
