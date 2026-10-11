@@ -194,7 +194,8 @@ describe("guests", () => {
     }
     /* A guest's post offers nothing it cannot do: every door is sign-up. */
     expect(home).toContain("post={{ ...postRef(item), yours: true }}");
-    expect(home).toContain("onMessage={toSignUp}");
+    /* The paper plane shares now; for a guest it is sign-up too. */
+    expect(home).toContain("onShare={toSignUp}");
   });
 });
 

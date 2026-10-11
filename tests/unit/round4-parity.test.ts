@@ -100,12 +100,19 @@ describe("Wanted from you ends in Message, not Go", () => {
     expect(app.home).not.toContain("Bring it and it");
     expect(app.home).toContain("`I have ${");
     expect(app.home).toContain("openLocalThread(");
-    const wantedRow = app.home.slice(
+    const wantedItem = app.home.slice(
       app.home.indexOf('item.kind === "wanted"'),
       app.home.indexOf('item.kind === "upcoming"'),
     );
-    expect(wantedRow).toContain("Message");
-    expect(wantedRow).not.toContain("GuestChip");
+    expect(wantedItem).toContain("<WantedRow");
+    expect(wantedItem).not.toContain("GuestChip");
+    /* Each row's button is Message. (This once matched the Feed posts'
+       onMessage props, which sat in the same stretch of the file.) */
+    const wantedRow = app.home.slice(
+      app.home.indexOf("function WantedRow("),
+      app.home.indexOf("export function HomeScreen("),
+    );
+    expect(wantedRow).toMatch(/\n\s+Message\n/);
   });
 });
 

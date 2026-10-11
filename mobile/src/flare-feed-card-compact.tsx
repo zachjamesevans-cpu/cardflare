@@ -53,7 +53,7 @@ export function FlareFeedCardCompact({
   onOpenProfile,
   onLike,
   onOpenThread,
-  onMessage,
+  onShare,
   onViewAll,
   onProgress,
   onTakeDown,
@@ -65,7 +65,7 @@ export function FlareFeedCardCompact({
   onOpenProfile: (playerId: string) => void;
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
-  onMessage?: () => void;
+  onShare?: () => void;
   /** The full list, to read; behind the three dots. */
   onViewAll?: () => void;
   /** The progress ticks on your own post; behind the three dots. */
@@ -214,7 +214,7 @@ export function FlareFeedCardCompact({
         comments={item.comments}
         onLike={onLike}
         onOpenThread={onOpenThread}
-        onMessage={onMessage}
+        onShare={onShare}
       />
     </View>
   );

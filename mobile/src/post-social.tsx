@@ -89,6 +89,7 @@ export function PostSocialRow({
   onLike,
   onOpenThread,
   onMessage,
+  onShare,
   threadOpen = false,
 }: {
   likes: number;
@@ -100,6 +101,11 @@ export function PostSocialRow({
   onOpenThread: () => void;
   /** The third action: message the poster. Absent on your own post. */
   onMessage?: () => void;
+  /**
+   * The paper plane as Instagram's: send the post to people you follow.
+   * The Feed passes this; where it is given, it is what the plane does.
+   */
+  onShare?: () => void;
   /** On the post's own screen the bubble is a label, not a door. */
   threadOpen?: boolean;
 }) {
@@ -207,11 +213,11 @@ export function PostSocialRow({
             {comments}
           </Text>
         </Tap>
-        {onMessage ? (
+        {onShare || onMessage ? (
           <Tap
-            onPress={onMessage}
+            onPress={onShare ?? onMessage}
             hitSlop={HIT}
-            accessibilityLabel="Message them"
+            accessibilityLabel={onShare ? "Share" : "Message them"}
             style={TARGET}
           >
             <Ionicons

@@ -235,7 +235,7 @@ export function FlareFeedCard({
   onOpenProfile,
   onLike,
   onOpenThread,
-  onMessage,
+  onShare,
   onEnterRoom,
   onViewAll,
   onProgress,
@@ -254,8 +254,8 @@ export function FlareFeedCard({
   onOpenProfile: (playerId: string) => void;
   onLike: (liked: boolean) => Promise<unknown>;
   onOpenThread: () => void;
-  /** Absent on your own post: there is nobody to message. */
-  onMessage?: () => void;
+  /** The paper plane: send this post to people you follow. */
+  onShare?: () => void;
   onEnterRoom: (code: string) => void;
   /** "View all 3": the full list, to read. */
   onViewAll?: () => void;
@@ -589,7 +589,7 @@ export function FlareFeedCard({
         offers={item.offers ?? 0}
         onLike={onLike}
         onOpenThread={onOpenThread}
-        onMessage={onMessage}
+        onShare={onShare}
       />
     </View>
   );

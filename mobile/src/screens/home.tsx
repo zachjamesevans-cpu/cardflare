@@ -58,7 +58,7 @@ import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { FeedFilterTabs } from "../feed-filter-tabs";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
-import { FlareMessageSheet, type MessageTarget } from "../flare-message-sheet";
+import { SharePostSheet, type SharedPost } from "../share-post-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
 import { StorePostCard } from "../store-post-card";
 import {
@@ -437,7 +437,7 @@ export function HomeScreen() {
   /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
   const shownKeys = feedKeys(shown);
   /* The Flare being messaged from its paper plane, or null. */
-  const [messaging, setMessaging] = useState<MessageTarget | null>(null);
+  const [sharing, setSharing] = useState<SharedPost | null>(null);
   /* The post whose cards are open in the sheet, to read or to offer on. */
   const [cardsSheet, setCardsSheet] = useState<
     (FlareSheetPost & { mode: "view" | "offer" }) | null
@@ -1432,7 +1432,7 @@ export function HomeScreen() {
                     throw new Error("guest");
                   }}
                   onOpenThread={toSignUp}
-                  onMessage={toSignUp}
+                  onShare={toSignUp}
                   onEnterRoom={toSignUp}
                   onReport={toSignUp}
                   picks={NO_PICKS}
@@ -1452,15 +1452,12 @@ export function HomeScreen() {
                   onOpenThread={() =>
                     navigation.navigate("FlarePost", { postId: item.postId })
                   }
-                  onMessage={
-                    item.yours || !item.cards[0]?.flareId
-                      ? undefined
-                      : () =>
-                          setMessaging({
-                            flareId: item.cards[0]?.flareId ?? "",
-                            cardName: postSubject(item),
-                            posterName: item.displayName,
-                          })
+                  onShare={() =>
+                    setSharing({
+                      postId: item.postId,
+                      posterName: item.displayName,
+                      subject: postSubject(item),
+                    })
                   }
                   /* The same two doors the classic card keeps behind its
                      three dots, so the menu is one menu in both views. */
@@ -1492,15 +1489,12 @@ export function HomeScreen() {
                   onOpenThread={() =>
                     navigation.navigate("FlarePost", { postId: item.postId })
                   }
-                  onMessage={
-                    item.yours || !item.cards[0]?.flareId
-                      ? undefined
-                      : () =>
-                          setMessaging({
-                            flareId: item.cards[0]?.flareId ?? "",
-                            cardName: postSubject(item),
-                            posterName: item.displayName,
-                          })
+                  onShare={() =>
+                    setSharing({
+                      postId: item.postId,
+                      posterName: item.displayName,
+                      subject: postSubject(item),
+                    })
                   }
                   onEnterRoom={(code) => void enter(code)}
                   onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
@@ -1927,14 +1921,12 @@ export function HomeScreen() {
           </Card>
         )}
 
-        <FlareMessageSheet
-          target={messaging}
-          onClose={() => setMessaging(null)}
-          onOpened={(threadId) => {
-            setMessaging(null);
-            navigation.navigate("LocalThread", { threadId });
-          }}
-        />
+        {/* The paper plane: send the post to people you follow, the way
+            Instagram's share sheet does. It used to open a note to the
+            poster; "I have this card" in a card's zoom is that door now. */}
+        {sharing ? (
+          <SharePostSheet post={sharing} onClose={() => setSharing(null)} />
+        ) : null}
         <FlareCardsSheet
           open={cardsSheet}
           picks={cardsSheet ? picksFor(cardsSheet.postId) : NO_PICKS}

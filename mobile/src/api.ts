@@ -2157,6 +2157,9 @@ export interface FollowedPlayer {
   displayName: string;
   avatarUrl: string | null;
   frame: string | null;
+  /** Worn cosmetics, as the server already sends them. */
+  ring?: string | null;
+  aura?: string | null;
   partners: boolean;
 }
 
@@ -4624,11 +4627,16 @@ export function threadTradeFailureMessage(caught: unknown): string {
   }
 }
 
-export const sendLocalMessage = (threadId: string, body: string) =>
+/**
+ * One message into a conversation. `postId` is a post shared from the
+ * Feed's paper plane: the server puts its cards on the message, and a
+ * server that does not know the field yet sends the words alone.
+ */
+export const sendLocalMessage = (threadId: string, body: string, postId?: string) =>
   call<{ ok: boolean }>(
     "POST",
     `/api/v1/local/threads/${encodeURIComponent(threadId)}`,
-    { body },
+    postId ? { body, postId } : { body },
   );
 
 /**

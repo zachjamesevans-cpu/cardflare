@@ -534,6 +534,7 @@ export async function sendThreadMessage(
   threadId: string,
   senderId: string,
   rawBody: string,
+  options?: { postId?: string },
 ): Promise<{ ok: true } | { ok: false; reason: ThreadFailure }> {
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
 
@@ -548,8 +549,44 @@ export async function sendThreadMessage(
 
   /* An anchor id from an old link writes to the pair's conversation. */
   const conversation = (await conversationIdFor(threadId)) ?? threadId;
-  const sent = await appendMessage(conversation, senderId, recipient, body);
+  const shared = options?.postId
+    ? await sharedPostCards(options.postId, senderId)
+    : null;
+  const sent = await appendMessage(
+    conversation,
+    senderId,
+    recipient,
+    body,
+    shared ?? undefined,
+  );
   return sent ? { ok: true } : { ok: false, reason: "unavailable" };
+}
+
+/** How many of a shared post's cards ride on the message. */
+const SHARED_CARDS = 6;
+
+/**
+ * The cards of a post shared from the Feed's paper plane, as a message's
+ * card context: the same `card_ids` and `printing_ids` a binder offer
+ * writes, so every build's chat already draws them. Read as the sender
+ * sees the post - one they cannot see shares nothing, and the message
+ * goes as words alone.
+ */
+async function sharedPostCards(
+  postId: string,
+  senderId: string,
+): Promise<{ cardIds: string[]; printingIds: (string | null)[] } | null> {
+  /* Loaded here, not at the top: the posts module reaches back into
+     messaging through the offer flow, and a static import would knot
+     the two together at load. */
+  const { postDetail } = await import("@/lib/feed/posts");
+  const post = await postDetail(postId, senderId);
+  const cards = post?.cards.slice(0, SHARED_CARDS) ?? [];
+  if (cards.length === 0) return null;
+  return {
+    cardIds: cards.map((card) => card.cardId),
+    printingIds: cards.map((card) => card.printingId ?? null),
+  };
 }
 
 /**
