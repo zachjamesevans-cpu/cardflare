@@ -186,7 +186,7 @@ describe("guests", () => {
     expect(home).toContain('label="Create account"');
     expect(home).toContain('label="Scan a store code"');
     for (const empty of [
-      '{!guest && feedReady && shown.length === 0 && tab === "mine" && (',
+      '{!guest && feedReady && shown.length === 0 && tab === "following" && (',
       '{!guest && feedReady && shown.length === 0 && tab === "nearby" && (',
       "{!guest && feedReady && feed.length < 3 && (",
     ]) {

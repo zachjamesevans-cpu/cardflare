@@ -43,7 +43,8 @@ describe("the Feed's first run", () => {
 
   it("waits for the first fetch before saying there is nothing", () => {
     expect(home).toContain("const feedReady = hydrated && feedSettled && !feedFailed;");
-    for (const tab of ["following", "mine", "nearby"]) {
+    /* Two tabs now: My Flares went, its posts already in Following. */
+    for (const tab of ["following", "nearby"]) {
       expect(home).toContain(
         `{!guest && feedReady && shown.length === 0 && tab === "${tab}" && (`,
       );

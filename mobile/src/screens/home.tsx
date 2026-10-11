@@ -56,7 +56,8 @@ import { FlareFeedCardCompact } from "../flare-feed-card-compact";
 import { feedViewFrom } from "../feed-views";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { FlareProgressSheet } from "../flare-progress-sheet";
-import { FeedFilterTabs } from "../feed-filter-tabs";
+import { FEED_TABS, FeedFilterTabs } from "../feed-filter-tabs";
+import { FeedPager } from "../feed-pager";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { SharePostSheet, type SharedPost } from "../share-post-sheet";
 import { PostSocialRow, haveFor, type PostRef } from "../post-social";
@@ -426,16 +427,16 @@ export function HomeScreen() {
   const [guest, setGuest] = useState(false);
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
-  const shown = guest
-    ? feed
-    : feed.filter(
-        (item) =>
-          belongsToTab(item, tab) && !(item.kind === "hunt" && hidden.has(item.postId)),
-      );
+  const shownFor = (which: FeedTab) =>
+    guest
+      ? feed
+      : feed.filter(
+          (item) =>
+            belongsToTab(item, which) &&
+            !(item.kind === "hunt" && hidden.has(item.postId)),
+        );
+  const shown = shownFor(tab);
   const toSignUp = () => navigation.navigate("CreateAccount");
-  const sectionsShown = new Set(shown.map((item) => item.section)).size;
-  /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
-  const shownKeys = feedKeys(shown);
   /* The Flare being messaged from its paper plane, or null. */
   const [sharing, setSharing] = useState<SharedPost | null>(null);
   /* The post whose cards are open in the sheet, to read or to offer on. */
@@ -937,6 +938,821 @@ export function HomeScreen() {
     openRoom(navigation);
   };
 
+  /*
+   * One tab's list: what is loading, what failed, the items under
+   * their headings, and the tab's own empty state. Drawn once per page
+   * of the pager, so each tab keeps its items and its place.
+   */
+  const tabContent = (tab: FeedTab) => {
+    const shown = shownFor(tab);
+    const sectionsShown = new Set(shown.map((item) => item.section)).size;
+    /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
+    const shownKeys = feedKeys(shown);
+    return (
+      <View style={{ gap: spacing(4) }}>
+            {/*
+             * The Feed leads. Everything here is derived - nobody posts to it -
+             * so a pilot with six players still opens something worth reading.
+             * The website's two item kinds, in the website's order: people
+             * before places, because a board will still be there tomorrow and
+             * somebody needing a card you are holding will not.
+             */}
+            {/*
+             * A kind this build has never heard of draws NOTHING.
+             *
+             * The server ships on Vercel's clock and the app on TestFlight's, so
+             * a phone meets item kinds newer than itself as a matter of routine.
+             * This chain used to end in the board branch, so an unknown kind was
+             * rendered AS a board - a card with an undefined title and a button
+             * to an undefined room. That is how the website and the app came to
+             * show different feeds the week the new kinds landed.
+             */}
+            {/*
+             * Until the cached read has answered, the list area is a spinner,
+             * not an empty column. The founder: "the 'loading' screen
+             * everywhere needs to be updated." Nothing that means "you have
+             * nothing" is drawn before we know that is true.
+             */}
+            {(!hydrated || !feedSettled) && !feedFailed && shown.length === 0 && (
+              <Loading />
+            )}
+
+            {/* The first load failed and nothing was cached to keep. */}
+            {feedFailed && shown.length === 0 && (
+              <Card>
+                <Title>Couldn&rsquo;t load the Feed</Title>
+                <Body>Check your connection and try again.</Body>
+                <Button
+                  label="Try again"
+                  variant="secondary"
+                  onPress={() => void refresh()}
+                />
+              </Card>
+            )}
+
+            {shown.map((item, index) => {
+              const body =
+                item.kind === "nearbyMatch" ? (
+                  <Card
+                    key={`nearby-match-${index}`}
+                    style={{ borderColor: `${colors.accent}66` }}
+                  >
+                    <Text
+                      style={{
+                        color: colors.accent,
+                        fontSize: 11,
+                        fontWeight: "700",
+                        letterSpacing: 1.6,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      You can answer a Flare
+                    </Text>
+                    <Muted>Only you see this. They hear from you when you answer.</Muted>
+
+                    <View style={{ gap: spacing(4) }}>
+                      {item.matches.slice(0, 5).map((match) => (
+                        <MatchRow
+                          key={`${match.ask.kind}-${match.ask.id}`}
+                          match={match}
+                          onOpen={(threadId) =>
+                            navigation.navigate("LocalThread", { threadId })
+                          }
+                        />
+                      ))}
+                    </View>
+
+                    {item.matches.length > 5 ? (
+                      <Muted>{`+${item.matches.length - 5} more nearby`}</Muted>
+                    ) : null}
+                  </Card>
+                ) : item.kind === "wanted" ? (
+                  <Card
+                    key={`wanted-${index}`}
+                    style={{ borderColor: `${colors.accent}66` }}
+                  >
+                    {/* The number IS the item. It moves on its own, which is the
+                    whole reason to open the app again on a Tuesday. */}
+                    <Title>
+                      {`${item.total} ${
+                        item.total === 1 ? "player wants" : "players want"
+                      } a card you're holding`}
+                    </Title>
+                    <Muted>They already asked. Tell them you have it.</Muted>
+
+                    <View style={{ gap: spacing(2.5) }}>
+                      {item.entries.map((entry) => (
+                        <WantedRow
+                          key={`${entry.playerSessionId}-${entry.card.cardId}`}
+                          entry={entry}
+                          onOpenProfile={() =>
+                            navigation.navigate("PlayerProfile", {
+                              playerId: entry.playerId,
+                            })
+                          }
+                          onOpenThread={(threadId) =>
+                            navigation.navigate("LocalThread", { threadId })
+                          }
+                        />
+                      ))}
+                    </View>
+
+                    {item.total > item.entries.length ? (
+                      <Muted>
+                        {`+${item.total - item.entries.length} more across your stores`}
+                      </Muted>
+                    ) : null}
+                  </Card>
+                ) : item.kind === "storePost" ? (
+                  /* A store you follow, saying something. The website's card,
+                     drawn natively; see store-post-card. */
+                  <StorePostCard
+                    key={`store-post-${item.postId}`}
+                    item={item}
+                    onOpenStore={(storeId) =>
+                      navigation.navigate("StoreProfile", { storeId })
+                    }
+                    onLike={(liked) => likePost(item.postId, liked)}
+                    onOpenThread={() =>
+                      navigation.navigate("FlarePost", { postId: item.postId })
+                    }
+                    onRsvp={rsvpToCode}
+                  />
+                ) : item.kind === "announcement" ? (
+                  <Card key={`announcement-${index}`}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                      }}
+                    >
+                      {/* The mark, not a face. There is no cardflare player and
+                      this is the item that has to look like it knows that. */}
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          backgroundColor: colors.elevated,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Image
+                          source={require("../../assets/cardflare-mark.png")}
+                          style={{
+                            height: 20,
+                            width: 20 * MARK_ASPECT,
+                            resizeMode: "contain",
+                          }}
+                        />
+                      </View>
+                      <View style={{ flexShrink: 1 }}>
+                        <Title>{item.headline}</Title>
+                        <Muted>cardflare</Muted>
+                      </View>
+                    </View>
+
+                    <Body>{item.body}</Body>
+
+                    {item.linkLabel && item.linkHref ? (
+                      <Button
+                        label={item.linkLabel}
+                        variant="secondary"
+                        onPress={() => follow(item.linkHref as string)}
+                      />
+                    ) : null}
+                  </Card>
+                ) : item.kind === "start" ? (
+                  <Card key={`start-${index}`}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                          backgroundColor: colors.elevated,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <MaterialCommunityIcons
+                          name={STARTERS[item.topic].icon}
+                          size={20}
+                          color={colors.accent}
+                        />
+                      </View>
+                      <View style={{ flexShrink: 1 }}>
+                        <Title>{STARTERS[item.topic].headline}</Title>
+                      </View>
+                    </View>
+
+                    <Body>{STARTERS[item.topic].body}</Body>
+
+                    <Button
+                      label={STARTERS[item.topic].label}
+                      onPress={() =>
+                        /* The store starter opens Plan a visit at its first
+                           step: a store picked there is a day from its room. */
+                        item.topic === "store"
+                          ? openPlanVisit()
+                          : navigation.navigate("DeckPaste")
+                      }
+                    />
+                  </Card>
+                ) : item.kind === "traded" ? (
+                  <Card key={`traded-${index}`}>
+                    <Body>
+                      {`${item.requester} traded for ${item.cardName}${
+                        item.holder ? ` with ${item.holder}` : ""
+                      } at ${item.storeName}.`}
+                    </Body>
+                  </Card>
+                ) : item.kind === "added" ? (
+                  <Card key={`added-${index}`}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                      }}
+                    >
+                      <FeedPerson
+                        playerId={item.playerId}
+                        displayName={item.displayName}
+                        avatarUrl={item.avatarUrl}
+                        frame={item.frame}
+                        ring={item.ring}
+                        detail={`added ${item.total} ${
+                          item.total === 1 ? "card" : "cards"
+                        } to their binder`}
+                        onOpen={(id) =>
+                          navigation.navigate("PlayerProfile", { playerId: id })
+                        }
+                      />
+                    </View>
+
+                    <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                      {item.cards.map((card) => (
+                        <CardImage
+                          key={card.cardId}
+                          imageUrl={card.imageUrl}
+                          width={48}
+                          name={card.cardName}
+                          cardNumber={card.cardNumber}
+                          /* Ringed only when it is on YOUR list, same as the web. */
+                          youHave={card.onYourList ? { kind: "exact", count: 0 } : null}
+                        />
+                      ))}
+                    </View>
+
+                    {item.onYourListCount > 0 && (
+                      <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                        {item.onYourListCount === 1
+                          ? "One of these is on your Flares"
+                          : `${item.onYourListCount} of these are on your Flares`}
+                      </Text>
+                    )}
+                  </Card>
+                ) : item.kind === "suggest" ? (
+                  <Card key={`suggest-${index}`}>
+                    <Title>Worth following</Title>
+                    <Muted>Their binders answer what you&rsquo;re looking for.</Muted>
+                    {item.players.map((person) => (
+                      <Tap
+                        key={person.playerId}
+                        onPress={() =>
+                          navigation.navigate("PlayerProfile", {
+                            playerId: person.playerId,
+                          })
+                        }
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: spacing(2),
+                        }}
+                      >
+                        <PlayerAvatar
+                          displayName={person.displayName}
+                          seed={person.playerId}
+                          avatarUrl={person.avatarUrl}
+                          size={36}
+                        />
+                        <View style={{ flexShrink: 1 }}>
+                          <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                            {person.displayName}
+                          </Text>
+                          {/* Always "wants": the list is plural even when the
+                          overlap with it is one card. */}
+                          <Muted>{`has ${person.answers} of your wants`}</Muted>
+                        </View>
+                      </Tap>
+                    ))}
+                  </Card>
+                ) : item.kind === "hunt" ? (
+                  guest ? (
+                    /*
+                     * The guest's read-only post. `post.yours` is set so the
+                     * card offers no "I have this" anywhere inside it (see
+                     * haveFor), and every door it does draw - heart, comments,
+                     * message, the face, Report - goes to sign-up rather than
+                     * to a call that would only answer 401. The heart's
+                     * promise rejects so it springs back unliked.
+                     */
+                    <FlareFeedCard
+                      key={`hunt-${item.postId}`}
+                      item={item}
+                      post={{ ...postRef(item), yours: true }}
+                      onOpenProfile={toSignUp}
+                      onLike={async () => {
+                        toSignUp();
+                        throw new Error("guest");
+                      }}
+                      onOpenThread={toSignUp}
+                      onShare={toSignUp}
+                      onReport={toSignUp}
+                      picks={NO_PICKS}
+                      onPicks={() => {}}
+                    />
+                  ) : view === "compact" ? (
+                    /* The founder's compact view: art and a needed-count,
+                       everything else a tap away. See flare-feed-card-compact. */
+                    <FlareFeedCardCompact
+                      key={`hunt-${item.postId}`}
+                      item={item}
+                      post={postRef(item)}
+                      onOpenProfile={(id) =>
+                        navigation.navigate("PlayerProfile", { playerId: id })
+                      }
+                      onLike={(liked) => likePost(item.postId, liked)}
+                      onOpenThread={() =>
+                        navigation.navigate("FlarePost", { postId: item.postId })
+                      }
+                      onShare={() =>
+                        setSharing({
+                          postId: item.postId,
+                          posterName: item.displayName,
+                          subject: postSubject(item),
+                        })
+                      }
+                      /* The same two doors the classic card keeps behind its
+                         three dots, so the menu is one menu in both views. */
+                      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+                      onProgress={
+                        item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
+                      }
+                      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+                      onReport={
+                        item.yours
+                          ? undefined
+                          : () => setReport({ kind: "post", targetId: item.postId })
+                      }
+                      onBlock={
+                        item.yours || !item.playerId
+                          ? undefined
+                          : () => block(item.playerId, item.displayName)
+                      }
+                    />
+                  ) : (
+                    <FlareFeedCard
+                      key={`hunt-${item.postId}`}
+                      item={item}
+                      post={postRef(item)}
+                      onOpenProfile={(id) =>
+                        navigation.navigate("PlayerProfile", { playerId: id })
+                      }
+                      onLike={(liked) => likePost(item.postId, liked)}
+                      onOpenThread={() =>
+                        navigation.navigate("FlarePost", { postId: item.postId })
+                      }
+                      onShare={() =>
+                        setSharing({
+                          postId: item.postId,
+                          posterName: item.displayName,
+                          subject: postSubject(item),
+                        })
+                      }
+                      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+                      onProgress={
+                        item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
+                      }
+                      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+                      onReport={
+                        item.yours
+                          ? undefined
+                          : () => setReport({ kind: "post", targetId: item.postId })
+                      }
+                      /* Only a post with a player behind it: a store's has nobody to block. */
+                      onBlock={
+                        item.yours || !item.playerId
+                          ? undefined
+                          : () => block(item.playerId, item.displayName)
+                      }
+                      onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+                      picks={picksFor(item.postId)}
+                      onPicks={(next) => setPicksFor(item.postId, next)}
+                    />
+                  )
+                ) : item.kind === "upcoming" ? (
+                  <Card key={`upcoming-${index}`}>
+                    <Muted>
+                      {item.city ? `${item.storeName} · ${item.city}` : item.storeName}
+                    </Muted>
+                    {/* A night on the calendar is the headline. Without one the
+                    counter code is, because the answer is "whenever". */}
+                    <Title>{item.nextEventName ?? "Walk in any time"}</Title>
+                    <Muted>
+                      {item.nextEventAt
+                        ? doorsAt(item.nextEventAt, item.timeZone)
+                        : "The counter code is always open"}
+                    </Muted>
+
+                    {item.wants > 0 ? (
+                      <Body>
+                        {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your Flares to ask about.`}
+                      </Body>
+                    ) : null}
+
+                    {/* Going, and who else is: the one button for a night,
+                        the same as on the website's upcoming card. Only
+                        with a night to go to, and only from a server that
+                        knows the word. */}
+                    {item.nextEventId && item.goingCount !== undefined ? (
+                      <GoingButton
+                        eventId={item.nextEventId}
+                        youGoing={item.youGoing ?? false}
+                        goingCount={item.goingCount}
+                      />
+                    ) : null}
+
+                    <Button
+                      label={item.nextEventCode ? "See the board" : "Open the room"}
+                      variant="secondary"
+                      onPress={() => void enter(item.nextEventCode ?? item.joinCode)}
+                    />
+                  </Card>
+                ) : item.kind === "recent" ? (
+                  <Card key={`recent-${item.id}`}>
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: spacing(2),
+                      }}
+                    >
+                      {/* The direction in words, never a texture - PRODUCT.md
+                      is explicit that foil means rare, not available. */}
+                      <FeedPerson
+                        playerId={item.playerId}
+                        displayName={item.displayName}
+                        avatarUrl={item.avatarUrl}
+                        frame={item.frame}
+                        ring={item.ring}
+                        aura={item.aura}
+                        size={36}
+                        detail={[
+                          item.direction === "showcase" ? "Offering" : null,
+                          item.deckLabel,
+                          item.storeName,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                        onOpen={(id) =>
+                          navigation.navigate("PlayerProfile", { playerId: id })
+                        }
+                      />
+                      <Muted>{agoFrom(item.when)}</Muted>
+                    </View>
+
+                    <CardRail
+                      cards={item.cards}
+                      more={item.more}
+                      width={tileWidth(item.cards.length)}
+                    />
+
+                    <Button
+                      label="See the board"
+                      variant="secondary"
+                      onPress={() => void enter(item.joinCode)}
+                    />
+                  </Card>
+                ) : item.kind === "nearbyStores" ? (
+                  /*
+                   * Three states, and the two empty ones carry the feature. A
+                   * section that vanishes when we do not know where somebody is
+                   * teaches them nothing; a section that asks is how anybody
+                   * finds out it exists. See nearbyStoreItems on the server.
+                   */
+                  item.needsLocation ? (
+                    <Card key={`nearby-${index}`}>
+                      <Title>Find stores near you</Title>
+                      <NearbyLocationAsk onDone={() => void load(() => true)} />
+                    </Card>
+                  ) : (
+                    <Card key={`nearby-${index}`}>
+                      <Title>Stores near you</Title>
+                      <Muted>
+                        Shops cardflare knows about, whether or not they use it yet.
+                      </Muted>
+
+                      {/* Known position, nothing in range. Said out loud: an empty
+                    list is indistinguishable from a broken one. */}
+                      {item.stores.length === 0 ? (
+                        <View style={{ gap: spacing(2.5) }}>
+                          <Muted>
+                            No stores near you yet. We&rsquo;re adding shops city by city.
+                          </Muted>
+                          {/* A ZIP that found nothing might simply be the wrong
+                        ZIP, and this is the only place to change it. */}
+                          {item.source === "postal" ? (
+                            <NearbyLocationAsk onDone={() => void load(() => true)} />
+                          ) : null}
+                        </View>
+                      ) : null}
+
+                      <View style={{ gap: spacing(2.5) }}>
+                        {item.stores.map((store) => (
+                          /* Tappable, because the website has put a "View" button
+                       on every one of these rows since the day the Nearby
+                       card shipped and the phone showed the same shops as
+                       dead text. A chevron says so without a button's
+                       weight in a list of five. */
+                          <Tap
+                            key={store.storeId}
+                            onPress={() =>
+                              navigation.navigate("StoreProfile", {
+                                storeId: store.storeId,
+                              })
+                            }
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              gap: spacing(2),
+                            }}
+                          >
+                            <MaterialCommunityIcons
+                              name="map-marker-outline"
+                              size={18}
+                              color={colors.textMuted}
+                            />
+                            <View style={{ flex: 1 }}>
+                              <View
+                                style={{
+                                  flexDirection: "row",
+                                  alignItems: "center",
+                                  gap: spacing(1),
+                                }}
+                              >
+                                <Text
+                                  numberOfLines={1}
+                                  style={{ color: colors.textPrimary, fontWeight: "600" }}
+                                >
+                                  {store.name}
+                                </Text>
+                                {/* Verified is the mark everybody sees beside a
+                                    store's name. Ultra is a tier and is never
+                                    drawn here: the store's own page says it. */}
+                                {store.verified ? <VerifiedMark size={14} /> : null}
+                              </View>
+                              <Text
+                                numberOfLines={1}
+                                style={{ color: colors.textMuted, fontSize: 12 }}
+                              >
+                                {`${store.miles} mi${store.city ? ` · ${store.city}` : ""}${
+                                  store.unclaimed ? " · Unclaimed listing" : ""
+                                }`}
+                              </Text>
+                            </View>
+                            <MaterialCommunityIcons
+                              name="chevron-right"
+                              size={20}
+                              color={colors.textMuted}
+                            />
+                          </Tap>
+                        ))}
+                      </View>
+                    </Card>
+                  )
+                ) : item.kind === "pack" ? (
+                  <Card key={`pack-${index}`}>
+                    <Muted>In the Embers shop</Muted>
+                    <Title>{item.name}</Title>
+                    <Body>{item.description}</Body>
+                    <Muted>
+                      {item.balance >= item.priceEmbers
+                        ? `${item.priceEmbers} Embers`
+                        : `${item.priceEmbers} Embers · you have ${item.balance}`}
+                    </Muted>
+                    <Button
+                      label={
+                        item.balance >= item.priceEmbers ? "Open a pack" : "See the store"
+                      }
+                      variant="secondary"
+                      onPress={() => navigation.navigate("Store")}
+                    />
+                  </Card>
+                ) : item.kind === "shop" ? (
+                  <Card key={`shop-${index}`}>
+                    <Title>Worth spending Embers on</Title>
+                    <Muted>{`You have ${item.balance} to spend.`}</Muted>
+                    <View style={{ gap: spacing(2) }}>
+                      {item.cosmetics.map((cosmetic) => (
+                        <View
+                          key={cosmetic.slug}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            gap: spacing(2),
+                          }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{ color: colors.textPrimary, fontWeight: "600" }}
+                              numberOfLines={1}
+                            >
+                              {cosmetic.name}
+                            </Text>
+                            <Text
+                              style={{ color: colors.textMuted, fontSize: 12 }}
+                              numberOfLines={1}
+                            >
+                              {cosmetic.description}
+                            </Text>
+                          </View>
+                          <Muted>{`${cosmetic.costEmbers}`}</Muted>
+                        </View>
+                      ))}
+                    </View>
+                    <Button
+                      label="See what you can wear"
+                      variant="secondary"
+                      onPress={() => navigation.navigate("Customize", { area: "profile" })}
+                    />
+                  </Card>
+                ) : item.kind !== "board" ? null : (
+                  <Card key={`board-${index}`}>
+                    {/* A local needs no address — you drive there. A room
+                    somewhere you have never been needs a place attached. */}
+                    <Muted>
+                      {item.yours || !item.city
+                        ? item.storeName
+                        : `${item.storeName} · ${item.city}`}
+                    </Muted>
+                    <Title>{item.eventName}</Title>
+                    <Muted>
+                      {item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}
+                    </Muted>
+
+                    {item.youCanAnswer > 0 && (
+                      <>
+                        <Text style={{ color: colors.accent, fontWeight: "600" }}>
+                          {`You can answer ${item.youCanAnswer} ${
+                            item.youCanAnswer === 1 ? "card" : "cards"
+                          } on this board`}
+                        </Text>
+                        <View style={{ flexDirection: "row", gap: spacing(2) }}>
+                          {item.sample.map((card) => (
+                            <View key={card.cardId}>
+                              <CardImage
+                                imageUrl={card.imageUrl}
+                                width={48}
+                                name={card.cardName}
+                                cardNumber={card.cardNumber}
+                                youHave={
+                                  card.match ? { kind: card.match, count: 0 } : undefined
+                                }
+                              />
+                              <HeldRing match={card.match} />
+                            </View>
+                          ))}
+                        </View>
+                      </>
+                    )}
+
+                    <Button
+                      label={item.live ? "Open the room" : "See the board"}
+                      variant="secondary"
+                      onPress={() => void enter(item.code)}
+                    />
+                  </Card>
+                );
+
+              /* The heading, only where the section changes. The order was
+               always an argument about what is worth a tap; this is that
+               argument said out loud. */
+              /*
+               * A SECTION WE HAVE NO TITLE FOR DRAWS NOTHING.
+               *
+               * `SECTION_TITLES[item.section]` used to be read straight into
+               * a <Text>. A server filing items under a section newer than
+               * the app returned undefined, and an empty Text still takes a
+               * line box - so the Feed opened on forty-three points of pure
+               * black above the first card, with nothing in it to see or to
+               * blame. Same forgiving rule the item kinds already follow.
+               */
+              /*
+               * And never on Following: the server sends that tab as one
+               * chronological list, so a heading there would carve up a
+               * timeline that is meant to read as one. The website draws
+               * none there either.
+               */
+              const heading =
+                guest || tab === "following" ? null : sectionHeading(item.section);
+              const opensSection =
+                heading !== null &&
+                sectionsShown > 1 &&
+                (index === 0 || shown[index - 1].section !== item.section);
+
+              return (
+                <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
+                  {opensSection ? (
+                    <Text
+                      style={{
+                        color: colors.textMuted,
+                        fontSize: 12,
+                        fontWeight: "600",
+                        letterSpacing: 1.4,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {heading}
+                    </Text>
+                  ) : null}
+                  {/* Why this is on your screen, ABOVE the card it explains:
+                    under it, the line read as the next card's caption. A
+                    feed that explains itself stops feeling arbitrary even
+                    when it is thin. A post carries its own label in its
+                    header instead - the founder: no separate text between
+                    cards. */}
+                  {item.reason && item.kind !== "hunt" ? (
+                    <Muted>{item.reason}</Muted>
+                  ) : null}
+                  {body}
+                </View>
+              );
+            })}
+
+            {/*
+             * The explainer, for a screen that has not filled up yet.
+             *
+             * It was unconditional, which meant an established player read "how
+             * it works" under their own board every time they opened the app.
+             * Below three items the screen has room for it and a newcomer needs
+             * it; above three it is the least interesting thing present.
+             */}
+            {/*
+             * And not until the cache has answered. Measured on a release
+             * build: the shell is up at 0.8s and the cached feed paints at
+             * ~1.2s, so an unguarded empty state flashes "how it works" at
+             * somebody with a full feed for a third of a second before their
+             * own content replaces it. Telling a returning player they have
+             * nothing, briefly, is its own kind of disorienting — which is
+             * the complaint this whole change exists to answer.
+             */}
+            {!guest && feedReady && shown.length === 0 && tab === "following" && (
+              <Card>
+                <Title>Nothing from people yet</Title>
+                <Body>
+                  Follow a friend and their Flares show up here. Find them by name in
+                  Search.
+                </Body>
+                <Button
+                  label="Find a player"
+                  variant="secondary"
+                  onPress={() => navigation.navigate("Tabs", { screen: "Search" })}
+                />
+              </Card>
+            )}
+            {!guest && feedReady && shown.length === 0 && tab === "nearby" && (
+              <Card>
+                <Title>Nothing on right now</Title>
+                <Body>
+                  Post a Flare for a card you are looking for, or follow a friend, and it
+                  shows up here. At a store? The code at the counter gets you into
+                  tonight&rsquo;s room.
+                </Body>
+                <Button
+                  label="Open the room"
+                  variant="secondary"
+                  onPress={() => openRoom(navigation)}
+                />
+              </Card>
+            )}
+      </View>
+    );
+  };
+
   return (
     <>
       {/*
@@ -1101,822 +1917,18 @@ export function HomeScreen() {
             </View>
           </Tap>
         )}
-
-        {/*
-         * The Feed leads. Everything here is derived - nobody posts to it -
-         * so a pilot with six players still opens something worth reading.
-         * The website's two item kinds, in the website's order: people
-         * before places, because a board will still be there tomorrow and
-         * somebody needing a card you are holding will not.
-         */}
-        {/*
-         * A kind this build has never heard of draws NOTHING.
-         *
-         * The server ships on Vercel's clock and the app on TestFlight's, so
-         * a phone meets item kinds newer than itself as a matter of routine.
-         * This chain used to end in the board branch, so an unknown kind was
-         * rendered AS a board - a card with an undefined title and a button
-         * to an undefined room. That is how the website and the app came to
-         * show different feeds the week the new kinds landed.
-         */}
-        {/*
-         * Until the cached read has answered, the list area is a spinner,
-         * not an empty column. The founder: "the 'loading' screen
-         * everywhere needs to be updated." Nothing that means "you have
-         * nothing" is drawn before we know that is true.
-         */}
-        {(!hydrated || !feedSettled) && !feedFailed && shown.length === 0 && (
-          <Loading />
-        )}
-
-        {/* The first load failed and nothing was cached to keep. */}
-        {feedFailed && shown.length === 0 && (
-          <Card>
-            <Title>Couldn&rsquo;t load the Feed</Title>
-            <Body>Check your connection and try again.</Body>
-            <Button
-              label="Try again"
-              variant="secondary"
-              onPress={() => void refresh()}
-            />
-          </Card>
-        )}
-
-        {shown.map((item, index) => {
-          const body =
-            item.kind === "nearbyMatch" ? (
-              <Card
-                key={`nearby-match-${index}`}
-                style={{ borderColor: `${colors.accent}66` }}
-              >
-                <Text
-                  style={{
-                    color: colors.accent,
-                    fontSize: 11,
-                    fontWeight: "700",
-                    letterSpacing: 1.6,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  You can answer a Flare
-                </Text>
-                <Muted>Only you see this. They hear from you when you answer.</Muted>
-
-                <View style={{ gap: spacing(4) }}>
-                  {item.matches.slice(0, 5).map((match) => (
-                    <MatchRow
-                      key={`${match.ask.kind}-${match.ask.id}`}
-                      match={match}
-                      onOpen={(threadId) =>
-                        navigation.navigate("LocalThread", { threadId })
-                      }
-                    />
-                  ))}
-                </View>
-
-                {item.matches.length > 5 ? (
-                  <Muted>{`+${item.matches.length - 5} more nearby`}</Muted>
-                ) : null}
-              </Card>
-            ) : item.kind === "wanted" ? (
-              <Card
-                key={`wanted-${index}`}
-                style={{ borderColor: `${colors.accent}66` }}
-              >
-                {/* The number IS the item. It moves on its own, which is the
-                whole reason to open the app again on a Tuesday. */}
-                <Title>
-                  {`${item.total} ${
-                    item.total === 1 ? "player wants" : "players want"
-                  } a card you're holding`}
-                </Title>
-                <Muted>They already asked. Tell them you have it.</Muted>
-
-                <View style={{ gap: spacing(2.5) }}>
-                  {item.entries.map((entry) => (
-                    <WantedRow
-                      key={`${entry.playerSessionId}-${entry.card.cardId}`}
-                      entry={entry}
-                      onOpenProfile={() =>
-                        navigation.navigate("PlayerProfile", {
-                          playerId: entry.playerId,
-                        })
-                      }
-                      onOpenThread={(threadId) =>
-                        navigation.navigate("LocalThread", { threadId })
-                      }
-                    />
-                  ))}
-                </View>
-
-                {item.total > item.entries.length ? (
-                  <Muted>
-                    {`+${item.total - item.entries.length} more across your stores`}
-                  </Muted>
-                ) : null}
-              </Card>
-            ) : item.kind === "storePost" ? (
-              /* A store you follow, saying something. The website's card,
-                 drawn natively; see store-post-card. */
-              <StorePostCard
-                key={`store-post-${item.postId}`}
-                item={item}
-                onOpenStore={(storeId) =>
-                  navigation.navigate("StoreProfile", { storeId })
-                }
-                onLike={(liked) => likePost(item.postId, liked)}
-                onOpenThread={() =>
-                  navigation.navigate("FlarePost", { postId: item.postId })
-                }
-                onRsvp={rsvpToCode}
-              />
-            ) : item.kind === "announcement" ? (
-              <Card key={`announcement-${index}`}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                  }}
-                >
-                  {/* The mark, not a face. There is no cardflare player and
-                  this is the item that has to look like it knows that. */}
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.elevated,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Image
-                      source={require("../../assets/cardflare-mark.png")}
-                      style={{
-                        height: 20,
-                        width: 20 * MARK_ASPECT,
-                        resizeMode: "contain",
-                      }}
-                    />
-                  </View>
-                  <View style={{ flexShrink: 1 }}>
-                    <Title>{item.headline}</Title>
-                    <Muted>cardflare</Muted>
-                  </View>
-                </View>
-
-                <Body>{item.body}</Body>
-
-                {item.linkLabel && item.linkHref ? (
-                  <Button
-                    label={item.linkLabel}
-                    variant="secondary"
-                    onPress={() => follow(item.linkHref as string)}
-                  />
-                ) : null}
-              </Card>
-            ) : item.kind === "start" ? (
-              <Card key={`start-${index}`}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      backgroundColor: colors.elevated,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <MaterialCommunityIcons
-                      name={STARTERS[item.topic].icon}
-                      size={20}
-                      color={colors.accent}
-                    />
-                  </View>
-                  <View style={{ flexShrink: 1 }}>
-                    <Title>{STARTERS[item.topic].headline}</Title>
-                  </View>
-                </View>
-
-                <Body>{STARTERS[item.topic].body}</Body>
-
-                <Button
-                  label={STARTERS[item.topic].label}
-                  onPress={() =>
-                    /* The store starter opens Plan a visit at its first
-                       step: a store picked there is a day from its room. */
-                    item.topic === "store"
-                      ? openPlanVisit()
-                      : navigation.navigate("DeckPaste")
-                  }
-                />
-              </Card>
-            ) : item.kind === "traded" ? (
-              <Card key={`traded-${index}`}>
-                <Body>
-                  {`${item.requester} traded for ${item.cardName}${
-                    item.holder ? ` with ${item.holder}` : ""
-                  } at ${item.storeName}.`}
-                </Body>
-              </Card>
-            ) : item.kind === "added" ? (
-              <Card key={`added-${index}`}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                  }}
-                >
-                  <FeedPerson
-                    playerId={item.playerId}
-                    displayName={item.displayName}
-                    avatarUrl={item.avatarUrl}
-                    frame={item.frame}
-                    ring={item.ring}
-                    detail={`added ${item.total} ${
-                      item.total === 1 ? "card" : "cards"
-                    } to their binder`}
-                    onOpen={(id) =>
-                      navigation.navigate("PlayerProfile", { playerId: id })
-                    }
-                  />
-                </View>
-
-                <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                  {item.cards.map((card) => (
-                    <CardImage
-                      key={card.cardId}
-                      imageUrl={card.imageUrl}
-                      width={48}
-                      name={card.cardName}
-                      cardNumber={card.cardNumber}
-                      /* Ringed only when it is on YOUR list, same as the web. */
-                      youHave={card.onYourList ? { kind: "exact", count: 0 } : null}
-                    />
-                  ))}
-                </View>
-
-                {item.onYourListCount > 0 && (
-                  <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                    {item.onYourListCount === 1
-                      ? "One of these is on your Flares"
-                      : `${item.onYourListCount} of these are on your Flares`}
-                  </Text>
-                )}
-              </Card>
-            ) : item.kind === "suggest" ? (
-              <Card key={`suggest-${index}`}>
-                <Title>Worth following</Title>
-                <Muted>Their binders answer what you&rsquo;re looking for.</Muted>
-                {item.players.map((person) => (
-                  <Tap
-                    key={person.playerId}
-                    onPress={() =>
-                      navigation.navigate("PlayerProfile", {
-                        playerId: person.playerId,
-                      })
-                    }
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: spacing(2),
-                    }}
-                  >
-                    <PlayerAvatar
-                      displayName={person.displayName}
-                      seed={person.playerId}
-                      avatarUrl={person.avatarUrl}
-                      size={36}
-                    />
-                    <View style={{ flexShrink: 1 }}>
-                      <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                        {person.displayName}
-                      </Text>
-                      {/* Always "wants": the list is plural even when the
-                      overlap with it is one card. */}
-                      <Muted>{`has ${person.answers} of your wants`}</Muted>
-                    </View>
-                  </Tap>
-                ))}
-              </Card>
-            ) : item.kind === "hunt" ? (
-              guest ? (
-                /*
-                 * The guest's read-only post. `post.yours` is set so the
-                 * card offers no "I have this" anywhere inside it (see
-                 * haveFor), and every door it does draw - heart, comments,
-                 * message, the face, Report - goes to sign-up rather than
-                 * to a call that would only answer 401. The heart's
-                 * promise rejects so it springs back unliked.
-                 */
-                <FlareFeedCard
-                  key={`hunt-${item.postId}`}
-                  item={item}
-                  post={{ ...postRef(item), yours: true }}
-                  onOpenProfile={toSignUp}
-                  onLike={async () => {
-                    toSignUp();
-                    throw new Error("guest");
-                  }}
-                  onOpenThread={toSignUp}
-                  onShare={toSignUp}
-                  onReport={toSignUp}
-                  picks={NO_PICKS}
-                  onPicks={() => {}}
-                />
-              ) : view === "compact" ? (
-                /* The founder's compact view: art and a needed-count,
-                   everything else a tap away. See flare-feed-card-compact. */
-                <FlareFeedCardCompact
-                  key={`hunt-${item.postId}`}
-                  item={item}
-                  post={postRef(item)}
-                  onOpenProfile={(id) =>
-                    navigation.navigate("PlayerProfile", { playerId: id })
-                  }
-                  onLike={(liked) => likePost(item.postId, liked)}
-                  onOpenThread={() =>
-                    navigation.navigate("FlarePost", { postId: item.postId })
-                  }
-                  onShare={() =>
-                    setSharing({
-                      postId: item.postId,
-                      posterName: item.displayName,
-                      subject: postSubject(item),
-                    })
-                  }
-                  /* The same two doors the classic card keeps behind its
-                     three dots, so the menu is one menu in both views. */
-                  onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
-                  onProgress={
-                    item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
-                  }
-                  onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
-                  onReport={
-                    item.yours
-                      ? undefined
-                      : () => setReport({ kind: "post", targetId: item.postId })
-                  }
-                  onBlock={
-                    item.yours || !item.playerId
-                      ? undefined
-                      : () => block(item.playerId, item.displayName)
-                  }
-                />
-              ) : (
-                <FlareFeedCard
-                  key={`hunt-${item.postId}`}
-                  item={item}
-                  post={postRef(item)}
-                  onOpenProfile={(id) =>
-                    navigation.navigate("PlayerProfile", { playerId: id })
-                  }
-                  onLike={(liked) => likePost(item.postId, liked)}
-                  onOpenThread={() =>
-                    navigation.navigate("FlarePost", { postId: item.postId })
-                  }
-                  onShare={() =>
-                    setSharing({
-                      postId: item.postId,
-                      posterName: item.displayName,
-                      subject: postSubject(item),
-                    })
-                  }
-                  onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
-                  onProgress={
-                    item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
-                  }
-                  onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
-                  onReport={
-                    item.yours
-                      ? undefined
-                      : () => setReport({ kind: "post", targetId: item.postId })
-                  }
-                  /* Only a post with a player behind it: a store's has nobody to block. */
-                  onBlock={
-                    item.yours || !item.playerId
-                      ? undefined
-                      : () => block(item.playerId, item.displayName)
-                  }
-                  onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
-                  picks={picksFor(item.postId)}
-                  onPicks={(next) => setPicksFor(item.postId, next)}
-                />
-              )
-            ) : item.kind === "upcoming" ? (
-              <Card key={`upcoming-${index}`}>
-                <Muted>
-                  {item.city ? `${item.storeName} · ${item.city}` : item.storeName}
-                </Muted>
-                {/* A night on the calendar is the headline. Without one the
-                counter code is, because the answer is "whenever". */}
-                <Title>{item.nextEventName ?? "Walk in any time"}</Title>
-                <Muted>
-                  {item.nextEventAt
-                    ? doorsAt(item.nextEventAt, item.timeZone)
-                    : "The counter code is always open"}
-                </Muted>
-
-                {item.wants > 0 ? (
-                  <Body>
-                    {`${item.wants} ${item.wants === 1 ? "card" : "cards"} on your Flares to ask about.`}
-                  </Body>
-                ) : null}
-
-                {/* Going, and who else is: the one button for a night,
-                    the same as on the website's upcoming card. Only
-                    with a night to go to, and only from a server that
-                    knows the word. */}
-                {item.nextEventId && item.goingCount !== undefined ? (
-                  <GoingButton
-                    eventId={item.nextEventId}
-                    youGoing={item.youGoing ?? false}
-                    goingCount={item.goingCount}
-                  />
-                ) : null}
-
-                <Button
-                  label={item.nextEventCode ? "See the board" : "Open the room"}
-                  variant="secondary"
-                  onPress={() => void enter(item.nextEventCode ?? item.joinCode)}
-                />
-              </Card>
-            ) : item.kind === "recent" ? (
-              <Card key={`recent-${item.id}`}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                  }}
-                >
-                  {/* The direction in words, never a texture - PRODUCT.md
-                  is explicit that foil means rare, not available. */}
-                  <FeedPerson
-                    playerId={item.playerId}
-                    displayName={item.displayName}
-                    avatarUrl={item.avatarUrl}
-                    frame={item.frame}
-                    ring={item.ring}
-                    aura={item.aura}
-                    size={36}
-                    detail={[
-                      item.direction === "showcase" ? "Offering" : null,
-                      item.deckLabel,
-                      item.storeName,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                    onOpen={(id) =>
-                      navigation.navigate("PlayerProfile", { playerId: id })
-                    }
-                  />
-                  <Muted>{agoFrom(item.when)}</Muted>
-                </View>
-
-                <CardRail
-                  cards={item.cards}
-                  more={item.more}
-                  width={tileWidth(item.cards.length)}
-                />
-
-                <Button
-                  label="See the board"
-                  variant="secondary"
-                  onPress={() => void enter(item.joinCode)}
-                />
-              </Card>
-            ) : item.kind === "nearbyStores" ? (
-              /*
-               * Three states, and the two empty ones carry the feature. A
-               * section that vanishes when we do not know where somebody is
-               * teaches them nothing; a section that asks is how anybody
-               * finds out it exists. See nearbyStoreItems on the server.
-               */
-              item.needsLocation ? (
-                <Card key={`nearby-${index}`}>
-                  <Title>Find stores near you</Title>
-                  <NearbyLocationAsk onDone={() => void load(() => true)} />
-                </Card>
-              ) : (
-                <Card key={`nearby-${index}`}>
-                  <Title>Stores near you</Title>
-                  <Muted>
-                    Shops cardflare knows about, whether or not they use it yet.
-                  </Muted>
-
-                  {/* Known position, nothing in range. Said out loud: an empty
-                list is indistinguishable from a broken one. */}
-                  {item.stores.length === 0 ? (
-                    <View style={{ gap: spacing(2.5) }}>
-                      <Muted>
-                        No stores near you yet. We&rsquo;re adding shops city by city.
-                      </Muted>
-                      {/* A ZIP that found nothing might simply be the wrong
-                    ZIP, and this is the only place to change it. */}
-                      {item.source === "postal" ? (
-                        <NearbyLocationAsk onDone={() => void load(() => true)} />
-                      ) : null}
-                    </View>
-                  ) : null}
-
-                  <View style={{ gap: spacing(2.5) }}>
-                    {item.stores.map((store) => (
-                      /* Tappable, because the website has put a "View" button
-                   on every one of these rows since the day the Nearby
-                   card shipped and the phone showed the same shops as
-                   dead text. A chevron says so without a button's
-                   weight in a list of five. */
-                      <Tap
-                        key={store.storeId}
-                        onPress={() =>
-                          navigation.navigate("StoreProfile", {
-                            storeId: store.storeId,
-                          })
-                        }
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: spacing(2),
-                        }}
-                      >
-                        <MaterialCommunityIcons
-                          name="map-marker-outline"
-                          size={18}
-                          color={colors.textMuted}
-                        />
-                        <View style={{ flex: 1 }}>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: spacing(1),
-                            }}
-                          >
-                            <Text
-                              numberOfLines={1}
-                              style={{ color: colors.textPrimary, fontWeight: "600" }}
-                            >
-                              {store.name}
-                            </Text>
-                            {/* Verified is the mark everybody sees beside a
-                                store's name. Ultra is a tier and is never
-                                drawn here: the store's own page says it. */}
-                            {store.verified ? <VerifiedMark size={14} /> : null}
-                          </View>
-                          <Text
-                            numberOfLines={1}
-                            style={{ color: colors.textMuted, fontSize: 12 }}
-                          >
-                            {`${store.miles} mi${store.city ? ` · ${store.city}` : ""}${
-                              store.unclaimed ? " · Unclaimed listing" : ""
-                            }`}
-                          </Text>
-                        </View>
-                        <MaterialCommunityIcons
-                          name="chevron-right"
-                          size={20}
-                          color={colors.textMuted}
-                        />
-                      </Tap>
-                    ))}
-                  </View>
-                </Card>
-              )
-            ) : item.kind === "pack" ? (
-              <Card key={`pack-${index}`}>
-                <Muted>In the Embers shop</Muted>
-                <Title>{item.name}</Title>
-                <Body>{item.description}</Body>
-                <Muted>
-                  {item.balance >= item.priceEmbers
-                    ? `${item.priceEmbers} Embers`
-                    : `${item.priceEmbers} Embers · you have ${item.balance}`}
-                </Muted>
-                <Button
-                  label={
-                    item.balance >= item.priceEmbers ? "Open a pack" : "See the store"
-                  }
-                  variant="secondary"
-                  onPress={() => navigation.navigate("Store")}
-                />
-              </Card>
-            ) : item.kind === "shop" ? (
-              <Card key={`shop-${index}`}>
-                <Title>Worth spending Embers on</Title>
-                <Muted>{`You have ${item.balance} to spend.`}</Muted>
-                <View style={{ gap: spacing(2) }}>
-                  {item.cosmetics.map((cosmetic) => (
-                    <View
-                      key={cosmetic.slug}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(2),
-                      }}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text
-                          style={{ color: colors.textPrimary, fontWeight: "600" }}
-                          numberOfLines={1}
-                        >
-                          {cosmetic.name}
-                        </Text>
-                        <Text
-                          style={{ color: colors.textMuted, fontSize: 12 }}
-                          numberOfLines={1}
-                        >
-                          {cosmetic.description}
-                        </Text>
-                      </View>
-                      <Muted>{`${cosmetic.costEmbers}`}</Muted>
-                    </View>
-                  ))}
-                </View>
-                <Button
-                  label="See what you can wear"
-                  variant="secondary"
-                  onPress={() => navigation.navigate("Customize", { area: "profile" })}
-                />
-              </Card>
-            ) : item.kind !== "board" ? null : (
-              <Card key={`board-${index}`}>
-                {/* A local needs no address — you drive there. A room
-                somewhere you have never been needs a place attached. */}
-                <Muted>
-                  {item.yours || !item.city
-                    ? item.storeName
-                    : `${item.storeName} · ${item.city}`}
-                </Muted>
-                <Title>{item.eventName}</Title>
-                <Muted>
-                  {item.live ? "Open now" : doorsAt(item.startsAt, item.timeZone)}
-                </Muted>
-
-                {item.youCanAnswer > 0 && (
-                  <>
-                    <Text style={{ color: colors.accent, fontWeight: "600" }}>
-                      {`You can answer ${item.youCanAnswer} ${
-                        item.youCanAnswer === 1 ? "card" : "cards"
-                      } on this board`}
-                    </Text>
-                    <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                      {item.sample.map((card) => (
-                        <View key={card.cardId}>
-                          <CardImage
-                            imageUrl={card.imageUrl}
-                            width={48}
-                            name={card.cardName}
-                            cardNumber={card.cardNumber}
-                            youHave={
-                              card.match ? { kind: card.match, count: 0 } : undefined
-                            }
-                          />
-                          <HeldRing match={card.match} />
-                        </View>
-                      ))}
-                    </View>
-                  </>
-                )}
-
-                <Button
-                  label={item.live ? "Open the room" : "See the board"}
-                  variant="secondary"
-                  onPress={() => void enter(item.code)}
-                />
-              </Card>
-            );
-
-          /* The heading, only where the section changes. The order was
-           always an argument about what is worth a tap; this is that
-           argument said out loud. */
-          /*
-           * A SECTION WE HAVE NO TITLE FOR DRAWS NOTHING.
-           *
-           * `SECTION_TITLES[item.section]` used to be read straight into
-           * a <Text>. A server filing items under a section newer than
-           * the app returned undefined, and an empty Text still takes a
-           * line box - so the Feed opened on forty-three points of pure
-           * black above the first card, with nothing in it to see or to
-           * blame. Same forgiving rule the item kinds already follow.
-           */
-          /*
-           * And never on Following: the server sends that tab as one
-           * chronological list, so a heading there would carve up a
-           * timeline that is meant to read as one. The website draws
-           * none there either.
-           */
-          const heading =
-            guest || tab === "following" ? null : sectionHeading(item.section);
-          const opensSection =
-            heading !== null &&
-            sectionsShown > 1 &&
-            (index === 0 || shown[index - 1].section !== item.section);
-
-          return (
-            <View key={shownKeys[index]} style={{ gap: spacing(2) }}>
-              {opensSection ? (
-                <Text
-                  style={{
-                    color: colors.textMuted,
-                    fontSize: 12,
-                    fontWeight: "600",
-                    letterSpacing: 1.4,
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {heading}
-                </Text>
-              ) : null}
-              {/* Why this is on your screen, ABOVE the card it explains:
-                under it, the line read as the next card's caption. A
-                feed that explains itself stops feeling arbitrary even
-                when it is thin. A post carries its own label in its
-                header instead - the founder: no separate text between
-                cards. */}
-              {item.reason && item.kind !== "hunt" ? (
-                <Muted>{item.reason}</Muted>
-              ) : null}
-              {body}
-            </View>
-          );
-        })}
-
-        {/*
-         * The explainer, for a screen that has not filled up yet.
-         *
-         * It was unconditional, which meant an established player read "how
-         * it works" under their own board every time they opened the app.
-         * Below three items the screen has room for it and a newcomer needs
-         * it; above three it is the least interesting thing present.
-         */}
-        {/*
-         * And not until the cache has answered. Measured on a release
-         * build: the shell is up at 0.8s and the cached feed paints at
-         * ~1.2s, so an unguarded empty state flashes "how it works" at
-         * somebody with a full feed for a third of a second before their
-         * own content replaces it. Telling a returning player they have
-         * nothing, briefly, is its own kind of disorienting — which is
-         * the complaint this whole change exists to answer.
-         */}
-        {!guest && feedReady && shown.length === 0 && tab === "following" && (
-          <Card>
-            <Title>Nothing from people yet</Title>
-            <Body>
-              Follow a friend and their Flares show up here. Find them by name in
-              Search.
-            </Body>
-            <Button
-              label="Find a player"
-              variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Search" })}
-            />
-          </Card>
-        )}
-        {/* The restored filter needs its own words. Without them it
-            fell through to Nearby's, which talks about store rooms. */}
-        {!guest && feedReady && shown.length === 0 && tab === "mine" && (
-          <Card>
-            <Title>You have not posted yet</Title>
-            <Body>
-              Post a Flare for a card you are looking for and it shows up here, and in
-              Following with everyone else&rsquo;s.
-            </Body>
-            <Button
-              label="Post a Flare"
-              variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
-            />
-          </Card>
-        )}
-
-        {!guest && feedReady && shown.length === 0 && tab === "nearby" && (
-          <Card>
-            <Title>Nothing on right now</Title>
-            <Body>
-              Post a Flare for a card you are looking for, or follow a friend, and it
-              shows up here. At a store? The code at the counter gets you into
-              tonight&rsquo;s room.
-            </Body>
-            <Button
-              label="Open the room"
-              variant="secondary"
-              onPress={() => openRoom(navigation)}
-            />
-          </Card>
+        {/* Following | Nearby as pages, swiped left and right; a guest
+            has no tabs and reads the one sample list. */}
+        {guest ? (
+          tabContent("following")
+        ) : (
+          <FeedPager
+            tabs={FEED_TABS}
+            active={tab}
+            onChange={setTab}
+            render={tabContent}
+            gutter={gutter}
+          />
         )}
 
         {/* The paper plane: send the post to people you follow, the way
