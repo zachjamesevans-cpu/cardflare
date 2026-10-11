@@ -15,12 +15,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { SheetBackdrop } from "./action-menu";
 import {
   getFollowing,
+  listLocalThreads,
   openDirectThread,
   searchPlayersByName,
   sendLocalMessage,
+  type FollowedPlayer,
+  type LocalThread,
 } from "./api";
 import { PlayerAvatar } from "./player-avatar";
 import { postLink } from "./post-link";
+import { rankShareTargets } from "./share-ranking";
 import { SwipeToClose } from "./sheet-swipe";
 import { colors, radius, spacing } from "./theme";
 import { Button, ErrorLine, Input, Muted, Tap } from "./ui";
@@ -69,7 +73,9 @@ export function SharePostSheet({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const [following, setFollowing] = useState<Person[] | null>(null);
+  const [following, setFollowing] = useState<FollowedPlayer[] | null>(null);
+  /* Your conversations, for who comes first; none is fine. */
+  const [threads, setThreads] = useState<LocalThread[]>([]);
   const [loadFailed, setLoadFailed] = useState(false);
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Person[] | null>(null);
@@ -84,6 +90,9 @@ export function SharePostSheet({
     getFollowing()
       .then((answer) => alive && setFollowing(answer.following))
       .catch(() => alive && setLoadFailed(true));
+    listLocalThreads()
+      .then((answer) => alive && setThreads(answer.threads))
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
@@ -108,10 +117,16 @@ export function SharePostSheet({
     };
   }, [term]);
 
-  /* The people you follow who match first, then anyone else found. */
+  /* Nothing typed: the six you talk to most (see share-ranking.ts), with
+     anyone already ticked from a search kept in sight in front. Typed:
+     the people you follow who match first, then anyone else found. */
   const people = useMemo(() => {
     if (!following) return null;
-    if (!term) return following;
+    if (!term) {
+      const top = rankShareTargets(threads, following);
+      const shown = new Set(top.map((person) => person.playerId));
+      return [...picked.filter((person) => !shown.has(person.playerId)), ...top];
+    }
     const lower = term.toLowerCase();
     const mine = following.filter((person) =>
       person.displayName.toLowerCase().includes(lower),
@@ -119,7 +134,7 @@ export function SharePostSheet({
     const known = new Set(mine.map((person) => person.playerId));
     const others = (found ?? []).filter((person) => !known.has(person.playerId));
     return [...mine, ...others];
-  }, [following, found, term]);
+  }, [following, threads, picked, found, term]);
 
   const isPicked = (person: Person) =>
     picked.some((each) => each.playerId === person.playerId);
@@ -181,7 +196,7 @@ export function SharePostSheet({
               paddingHorizontal: spacing(4),
               paddingBottom: spacing(4) + insets.bottom,
               gap: spacing(3),
-              height: "72%",
+              maxHeight: "88%",
             }}
           >
             {/* The grab handle: this pulls down to close. */}
@@ -215,7 +230,7 @@ export function SharePostSheet({
             </View>
 
             <ScrollView
-              style={{ flex: 1 }}
+              style={{ flexGrow: 0 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
               contentContainerStyle={{ flexDirection: "row", flexWrap: "wrap" }}
