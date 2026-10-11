@@ -53,6 +53,7 @@ import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
+import { useTypefaceReady } from "./src/typeface";
 import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
@@ -814,6 +815,9 @@ function AppGates() {
    * if storage is slow.
    */
   const [gate, setGate] = useState<"checking" | "welcome" | "open">("checking");
+  /* The typeface's files, so the first screen draws in Inter rather
+     than in San Francisco and then jumping (src/typeface.tsx). */
+  const fontsReady = useTypefaceReady();
 
   useEffect(() => {
     let live = true;
@@ -913,7 +917,7 @@ function AppGates() {
     };
   }, [gate]);
 
-  if (gate === "checking") {
+  if (gate === "checking" || !fontsReady) {
     return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
   }
 
