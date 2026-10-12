@@ -79,7 +79,7 @@ describe("the one switch", () => {
         "When you join a room, your open Flares go up on its board.",
       );
     }
-    expect(read("src/app/profile/settings/page.tsx")).toContain("<AutoPostToggle");
+    expect(read("src/app/profile/settings/settings-content.tsx")).toContain("<AutoPostToggle");
     expect(app).toContain("setAutoPost(data.me.player.autoPostFlares ?? true)");
     expect(read("mobile/src/api.ts")).toContain('action: "set-auto-post"');
   });

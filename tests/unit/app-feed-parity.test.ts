@@ -384,7 +384,7 @@ describe("the home screen's furniture", () => {
     /* The website's settings page is the same housekeeping-only page:
        no wants list (the Flare tab's "Flares" is the one list)
        and no followed-store list (the Room tab's "Following" is). */
-    const webSettings = read("src/app/profile/settings/page.tsx");
+    const webSettings = read("src/app/profile/settings/settings-content.tsx");
     expect(webSettings).not.toContain("Your saved wants");
     expect(webSettings).not.toContain("Your locals");
     /* The paste box stays, under the title the app's card carries. */

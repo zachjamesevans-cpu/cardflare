@@ -65,7 +65,7 @@ describe("Edit profile", () => {
   });
 
   it("is where settings sends you for your name and username", () => {
-    const settings = read("src/app/profile/settings/page.tsx");
+    const settings = read("src/app/profile/settings/settings-content.tsx");
     expect(settings).toContain('href="/profile/edit"');
     expect(settings).toContain("Name and username");
     expect(settings).not.toContain("DisplayNameForm");

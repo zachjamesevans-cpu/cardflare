@@ -27,7 +27,7 @@ const read = (path: string) =>
 const webCopySource = read("src/lib/notifications/push-prefs.ts");
 const appCopySource = read("mobile/src/push-copy.ts");
 
-const webSettings = read("src/app/profile/settings/page.tsx");
+const webSettings = read("src/app/profile/settings/settings-content.tsx");
 const webToggles = read("src/components/players/push-pref-toggles.tsx");
 const appSettings = read("mobile/src/screens/settings.tsx");
 
@@ -135,7 +135,7 @@ describe("push copy, both platforms", () => {
 });
 
 describe("the website's settings page", () => {
-  it("has a notifications card after the rooms and look cards, in both orders", () => {
+  it("has a notifications card, the Notifications category's whole page", () => {
     expect(webSettings).toMatch(/<Card key="notifications"/);
     expect(webSettings).toContain("{PUSH_HEADING}");
     expect(webSettings).toContain("{PUSH_LINE}");
@@ -145,9 +145,9 @@ describe("the website's settings page", () => {
     expect(webSettings).toContain(
       "<PushPrefToggles initial={await pushPrefsFor(playerId)} />",
     );
-    const orders =
-      webSettings.match(/roomsCard,\s*lookCard,\s*notificationsCard,/g) ?? [];
-    expect(orders).toHaveLength(2);
+    /* Settings in categories (settings-sections.ts): the founder,
+       "group settings into categories". */
+    expect(webSettings).toContain("notifications: [notificationsCard],");
   });
 
   it("draws the four switches from the copy, optimistic, truth back on error", () => {
