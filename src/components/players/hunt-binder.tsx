@@ -201,6 +201,8 @@ export function HuntBinder({
     lookingFor: card.needed,
     stillNeeds: card.remaining,
     youHave: null,
+    /* A found pocket opens found: band and all, as the app's does. */
+    state: card.found ? "found" : "open",
     /* The pick control, for a signed-in visitor on a card still open.
        A found card cannot be picked, so it carries none. */
     have:

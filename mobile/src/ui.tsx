@@ -250,6 +250,13 @@ export interface ZoomCard {
    * on your own post and on a card that already traded.
    */
   have?: ZoomHave | null;
+  /**
+   * FOUND or OFFERED, so the open card says what its thumbnail said.
+   * The founder: "when viewing a card in full view, it should still
+   * show that the card was found, and with the green 'found' thing at
+   * bottom."
+   */
+  state?: "open" | "offered" | "found";
 }
 
 export interface ZoomHave {
@@ -760,9 +767,12 @@ export function NoArt({
 export function StateBand({
   state,
   small = false,
+  large = false,
 }: {
   state: "found" | "offered";
   small?: boolean;
+  /** The full view's card: the same band, sized to a card that big. */
+  large?: boolean;
 }) {
   const found = state === "found";
   return (
@@ -773,7 +783,7 @@ export function StateBand({
         left: 0,
         right: 0,
         bottom: 0,
-        paddingVertical: small ? 1 : 2,
+        paddingVertical: large ? 6 : small ? 1 : 2,
         alignItems: "center",
         backgroundColor: found ? colors.accent : colors.scrim,
       }}
@@ -782,9 +792,9 @@ export function StateBand({
         maxFontSizeMultiplier={1.3}
         style={{
           color: found ? colors.accentContrast : colors.textSecondary,
-          fontSize: small ? 7 : 11,
+          fontSize: large ? 16 : small ? 7 : 11,
           fontWeight: "800",
-          letterSpacing: small ? 0.4 : 1,
+          letterSpacing: large ? 2 : small ? 0.4 : 1,
         }}
       >
         {state.toUpperCase()}
@@ -1463,58 +1473,26 @@ export function CardImage({
                             close();
                           }}
                         >
-                          {card.imageUrl ? (
-                            <RemoteImage
-                              uri={card.imageUrl}
-                              contentFit="contain"
-                              style={{
-                                width: hero,
-                                height: Math.round((hero * 88) / 63),
-                                borderRadius: radius.control,
-                                backgroundColor: colors.canvas,
-                              }}
-                            />
-                          ) : (
-                            <NoArt
-                              name={card.name}
-                              cardNumber={card.cardNumber}
-                              large
-                              style={{
-                                width: hero,
-                                height: Math.round((hero * 88) / 63),
-                                borderRadius: radius.control,
-                              }}
-                            />
-                          )}
+                          <ZoomArt
+                            imageUrl={card.imageUrl}
+                            name={card.name}
+                            cardNumber={card.cardNumber}
+                            width={hero}
+                            state={card.state ?? "open"}
+                          />
                         </Pressable>
                       ))}
                     </ScrollView>
                   </View>
                 ) : (
                   <Pressable onPress={close}>
-                    {imageUrl ? (
-                      <RemoteImage
-                        uri={imageUrl}
-                        contentFit="contain"
-                        style={{
-                          width: hero,
-                          height: Math.round((hero * 88) / 63),
-                          borderRadius: radius.control,
-                          backgroundColor: colors.canvas,
-                        }}
-                      />
-                    ) : (
-                      <NoArt
-                        name={name}
-                        cardNumber={cardNumber}
-                        large
-                        style={{
-                          width: hero,
-                          height: Math.round((hero * 88) / 63),
-                          borderRadius: radius.control,
-                        }}
-                      />
-                    )}
+                    <ZoomArt
+                      imageUrl={imageUrl}
+                      name={name}
+                      cardNumber={cardNumber}
+                      width={hero}
+                      state={state}
+                    />
                   </Pressable>
                 )}
                 {/*
@@ -2013,3 +1991,45 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+/**
+ * The card at full size in the viewer, saying what its thumbnail says:
+ * a found card in black and white with the green FOUND band at its
+ * foot, an offered one dimmed with OFFERED. ONE language, on the
+ * thumbnail and on the card opened from it - the founder, "it's
+ * important we have a universal language across the app."
+ */
+function ZoomArt({
+  imageUrl,
+  name,
+  cardNumber,
+  width,
+  state,
+}: {
+  imageUrl: string | null;
+  name: string;
+  cardNumber: string;
+  width: number;
+  state: "open" | "offered" | "found";
+}) {
+  const height = Math.round((width * 88) / 63);
+  const box = { width, height, borderRadius: radius.control };
+  const art = !imageUrl ? (
+    <NoArt name={name} cardNumber={cardNumber} large style={box} />
+  ) : state === "found" ? (
+    <FoundArt uri={imageUrl} width={width} height={height} borderRadius={radius.control} />
+  ) : (
+    <RemoteImage
+      uri={imageUrl}
+      contentFit="contain"
+      style={{ ...box, backgroundColor: colors.canvas }}
+    />
+  );
+  if (state === "open") return art;
+  return (
+    <View style={{ ...box, overflow: "hidden" }}>
+      <View style={{ opacity: state === "offered" ? 0.5 : 1 }}>{art}</View>
+      <StateBand state={state} large />
+    </View>
+  );
+}
