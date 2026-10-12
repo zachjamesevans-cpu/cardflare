@@ -959,9 +959,11 @@
   filter: drop-shadow(0 0 6px rgba(80, 170, 230, 0.6));
 }
 
-/* Sakura: soft pink, petals drifting down around the picture. */
+/* Sakura: blossom pink from blush to deep rose, turning slowly - the
+   ring of the Sakura Season set (2026-10-11), richer than the flat
+   pinks it had. */
 .cfa-ring-sakura {
-  --cfa-band: conic-gradient(#f9c9dd, #f39ec2, #fde7f0, #f39ec2, #f9c9dd);
+  --cfa-band: conic-gradient(#ffd6e6, #f59ac0, #fff1f6, #e9779f, #ffd6e6);
 }
 .cfa-ring-sakura .cfx-ring-band::before {
   animation: cfa-spin 20s linear infinite;
@@ -1863,7 +1865,7 @@
 .cfa-pattern-sakura-petals .cfx-card-fx {
   background:
     var(--cfa-p-petal) 0 0 / 42px 42px,
-    var(--cfa-p-petal) 22px 26px / 60px 60px;
+    var(--cfa-p-petal-light) 22px 26px / 60px 60px;
   mix-blend-mode: screen;
   opacity: 0.6;
   animation: cfa-fall 7s linear infinite;
@@ -2084,7 +2086,7 @@
 .cfa-anim-sakura-petals .cfx-card-fx {
   background:
     var(--cfa-p-petal) 0 0 / 40px 40px,
-    var(--cfa-p-petal) 22px 26px / 58px 58px;
+    var(--cfa-p-petal-light) 22px 26px / 58px 58px;
   animation: cfa-fall 6.4s linear infinite;
   opacity: 0.8;
 }
@@ -2455,8 +2457,8 @@
 .cfa-bg-sakura-garden {
   background:
     var(--cfa-p-petal) 0 0 / 56px 56px,
-    var(--cfa-p-petal) 30px 36px / 84px 84px,
-    linear-gradient(180deg, #2b1a2a, #1d1220);
+    var(--cfa-p-petal-light) 30px 36px / 84px 84px,
+    linear-gradient(180deg, #4a2440 0%, #2b1530 55%, #170c1c 100%);
 }
 .cfa-bg-underwater {
   background:
@@ -2567,7 +2569,7 @@
   opacity: 0.7;
 }
 .cfa-scene-sakura-petals .cfx-panel-fx {
-  background-image: var(--cfa-p-petal), var(--cfa-p-petal);
+  background-image: var(--cfa-p-petal), var(--cfa-p-petal-light);
   background-size:
     46px 46px,
     70px 70px;
