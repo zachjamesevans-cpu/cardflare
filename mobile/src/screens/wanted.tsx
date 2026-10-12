@@ -1,10 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
+import { DotsButton, SheetBackdrop } from "../action-menu";
 import {
   getWantedNearYou,
   serverMessage,
@@ -13,64 +24,58 @@ import {
   type WantedPage,
 } from "../api";
 import { HeldRing } from "../held-ring";
-import {
-  WANTED_PRIVATE_LINE,
-  WANTED_SORTS,
-  wantedCountLine,
-  type WantedSort,
-} from "../nearby-shared";
-import { colors, gutter, spacing } from "../theme";
+import { WANTED_PRIVATE_LINE, wantedCountLine } from "../nearby-shared";
+import { SwipeToClose } from "../sheet-swipe";
+import { colors, gutter, radius, spacing } from "../theme";
 import { Button, Card, CardImage, ErrorLine, Loading, Muted, Tap } from "../ui";
 import { PersonRow } from "../wanted-near-you";
 
-/** How many people a card shows before "Show all". */
-const FIRST_PEOPLE = 5;
+const COLUMNS = 3;
+const GAP = spacing(3);
 
 /**
- * "Wanted near you": every card of yours somebody near you wants, one
- * section each, people inside. Grouped by card because that is the
- * question - which of mine is wanted - and because a big city can put
- * a hundred people here. The website's page is the same
- * (src/app/feed/wanted/page.tsx).
+ * "Wanted near you", as your binder: the cards of yours somebody near
+ * you wants, in a grid, each wearing how many people want it. Tap one
+ * and its people slide up. The founder, of the list this replaced:
+ * "seems like a lot of info for someone." The first screen is card art
+ * and numbers; people appear only for the card you picked. The
+ * website's page is the same (src/app/feed/wanted/page.tsx).
+ *
+ * Most wanted first, and closest first inside a card: the order a
+ * person would pick, so there is nothing to sort.
  *
  * LIVE: read again every time the screen comes into view, so somebody
- * who took their Flare down is gone from it. The founder: "it needs to
- * be 'live'."
+ * who took their Flare down is gone from it.
  */
 export function WantedNearYouScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const [sort, setSort] = useState<WantedSort>("most");
+  const route = useRoute<RouteProp<StackParams, "WantedNearYou">>();
+  const { width } = useWindowDimensions();
   const [page, setPage] = useState<WantedPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [more, setMore] = useState(false);
-  /* The sort a read was for, so a slow answer for the old sort cannot
-     land over the new one. */
-  const asked = useRef<WantedSort>("most");
+  const [openCard, setOpenCard] = useState<string | null>(route.params?.cardId ?? null);
 
-  const load = useCallback(async (next: WantedSort) => {
-    asked.current = next;
+  const load = useCallback(async () => {
     setError(null);
     try {
-      const fresh = await getWantedNearYou(next, 0);
-      if (asked.current === next) setPage(fresh);
+      setPage(await getWantedNearYou("most", 0));
     } catch (caught) {
-      if (asked.current === next) {
-        setError(serverMessage(caught) ?? "Could not load this. Try again in a moment.");
-      }
+      setError(serverMessage(caught) ?? "Could not load this. Try again in a moment.");
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
-      void load(sort);
-    }, [load, sort]),
+      void load();
+    }, [load]),
   );
 
   const loadMore = async () => {
     if (!page || page.nextOffset === null || more) return;
     setMore(true);
     try {
-      const next = await getWantedNearYou(sort, page.nextOffset);
+      const next = await getWantedNearYou("most", page.nextOffset);
       setPage({ ...next, groups: [...page.groups, ...next.groups] });
     } catch (caught) {
       setError(serverMessage(caught) ?? "Could not load more.");
@@ -79,103 +84,160 @@ export function WantedNearYouScreen() {
     }
   };
 
+  const tile = Math.floor((width - gutter * 2 - GAP * (COLUMNS - 1)) / COLUMNS);
+  const open = page?.groups.find((group) => group.card.cardId === openCard) ?? null;
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{ padding: gutter, gap: spacing(4), paddingBottom: spacing(10) }}
-      keyboardShouldPersistTaps="handled"
-      /* The draft box opens under a row; the keyboard must not cover it. */
-      automaticallyAdjustKeyboardInsets
-    >
-      {page && page.totalPeople > 0 ? (
-        <Muted>{`${wantedCountLine(page.totalPeople)}. ${WANTED_PRIVATE_LINE}`}</Muted>
-      ) : null}
+    <>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.canvas }}
+        contentContainerStyle={{ padding: gutter, gap: spacing(4), paddingBottom: spacing(10) }}
+      >
+        {page && page.totalPeople > 0 ? (
+          <View style={{ gap: 2 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+              {wantedCountLine(page.totalPeople)}
+            </Text>
+            <Muted>{WANTED_PRIVATE_LINE}</Muted>
+          </View>
+        ) : null}
 
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-        {WANTED_SORTS.map((option) => {
-          const on = option.key === sort;
-          return (
-            <Tap
-              key={option.key}
-              accessibilityLabel={`Sort by ${option.label}`}
-              accessibilityState={{ selected: on }}
-              onPress={() => {
-                setSort(option.key);
-                setPage(null);
-              }}
-              style={{
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: on ? colors.accent : colors.border,
-                backgroundColor: on ? colors.accentTint : "transparent",
-                paddingHorizontal: spacing(3),
-                paddingVertical: spacing(1.5),
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.accent : colors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: "600",
-                }}
-              >
-                {option.label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
+        <ErrorLine message={error} />
+        {!page && !error ? <Loading /> : null}
 
-      <ErrorLine message={error} />
+        {page && page.groups.length === 0 ? (
+          <Card style={{ alignItems: "center", paddingVertical: spacing(10) }}>
+            <Ionicons name="location-outline" size={24} color={colors.textMuted} />
+            <Muted>
+              Nobody near you is looking for your cards right now. When someone is, they
+              show up here.
+            </Muted>
+          </Card>
+        ) : null}
 
-      {!page && !error ? <Loading /> : null}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: GAP }}>
+          {page?.groups.map((group) => (
+            <WantedTile
+              key={group.card.cardId}
+              group={group}
+              width={tile}
+              onPress={() => setOpenCard(group.card.cardId)}
+            />
+          ))}
+        </View>
 
-      {page && page.groups.length === 0 ? (
-        <Card style={{ alignItems: "center", paddingVertical: spacing(10) }}>
-          <Ionicons name="location-outline" size={24} color={colors.textMuted} />
-          <Muted>
-            Nobody near you is looking for your cards right now. When someone is, they
-            show up here.
-          </Muted>
-        </Card>
-      ) : null}
+        {page && page.nextOffset !== null ? (
+          <Button
+            label="Show more cards"
+            variant="secondary"
+            busy={more}
+            onPress={() => void loadMore()}
+          />
+        ) : null}
+      </ScrollView>
 
-      {page?.groups.map((group) => (
-        <CardSection
-          key={group.card.cardId}
-          group={group}
-          onOpenThread={(threadId) => navigation.navigate("LocalThread", { threadId })}
-          onStopped={() => void load(sort)}
-        />
-      ))}
-
-      {page && page.nextOffset !== null ? (
-        <Button
-          label="Show more cards"
-          variant="secondary"
-          busy={more}
-          onPress={() => void loadMore()}
+      {open ? (
+        <PeopleForCard
+          group={open}
+          onClose={() => setOpenCard(null)}
+          onOpenThread={(threadId) => {
+            setOpenCard(null);
+            navigation.navigate("LocalThread", { threadId });
+          }}
+          onStopped={() => {
+            setOpenCard(null);
+            void load();
+          }}
         />
       ) : null}
-    </ScrollView>
+    </>
   );
 }
 
-/** One card of yours, and the people near you who want it. */
-function CardSection({
+/** One card in the grid: the art, ringed as yours, and how many want it. */
+function WantedTile({
   group,
+  width,
+  onPress,
+}: {
+  group: WantedGroup;
+  width: number;
+  onPress: () => void;
+}) {
+  const count = group.people.length;
+  return (
+    <Tap
+      accessibilityLabel={`${group.card.cardName}, ${count} ${count === 1 ? "person wants" : "people want"} it`}
+      onPress={onPress}
+    >
+      <View>
+        <CardImage
+          imageUrl={group.card.imageUrl}
+          width={width}
+          name={group.card.cardName}
+          cardNumber={group.card.cardNumber}
+          youHave={{ kind: group.card.match, count: 0 }}
+        />
+        <HeldRing match={group.card.match} />
+        <CountBadge count={count} />
+      </View>
+    </Tap>
+  );
+}
+
+/** The green number on a card's corner: how many people near you want it. */
+function CountBadge({ count }: { count: number }) {
+  return (
+    <View
+      style={{
+        position: "absolute",
+        top: -6,
+        right: -6,
+        minWidth: 28,
+        height: 28,
+        paddingHorizontal: 7,
+        borderRadius: 14,
+        backgroundColor: colors.accent,
+        borderWidth: 2,
+        borderColor: colors.canvas,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text style={{ color: colors.accentContrast, fontSize: 13, fontWeight: "800" }}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * One card's people, sliding up from the bottom: closest first, the
+ * ones already messaged at the foot. "Not trading this anymore" is
+ * behind the three dots, out of the way of the thing you came to do.
+ */
+function PeopleForCard({
+  group,
+  onClose,
   onOpenThread,
   onStopped,
 }: {
   group: WantedGroup;
+  onClose: () => void;
   onOpenThread: (threadId: string) => void;
   onStopped: () => void;
 }) {
-  const [all, setAll] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const count = group.people.length;
-  const shown = all ? group.people : group.people.slice(0, FIRST_PEOPLE);
+
+  /* A different card is a fresh sheet. */
+  useEffect(() => {
+    setMenu(false);
+    setError(null);
+  }, [group.card.cardId]);
 
   const stop = async () => {
     if (busy) return;
@@ -192,72 +254,82 @@ function CardSection({
   };
 
   return (
-    <View
-      style={{
-        gap: spacing(3),
-        paddingBottom: spacing(4),
-        borderBottomWidth: 1,
-        borderBottomColor: colors.border,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
-        <View>
-          <CardImage
-            imageUrl={group.card.imageUrl}
-            width={52}
-            name={group.card.cardName}
-            cardNumber={group.card.cardNumber}
-            youHave={{ kind: group.card.match, count: 0 }}
-          />
-          <HeldRing match={group.card.match} />
-        </View>
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "700" }}
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable onPress={onClose} style={{ flex: 1, justifyContent: "flex-end" }}>
+          <SwipeToClose
+            onClose={onClose}
+            style={{
+              backgroundColor: colors.surface,
+              borderTopLeftRadius: radius.panel,
+              borderTopRightRadius: radius.panel,
+              borderWidth: 1,
+              borderColor: colors.border,
+              padding: spacing(4),
+              paddingBottom: spacing(4) + insets.bottom,
+              gap: spacing(3),
+              maxHeight: "80%",
+            }}
           >
-            {group.card.cardName}
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {`${count} ${count === 1 ? "person wants" : "people want"} this`}
-            {group.card.match === "other-printing" ? " · You have another printing" : ""}
-          </Text>
-        </View>
-      </View>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text
+                  numberOfLines={1}
+                  style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "700" }}
+                >
+                  {group.card.cardName}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {`${count} ${count === 1 ? "person wants" : "people want"} this`}
+                  {group.card.match === "other-printing" ? " · You have another printing" : ""}
+                </Text>
+              </View>
+              <DotsButton label="More for this card" onPress={() => setMenu(!menu)} />
+            </View>
 
-      <View style={{ gap: spacing(3) }}>
-        {shown.map((person) => (
-          <PersonRow
-            key={`${person.ask.kind}-${person.ask.id}`}
-            person={person}
-            onOpenThread={onOpenThread}
-          />
-        ))}
-      </View>
+            {menu ? (
+              <Tap
+                accessibilityLabel={`Not trading ${group.card.cardName} anymore`}
+                disabled={busy}
+                onPress={() => void stop()}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(2),
+                  borderRadius: radius.control,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.elevated,
+                  padding: spacing(3),
+                }}
+              >
+                <Ionicons name="close-circle-outline" size={18} color={colors.textSecondary} />
+                <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
+                  {busy ? "Saving…" : "Not trading this anymore"}
+                </Text>
+              </Tap>
+            ) : null}
+            <ErrorLine message={error} />
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
-        {count > FIRST_PEOPLE ? (
-          <Tap
-            accessibilityLabel={all ? "Show fewer" : `Show all ${count}`}
-            onPress={() => setAll(!all)}
-          >
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-              {all ? "Show fewer" : `Show all ${count}`}
-            </Text>
-          </Tap>
-        ) : null}
-        <View style={{ flex: 1 }} />
-        <Tap
-          accessibilityLabel={`Not trading ${group.card.cardName} anymore`}
-          disabled={busy}
-          onPress={() => void stop()}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {busy ? "Saving…" : "Not trading this anymore"}
-          </Text>
-        </Tap>
-      </View>
-      <ErrorLine message={error} />
-    </View>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ gap: spacing(3) }}
+            >
+              {group.people.map((person) => (
+                <PersonRow
+                  key={`${person.ask.kind}-${person.ask.id}`}
+                  person={person}
+                  onOpenThread={onOpenThread}
+                />
+              ))}
+            </ScrollView>
+          </SwipeToClose>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }

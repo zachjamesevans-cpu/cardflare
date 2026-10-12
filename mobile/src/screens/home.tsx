@@ -1057,7 +1057,9 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                     <WantedSummaryCard
                       key={`nearby-match-${index}`}
                       summary={item.summary}
-                      onOpen={() => navigation.navigate("WantedNearYou")}
+                      onOpen={(cardId) =>
+                        navigation.navigate("WantedNearYou", cardId ? { cardId } : undefined)
+                      }
                     />
                   ) : null
                 ) : item.kind === "wanted" ? (

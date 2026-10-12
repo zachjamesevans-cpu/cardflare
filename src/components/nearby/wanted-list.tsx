@@ -1,134 +1,145 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { MapPin, MessageCircle } from "lucide-react";
+import { MapPin, MessageCircle, MoreHorizontal, XCircle } from "lucide-react";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { buttonStyles } from "@/components/ui/button";
+import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
+import { cardImageAlt } from "@/lib/cards/images";
 import { answerNearbyAction, stopTradingAction } from "@/lib/nearby/actions";
 import type { NearbyMatch, WantedGroup } from "@/lib/nearby/matching";
-import {
-  ANSWER_DRAFT,
-  WANTED_PATH,
-  WANTED_SORTS,
-  type WantedSort,
-} from "@/lib/nearby/shared";
-
-/** How many people a card shows before "Show all". */
-const FIRST_PEOPLE = 5;
+import { ANSWER_DRAFT, shortMiles } from "@/lib/nearby/shared";
 
 const threadHref = (threadId: string) =>
   `/local?thread=${encodeURIComponent(threadId)}`;
 
 /**
- * "Wanted near you": every card of yours somebody near you wants, one
- * section each, people inside. Grouped by card because that is the
- * question - which of mine is wanted - and because a big city can put
- * a hundred people on this screen. The app's screen is the same
- * (mobile/src/screens/wanted-near-you.tsx).
+ * "Wanted near you", as your binder: the cards of yours somebody near
+ * you wants, in a grid, each wearing how many people want it. Click
+ * one and its people open in a sheet. The founder, of the list this
+ * replaced: "seems like a lot of info for someone." The app's screen
+ * is the same (mobile/src/screens/wanted.tsx).
  */
-export function WantedList({
+export function WantedGrid({
   groups,
-  sort,
-  tiles,
+  initialCardId,
 }: {
   groups: WantedGroup[];
-  sort: WantedSort;
-  /** Each card's picture, drawn by the server with the Feed's tile. */
-  tiles: Record<string, React.ReactNode>;
+  /** The card the Feed's summary was clicked on, opened straight away. */
+  initialCardId: string | null;
 }) {
-  return (
-    <div className="flex flex-col gap-5">
-      <nav aria-label="Sort" className="flex flex-wrap gap-2">
-        {WANTED_SORTS.map((option) => (
-          <Link
-            key={option.key}
-            href={`${WANTED_PATH}?sort=${option.key}`}
-            aria-current={option.key === sort ? "page" : undefined}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-sm font-semibold",
-              option.key === sort
-                ? "border-accent bg-accent/10 text-accent"
-                : "border-border text-text-secondary hover:text-text-primary",
-            )}
-          >
-            {option.label}
-          </Link>
-        ))}
-      </nav>
+  const [openCard, setOpenCard] = useState<string | null>(
+    groups.some((group) => group.card.cardId === initialCardId) ? initialCardId : null,
+  );
+  const open = groups.find((group) => group.card.cardId === openCard) ?? null;
 
-      {groups.map((group) => (
-        <CardSection
-          key={group.card.cardId}
-          group={group}
-          tile={tiles[group.card.cardId]}
-        />
-      ))}
-    </div>
+  return (
+    <>
+      <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+        {groups.map((group) => {
+          const count = group.people.length;
+          return (
+            <li key={group.card.cardId}>
+              <button
+                type="button"
+                onClick={() => setOpenCard(group.card.cardId)}
+                aria-label={`${group.card.cardName}, ${count} ${count === 1 ? "person wants" : "people want"} it`}
+                className="relative block w-full cursor-pointer rounded-[6px] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
+              >
+                {/* The held ring, the same as every card of yours. */}
+                <span className="block aspect-[60/84] w-full overflow-hidden rounded-[6px] border border-border bg-elevated shadow-[0_0_14px_rgba(206,252,132,0.5)] ring-[3px] ring-accent">
+                  {group.card.imageUrl && (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={group.card.imageUrl}
+                      alt={cardImageAlt(group.card.cardName, group.card.cardNumber)}
+                      className="size-full object-contain"
+                    />
+                  )}
+                </span>
+                {/* How many people near you want it. */}
+                <span className="absolute -top-2 -right-2 flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-canvas bg-accent px-1.5 text-[13px] font-extrabold text-accent-contrast">
+                  {count}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+
+      <Sheet
+        open={open !== null}
+        onClose={() => setOpenCard(null)}
+        title={open?.card.cardName ?? ""}
+      >
+        {open && <PeopleForCard key={open.card.cardId} group={open} />}
+      </Sheet>
+    </>
   );
 }
 
-/** One card of yours, and the people near you who want it. */
-function CardSection({ group, tile }: { group: WantedGroup; tile: React.ReactNode }) {
+/**
+ * One card's people: closest first, the ones already messaged at the
+ * foot. "Not trading this anymore" is behind the three dots, out of the
+ * way of the thing you came to do.
+ */
+function PeopleForCard({ group }: { group: WantedGroup }) {
   const router = useRouter();
-  const [all, setAll] = useState(false);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const shown = all ? group.people : group.people.slice(0, FIRST_PEOPLE);
+  const [menu, setMenu] = useState(false);
   const count = group.people.length;
 
+  const stop = () =>
+    startTransition(async () => {
+      setError(null);
+      const result = await stopTradingAction(group.haveEntryId);
+      if (result.ok) router.refresh();
+      else setError(result.message);
+    });
+
   return (
-    <section className="flex flex-col gap-3 border-b border-border pb-5 last:border-b-0">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-3">
-        {tile}
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="truncate font-semibold text-text-primary">
-            {group.card.cardName}
-          </h2>
-          <p className="text-xs text-text-muted">
-            {count} {count === 1 ? "person wants" : "people want"} this
-            {group.card.match === "other-printing" && " · You have another printing"}
-          </p>
-        </div>
+        <p className="min-w-0 flex-1 text-sm text-text-muted">
+          {count} {count === 1 ? "person wants" : "people want"} this
+          {group.card.match === "other-printing" && " · You have another printing"}
+        </p>
+        {/* The three dots open a row in place rather than a dropdown,
+            which the sheet's scrolling body would clip; the app's sheet
+            does the same. */}
+        <button
+          type="button"
+          onClick={() => setMenu(!menu)}
+          aria-label={`More for ${group.card.cardName}`}
+          aria-expanded={menu}
+          className="-m-1 shrink-0 cursor-pointer rounded-full p-1 text-text-muted hover:text-text-primary"
+        >
+          <MoreHorizontal className="size-5" aria-hidden="true" />
+        </button>
       </div>
-
-      <ul className="flex flex-col gap-3">
-        {shown.map((person) => (
-          <PersonRow key={`${person.ask.kind}-${person.ask.id}`} person={person} />
-        ))}
-      </ul>
-
-      <div className="flex flex-wrap items-center gap-3">
-        {count > FIRST_PEOPLE && (
-          <button
-            type="button"
-            onClick={() => setAll(!all)}
-            className="text-sm font-semibold text-accent"
-          >
-            {all ? "Show fewer" : `Show all ${count}`}
-          </button>
-        )}
+      {menu && (
         <button
           type="button"
           disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              setError(null);
-              const result = await stopTradingAction(group.haveEntryId);
-              if (result.ok) router.refresh();
-              else setError(result.message);
-            })
-          }
-          className="ml-auto text-sm text-text-muted hover:text-text-primary"
+          onClick={stop}
+          className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated p-3 text-left text-sm font-semibold text-text-primary"
         >
+          <XCircle className="size-4 text-text-secondary" aria-hidden="true" />
           {pending ? "Saving…" : "Not trading this anymore"}
         </button>
-      </div>
+      )}
       {error && <p className="text-sm text-danger">{error}</p>}
-    </section>
+
+      <ul className="flex flex-col gap-3">
+        {group.people.map((person) => (
+          <PersonRow key={`${person.ask.kind}-${person.ask.id}`} person={person} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -176,10 +187,10 @@ function PersonRow({ person }: { person: NearbyMatch }) {
           <p className="truncate text-sm font-semibold text-text-primary">
             {person.wanter.displayName}
           </p>
+          {/* Short, and no "Messaged": the filled icon already says it. */}
           <p className="flex items-center gap-1 text-xs text-text-muted">
             <MapPin className="size-3.5" aria-hidden="true" />
-            {person.milesLabel}
-            {person.threadId && " · Messaged"}
+            {shortMiles(person.miles)}
           </p>
         </div>
         <button
@@ -196,7 +207,7 @@ function PersonRow({ person }: { person: NearbyMatch }) {
               : setDrafting(!drafting)
           }
           className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-full border",
+            "flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full border",
             person.threadId
               ? "border-accent/40 bg-accent/10 text-accent"
               : "border-border-strong text-accent hover:bg-elevated",

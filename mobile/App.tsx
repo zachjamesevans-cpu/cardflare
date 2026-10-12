@@ -181,8 +181,9 @@ export type StackParams = {
   LocalThread: { threadId: string; draft?: string };
   /** The notices, from the bell at the Feed's top right. It was a tab. */
   Inbox: undefined;
-  /** Everybody near you who wants a card you trade, by card. */
-  WantedNearYou: undefined;
+  /** Everybody near you who wants a card you trade, by card. `cardId`
+      opens straight onto that card's people. */
+  WantedNearYou: { cardId?: string } | undefined;
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;

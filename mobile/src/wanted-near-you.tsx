@@ -4,7 +4,13 @@ import { Text, View } from "react-native";
 
 import { answerNearby, serverMessage, type NearbyMatch, type WantedSummary } from "./api";
 import { HeldRing } from "./held-ring";
-import { ANSWER_DRAFT, WANTED_HEADING, WANTED_PRIVATE_LINE, wantedCountLine } from "./nearby-shared";
+import {
+  ANSWER_DRAFT,
+  WANTED_HEADING,
+  WANTED_PRIVATE_LINE,
+  shortMiles,
+  wantedCountLine,
+} from "./nearby-shared";
 import { PlayerAvatar } from "./player-avatar";
 import { colors, spacing } from "./theme";
 import { Button, Card, CardImage, ErrorLine, Input, Tap } from "./ui";
@@ -29,7 +35,8 @@ export function WantedSummaryCard({
   onOpen,
 }: {
   summary: WantedSummary;
-  onOpen: () => void;
+  /** With a card: open the screen on that card's people. */
+  onOpen: (cardId?: string) => void;
 }) {
   return (
     <Card style={{ borderColor: `${colors.accent}66` }}>
@@ -56,7 +63,7 @@ export function WantedSummaryCard({
           <Tap
             key={group.card.cardId}
             accessibilityLabel={`${group.card.cardName}, ${peopleLine(group.count, group.nearestLabel)}`}
-            onPress={onOpen}
+            onPress={() => onOpen(group.card.cardId)}
             style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}
           >
             <View>
@@ -92,7 +99,7 @@ export function WantedSummaryCard({
             : "See everyone"
         }
         variant="secondary"
-        onPress={onOpen}
+        onPress={() => onOpen()}
       />
     </Card>
   );
@@ -265,9 +272,9 @@ export function PersonRow({
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
             <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+            {/* Short, and no "Messaged": the filled icon already says it. */}
             <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
-              {person.milesLabel}
-              {person.threadId ? " · Messaged" : ""}
+              {shortMiles(person.miles)}
             </Text>
           </View>
         </View>

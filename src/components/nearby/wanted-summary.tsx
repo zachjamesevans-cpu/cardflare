@@ -45,7 +45,7 @@ export function WantedSummaryCard({ summary }: { summary: WantedSummary }) {
         {summary.groups.map((group) => (
           <Link
             key={group.card.cardId}
-            href={WANTED_PATH}
+            href={`${WANTED_PATH}?card=${encodeURIComponent(group.card.cardId)}`}
             className="flex items-center gap-3 rounded-[var(--radius-control)] focus-visible:outline-2 focus-visible:outline-accent"
           >
             <FeedTile

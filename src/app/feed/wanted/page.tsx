@@ -4,8 +4,7 @@ import { redirect } from "next/navigation";
 import { MapPin } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
-import { FeedTile } from "@/components/feed/feed-tile";
-import { WantedList } from "@/components/nearby/wanted-list";
+import { WantedGrid } from "@/components/nearby/wanted-list";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { BackLink } from "@/components/ui/back-link";
 import { buttonStyles } from "@/components/ui/button";
@@ -13,7 +12,6 @@ import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
 import { WANTED_PAGE, wantedNearYou } from "@/lib/nearby/matching";
 import {
-  isWantedSort,
   WANTED_HEADING,
   WANTED_PATH,
   WANTED_PRIVATE_LINE,
@@ -30,15 +28,16 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 /**
- * "Wanted near you": the whole list behind the Feed's card. Read live
- * on every visit, so an ask taken down is simply not here. `page`
- * shows that many pages of cards at once; "Show more cards" asks for
- * one more.
+ * "Wanted near you": your wanted cards as a grid, each card's people in
+ * a sheet. Read live on every visit, so an ask taken down is simply not
+ * here. Most wanted first, closest first inside a card: nothing to
+ * sort. `card` opens that card's sheet (the Feed's summary links so);
+ * `page` shows that many pages of cards at once.
  */
 export default async function WantedNearYouPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string; page?: string }>;
+  searchParams: Promise<{ card?: string; page?: string }>;
 }) {
   const viewer = await getViewer();
   if (viewer.kind === "anonymous") redirect(`/login?next=${WANTED_PATH}`);
@@ -49,24 +48,10 @@ export default async function WantedNearYouPage({
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   const params = await searchParams;
-  const sort = isWantedSort(params.sort) ? params.sort : "most";
   const pages = Math.min(20, Math.max(1, Math.floor(Number(params.page)) || 1));
   const wanted = playerId
-    ? await wantedNearYou(playerId, sort, 0, WANTED_PAGE * pages)
+    ? await wantedNearYou(playerId, "most", 0, WANTED_PAGE * pages)
     : null;
-
-  const tiles = Object.fromEntries(
-    (wanted?.groups ?? []).map((group) => [
-      group.card.cardId,
-      <FeedTile
-        key={group.card.cardId}
-        imageUrl={group.card.imageUrl}
-        name={group.card.cardName}
-        cardNumber={group.card.cardNumber}
-        match={group.card.match}
-      />,
-    ]),
-  );
 
   return (
     <>
@@ -85,9 +70,12 @@ export default async function WantedNearYouPage({
               <h1 className="text-xl font-bold text-text-primary">{WANTED_HEADING}</h1>
             </span>
             {wanted && wanted.totalPeople > 0 && (
-              <p className="text-sm text-text-secondary">
-                {wantedCountLine(wanted.totalPeople)}. {WANTED_PRIVATE_LINE}
-              </p>
+              <>
+                <p className="font-semibold text-text-primary">
+                  {wantedCountLine(wanted.totalPeople)}
+                </p>
+                <p className="text-sm text-text-muted">{WANTED_PRIVATE_LINE}</p>
+              </>
             )}
           </div>
 
@@ -102,10 +90,10 @@ export default async function WantedNearYouPage({
             </Card>
           ) : (
             <>
-              <WantedList groups={wanted.groups} sort={sort} tiles={tiles} />
+              <WantedGrid groups={wanted.groups} initialCardId={params.card ?? null} />
               {wanted.nextOffset !== null && (
                 <Link
-                  href={`${WANTED_PATH}?sort=${sort}&page=${pages + 1}`}
+                  href={`${WANTED_PATH}?page=${pages + 1}`}
                   className={buttonStyles("secondary", "sm")}
                   scroll={false}
                 >

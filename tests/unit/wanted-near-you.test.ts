@@ -371,10 +371,63 @@ describe("both platforms", () => {
     expect(read("mobile/src/screens/home.tsx")).toContain("<WantedSummaryCard");
     expect(read("src/components/feed/feed-items.tsx")).toContain("<WantedSummaryCard");
     expect(read("mobile/App.tsx")).toContain('name="WantedNearYou"');
-    expect(read("src/app/feed/wanted/page.tsx")).toContain("<WantedList");
+    expect(read("src/app/feed/wanted/page.tsx")).toContain("<WantedGrid");
     expect(read("mobile/src/follow-href.ts")).toContain(
       'navigation.navigate("WantedNearYou")',
     );
+  });
+
+  /*
+   * The founder, of the list of sections this replaced: "seems like a
+   * lot of info for someone." Your cards as a grid with a count on
+   * each; a card's people only once you pick it.
+   */
+  it("is a grid of your cards with a count, and a sheet of people per card", () => {
+    const app = read("mobile/src/screens/wanted.tsx");
+    expect(app).toContain("<WantedTile");
+    expect(app).toContain("<CountBadge count={count} />");
+    expect(app).toContain("<PeopleForCard");
+    expect(app).toContain("<SwipeToClose");
+    const web = read("src/components/nearby/wanted-list.tsx");
+    expect(web).toContain("grid grid-cols-3");
+    expect(web).toContain("<Sheet");
+    expect(web).toContain("<PeopleForCard");
+  });
+
+  it("has nothing to sort and keeps Not trading behind the three dots", () => {
+    for (const file of [
+      "mobile/src/screens/wanted.tsx",
+      "src/components/nearby/wanted-list.tsx",
+    ]) {
+      const source = read(file);
+      expect(source, file).not.toContain("WANTED_SORTS");
+      expect(source, file).not.toContain("Show all");
+      expect(source, file).toMatch(/setMenu\(!menu\)/);
+      expect(source, file).toContain("Not trading this anymore");
+    }
+  });
+
+  it("opens straight onto the card tapped on the Feed", () => {
+    expect(read("mobile/src/wanted-near-you.tsx")).toContain(
+      "onPress={() => onOpen(group.card.cardId)}",
+    );
+    expect(read("mobile/src/screens/wanted.tsx")).toContain("route.params?.cardId");
+    expect(read("src/components/nearby/wanted-summary.tsx")).toContain(
+      "`${WANTED_PATH}?card=${encodeURIComponent(group.card.cardId)}`",
+    );
+  });
+
+  it("says a distance short, and lets the filled icon say Messaged", async () => {
+    const { shortMiles } = await import("@/lib/nearby/shared");
+    expect(shortMiles(1)).toBe("Under 2 mi");
+    expect(shortMiles(4)).toBe("4 mi");
+    for (const file of [
+      "mobile/src/wanted-near-you.tsx",
+      "src/components/nearby/wanted-list.tsx",
+    ]) {
+      expect(read(file), file).toContain("shortMiles(person.miles)");
+      expect(read(file), file).not.toContain('" · Messaged"');
+    }
   });
 
   it("sends nothing on the icon's tap: a draft, then Send", () => {

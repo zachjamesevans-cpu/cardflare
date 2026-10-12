@@ -47,6 +47,15 @@ export const WANTED_HEADING = "Wanted near you";
 export const WANTED_PRIVATE_LINE =
   "Only you see this. They hear from you when you message.";
 
+/**
+ * A distance as short as a row can say it: "Under 2 mi", "4 mi". Fed
+ * the rounded number the server sends (roundedMiles), so it is no finer
+ * than the label.
+ */
+export function shortMiles(miles: number): string {
+  return miles < 2 ? "Under 2 mi" : `${Math.round(miles)} mi`;
+}
+
 /** The count under the heading: people, not matches. */
 export function wantedCountLine(people: number): string {
   return people === 1

@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { demoOn, setDemoMode } from "../demo/demo-mode";
+import { DEMO_CARDS } from "../demo/demo-cards";
 import { huntId, postId } from "../demo/demo-world";
 import { colors, gutter, spacing } from "../theme";
 import { Body, Button, Card, Muted, Tap, Title } from "../ui";
@@ -91,6 +92,12 @@ export const SHOTS: Shot[] = [
     title: "13. Wanted near you on the Feed",
     tip: "The Nearby tab's card: the top cards, a few faces each.",
     go: (nav) => nav.navigate("Tabs", { screen: "Feed", params: { tab: "nearby" } }),
+  },
+  {
+    title: "14. One wanted card's people",
+    tip: "Umbreon's sheet: who wants it, closest first, the message icon on each.",
+    go: (nav) =>
+      nav.navigate("WantedNearYou", { cardId: DEMO_CARDS.umbreonCol.cardId }),
   },
 ];
 
