@@ -8,7 +8,7 @@ import {
   type PoolEntry,
   type SeriesManifest,
 } from "./index";
-import { seriesOrNull } from "./index";
+import { seriesById } from "./catalog";
 
 /**
  * Sealed packs: granting, buying, opening.
@@ -39,7 +39,7 @@ export async function grantPack(
   series: string,
   source: "signup" | "purchase",
 ): Promise<boolean> {
-  if (!isSupabaseConfigured() || !seriesOrNull(series)) return false;
+  if (!isSupabaseConfigured() || !(await seriesById(series))) return false;
 
   const { error } = await getSupabaseAdmin()
     .from("player_packs")
@@ -93,7 +93,7 @@ export async function buyPackWithEmbers(
   playerId: string,
   seriesId: string,
 ): Promise<"bought" | "cannot-afford" | "failed"> {
-  const series = seriesOrNull(seriesId);
+  const series = await seriesById(seriesId);
   if (!series || !isSupabaseConfigured()) return "failed";
 
   /* A UNIQUE ref per purchase: the ledger's ref index treats a repeat
@@ -146,6 +146,20 @@ export async function openPack(
 
   const admin = getSupabaseAdmin();
 
+  /* Which set it is BEFORE it is claimed: a pack whose set cannot be
+     drawn stays sealed rather than being opened into nothing. A set
+     taken off sale since still opens for a pack already held. */
+  const { data: sealed } = await admin
+    .from("player_packs")
+    .select("series")
+    .eq("id", packId)
+    .eq("player_id", playerId)
+    .is("opened_at", null)
+    .maybeSingle();
+  if (!sealed) return null;
+  const series = await seriesById(sealed.series, { opening: true });
+  if (!series) return null;
+
   const { data: claimed, error: claimError } = await admin
     .from("player_packs")
     .update({ opened_at: new Date().toISOString() })
@@ -159,9 +173,6 @@ export async function openPack(
     if (claimError) console.error("Could not claim the pack", claimError);
     return null;
   }
-
-  const series = seriesOrNull(claimed.series);
-  if (!series) return null;
 
   /* Plenty of rolls: slots plus re-draw headroom for duplicates. */
   const rolls = Array.from({ length: series.slots * 6 }, () => {

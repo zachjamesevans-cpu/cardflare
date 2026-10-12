@@ -5,7 +5,8 @@ import { Flame } from "lucide-react";
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
 import { PackShop } from "@/components/packs/pack-shop";
-import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { shopSeries } from "@/lib/packs/catalog";
 import { packItemLabels } from "@/lib/packs/labels";
 import { listSealedPacks } from "@/lib/packs/repository";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -57,6 +58,8 @@ export default async function EmberStorePage() {
   /* Anybody can buy; Pro wears. The tiles say which. */
   const canWear = profile ? tierAllows(profile.tier, "cosmetics") : false;
   const sealed = await listSealedPacks(playerId);
+  /* Every pack on sale: Origin and each ready console-built set. */
+  const onSale = await shopSeries();
   if (!profile) redirect("/profile/settings");
 
   const [wardrobe, areas] = await Promise.all([
@@ -107,7 +110,7 @@ export default async function EmberStorePage() {
                 was on the house.
               </p>
             </div>
-            {Object.values(SERIES).map((series) => (
+            {onSale.map((series) => (
               <PackShop
                 key={series.id}
                 series={{
@@ -120,12 +123,18 @@ export default async function EmberStorePage() {
                   oddsDetail: oddsPerItem(series),
                 }}
                 sealed={sealed}
-                names={packItemLabels([
-                  ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
-                  ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
-                  ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
-                  ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
-                ])}
+                names={{
+                  ...series.names,
+                  ...packItemLabels([
+                    ...wardrobe.avatarFrames.map((item) => ({
+                      ...item,
+                      kind: "frame",
+                    })),
+                    ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
+                    ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
+                    ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
+                  ]),
+                }}
               />
             ))}
           </Card>

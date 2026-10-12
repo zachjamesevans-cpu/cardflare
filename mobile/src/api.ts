@@ -2315,6 +2315,8 @@ export interface PackSeries {
   slots: number;
   odds: { rarity: string; slugs: string[]; percent: number }[];
   oddsDetail?: { rarity: string; items: { slug: string; percent: number }[] }[];
+  /** A console-built set's cosmetics by name. Absent from an older server. */
+  names?: Record<string, string>;
 }
 
 export interface SealedPack {

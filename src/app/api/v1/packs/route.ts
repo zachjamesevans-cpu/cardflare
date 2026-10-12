@@ -4,7 +4,8 @@ import { apiPlayer, badRequest, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
-import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { shopSeries } from "@/lib/packs/catalog";
 import { buyPackWithEmbers, listSealedPacks, openPack } from "@/lib/packs/repository";
 
 export const dynamic = "force-dynamic";
@@ -28,8 +29,11 @@ export async function GET(request: Request): Promise<Response> {
   const me = await viewerPlayerId(request);
   if (!me) return unauthorized();
 
+  /* Every pack on sale: Origin and each ready set built in the console
+     (lib/packs/catalog.ts). `names` labels a console set's pulls. */
+  const onSale = await shopSeries();
   return Response.json({
-    series: Object.values(SERIES).map((series) => ({
+    series: onSale.map((series) => ({
       id: series.id,
       name: series.name,
       setNumber: series.setNumber,
@@ -37,6 +41,7 @@ export async function GET(request: Request): Promise<Response> {
       slots: series.slots,
       odds: oddsByRarity(series),
       oddsDetail: oddsPerItem(series),
+      names: series.names,
     })),
     packs: await listSealedPacks(me),
   });

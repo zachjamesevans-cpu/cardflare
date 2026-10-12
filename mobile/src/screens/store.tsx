@@ -157,12 +157,17 @@ export function StoreScreen() {
             key={series.id}
             series={series}
             sealed={sealed}
-            names={packItemLabels([
-              ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
-              ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
-              ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
-              ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
-            ])}
+            names={{
+              /* A console-built set names its own pulls (the server's
+                 lib/packs/catalog.ts); Origin's come from the wardrobe. */
+              ...(series.names ?? {}),
+              ...packItemLabels([
+                ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
+                ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
+                ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
+                ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
+              ]),
+            }}
             onChanged={() => void load()}
           />
         ))}
