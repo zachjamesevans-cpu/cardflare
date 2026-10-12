@@ -11,6 +11,12 @@ import { collectionAvailability } from "@/lib/players/collection";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { avatarSrc } from "@/lib/players/profile-image";
 import { blockedBetween } from "@/lib/players/safety";
+import {
+  DIGEST_BODY,
+  DIGEST_TITLE,
+  PUSHES_PER_DAY,
+  WANTED_PATH,
+} from "@/lib/nearby/shared";
 import { storeHasFeature } from "@/lib/stores/ultra-access";
 import { siteUrl } from "@/lib/site";
 import { STORE_POST_NOTICES_PER_DAY } from "@/lib/stores/post-schema";
@@ -1173,9 +1179,10 @@ export async function notifyNearbyMatch(match: {
   if (await blockedBetween(match.holderId, match.wanterId)) return;
 
   try {
-    const title = `${match.wanterName} is looking for your ${match.cardName}`;
-    const body = `${match.milesLabel}. Tap to say you have it.`;
-    const path = "/feed";
+    const title = `${match.wanterName} wants your ${match.cardName}`;
+    const body = `${match.milesLabel}. Tap to message them.`;
+    /* "Wanted near you", where every one of them is, grouped by card. */
+    const path = WANTED_PATH;
 
     const id = await record({
       playerId: match.holderId,
@@ -1186,8 +1193,27 @@ export async function notifyNearbyMatch(match: {
       dedupeKey: `nearby:${match.askKey}:${match.haveEntryId}`,
       actorId: match.wanterId,
     });
+    if (!id) return;
 
-    if (id)
+    /*
+     * The phone buzzes for the first PUSHES_PER_DAY a day, once more to
+     * say there are more, and then stays quiet; the rest wait in the
+     * Inbox and in "Wanted near you". In a big city a binder can match a
+     * hundred people, and a hundred buzzes is how an app gets deleted.
+     * Counted per UTC day from the notices themselves, so there is no
+     * new table and no job to run.
+     */
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+    const { count } = await getSupabaseAdmin()
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("player_id", match.holderId)
+      .eq("kind", "nearby-match")
+      .gte("created_at", today.toISOString());
+    const todays = count ?? 1;
+
+    if (todays <= PUSHES_PER_DAY) {
       await deliverByPush(
         match.holderId,
         title,
@@ -1196,6 +1222,16 @@ export async function notifyNearbyMatch(match: {
         "nearby-match",
         match.wanterId,
       );
+    } else if (todays === PUSHES_PER_DAY + 1) {
+      await deliverByPush(
+        match.holderId,
+        DIGEST_TITLE,
+        DIGEST_BODY,
+        path,
+        "nearby-match",
+        null,
+      );
+    }
   } catch (error) {
     console.error("Could not notify the nearby match", error);
   }

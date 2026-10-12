@@ -1,4 +1,9 @@
-import { nearbyMatchesForHolder, type NearbyMatch } from "@/lib/nearby/matching";
+import {
+  nearbyMatchesForHolder,
+  wantedSummaryOf,
+  type NearbyMatch,
+  type WantedSummary,
+} from "@/lib/nearby/matching";
 import "server-only";
 
 import { showingAnnouncements } from "@/lib/announcements/repository";
@@ -747,7 +752,14 @@ export interface ShopItem {
  */
 export interface NearbyMatchItem {
   kind: "nearbyMatch";
+  /**
+   * The nearest five, the way the card was drawn before "Wanted near
+   * you". Kept so an app build from before it still draws something;
+   * this build reads `summary`.
+   */
   matches: NearbyMatch[];
+  /** The top cards with a few faces each, and the totals behind them. */
+  summary: WantedSummary;
 }
 
 /**
@@ -3018,7 +3030,15 @@ export async function listFeed(
     nearbyMatchesForHolder(playerId).catch(() => []),
   ]);
   const nearbyItems: NearbyMatchItem[] =
-    nearby.length > 0 ? [{ kind: "nearbyMatch", matches: nearby }] : [];
+    nearby.length > 0
+      ? [
+          {
+            kind: "nearbyMatch",
+            matches: nearby.slice(0, 5),
+            summary: wantedSummaryOf(nearby),
+          },
+        ]
+      : [];
 
   const upcoming = await withGoing(upcomingItems(locals, shown, wanted.size), playerId);
 

@@ -81,11 +81,11 @@ describe("Wanted from you ends in Message, not Go", () => {
     expect(web.feedItems).toContain("<WantedMessageButton");
     expect(web.feedItems).toContain("They already asked. Tell them you have it.");
     expect(web.feedItems).not.toContain("Bring it and it");
+    /* A message icon and a draft now, as on "Wanted near you": "I have
+       <card>." is in the box and Send starts the thread. */
     expect(web.wantedButton).toContain("`I have ${cardName}.`");
-    expect(web.wantedButton).toContain(
-      "openThreadAction(flareId, `I have ${cardName}.`)",
-    );
-    expect(web.wantedButton).toMatch(/\n\s+Message\n/);
+    expect(web.wantedButton).toContain("openThreadAction(flareId, text.trim())");
+    expect(web.wantedButton).toContain("<MessageCircle");
     /* Accounts only: the Guest chip has nothing to say on this row. */
     const wantedRow = web.feedItems.slice(
       web.feedItems.indexOf('item.kind === "wanted"'),
@@ -106,13 +106,14 @@ describe("Wanted from you ends in Message, not Go", () => {
     );
     expect(wantedItem).toContain("<WantedRow");
     expect(wantedItem).not.toContain("GuestChip");
-    /* Each row's button is Message. (This once matched the Feed posts'
-       onMessage props, which sat in the same stretch of the file.) */
+    /* Each row ends in the message icon, and the icon opens a draft:
+       the same as "Wanted near you". */
     const wantedRow = app.home.slice(
       app.home.indexOf("function WantedRow("),
       app.home.indexOf("export function HomeScreen("),
     );
-    expect(wantedRow).toMatch(/\n\s+Message\n/);
+    expect(wantedRow).toContain("<MessageIcon");
+    expect(wantedRow).toContain("<DraftBox");
   });
 });
 

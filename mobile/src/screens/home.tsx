@@ -96,7 +96,7 @@ import {
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { NearbyHeader } from "../nearby-parts";
 import { planNearby } from "../nearby-plan";
-import { MatchRow } from "../nearby";
+import { DraftBox, MessageIcon, WantedSummaryCard } from "../wanted-near-you";
 import { PlayerAvatar } from "../player-avatar";
 import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
@@ -292,36 +292,25 @@ function WantedRow({
   onOpenProfile: () => void;
   onOpenThread: (threadId: string) => void;
 }) {
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [drafting, setDrafting] = useState(false);
 
   /*
-   * A second tap on the same card opens the conversation already had
-   * rather than saying "I have this" twice: the server sends the thread
-   * it knows about, and the first message goes only when there is none.
+   * The icon opens "I have <card>." as a draft under the row - the same
+   * icon and draft as "Wanted near you" - and Send starts the thread.
+   * With a conversation already open the icon is filled and opens it:
+   * nothing is said twice.
    */
-  const message = async () => {
-    if (sending) return;
-    if (entry.threadId) {
-      onOpenThread(entry.threadId);
-      return;
-    }
-    setSending(true);
-    setError(null);
+  const send = async (text: string): Promise<string | null> => {
     try {
-      const result = await openLocalThread(
-        entry.flareId,
-        `I have ${entry.card.cardName}.`,
-      );
+      const result = await openLocalThread(entry.flareId, text);
       if (result.ok && result.threadId) {
+        setDrafting(false);
         onOpenThread(result.threadId);
-        return;
+        return null;
       }
-      setError(result.message ?? "Could not start the conversation.");
+      return result.message ?? "Could not start the conversation.";
     } catch (caught) {
-      setError(serverMessage(caught) ?? "Could not start the conversation.");
-    } finally {
-      setSending(false);
+      return serverMessage(caught) ?? "Could not start the conversation.";
     }
   };
 
@@ -370,32 +359,26 @@ function WantedRow({
               .join(" · ")}
           </Text>
         </View>
-        <Tap
-          accessibilityLabel={`Message ${entry.displayName ?? "this player"} about ${entry.card.cardName}`}
-          disabled={sending}
-          onPress={() => void message()}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: spacing(1.5),
-            borderRadius: radius.control,
-            backgroundColor: colors.accent,
-            paddingHorizontal: spacing(3),
-            paddingVertical: spacing(2),
-            opacity: sending ? 0.6 : 1,
-          }}
-        >
-          {sending ? (
-            <ActivityIndicator size="small" color={colors.accentContrast} />
-          ) : null}
-          <Text
-            style={{ color: colors.accentContrast, fontWeight: "700", fontSize: 13 }}
-          >
-            Message
-          </Text>
-        </Tap>
+        <MessageIcon
+          messaged={Boolean(entry.threadId)}
+          label={
+            entry.threadId
+              ? "Open the conversation"
+              : `Message ${entry.displayName ?? "this player"} about ${entry.card.cardName}`
+          }
+          onPress={() =>
+            entry.threadId ? onOpenThread(entry.threadId) : setDrafting(!drafting)
+          }
+        />
       </View>
-      <ErrorLine message={error} />
+      {drafting && !entry.threadId ? (
+        <DraftBox
+          initial={`I have ${entry.card.cardName}.`}
+          label="Your message"
+          onCancel={() => setDrafting(false)}
+          onSend={send}
+        />
+      ) : null}
     </View>
   );
 }
@@ -1067,39 +1050,16 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
             {shown.map((item, index) => {
               const body =
                 item.kind === "nearbyMatch" ? (
-                  <Card
-                    key={`nearby-match-${index}`}
-                    style={{ borderColor: `${colors.accent}66` }}
-                  >
-                    <Text
-                      style={{
-                        color: colors.accent,
-                        fontSize: 11,
-                        fontWeight: "700",
-                        letterSpacing: 1.6,
-                        textTransform: "uppercase",
-                      }}
-                    >
-                      You can answer a Flare
-                    </Text>
-                    <Muted>Only you see this. They hear from you when you answer.</Muted>
-
-                    <View style={{ gap: spacing(4) }}>
-                      {item.matches.slice(0, 5).map((match) => (
-                        <MatchRow
-                          key={`${match.ask.kind}-${match.ask.id}`}
-                          match={match}
-                          onOpen={(threadId) =>
-                            navigation.navigate("LocalThread", { threadId })
-                          }
-                        />
-                      ))}
-                    </View>
-
-                    {item.matches.length > 5 ? (
-                      <Muted>{`+${item.matches.length - 5} more nearby`}</Muted>
-                    ) : null}
-                  </Card>
+                  /* WANTED NEAR YOU: the top cards, a few faces each,
+                     and the way into everybody (screens/wanted.tsx).
+                     Nothing from a server too old to send the summary. */
+                  item.summary ? (
+                    <WantedSummaryCard
+                      key={`nearby-match-${index}`}
+                      summary={item.summary}
+                      onOpen={() => navigation.navigate("WantedNearYou")}
+                    />
+                  ) : null
                 ) : item.kind === "wanted" ? (
                   <Card
                     key={`wanted-${index}`}

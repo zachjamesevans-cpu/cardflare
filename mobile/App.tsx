@@ -32,6 +32,8 @@ import {
 } from "react-native";
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
+import { WantedNearYouScreen } from "./src/screens/wanted";
+import { WANTED_HEADING } from "./src/nearby-shared";
 import { FlarePostScreen } from "./src/screens/flare-post";
 import { HuntScreen } from "./src/screens/hunt";
 import { RemoteScreen } from "./src/screens/remote";
@@ -179,6 +181,8 @@ export type StackParams = {
   LocalThread: { threadId: string; draft?: string };
   /** The notices, from the bell at the Feed's top right. It was a tab. */
   Inbox: undefined;
+  /** Everybody near you who wants a card you trade, by card. */
+  WantedNearYou: undefined;
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
@@ -1010,6 +1014,11 @@ function AppGates() {
             name="LocalThread"
             component={ThreadScreen}
             options={{ title: "Conversation" }}
+          />
+          <Stack.Screen
+            name="WantedNearYou"
+            component={WantedNearYouScreen}
+            options={{ title: WANTED_HEADING }}
           />
           <Stack.Screen name="SignIn" options={{ title: "Sign in" }}>
             {({ navigation }) => (

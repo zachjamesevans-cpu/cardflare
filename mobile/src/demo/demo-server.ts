@@ -1,4 +1,5 @@
 import type { FeedCard } from "../api";
+import type { WantedSort } from "../nearby-shared";
 import { PEOPLE } from "./demo-people";
 import {
   demoAnswerTrade,
@@ -11,6 +12,7 @@ import {
   demoNotifications,
   demoOpenThread,
   demoPeople,
+  demoWanted,
   demoPost,
   demoProfile,
   demoProposeTrade,
@@ -168,6 +170,10 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
   /* --- Reads ------------------------------------------------------ */
   if (method === "GET") {
     if (route === "/api/v1/feed") return { value: demoFeed() };
+    if (route === "/api/v1/nearby/wanted") {
+      const sort = /[?&]sort=(most|closest|newest)/.exec(path)?.[1] ?? "most";
+      return { value: demoWanted(sort as WantedSort) };
+    }
     if (route === "/api/v1/notifications") return { value: demoNotifications() };
     if (route === "/api/v1/notifications/unread") return { value: demoUnread() };
     if (route === "/api/v1/local/threads") return { value: demoThreads() };

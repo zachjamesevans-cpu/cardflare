@@ -66,6 +66,11 @@ vi.mock("@/lib/supabase/admin", () => ({
     auth: { getUser: (...a: unknown[]) => getUser(...a) },
   }),
 }));
+/* Clearing stale nearby notices before a read has its own test
+   (wanted-near-you.test.ts); here it would spend the scripted rows. */
+vi.mock("@/lib/nearby/live", () => ({
+  pruneStaleNearbyNotices: async () => {},
+}));
 vi.mock("@/lib/players/accounts", () => ({
   playerForUser: (...a: unknown[]) => playerForUser(...a),
 }));

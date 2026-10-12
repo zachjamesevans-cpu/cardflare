@@ -9,6 +9,7 @@ import type { ArtFile } from "./cosmetic-film";
 import { demoReady, demoOn } from "./demo/demo-mode";
 import { demoAnswer, demoSaw } from "./demo/demo-server";
 import type { BinderCoverId } from "./binder-covers";
+import type { WantedSort } from "./nearby-shared";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
@@ -2297,15 +2298,58 @@ export interface NearbyMatch {
   miles: number;
   milesLabel: string;
   threadId: string | null;
+  /** When they asked; absent from an older server. */
+  when?: string;
 }
 
-/** "I have this": opens the conversation on the ask with a first message. */
-export const openMatchThread = (ask: NearbyAsk, body: string) =>
+/** The Feed's "Wanted near you": the top cards, a few faces each. */
+export interface WantedSummary {
+  totalPeople: number;
+  totalCards: number;
+  groups: {
+    card: NearbyMatch["card"];
+    count: number;
+    nearestLabel: string;
+    faces: NearbyMatch["wanter"][];
+  }[];
+}
+
+/** One card of yours on "Wanted near you", and everybody near you who wants it. */
+export interface WantedGroup {
+  card: NearbyMatch["card"];
+  haveEntryId: string;
+  people: NearbyMatch[];
+  nearestLabel: string;
+}
+
+export interface WantedPage {
+  groups: WantedGroup[];
+  totalPeople: number;
+  totalCards: number;
+  nextOffset: number | null;
+}
+
+/** A page of "Wanted near you", read live. */
+export const getWantedNearYou = (sort: WantedSort, offset = 0) =>
+  call<WantedPage>(
+    "GET",
+    `/api/v1/nearby/wanted?sort=${sort}&offset=${offset}`,
+  );
+
+/**
+ * A reply from "Wanted near you": the holder's draft, sent now, on an
+ * ask that is still up. A 409 carries the words to show.
+ */
+export const answerNearby = (ask: NearbyAsk, body: string) =>
   call<{ ok: boolean; threadId?: string; message?: string }>(
     "POST",
-    "/api/v1/local/threads",
-    ask.kind === "want" ? { wantId: ask.id, body } : { flareId: ask.id, body },
+    "/api/v1/nearby/answer",
+    { kind: ask.kind, id: ask.id, body },
   );
+
+/** "Not trading this anymore": takes one card off Trade locally. */
+export const setLocalTrade = (entryId: string, localTrade: boolean) =>
+  call<{ ok: boolean }>("PUT", "/api/v1/haves", { entryId, localTrade });
 
 export interface PackSeries {
   id: string;
@@ -3798,7 +3842,12 @@ export type FeedItem =
    * the holder's Feed carries it; the wanter hears nothing until the
    * holder answers.
    */
-  | { kind: "nearbyMatch"; matches: NearbyMatch[] }
+  | {
+      kind: "nearbyMatch";
+      matches: NearbyMatch[];
+      /** Absent from a server older than "Wanted near you". */
+      summary?: WantedSummary;
+    }
   /**
    * A store you follow, saying something: the founder's "OP-12
    * prerelease Saturday, 20 seats". Drawn as the post a Flare is, with

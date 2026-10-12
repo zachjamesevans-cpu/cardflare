@@ -82,6 +82,16 @@ export const SHOTS: Shot[] = [
     tip: "Offers, matches nearby, a confirmed trade, new followers.",
     go: (nav) => nav.navigate("Inbox"),
   },
+  {
+    title: "12. Wanted near you",
+    tip: "Everybody near you who wants your cards, by card.",
+    go: (nav) => nav.navigate("WantedNearYou"),
+  },
+  {
+    title: "13. Wanted near you on the Feed",
+    tip: "The Nearby tab's card: the top cards, a few faces each.",
+    go: (nav) => nav.navigate("Tabs", { screen: "Feed", params: { tab: "nearby" } }),
+  },
 ];
 
 export function DemoShotsScreen() {

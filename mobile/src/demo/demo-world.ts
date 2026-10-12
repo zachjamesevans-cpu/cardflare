@@ -11,8 +11,17 @@ import type {
   PostComment,
   PostDetail,
   ThreadTrade,
+  WantedGroup,
+  WantedPage,
+  WantedSummary,
 } from "../api";
 import { DEMO_CARDS, type DemoCardKey } from "./demo-cards";
+import {
+  distinctPeople,
+  groupByCard,
+  milesLabel,
+  type WantedSort,
+} from "../nearby-shared";
 import { PEOPLE, type DemoPerson, type DemoPersonKey } from "./demo-people";
 
 /**
@@ -360,46 +369,101 @@ function feedItem(id: string, state: PostState): FeedEntry {
   };
 }
 
-const nearbyMatches = (): NearbyMatch[] =>
-  (
-    [
-      ["zoe", "umbreonCol", "exact"],
-      ["eli", "law01", "exact"],
-      ["kaito", "umbreonCol", "exact"],
-    ] as const
-  ).map(([who, key, match], index) => {
-    const p = PEOPLE[who];
-    const card = DEMO_CARDS[key];
-    return {
-      ask: { kind: "flare", id: `demo-ask-${index}` },
-      haveEntryId: `demo-have-${index}`,
-      wanter: {
-        playerId: p.playerId,
-        displayName: p.displayName,
-        avatarUrl: p.avatarUrl,
-        frame: p.frame,
-        ring: p.ring,
-        aura: p.aura,
-        ringArt: null,
-        auraArt: null,
-      },
-      card: {
-        cardId: card.cardId,
-        cardName: card.cardName,
-        cardNumber: card.cardNumber,
-        imageUrl: card.imageUrl,
-        match,
-      },
-      miles: p.miles,
-      milesLabel: `${p.miles} mi away`,
-      threadId: null,
-    };
-  });
+/*
+ * Wanted near you, as a busy city: twenty-two people across five of
+ * your cards, the shape the founder asked about ("in a big city like
+ * portland, it's entirely possible that there could be 100+ people").
+ * One conversation already open, so the filled icon and "Messaged" at
+ * the bottom of its card show too.
+ */
+const WANTED_DEMO: [DemoCardKey, DemoPersonKey[]][] = [
+  ["umbreonCol", ["zoe", "kaito", "hana", "theo", "ava", "marcus", "sam", "leo"]],
+  ["law01", ["eli", "maya", "priya", "jordan", "hana", "ava"]],
+  ["charizardBase", ["kaito", "marcus", "theo", "sam"]],
+  ["shanksSec", ["jordan", "zoe", "eli"]],
+  ["mewtwoBase", ["priya"]],
+];
+
+const nearbyMatches = (): (NearbyMatch & { when: string })[] =>
+  WANTED_DEMO.flatMap(([key, people], cardIndex) =>
+    people.map((who, index) => {
+      const p = PEOPLE[who];
+      const card = DEMO_CARDS[key];
+      const miles = Math.max(1, Math.round(p.miles + index * 1.7 + cardIndex));
+      return {
+        ask: { kind: "flare" as const, id: `demo-ask-${cardIndex}-${index}` },
+        haveEntryId: `demo-have-${cardIndex}`,
+        wanter: {
+          playerId: p.playerId,
+          displayName: p.displayName,
+          avatarUrl: p.avatarUrl,
+          frame: p.frame,
+          ring: p.ring,
+          aura: p.aura,
+          ringArt: null,
+          auraArt: null,
+        },
+        card: {
+          cardId: card.cardId,
+          cardName: card.cardName,
+          cardNumber: card.cardNumber,
+          imageUrl: card.imageUrl,
+          match: "exact" as const,
+        },
+        miles,
+        milesLabel: milesLabel(miles),
+        threadId: cardIndex === 0 && index === 1 ? "demo-thread-wanted" : null,
+        when: new Date(Date.now() - (cardIndex * 7 + index) * 3_600_000).toISOString(),
+      };
+    }),
+  );
+
+function wantedGroups(sort: WantedSort): WantedGroup[] {
+  return groupByCard(nearbyMatches(), sort).map((group) => ({
+    card: group.people[0].card,
+    haveEntryId: group.people[0].haveEntryId,
+    people: group.people,
+    nearestLabel: milesLabel(group.nearest),
+  }));
+}
+
+/** "Wanted near you" for demo mode: the same grouping the server does. */
+export function demoWanted(sort: WantedSort): WantedPage {
+  const matches = nearbyMatches();
+  const groups = wantedGroups(sort);
+  return {
+    groups,
+    totalPeople: distinctPeople(matches),
+    totalCards: groups.length,
+    nextOffset: null,
+  };
+}
+
+function wantedSummary(): WantedSummary {
+  const matches = nearbyMatches();
+  const groups = wantedGroups("most");
+  return {
+    totalPeople: distinctPeople(matches),
+    totalCards: groups.length,
+    groups: groups.slice(0, 3).map((group) => ({
+      card: group.card,
+      count: group.people.length,
+      nearestLabel: group.nearestLabel,
+      faces: group.people.slice(0, 3).map((person) => person.wanter),
+    })),
+  };
+}
 
 export function demoFeed(): { items: FeedEntry[]; radius: number } {
   const items: FeedEntry[] = [
     ...yourPosts,
-    { kind: "nearbyMatch", matches: nearbyMatches(), section: "wanted", tab: "nearby" },
+    {
+      kind: "nearbyMatch",
+      matches: nearbyMatches().slice(0, 5),
+      summary: wantedSummary(),
+      section: "wanted",
+      tab: "nearby",
+    },
     ...[...posts.entries()].map(([id, state]) => feedItem(id, state)),
   ];
   return { items, radius: 25 };
