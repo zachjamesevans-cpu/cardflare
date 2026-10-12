@@ -5,7 +5,8 @@ import { tierMayWear } from "@/lib/players/cosmetics";
 import { grantSpendableEmbers, spendEmbers } from "@/lib/players/embers";
 import {
   DUPLICATE_EMBERS,
-  drawPack,
+  drawPackWithPity,
+  isTopPull,
   type PoolEntry,
   type SeriesManifest,
 } from "./index";
@@ -190,7 +191,30 @@ export async function openPack(
     crypto.getRandomValues(buffer);
     return buffer[0] / 0xffffffff;
   });
-  const drawn: PoolEntry[] = drawPack(series, rolls);
+  /* The pity rule (manifest.ts): packs of this set opened in a row
+     without an Epic or better. Missing table or row reads as none. */
+  const { data: pity } = await admin
+    .from("player_pack_pity")
+    .select("packs_without_top")
+    .eq("player_id", playerId)
+    .eq("series", series.id)
+    .maybeSingle();
+  const drawn: PoolEntry[] = drawPackWithPity(
+    series,
+    rolls,
+    pity?.packs_without_top ?? 0,
+  );
+
+  /* Reset by a top pull, otherwise one more in the run. */
+  const { error: pityError } = await admin.from("player_pack_pity").upsert(
+    {
+      player_id: playerId,
+      series: series.id,
+      packs_without_top: drawn.some(isTopPull) ? 0 : (pity?.packs_without_top ?? 0) + 1,
+    },
+    { onConflict: "player_id,series" },
+  );
+  if (pityError) console.error("Could not count the pity run", pityError);
 
   const { data: ownedRows } = await admin
     .from("player_cosmetics")

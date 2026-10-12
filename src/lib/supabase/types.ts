@@ -1247,6 +1247,13 @@ export type PlayerPackInsert = Omit<
   ref?: string | null;
 };
 
+/** Packs of one set opened in a row without an Epic or better (the pity rule). */
+export type PlayerPackPityRow = {
+  player_id: string;
+  series: string;
+  packs_without_top: number;
+};
+
 export type PlayerFollowRow = {
   follower_id: string;
   followed_id: string;
@@ -2169,6 +2176,7 @@ export type Database = {
       players: Table<PlayerRow, PlayerInsert>;
       player_follows: Table<PlayerFollowRow, PlayerFollowInsert>;
       player_packs: Table<PlayerPackRow, PlayerPackInsert>;
+      player_pack_pity: Table<PlayerPackPityRow, PlayerPackPityRow>;
       cosmetics: Table<CosmeticRow, CosmeticRow>;
       player_equips: Table<PlayerEquipRow, PlayerEquipInsert>;
       pack_series: Table<PackSeriesRow, PackSeriesInsert>;

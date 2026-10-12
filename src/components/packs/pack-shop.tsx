@@ -203,7 +203,8 @@ export function PackShop({
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-2">
           <p className="text-sm text-text-secondary">
             {series.slots} cosmetics per pack, drawn the moment you open it. Duplicates
-            come back as Embers, so no pull is ever nothing.
+            come back as Embers, so no pull is ever nothing. Nine packs without an Epic
+            or better, and the tenth has one.
           </p>
           <p className="text-sm text-text-muted">
             {mine > 0

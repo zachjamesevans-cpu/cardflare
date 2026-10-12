@@ -8,10 +8,12 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import {
   ApiError,
   buyCosmetic,
+  getDailyShop,
   getMilestones,
   getPacks,
   getProfile,
   type CosmeticItem,
+  type DailyShelf,
   type MilestoneBoard,
   type EquipSlot,
   type Profile,
@@ -20,6 +22,7 @@ import {
   type SealedPack,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { DailyShop } from "../daily-shop";
 import { MilestoneList } from "../milestone-list";
 import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
@@ -46,6 +49,7 @@ export function StoreScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [board, setBoard] = useState<MilestoneBoard | null>(null);
+  const [shelf, setShelf] = useState<DailyShelf | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -62,6 +66,9 @@ export function StoreScreen() {
         .catch(() => {});
       getMilestones()
         .then(setBoard)
+        .catch(() => {});
+      getDailyShop()
+        .then(setShelf)
         .catch(() => {});
     } catch {
       setMessage("Could not load the store. Pull back and try again.");
@@ -158,6 +165,16 @@ export function StoreScreen() {
       </View>
 
       {board ? <MilestoneList board={board} /> : null}
+
+      {shelf ? (
+        <DailyShop
+          key={shelf.resetsAt}
+          shelf={shelf}
+          pro={profile.pro !== false}
+          onPro={() => navigation.navigate("Pro")}
+          onBought={() => void load()}
+        />
+      ) : null}
 
       <Card>
         <Title>cardflare packs</Title>

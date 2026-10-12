@@ -215,7 +215,8 @@ export function PackShopSection({
         <View style={{ flex: 1, justifyContent: "center", gap: spacing(2) }}>
           <Muted>
             {series.slots} cosmetics per pack, drawn the moment you open it.
-            Duplicates come back as Embers, so no pull is ever nothing.
+            Duplicates come back as Embers, so no pull is ever nothing. Nine
+            packs without an Epic or better, and the tenth has one.
           </Muted>
           <Muted>
             {mine > 0

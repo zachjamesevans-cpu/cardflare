@@ -4,6 +4,7 @@ import { Flame } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
+import { DailyShop } from "@/components/players/daily-shop";
 import { MilestoneList } from "@/components/players/milestone-list";
 import { PackShop } from "@/components/packs/pack-shop";
 import { oddsByRarity, oddsPerItem } from "@/lib/packs";
@@ -17,6 +18,7 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { wardrobeFor } from "@/lib/players/cosmetics";
+import { dailyShelf } from "@/lib/players/daily-shop";
 import { checkMilestones } from "@/lib/players/milestones";
 import { needsSetup, ownProfile } from "@/lib/players/profile";
 import { tierAllows } from "@/lib/tiers";
@@ -65,6 +67,8 @@ export default async function EmberStorePage() {
   const sealed = await listSealedPacks(playerId);
   /* Every pack on sale: Origin and each ready console-built set. */
   const onSale = await shopSeries();
+  /* Today's shelf: a few cosmetics, changing at midnight UTC. */
+  const shelf = await dailyShelf(playerId);
   if (!profile) redirect("/profile/settings");
 
   const [wardrobe, areas] = await Promise.all([
@@ -108,6 +112,8 @@ export default async function EmberStorePage() {
           </div>
 
           <MilestoneList board={board} />
+
+          <DailyShop shelf={shelf} pro={canWear} />
 
           <Card className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">

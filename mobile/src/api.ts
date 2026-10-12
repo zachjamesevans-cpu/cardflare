@@ -2339,6 +2339,34 @@ export interface MilestoneBoard {
 /** Pays anything newly reached, then lists where the player stands. */
 export const getMilestones = () => call<MilestoneBoard>("GET", "/api/v1/milestones");
 
+/** One cosmetic on today's shelf in the daily shop. */
+export interface DailyOffer {
+  slug: string;
+  kind: CustomizeKind;
+  name: string;
+  description: string;
+  costEmbers: number;
+  owned: boolean;
+  requiresEarned: number | null;
+}
+
+export interface DailyShelf {
+  offers: DailyOffer[];
+  /** When the shelf changes: the next UTC midnight. */
+  resetsAt: string;
+}
+
+/** Today's shelf: a few cosmetics, changing at midnight UTC. */
+export const getDailyShop = () => call<DailyShelf>("GET", "/api/v1/shop/daily");
+
+/** Buys from today's shelf and wears it. Refusals are ApiError codes. */
+export const buyDailyOffer = (slug: string) =>
+  call<{ ok: true; outcome: "bought" | "owned"; shelf: DailyShelf }>(
+    "POST",
+    "/api/v1/shop/daily",
+    { slug },
+  );
+
 export interface SealedPack {
   id: string;
   series: string;
