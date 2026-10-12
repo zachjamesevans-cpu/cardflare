@@ -1,3 +1,4 @@
+import { foundLast } from "@/lib/feed/card-copy";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -188,13 +189,15 @@ export function FlareFeedCard({
 }) {
   const direction: "want" | "showcase" =
     item.direction === "showcase" ? "showcase" : "want";
-  const lead = item.cards[0];
+  /* Found cards at the far right, whatever order they arrived in. */
+  const cards = [...item.cards].sort(foundLast);
+  const lead = cards[0];
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours || preview };
   /* What the menu, the offer button and the offer itself read. */
   const shape = {
     postId: item.postId,
-    cards: item.cards,
+    cards: cards,
     total: item.total,
     direction,
     yours: item.yours,
@@ -205,7 +208,7 @@ export function FlareFeedCard({
   };
 
   /* The zoom pages along the whole deck from any card. */
-  const shelf: ZoomCard[] = item.cards.map((card) => ({
+  const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
@@ -216,9 +219,10 @@ export function FlareFeedCard({
     stillNeeds: direction === "want" ? (card.remaining ?? null) : null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: preview ? null : haveFor(card, post),
+    state: card.state ?? "open",
   }));
 
-  const tiles = item.cards.map((card, index) => (
+  const tiles = cards.map((card, index) => (
     <FeedTile
       key={card.cardId}
       imageUrl={card.imageUrl}
@@ -348,7 +352,7 @@ export function FlareFeedCard({
         </SingleFlare>
       ) : (
         <FlareCarousel
-          cards={item.cards}
+          cards={cards}
           direction={direction}
           tiles={tiles}
           post={preview ? null : shape}

@@ -1,3 +1,4 @@
+import { foundLast } from "./found-last";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -353,9 +354,11 @@ export function FlareFeedCard({
   onOpenHunt?: (huntId: string) => void;
 }) {
   const direction = item.direction ?? "want";
-  const lead = item.cards[0];
+  /* Found cards at the far right (found-last.ts). */
+  const cards = [...item.cards].sort(foundLast);
+  const lead = cards[0];
   const single = item.total === 1 && lead;
-  const shelf = shelfFor(item.cards, post);
+  const shelf = shelfFor(cards, post);
   const completed = item.completed ?? false;
   /* "28m · nearby": when it went up and how far, beside the name. */
   const meta = [
@@ -529,7 +532,7 @@ export function FlareFeedCard({
         />
       ) : (
         <FlareStrip
-          cards={item.cards}
+          cards={cards}
           total={item.total}
           direction={direction}
           post={post}
@@ -569,7 +572,7 @@ export function FlareFeedCard({
           postId={post.postId}
           posterName={post.posterName ?? item.displayName}
           lines={Object.entries(picks).map(([flareId, quantity]) => {
-            const card = item.cards.find((entry) => entry.flareId === flareId);
+            const card = cards.find((entry) => entry.flareId === flareId);
             return {
               flareId,
               name: card?.cardName ?? "one card",
