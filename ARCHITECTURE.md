@@ -911,12 +911,41 @@ store. The nudge asks; it never edits the binder itself.
 a store reads after a night. Totals only, never who traded what with whom:
 the store hosts the room, it does not read it.
 
-**A confirmed trade is the only thing that earns Embers.** See below.
+**A confirmed trade is what mostly earns Embers.** See below.
 
 ## Profiles and Embers
 
-Only a confirmed trade earns anything. Not posting, not pledging, not turning
-up. The one act the whole product exists to cause is the only one that pays.
+A confirmed trade is the main thing that earns, and the only one that earns
+week after week. Three smaller sources sit beside it, each capped by
+construction: 1 Ember for turning up at a store you had already saved (once
+per store per day, 3 a week), 40 for a pack pull you already own, and the
+milestones below, each of which pays once ever.
+
+### Milestones, the daily shop, packs and the pity rule (2026-10-11)
+
+From the founder's Embers review: earning came almost only from trades, the
+badge tiers unlocked nothing, and a player who owned the shop had nothing left
+to spend on. The founder chose to keep wearing (and so buying) Pro.
+
+- **Milestones** (`lib/players/milestone-rules.ts`, `milestones.ts`): seven
+  one-off rewards - first Flare 15, first trade 25, 5 and 10 trading partners
+  40 and 75, first and third finished hunt 50 and 100, four store visits 30 -
+  counted from the records (confirmed, undisputed trades and their distinct
+  partners; hunts of 3+ cards fully found; Flares; attendance), paid with
+  `reason = 'milestone'` and a once-ever ref. Each badge tier reached (Kindling
+  50, Blaze 200, Wildfire 600, Inferno 1500) hands over a sealed pack of the
+  newest set, once, by `player_packs.ref`. Checked when the profile opens and
+  in the shop.
+- **Packs** (`lib/packs/catalog.ts`): Origin plus every console-built set that
+  is live, released, adds to 100 and has only live items. Buying is Pro, asked
+  before an Ember moves; the signup pack and tier packs open for anyone. A
+  pack already held opens even if its set has since come off sale.
+- **The pity rule** (`lib/packs/manifest.ts`): nine packs of a set without an
+  Epic or better and the tenth is guaranteed one, per player per set
+  (`player_pack_pity`).
+- **The daily shop** (`lib/players/daily-shop-rules.ts`): four cosmetics a day
+  from the live, priced catalogue kinds, the same for everyone, turning over
+  at midnight UTC; only today's shelf sells, Pro, worn on purchase.
 
 ### A handle to be found by, a name to be seen as
 
@@ -1012,11 +1041,10 @@ handed everything still grind to 500 for Orbit is a strange kind of gift.
 Turning it off leaves anything actually bought still owned — the flag and the
 purchase rows are separate answers to "do they own this".
 
-An Ember grant goes through `award_embers` like every other movement, so it is
-in the ledger with `reason = 'grant'`. It raises the lifetime badge as well as
-the balance, which is a real cost: an admin gift shows up as trading the player
-did not do. The UI says so above the field rather than leaving it to be
-discovered. There is deliberately no way to take Embers away — `embers_earned`
+An Ember grant goes through `grant_embers`, so it is in the ledger with
+`reason = 'grant'` and moves the spendable balance only (`earned_delta = 0`):
+the founder's rule that a gift must not show up on somebody's profile as
+trading they did not do. There is deliberately no way to take Embers away — `embers_earned`
 is monotonic by design, and an admin "undo" would be the one thing that breaks
 what the badge means. `GRANT_MAX` caps a single grant at 10,000 as a guard
 against a slipped digit, not as a policy about generosity.
@@ -1068,8 +1096,12 @@ nothing to drift.
 
 ### Anti-farming, and that it is a proposal
 
-A trade with somebody new pays 10; a repeat partner pays 2; a trade with
-nobody named pays 3. The taper is NOT something the founder asked for — it is
+Per 90-day season, a pair's trades pay 10, then 4, then 2, then nothing; the
+first five paid trades in a room are full rate and the next five half; a
+young account earns half; past 60 trade-Embers in a week each trade pays 1; a
+trade with nobody named pays 0, and an unanswered one pays its author 3 a day
+later (`ember-rules.ts` is the source of these numbers). The taper is NOT
+something the founder asked for — it is
 in `ember-rules.ts` because without it two friends can sit at a table tapping
 confirm at each other until the badge means nothing, and the badge is the
 entire point of `embers_earned`. Two rather than zero because regulars trading
