@@ -55,7 +55,7 @@ export default async function EmberStorePage() {
     ownProfile(playerId),
   ]);
   if (setupOwed) redirect("/welcome");
-  /* Anybody can buy; Pro wears. The tiles say which. */
+  /* Buying and wearing are both Pro (packs too: lib/packs/repository.ts). */
   const canWear = profile ? tierAllows(profile.tier, "cosmetics") : false;
   const sealed = await listSealedPacks(playerId);
   /* Every pack on sale: Origin and each ready console-built set. */
@@ -112,6 +112,7 @@ export default async function EmberStorePage() {
             </div>
             {onSale.map((series) => (
               <PackShop
+                pro={canWear}
                 key={series.id}
                 series={{
                   id: series.id,

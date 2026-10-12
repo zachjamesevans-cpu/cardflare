@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { tierMayWear } from "@/lib/players/cosmetics";
 import { grantSpendableEmbers, spendEmbers } from "@/lib/players/embers";
 import {
   DUPLICATE_EMBERS,
@@ -92,9 +93,18 @@ export async function listSealedPacks(playerId: string): Promise<SealedPack[]> {
 export async function buyPackWithEmbers(
   playerId: string,
   seriesId: string,
-): Promise<"bought" | "cannot-afford" | "failed"> {
+): Promise<"bought" | "cannot-afford" | "not-pro" | "failed"> {
   const series = await seriesById(seriesId);
   if (!series || !isSupabaseConfigured()) return "failed";
+
+  /*
+   * Packs are Pro, like buying a cosmetic (buyCosmetic). The Embers
+   * review found a free player could spend 300 Embers on cosmetics they
+   * could not wear; the founder chose to keep wearing Pro and stop the
+   * spend instead ("option b"). Refused before a single Ember moves. The
+   * signup pack is a gift and still arrives for everyone.
+   */
+  if (!(await tierMayWear(playerId))) return "not-pro";
 
   /* A UNIQUE ref per purchase: the ledger's ref index treats a repeat
      as already-paid, which is right for one-off cosmetics and dead

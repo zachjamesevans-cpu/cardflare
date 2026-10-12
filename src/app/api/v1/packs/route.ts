@@ -64,6 +64,9 @@ export async function POST(request: Request): Promise<Response> {
     if (outcome === "cannot-afford") {
       return Response.json({ error: "not-enough-embers" }, { status: 402 });
     }
+    if (outcome === "not-pro") {
+      return Response.json({ error: "not-pro" }, { status: 403 });
+    }
     if (outcome === "failed") {
       return Response.json({ error: "buy-failed" }, { status: 500 });
     }

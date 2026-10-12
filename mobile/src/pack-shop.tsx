@@ -134,11 +134,21 @@ export function PackShopSection({
   sealed,
   names,
   onChanged,
+  pro,
+  onPro,
 }: {
   series: PackSeries;
   sealed: SealedPack[];
   names: Record<string, string>;
   onChanged: () => void;
+  /**
+   * Whether the viewer may buy packs. Packs are Pro, like wearing what is
+   * in them; a free player gets the door to Pro instead of a Buy that
+   * would spend Embers on things they cannot wear (the founder's
+   * "option b"). The website's PackShop does the same.
+   */
+  pro: boolean;
+  onPro: () => void;
 }) {
   const [packs, setPacks] = useState(sealed);
   const [busy, setBusy] = useState(false);
@@ -159,13 +169,17 @@ export function PackShopSection({
         setMessage("Pack added. Tear it open when ready.");
         onChanged();
       })
-      .catch((caught) =>
+      .catch((caught) => {
+        if (describeError(caught).includes("not-pro")) {
+          onPro();
+          return;
+        }
         setMessage(
           describeError(caught).includes("402")
             ? "Not enough Embers for a pack yet."
             : `That did not go through. ${friendlyError(caught)}`,
-        ),
-      )
+        );
+      })
       .finally(() => setBusy(false));
   };
 
@@ -213,11 +227,15 @@ export function PackShopSection({
 
       <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing(2) }}>
         <View style={{ flex: 1 }}>
-          <Button
-            label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
-            busy={busy}
-            onPress={buy}
-          />
+          {pro ? (
+            <Button
+              label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
+              busy={busy}
+              onPress={buy}
+            />
+          ) : (
+            <Button label="Packs are Pro" onPress={onPro} />
+          )}
         </View>
         {mine > 0 && (
           <View style={{ flex: 1 }}>

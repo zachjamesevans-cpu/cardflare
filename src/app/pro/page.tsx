@@ -52,7 +52,7 @@ const INCLUDED = [
 const FAQ = [
   {
     q: "What do I get without Pro?",
-    a: "Everything that makes cardflare work: Flares, rooms, your binder and your friends. You can browse and unlock cosmetics with Embers too. Pro is what lets you wear them.",
+    a: "Everything that makes cardflare work: Flares, rooms, your binder and your friends. You earn Embers and can browse every cosmetic, and your welcome pack is yours to open. Buying cosmetics and packs with Embers, and wearing them, is Pro.",
   },
   {
     q: "What happens if I stop?",
@@ -133,7 +133,7 @@ export default async function ProPage({
             id="pro-benefits-title"
             eyebrow="What Pro does"
             title="Wear what you unlock"
-            description="Cosmetics are earned with Embers and bought in the shop by anyone. Pro is what puts them on."
+            description="Everyone earns Embers by trading. Pro is what spends them - in the shop and on packs - and puts what you unlock on."
           />
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {BENEFITS.map((benefit) => (

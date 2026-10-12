@@ -1,6 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { StackParams } from "../../App";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import {
@@ -33,6 +35,7 @@ import { colors, gutter, spacing } from "../theme";
  * No confirmation step, because Embers cannot be bought with money.
  */
 export function StoreScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [packSeries, setPackSeries] = useState<PackSeries[]>([]);
   const [sealed, setSealed] = useState<SealedPack[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -169,6 +172,8 @@ export function StoreScreen() {
               ]),
             }}
             onChanged={() => void load()}
+            pro={profile?.pro !== false}
+            onPro={() => navigation.navigate("Pro")}
           />
         ))}
       </Card>
@@ -240,7 +245,7 @@ function Shelf({
   slot: EquipSlot;
   balance: number;
   busy: string | null;
-  /** Anybody can buy; Pro wears. The tile says which. */
+  /** Buying and wearing are both Pro; the tile says which. */
   canWear: boolean;
   onBuy: (item: CosmeticItem, slot: EquipSlot) => void;
 }) {

@@ -50,7 +50,7 @@ export function CosmeticShop({
   /** The private number. Only ever rendered on the owner's own profile. */
   balance: number;
   /**
-   * Whether this player's tier may wear what they own. Anybody can buy;
+   * Whether this player's tier may wear what they own. Buying is Pro too;
    * Pro wears. The tile says which, so "Tap to wear" is never a lie to
    * a free player (the audit: the store never mentioned Pro).
    */

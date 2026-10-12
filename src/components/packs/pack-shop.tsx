@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { HelpCircle, Loader2, X } from "lucide-react";
 
 import { FRAME_CLASS } from "@/components/players/cosmetic-card";
@@ -106,11 +107,18 @@ export function PackShop({
   series,
   sealed,
   names,
+  pro,
 }: {
   series: SeriesJson;
   sealed: SealedJson[];
   /** slug to display name, resolved from the catalogue server-side. */
   names: Record<string, string>;
+  /**
+   * Whether the viewer may buy packs. Packs are Pro, like wearing what is
+   * in them: a free player is shown the door to Pro before any Embers
+   * move, not told afterwards (the founder's "option b").
+   */
+  pro: boolean;
 }) {
   const [packs, setPacks] = useState(sealed);
   const [busy, setBusy] = useState<"buy" | null>(null);
@@ -137,6 +145,10 @@ export function PackShop({
       const response = await post({ action: "buy", series: series.id });
       if (response.status === 402) {
         setMessage("Not enough Embers for a pack yet.");
+        return;
+      }
+      if (response.status === 403) {
+        setMessage("Packs are part of cardflare Pro.");
         return;
       }
       if (!response.ok) {
@@ -202,15 +214,24 @@ export function PackShop({
       </div>
 
       <div className="flex items-stretch gap-2">
-        <button
-          type="button"
-          onClick={() => void buy()}
-          disabled={busy !== null}
-          className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent disabled:opacity-60"
-        >
-          {busy === "buy" && <Loader2 className="size-4 animate-spin" />}
-          {busy === "buy" ? "Buying…" : `Buy · ${series.priceEmbers} Embers`}
-        </button>
+        {pro ? (
+          <button
+            type="button"
+            onClick={() => void buy()}
+            disabled={busy !== null}
+            className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent disabled:opacity-60"
+          >
+            {busy === "buy" && <Loader2 className="size-4 animate-spin" />}
+            {busy === "buy" ? "Buying…" : `Buy · ${series.priceEmbers} Embers`}
+          </button>
+        ) : (
+          <Link
+            href="/pro"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-4 py-2.5 text-sm font-semibold text-accent transition-colors hover:border-accent"
+          >
+            Packs are Pro · See Pro
+          </Link>
+        )}
 
         {mine > 0 && (
           <button
