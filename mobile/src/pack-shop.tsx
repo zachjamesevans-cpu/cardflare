@@ -33,6 +33,13 @@ import { colors, radius, spacing } from "./theme";
  * exact percent.
  */
 
+/* The CF mark on the pack and the card backs, as everywhere the logo
+   is drawn (the flame card it replaced lingered here). Wider than tall:
+   sized by width, height from the artwork. */
+const CF_MARK = require("../assets/cf-mark.png");
+const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
+const CF_MARK_RATIO = CF_MARK_SOURCE.height / CF_MARK_SOURCE.width;
+
 const RARITY_COLOR: Record<string, string> = {
   common: colors.textSecondary,
   uncommon: "#7bd88a",
@@ -96,8 +103,12 @@ export function PackArt({
       <View style={crimp(true)} />
       <View style={crimp(false)} />
       <Image
-        source={require("../assets/cardflare-mark.png")}
-        style={{ height: 72 * scale, width: 60 * scale, resizeMode: "contain" }}
+        source={CF_MARK}
+        style={{
+          width: 72 * scale,
+          height: 72 * scale * CF_MARK_RATIO,
+          resizeMode: "contain",
+        }}
       />
       <Text
         style={{
@@ -514,8 +525,13 @@ function FlipCard({
           }}
         >
           <Image
-            source={require("../assets/cardflare-mark.png")}
-            style={{ height: 90, width: 76, resizeMode: "contain", opacity: 0.8 }}
+            source={CF_MARK}
+            style={{
+              width: 84,
+              height: 84 * CF_MARK_RATIO,
+              resizeMode: "contain",
+              opacity: 0.8,
+            }}
           />
           {last && <Muted>Your best pull waits here</Muted>}
           <Muted>Tap to flip</Muted>
