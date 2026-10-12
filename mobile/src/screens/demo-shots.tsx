@@ -5,6 +5,8 @@ import { ScrollView, Text, View } from "react-native";
 import type { StackParams } from "../../App";
 import { demoOn, setDemoMode } from "../demo/demo-mode";
 import { DEMO_CARDS } from "../demo/demo-cards";
+import { PEOPLE } from "../demo/demo-people";
+import { answerDraft } from "../nearby-shared";
 import { huntId, postId } from "../demo/demo-world";
 import { colors, gutter, spacing } from "../theme";
 import { Body, Button, Card, Muted, Tap, Title } from "../ui";
@@ -98,6 +100,20 @@ export const SHOTS: Shot[] = [
     tip: "Umbreon's sheet: who wants it, closest first, the message icon on each.",
     go: (nav) =>
       nav.navigate("WantedNearYou", { cardId: DEMO_CARDS.umbreonCol.cardId }),
+  },
+  {
+    title: "15. Messaging someone who wants your card",
+    tip: "A new conversation with Zoe, the first line already written.",
+    go: (nav) =>
+      nav.navigate("NewMessage", {
+        ask: { kind: "flare", id: "demo-ask-0-0" },
+        withName: PEOPLE.zoe.displayName,
+        withPlayerId: PEOPLE.zoe.playerId,
+        withAvatarUrl: PEOPLE.zoe.avatarUrl,
+        cardName: DEMO_CARDS.umbreonCol.cardName,
+        imageUrl: DEMO_CARDS.umbreonCol.imageUrl,
+        draft: answerDraft(DEMO_CARDS.umbreonCol.cardName),
+      }),
   },
 ];
 

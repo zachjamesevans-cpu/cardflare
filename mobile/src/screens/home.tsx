@@ -96,7 +96,8 @@ import {
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { NearbyHeader } from "../nearby-parts";
 import { planNearby } from "../nearby-plan";
-import { DraftBox, MessageIcon, WantedSummaryCard } from "../wanted-near-you";
+import { answerDraft } from "../nearby-shared";
+import { MessageIcon, WantedSummaryCard } from "../wanted-near-you";
 import { PlayerAvatar } from "../player-avatar";
 import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
@@ -287,32 +288,19 @@ function WantedRow({
   entry,
   onOpenProfile,
   onOpenThread,
+  onCompose,
 }: {
   entry: Extract<FeedEntry, { kind: "wanted" }>["entries"][number];
   onOpenProfile: () => void;
   onOpenThread: (threadId: string) => void;
-}) {
-  const [drafting, setDrafting] = useState(false);
-
   /*
-   * The icon opens "I have <card>." as a draft under the row - the same
-   * icon and draft as "Wanted near you" - and Send starts the thread.
-   * With a conversation already open the icon is filled and opens it:
-   * nothing is said twice.
+   * No conversation yet: a new one opens, inbox-style, with "I have
+   * <card>. Are you looking to trade for it?" in the box - the same as
+   * "Wanted near you". With a conversation already open the icon is
+   * filled and opens it: nothing is said twice.
    */
-  const send = async (text: string): Promise<string | null> => {
-    try {
-      const result = await openLocalThread(entry.flareId, text);
-      if (result.ok && result.threadId) {
-        setDrafting(false);
-        onOpenThread(result.threadId);
-        return null;
-      }
-      return result.message ?? "Could not start the conversation.";
-    } catch (caught) {
-      return serverMessage(caught) ?? "Could not start the conversation.";
-    }
-  };
+  onCompose: () => void;
+}) {
 
   return (
     <View style={{ gap: spacing(1.5) }}>
@@ -366,19 +354,9 @@ function WantedRow({
               ? "Open the conversation"
               : `Message ${entry.displayName ?? "this player"} about ${entry.card.cardName}`
           }
-          onPress={() =>
-            entry.threadId ? onOpenThread(entry.threadId) : setDrafting(!drafting)
-          }
+          onPress={() => (entry.threadId ? onOpenThread(entry.threadId) : onCompose())}
         />
       </View>
-      {drafting && !entry.threadId ? (
-        <DraftBox
-          initial={`I have ${entry.card.cardName}.`}
-          label="Your message"
-          onCancel={() => setDrafting(false)}
-          onSend={send}
-        />
-      ) : null}
     </View>
   );
 }
@@ -1088,6 +1066,17 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                           }
                           onOpenThread={(threadId) =>
                             navigation.navigate("LocalThread", { threadId })
+                          }
+                          onCompose={() =>
+                            navigation.navigate("NewMessage", {
+                              ask: { kind: "flare", id: entry.flareId },
+                              withName: entry.displayName ?? "A player",
+                              withPlayerId: entry.playerId,
+                              withAvatarUrl: entry.avatarUrl,
+                              cardName: entry.card.cardName,
+                              imageUrl: entry.card.imageUrl,
+                              draft: answerDraft(entry.card.cardName),
+                            })
                           }
                         />
                       ))}

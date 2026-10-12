@@ -63,8 +63,20 @@ export function wantedCountLine(people: number): string {
     : `${people} people near you want cards from your binder`;
 }
 
-/** What a reply starts as. A draft: nothing is sent until Send. */
-export const ANSWER_DRAFT = "I have this one. Where do you usually play?";
+/**
+ * The first line already in the box when you message somebody who
+ * wants your card. A draft: nothing is sent until Send. The founder:
+ * "autofilled with 'I have (card name here). If you're looking to
+ * trade for it?' or something along those lines."
+ */
+export function answerDraft(cardName: string): string {
+  return `I have ${cardName}. Are you looking to trade for it?`;
+}
+
+/** The website's "new message" page for an ask, beside Messages. */
+export function newMessageHref(ask: { kind: "want" | "flare"; id: string }): string {
+  return `/local/new?kind=${ask.kind}&id=${encodeURIComponent(ask.id)}`;
+}
 
 /** A row whose Flare is gone by the time somebody answers it. */
 export const ANSWER_GONE = "They found it or took it down.";

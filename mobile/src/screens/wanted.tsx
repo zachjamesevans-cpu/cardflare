@@ -20,15 +20,22 @@ import {
   getWantedNearYou,
   serverMessage,
   setLocalTrade,
+  type NearbyMatch,
   type WantedGroup,
   type WantedPage,
 } from "../api";
 import { HeldRing } from "../held-ring";
-import { WANTED_PRIVATE_LINE, wantedCountLine } from "../nearby-shared";
+import { answerDraft, WANTED_PRIVATE_LINE, wantedCountLine } from "../nearby-shared";
 import { SwipeToClose } from "../sheet-swipe";
 import { colors, gutter, radius, spacing } from "../theme";
 import { Button, Card, CardImage, ErrorLine, Loading, Muted, Tap } from "../ui";
-import { PersonRow } from "../wanted-near-you";
+import { avatarOverhang } from "../avatar-geometry";
+import { PERSON_AVATAR, PersonRow } from "../wanted-near-you";
+
+/* Room for the widest thing a row's avatar can wear (PERSON_AVATAR),
+   up to the sheet's own padding: the list borrows that back, and the
+   last points of the widest glow are a whisper nobody misses. */
+const OVERHANG = Math.min(avatarOverhang(PERSON_AVATAR), spacing(4));
 
 const COLUMNS = 3;
 const GAP = spacing(3);
@@ -144,6 +151,18 @@ export function WantedNearYouScreen() {
             setOpenCard(null);
             navigation.navigate("LocalThread", { threadId });
           }}
+          onCompose={(person) => {
+            setOpenCard(null);
+            navigation.navigate("NewMessage", {
+              ask: person.ask,
+              withName: person.wanter.displayName,
+              withPlayerId: person.wanter.playerId,
+              withAvatarUrl: person.wanter.avatarUrl,
+              cardName: person.card.cardName,
+              imageUrl: person.card.imageUrl,
+              draft: answerDraft(person.card.cardName),
+            });
+          }}
           onStopped={() => {
             setOpenCard(null);
             void load();
@@ -220,11 +239,13 @@ function PeopleForCard({
   group,
   onClose,
   onOpenThread,
+  onCompose,
   onStopped,
 }: {
   group: WantedGroup;
   onClose: () => void;
   onOpenThread: (threadId: string) => void;
+  onCompose: (person: NearbyMatch) => void;
   onStopped: () => void;
 }) {
   const insets = useSafeAreaInsets();
@@ -315,15 +336,21 @@ function PeopleForCard({
             ) : null}
             <ErrorLine message={error} />
 
+            {/* A scroll view clips at its edge, and a worn ring or aura
+                reaches past the picture's: room for it on every side,
+                taken back from the margin so the faces still line up
+                with the card's name above. */}
             <ScrollView
               keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: spacing(3) }}
+              style={{ marginHorizontal: -OVERHANG }}
+              contentContainerStyle={{ gap: spacing(3), padding: OVERHANG }}
             >
               {group.people.map((person) => (
                 <PersonRow
                   key={`${person.ask.kind}-${person.ask.id}`}
                   person={person}
                   onOpenThread={onOpenThread}
+                  onCompose={() => onCompose(person)}
                 />
               ))}
             </ScrollView>

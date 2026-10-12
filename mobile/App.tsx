@@ -33,6 +33,7 @@ import {
 
 import { PlayerProfileScreen } from "./src/screens/player-profile";
 import { WantedNearYouScreen } from "./src/screens/wanted";
+import { NewMessageScreen } from "./src/screens/new-message";
 import { WANTED_HEADING } from "./src/nearby-shared";
 import { FlarePostScreen } from "./src/screens/flare-post";
 import { HuntScreen } from "./src/screens/hunt";
@@ -184,6 +185,17 @@ export type StackParams = {
   /** Everybody near you who wants a card you trade, by card. `cardId`
       opens straight onto that card's people. */
   WantedNearYou: { cardId?: string } | undefined;
+  /** A conversation not started yet: the person, the card, the first
+      line written; Send creates it and swaps to LocalThread. */
+  NewMessage: {
+    ask: { kind: "want" | "flare"; id: string };
+    withName: string;
+    withPlayerId: string;
+    withAvatarUrl: string | null;
+    cardName: string;
+    imageUrl: string | null;
+    draft: string;
+  };
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
@@ -1020,6 +1032,11 @@ function AppGates() {
             name="WantedNearYou"
             component={WantedNearYouScreen}
             options={{ title: WANTED_HEADING }}
+          />
+          <Stack.Screen
+            name="NewMessage"
+            component={NewMessageScreen}
+            options={{ title: "New message" }}
           />
           <Stack.Screen name="SignIn" options={{ title: "Sign in" }}>
             {({ navigation }) => (

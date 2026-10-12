@@ -430,12 +430,46 @@ describe("both platforms", () => {
     }
   });
 
-  it("sends nothing on the icon's tap: a draft, then Send", () => {
-    const app = read("mobile/src/wanted-near-you.tsx");
-    expect(app).toContain("initial={ANSWER_DRAFT}");
-    expect(app).toMatch(/setDrafting\(!drafting\)/);
-    const web = read("src/components/nearby/wanted-list.tsx");
-    expect(web).toContain("useState(ANSWER_DRAFT)");
-    expect(web).toMatch(/setDrafting\(!drafting\)/);
+  /*
+   * The founder: "pressing the message button should immediately open
+   * up a message in someone's inbox ... autofilled with 'I have (card
+   * name here). If you're looking to trade for it?' ... the little pop
+   * up is kinda weird." A conversation screen, the first line written;
+   * nothing is sent - and nothing appears in their Messages - until Send.
+   */
+  it("opens a new conversation with the first line written, sent only on Send", async () => {
+    const { answerDraft, newMessageHref } = await import("@/lib/nearby/shared");
+    expect(answerDraft("Umbreon")).toBe(
+      "I have Umbreon. Are you looking to trade for it?",
+    );
+    expect(newMessageHref({ kind: "want", id: "abc" })).toBe(
+      "/local/new?kind=want&id=abc",
+    );
+
+    const sheet = read("mobile/src/screens/wanted.tsx");
+    expect(sheet).toContain('navigation.navigate("NewMessage"');
+    expect(sheet).toContain("draft: answerDraft(person.card.cardName)");
+    const compose = read("mobile/src/screens/new-message.tsx");
+    expect(compose).toContain("answerNearby(ask, body)");
+    expect(compose).toContain('navigation.replace("LocalThread"');
+
+    expect(read("src/components/nearby/wanted-list.tsx")).toContain(
+      "newMessageHref(person.ask)",
+    );
+    const page = read("src/app/local/new/page.tsx");
+    expect(page).toContain("draft={answerDraft(preview.cardName)}");
+    const composer = read("src/components/nearby/new-message-composer.tsx");
+    expect(composer).toContain("answerNearbyAction(ask, text)");
+    expect(composer).toContain("router.replace(");
+
+    /* No pop-up draft left on either. */
+    for (const file of [
+      "mobile/src/wanted-near-you.tsx",
+      "mobile/src/screens/home.tsx",
+      "src/components/nearby/wanted-list.tsx",
+      "src/components/feed/wanted-message-button.tsx",
+    ]) {
+      expect(read(file), file).not.toMatch(/DraftBox|setDrafting/);
+    }
   });
 });

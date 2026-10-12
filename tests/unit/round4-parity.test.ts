@@ -81,10 +81,11 @@ describe("Wanted from you ends in Message, not Go", () => {
     expect(web.feedItems).toContain("<WantedMessageButton");
     expect(web.feedItems).toContain("They already asked. Tell them you have it.");
     expect(web.feedItems).not.toContain("Bring it and it");
-    /* A message icon and a draft now, as on "Wanted near you": "I have
-       <card>." is in the box and Send starts the thread. */
-    expect(web.wantedButton).toContain("`I have ${cardName}.`");
-    expect(web.wantedButton).toContain("openThreadAction(flareId, text.trim())");
+    /* A message icon that opens a new conversation, the first line
+       written, as on "Wanted near you" (wanted-near-you.test.ts). */
+    expect(web.wantedButton).toContain(
+      'newMessageHref({ kind: "flare", id: flareId })',
+    );
     expect(web.wantedButton).toContain("<MessageCircle");
     /* Accounts only: the Guest chip has nothing to say on this row. */
     const wantedRow = web.feedItems.slice(
@@ -98,22 +99,24 @@ describe("Wanted from you ends in Message, not Go", () => {
   it("in the app", () => {
     expect(app.home).toContain("They already asked. Tell them you have it.");
     expect(app.home).not.toContain("Bring it and it");
-    expect(app.home).toContain("`I have ${");
-    expect(app.home).toContain("openLocalThread(");
+    /* "I have <card>. Are you looking to trade for it?", written into
+       a new conversation (screens/new-message.tsx). */
+    expect(app.home).toContain("draft: answerDraft(entry.card.cardName)");
     const wantedItem = app.home.slice(
       app.home.indexOf('item.kind === "wanted"'),
       app.home.indexOf('item.kind === "upcoming"'),
     );
     expect(wantedItem).toContain("<WantedRow");
     expect(wantedItem).not.toContain("GuestChip");
-    /* Each row ends in the message icon, and the icon opens a draft:
-       the same as "Wanted near you". */
+    /* Each row ends in the message icon, which opens a new
+       conversation: the same as "Wanted near you". */
     const wantedRow = app.home.slice(
       app.home.indexOf("function WantedRow("),
       app.home.indexOf("export function HomeScreen("),
     );
     expect(wantedRow).toContain("<MessageIcon");
-    expect(wantedRow).toContain("<DraftBox");
+    expect(wantedRow).toContain("onCompose()");
+    expect(app.home).toContain('navigation.navigate("NewMessage"');
   });
 });
 

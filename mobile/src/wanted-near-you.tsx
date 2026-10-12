@@ -1,11 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
 import { Text, View } from "react-native";
 
-import { answerNearby, serverMessage, type NearbyMatch, type WantedSummary } from "./api";
+import type { NearbyMatch, WantedSummary } from "./api";
 import { HeldRing } from "./held-ring";
 import {
-  ANSWER_DRAFT,
   WANTED_HEADING,
   WANTED_PRIVATE_LINE,
   shortMiles,
@@ -13,7 +11,7 @@ import {
 } from "./nearby-shared";
 import { PlayerAvatar } from "./player-avatar";
 import { colors, spacing } from "./theme";
-import { Button, Card, CardImage, ErrorLine, Input, Tap } from "./ui";
+import { Button, Card, CardImage, Tap } from "./ui";
 
 /** "14 people · closest under 2 mi away", for one card's line. */
 export function peopleLine(count: number, nearestLabel: string): string {
@@ -181,58 +179,9 @@ export function MessageIcon({
   );
 }
 
-/**
- * The draft under a row: the words already in the box, nothing sent
- * until Send. The founder's call, made between "send on tap" and "a
- * draft": a stray tap on an icon should never put words in somebody's
- * inbox.
- */
-export function DraftBox({
-  initial,
-  label,
-  onSend,
-  onCancel,
-}: {
-  initial: string;
-  label: string;
-  /** Resolves to an error to show, or null once it has gone. */
-  onSend: (text: string) => Promise<string | null>;
-  onCancel: () => void;
-}) {
-  const [text, setText] = useState(initial);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const send = async () => {
-    if (busy || !text.trim()) return;
-    setBusy(true);
-    setError(null);
-    const problem = await onSend(text.trim());
-    setBusy(false);
-    if (problem) setError(problem);
-  };
-
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <Input
-        value={text}
-        onChangeText={setText}
-        multiline
-        accessibilityLabel={label}
-        style={{ minHeight: 64, textAlignVertical: "top" }}
-      />
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>
-        <View style={{ flex: 1 }}>
-          <Button label="Send" busy={busy} onPress={() => void send()} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Button label="Cancel" variant="secondary" disabled={busy} onPress={onCancel} />
-        </View>
-      </View>
-      <ErrorLine message={error} />
-    </View>
-  );
-}
+/** A person row's face, in points. Lists that hold these leave room for
+    the ring around it (avatarOverhang). */
+export const PERSON_AVATAR = 32;
 
 /**
  * One person on "Wanted near you": face, name, how far, and the message
@@ -242,77 +191,52 @@ export function DraftBox({
 export function PersonRow({
   person,
   onOpenThread,
+  onCompose,
 }: {
   person: NearbyMatch;
   onOpenThread: (threadId: string) => void;
+  /** No conversation yet: open a new one, the first line written. */
+  onCompose: () => void;
 }) {
-  const [drafting, setDrafting] = useState(false);
   const first = person.wanter.displayName.split(" ")[0];
 
   return (
-    <View style={{ gap: spacing(2) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
-        <PlayerAvatar
-          displayName={person.wanter.displayName}
-          seed={person.wanter.playerId}
-          avatarUrl={person.wanter.avatarUrl}
-          frame={person.wanter.frame}
-          ring={person.wanter.ring}
-          aura={person.wanter.aura}
-          ringArt={person.wanter.ringArt}
-          auraArt={person.wanter.auraArt}
-          size={32}
-        />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "600" }}
-          >
-            {person.wanter.displayName}
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+      <PlayerAvatar
+        displayName={person.wanter.displayName}
+        seed={person.wanter.playerId}
+        avatarUrl={person.wanter.avatarUrl}
+        frame={person.wanter.frame}
+        ring={person.wanter.ring}
+        aura={person.wanter.aura}
+        ringArt={person.wanter.ringArt}
+        auraArt={person.wanter.auraArt}
+        size={PERSON_AVATAR}
+      />
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "600" }}
+        >
+          {person.wanter.displayName}
+        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="location-outline" size={12} color={colors.textMuted} />
+          {/* Short, and no "Messaged": the filled icon already says it. */}
+          <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+            {shortMiles(person.miles)}
           </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Ionicons name="location-outline" size={12} color={colors.textMuted} />
-            {/* Short, and no "Messaged": the filled icon already says it. */}
-            <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
-              {shortMiles(person.miles)}
-            </Text>
-          </View>
         </View>
-        <MessageIcon
-          messaged={Boolean(person.threadId)}
-          label={
-            person.threadId
-              ? `Open your conversation with ${first}`
-              : `Message ${first} about ${person.card.cardName}`
-          }
-          onPress={() =>
-            person.threadId ? onOpenThread(person.threadId) : setDrafting(!drafting)
-          }
-        />
       </View>
-
-      {drafting && !person.threadId ? (
-        <View style={{ paddingLeft: 32 + spacing(3) }}>
-          <DraftBox
-            initial={ANSWER_DRAFT}
-            label={`Message to ${first}`}
-            onCancel={() => setDrafting(false)}
-            onSend={async (text) => {
-              try {
-                const result = await answerNearby(person.ask, text);
-                if (result.ok && result.threadId) {
-                  setDrafting(false);
-                  onOpenThread(result.threadId);
-                  return null;
-                }
-                return result.message ?? "Could not send that.";
-              } catch (caught) {
-                return serverMessage(caught) ?? "Could not send that.";
-              }
-            }}
-          />
-        </View>
-      ) : null}
+      <MessageIcon
+        messaged={Boolean(person.threadId)}
+        label={
+          person.threadId
+            ? `Open your conversation with ${first}`
+            : `Message ${first} about ${person.card.cardName}`
+        }
+        onPress={() => (person.threadId ? onOpenThread(person.threadId) : onCompose())}
+      />
     </View>
   );
 }
