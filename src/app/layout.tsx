@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
+import { BACKDROP_SCRIPT } from "@/lib/players/backdrop";
 import { SITE, siteUrl } from "@/lib/site";
 import "./globals.css";
 
@@ -68,7 +69,14 @@ export default function RootLayout({
       lang="en"
       data-scroll-behavior="smooth"
       className={`${sans.variable} ${mono.variable} h-full antialiased`}
+      // The head script below may set data-backdrop before React hydrates.
+      suppressHydrationWarning
     >
+      <head>
+        {/* The player's Pure black choice, before the first paint
+            (lib/players/backdrop.ts). */}
+        <script dangerouslySetInnerHTML={{ __html: BACKDROP_SCRIPT }} />
+      </head>
       <body className="flex min-h-full flex-col">
         <a
           href="#main"

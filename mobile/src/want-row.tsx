@@ -210,7 +210,9 @@ export function WantRow({
 const styles = StyleSheet.create({
   wantRow: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    get borderTopColor() {
+      return colors.border;
+    },
     paddingVertical: spacing(2),
   },
   // The Flare row's name scale exactly, so the two lists read as one.
@@ -241,7 +243,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderWidth: 1,
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
