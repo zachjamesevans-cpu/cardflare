@@ -465,7 +465,7 @@ function ComposerBody({
                   className={cn(
                     "block h-[84px] w-[60px] cursor-grab overflow-hidden rounded-[6px] border bg-elevated transition-[box-shadow] active:cursor-grabbing",
                     active
-                      ? "border-accent shadow-[0_0_8px_rgba(198,238,79,0.5)]"
+                      ? "border-accent shadow-[0_0_8px_rgba(206,252,132,0.5)]"
                       : "border-border hover:border-border-strong",
                   )}
                 >

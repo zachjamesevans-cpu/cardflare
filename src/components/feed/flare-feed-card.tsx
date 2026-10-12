@@ -141,7 +141,7 @@ export function FlareStatus({
         <Crosshair
           className={cn(
             "size-[17px] shrink-0",
-            glow && "drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]",
+            glow && "drop-shadow-[0_0_5px_rgba(206,252,132,0.7)]",
           )}
           strokeWidth={1.75}
           aria-hidden="true"
@@ -235,7 +235,11 @@ export function FlareFeedCard({
   ));
 
   const article = (
-    <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
+    /* No panel: the post sits on the Feed's own green with a hairline
+       under it, the app's FEED_LOOK "open". The founder (2026-10-11):
+       "without the green 'blocks' in the feed ... the full background was
+       just that dark gray green color". */
+    <article className="flex flex-col gap-2.5 border-b border-border-strong/70 px-3 pt-1 pb-4">
       {/* The header: face, then the name with when and how far beside it,
           then the status line; the three dots at the right. "Your Flare"
           is a small label inside the name's row, never a line between

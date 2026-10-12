@@ -7,17 +7,17 @@
  */
 export const EMAIL_COLOR = {
   canvas: "#0e1116",
-  surface: "#151a21",
-  elevated: "#1d242d",
-  border: "#2a323d",
-  borderStrong: "#3a4553",
-  accent: "#c6ee4f",
+  surface: "#111710",
+  elevated: "#1a2118",
+  border: "#242d22",
+  borderStrong: "#333e30",
+  accent: "#cefc84",
   accentContrast: "#0e1116",
   /** The accent laid at about 8% over the surface: the ticket's fill. */
   accentTint: "#1f2a1c",
   textPrimary: "#f2f5f7",
-  textSecondary: "#b3becc",
-  textMuted: "#8593a4",
+  textSecondary: "#bcc4b8",
+  textMuted: "#8a9386",
 } as const;
 
 /** System faces only: a mail client will not load a web font reliably. */

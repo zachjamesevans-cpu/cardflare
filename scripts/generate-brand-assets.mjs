@@ -17,13 +17,28 @@
  *
  * Usage: npm run brand:assets
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import sharp from "sharp";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const MASTER = resolve(ROOT, "public/brand/cardflare-logo.png");
 const WORDMARK_MASTER = resolve(ROOT, "public/brand/cardflare-wordmark.png");
+
+/*
+ * WHICH LOOK, read from the app's one switch (BRAND in mobile/src/
+ * theme.ts) so the two can never disagree. "lime" is everything below as
+ * it always was. "soft" is the founder's flat CF logo (2026-10-11): the
+ * app's icon and splash are hand-made files in mobile/assets (the lime
+ * originals kept in mobile/assets/brand-lime/), so this script must not
+ * overwrite them, and the website's favicon and home-screen icon are
+ * cut from that same green CF icon. Without this, one run of the script
+ * quietly put the lime icons back on both platforms.
+ */
+const BRAND = /export const BRAND: [^=]+= "(soft|lime)"/.exec(
+  await readFile(resolve(ROOT, "mobile/src/theme.ts"), "utf8"),
+)?.[1];
+const SOFT_ICON = resolve(ROOT, "mobile/assets/icon.png");
 
 /**
  * Backdrop for the square app icons.
@@ -201,6 +216,23 @@ async function main() {
     .toBuffer();
   await write(resolve(ROOT, "public/brand/cardflare-wordmark-cut.png"), wordmark);
   await write(resolve(ROOT, "mobile/assets/wordmark.png"), wordmark);
+
+  if (BRAND === "soft") {
+    // The website's icons from the app's own green CF icon, so the tab,
+    // the home screen and the App Store all wear the same mark.
+    await write(
+      resolve(ROOT, "src/app/icon.png"),
+      await sharp(SOFT_ICON).resize(256, 256).png(png).toBuffer(),
+    );
+    await write(
+      resolve(ROOT, "src/app/apple-icon.png"),
+      await sharp(SOFT_ICON).resize(180, 180).png(png).toBuffer(),
+    );
+    console.log(
+      '\nBRAND is "soft": the app icon and splash in mobile/assets are left as they are.\nDone.',
+    );
+    return;
+  }
 
   // Favicon source. Square and backed, so it stays visible on any tab colour.
   // Padding is kept tight — at 16px every pixel of artwork counts.

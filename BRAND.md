@@ -83,22 +83,25 @@ as a lockup — no font can drift from art.
 
 ## Colour
 
-Sampled from the approved logo. Defined once in the `@theme` block of
+The "soft" look (2026-10-11): the flat CF logo's deep green-black and its
+soft green, replacing the navy and lime sampled from the original badge
+(surface `#151a21`, accent `#c6ee4f`). The app switches the same values
+with `BRAND` in `mobile/src/theme.ts`. Defined once in the `@theme` block of
 `src/app/globals.css`; never write these hex values into a component.
 
 | Token                     | Value     | Use                       |
 | ------------------------- | --------- | ------------------------- |
 | `--color-canvas`          | `#000000` | Page background           |
-| `--color-surface`         | `#151a21` | Section and card surfaces |
-| `--color-elevated`        | `#1d242d` | Raised controls           |
-| `--color-border`          | `#2a323d` | Hairlines                 |
-| `--color-border-strong`   | `#3a4553` | Hover / emphasis borders  |
-| `--color-accent`          | `#c6ee4f` | Primary accent            |
-| `--color-accent-hover`    | `#d3fa5f` | Bright accent state       |
+| `--color-surface`         | `#111710` | Section and card surfaces |
+| `--color-elevated`        | `#1a2118` | Raised controls           |
+| `--color-border`          | `#242d22` | Hairlines                 |
+| `--color-border-strong`   | `#333e30` | Hover / emphasis borders  |
+| `--color-accent`          | `#cefc84` | Primary accent            |
+| `--color-accent-hover`    | `#dbfda2` | Bright accent state       |
 | `--color-accent-contrast` | `#0e1116` | Text on accent fills      |
 | `--color-text-primary`    | `#f2f5f7` | Headings, body            |
-| `--color-text-secondary`  | `#b3becc` | Supporting copy           |
-| `--color-text-muted`      | `#8593a4` | Metadata, captions        |
+| `--color-text-secondary`  | `#bcc4b8` | Supporting copy           |
+| `--color-text-muted`      | `#8a9386` | Metadata, captions        |
 | `--color-success`         | `#6ee7a8` |                           |
 | `--color-warning`         | `#fbc85a` |                           |
 | `--color-danger`          | `#ff8f8f` | Form errors               |

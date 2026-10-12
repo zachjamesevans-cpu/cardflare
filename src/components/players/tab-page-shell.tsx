@@ -21,8 +21,14 @@ export function TabPageShell({
   leading,
   trailing,
   trailingCount = 1,
+  surface = false,
   children,
 }: {
+  /**
+   * The page in the surface green rather than black: the Feed, whose
+   * posts sit on it without panels (the app's FEED_LOOK "open").
+   */
+  surface?: boolean;
   /** The page's name for screen readers; nothing draws it. */
   title: string;
   /** A control on the left of the wordmark: on the Feed, the + that posts a Flare. */
@@ -38,7 +44,10 @@ export function TabPageShell({
     <>
       <main
         id="main"
-        className="flex min-h-dvh flex-col items-center gap-4 px-2 pt-6 pb-16 sm:px-6"
+        className={cn(
+          "flex min-h-dvh flex-col items-center gap-4 px-2 pt-6 pb-16 sm:px-6",
+          surface && "bg-surface",
+        )}
       >
         {/* The wordmark, centred, and the doors out on the right: on
             the Feed, search and the notifications bell. Same place on

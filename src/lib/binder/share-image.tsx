@@ -121,9 +121,9 @@ export async function binderShareImage(
   const edge = resolveVar(cover.edge, colours, "#1d232c");
   const spine = resolveVar(cover.spine, colours, "#000000");
   const canvas = colours.get("canvas") ?? "#000000";
-  const surface = colours.get("surface") ?? "#151a21";
-  const border = colours.get("border") ?? "#2a323d";
-  const accent = colours.get("accent") ?? "#c6ee4f";
+  const surface = colours.get("surface") ?? "#111710";
+  const border = colours.get("border") ?? "#242d22";
+  const accent = colours.get("accent") ?? "#cefc84";
   const textPrimary = colours.get("text-primary") ?? "#f2f5f7";
 
   /* The first page: pockets 0 to 8, gaps and all. */
@@ -139,7 +139,7 @@ export async function binderShareImage(
       ),
     ),
     owner ? ownerAvatar(owner) : Promise.resolve(null),
-    readFile(join(process.cwd(), "public/brand/cardflare-wordmark-cut.png")),
+    readFile(join(process.cwd(), "public/brand/cardflare-wordmark-soft.png")),
   ]);
   const markHeight = 34;
   const markWidth = Math.round(

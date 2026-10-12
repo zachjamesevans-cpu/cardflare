@@ -15,12 +15,13 @@ export const contentType = "image/png";
  * variables — keep this list in sync with the `@theme` block in globals.css.
  */
 const COLOR = {
-  canvas: "#0e1116",
-  surface: "#151a21",
-  border: "#2a323d",
-  accent: "#c6ee4f",
+  /* The CF logo's own ground, the "soft" look's surface (2026-10-11). */
+  canvas: "#111710",
+  surface: "#111710",
+  border: "#242d22",
+  accent: "#cefc84",
   textPrimary: "#f2f5f7",
-  textSecondary: "#b3becc",
+  textSecondary: "#bcc4b8",
 };
 
 /**
@@ -32,13 +33,15 @@ function pngSize(buffer: Buffer) {
 }
 
 export default async function OpengraphImage() {
-  const markPath = join(process.cwd(), "public/brand/cardflare-mark.png");
+  /* The founder's flat "cardflare" wordmark in the logo's green, the one
+     the site header and the app's Feed wear, in place of the lime card
+     mark and the name typed beside it. */
+  const markPath = join(process.cwd(), "public/brand/cardflare-wordmark-soft.png");
   const mark = await readFile(markPath);
 
-  // The mark is taller than it is wide. Derive the width from the file so the
-  // card never stretches it, whatever proportions a future master has.
+  // Derive the width from the file so the card never stretches it.
   const { width: markWidth, height: markHeight } = pngSize(mark);
-  const MARK_HEIGHT = 76;
+  const MARK_HEIGHT = 52;
   const markRenderWidth = Math.round(MARK_HEIGHT * (markWidth / markHeight));
 
   return new ImageResponse(
@@ -50,7 +53,7 @@ export default async function OpengraphImage() {
         flexDirection: "column",
         justifyContent: "space-between",
         background: COLOR.canvas,
-        backgroundImage: `radial-gradient(900px 420px at 50% -20%, rgba(198,238,79,0.14), transparent 70%)`,
+        backgroundImage: `radial-gradient(900px 420px at 50% -20%, rgba(206,252,132,0.14), transparent 70%)`,
         padding: 72,
       }}
     >
@@ -61,10 +64,6 @@ export default async function OpengraphImage() {
           height={MARK_HEIGHT}
           alt=""
         />
-        <div style={{ display: "flex", fontSize: 40, fontWeight: 700 }}>
-          <span style={{ color: COLOR.textPrimary }}>Card</span>
-          <span style={{ color: COLOR.accent }}>Flare</span>
-        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
