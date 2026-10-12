@@ -4,6 +4,7 @@ import { binderSessionFor } from "@/lib/lists/haves";
 import { addToBinder } from "@/lib/lists/repository";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
+import { afterResponse } from "@/lib/after-response";
 import { afterHolderChanged } from "./matching";
 
 /**
@@ -85,7 +86,7 @@ export async function keepShowcaseAsHave(
       return;
     }
 
-    if (playerId) void afterHolderChanged(playerId, entry.cardId);
+    if (playerId) afterResponse(() => afterHolderChanged(playerId, entry.cardId));
   } catch (error) {
     console.error("Could not keep the showcase as a Have", error);
   }

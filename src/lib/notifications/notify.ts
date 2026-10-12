@@ -1167,6 +1167,10 @@ export async function notifyNearbyMatch(match: {
   milesLabel: string;
 }): Promise<void> {
   if (!isSupabaseConfigured()) return;
+  /* Never a lock-screen push naming somebody blocked, either way. The
+     match list already leaves them out; this is the check that fails
+     closed if the block table cannot be read. */
+  if (await blockedBetween(match.holderId, match.wanterId)) return;
 
   try {
     const title = `${match.wanterName} is looking for your ${match.cardName}`;

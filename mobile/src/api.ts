@@ -4167,6 +4167,14 @@ export const getPostalCode = () =>
 export const savePostalCode = (postalCode: string) =>
   call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", { postalCode });
 
+/** "Use my location" for nearby matching: the server keeps the nearest
+    ZIP and drops the position (savePostalCodeFromPoint). */
+export const savePostalCodeFromCoords = (latitude: number, longitude: number) =>
+  call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", {
+    latitude,
+    longitude,
+  });
+
 /**
  * A store as a player sees it — claimed or not.
  *

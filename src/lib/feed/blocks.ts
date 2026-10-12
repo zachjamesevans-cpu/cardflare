@@ -17,10 +17,21 @@ function isLoose(value: unknown): value is Loose {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** True when the object itself names a blocked player. */
+/**
+ * True when the object names a blocked player: itself, or one level
+ * down in a person field, the way a nearby match carries its wanter as
+ * `wanter.playerId`. Checking only the top level let a blocked wanter's
+ * match through to the Feed.
+ */
 function namesBlocked(value: Loose, blocked: Set<string>): boolean {
   const id = value.playerId;
-  return typeof id === "string" && blocked.has(id);
+  if (typeof id === "string" && blocked.has(id)) return true;
+  return Object.values(value).some(
+    (field) =>
+      isLoose(field) &&
+      typeof field.playerId === "string" &&
+      blocked.has(field.playerId),
+  );
 }
 
 /**

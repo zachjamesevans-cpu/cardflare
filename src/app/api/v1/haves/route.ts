@@ -4,6 +4,7 @@ import { readJsonPayload } from "@/lib/api/payload";
 import { binderSessionFor, listHaves } from "@/lib/lists/haves";
 import { addToBinder, removeFromBinder, setLocalTrade } from "@/lib/lists/repository";
 import { addEntrySchema } from "@/lib/lists/schema";
+import { afterResponse } from "@/lib/after-response";
 import { afterHolderChanged } from "@/lib/nearby/matching";
 import { z } from "zod";
 
@@ -67,7 +68,7 @@ export async function PUT(request: Request): Promise<Response> {
   );
   if (!saved) return Response.json({ error: "unavailable" }, { status: 503 });
 
-  if (parsed.data.localTrade) void afterHolderChanged(player.playerId);
+  if (parsed.data.localTrade) afterResponse(() => afterHolderChanged(player.playerId));
 
   return Response.json({ ok: true });
 }

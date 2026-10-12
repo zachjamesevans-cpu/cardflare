@@ -9,6 +9,7 @@ import {
   removeFromBinder,
 } from "@/lib/lists/repository";
 import type { AddEntryInput } from "@/lib/lists/schema";
+import { afterResponse } from "@/lib/after-response";
 import { afterHolderChanged } from "@/lib/nearby/matching";
 import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
 import type { BinderCardRow, BinderRow } from "@/lib/supabase/types";
@@ -119,7 +120,10 @@ export type BinderSettingsPatch = {
  * you don't necessarily want something up for trade, but also want it
  * visible on your profile".
  */
-export function shownToOthers(row: { for_trade: boolean; is_public: boolean }): boolean {
+export function shownToOthers(row: {
+  for_trade: boolean;
+  is_public: boolean;
+}): boolean {
   return row.for_trade || row.is_public;
 }
 
@@ -605,7 +609,7 @@ async function syncTradeCard(
       ? mark.eq("printing_id", printingId)
       : mark.is("printing_id", null);
     await mark;
-    void afterHolderChanged(playerId, cardId);
+    afterResponse(() => afterHolderChanged(playerId, cardId));
     return;
   }
 
@@ -732,7 +736,12 @@ function cleanName(name: string): string | null {
 /** A new binder, last in the row. Private unless asked for. */
 export async function createBinder(
   playerId: string,
-  input: { name: string; cover?: BinderCoverId; forTrade?: boolean; isPublic?: boolean },
+  input: {
+    name: string;
+    cover?: BinderCoverId;
+    forTrade?: boolean;
+    isPublic?: boolean;
+  },
 ): Promise<
   { ok: true; id: string } | { ok: false; reason: "at-cap" | "invalid" | "unavailable" }
 > {

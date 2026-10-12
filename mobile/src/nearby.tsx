@@ -83,6 +83,7 @@ export function NearbyCard() {
         >
           <NearbyLocationAsk
             intro="Nearby needs to know roughly where you are. Just the ZIP."
+            keepAsZip
             onDone={() => void load()}
           />
         </View>
