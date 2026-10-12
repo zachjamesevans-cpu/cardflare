@@ -48,6 +48,8 @@ export interface PickedLine {
   /** Null is any printing. */
   printingId: string | null;
   quantity: number;
+  /** Why this card, in the poster's words (card-note.ts). */
+  cardNote?: string;
 }
 
 /**

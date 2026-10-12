@@ -102,6 +102,8 @@ export interface AreaFlareInput {
   printingId?: string | null;
   quantity?: number;
   note?: string | null;
+  /** Why this card (flares.card_note). */
+  cardNote?: string | null;
   /** "want" is hunting it; "showcase" is offering it up. */
   intent?: "want" | "showcase";
   acceptsTrade?: boolean;
@@ -204,6 +206,9 @@ function areaRow(
     printing_id: input.printingId ?? null,
     quantity: input.quantity ?? 1,
     note: input.note ?? null,
+    /* Only when there is one, so a database without the column yet
+       still takes a note-less post. */
+    ...(input.cardNote ? { card_note: input.cardNote } : {}),
     intent: input.intent ?? "want",
     accepts_trade: input.acceptsTrade ?? true,
     accepts_cash: input.acceptsCash ?? false,

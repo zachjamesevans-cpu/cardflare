@@ -66,7 +66,9 @@ export async function saveWant(
     cardId: string;
     printingId: string | null;
     quantity: number;
-    note: string | null;
+    /** Left out, the want keeps the note it has: a Flare posted with no
+        note for this card must not wipe one written before. */
+    note?: string | null;
     deckLabel: string | null;
   },
 ): Promise<"saved" | "at-cap" | "unavailable"> {
@@ -87,7 +89,7 @@ export async function saveWant(
       card_id: entry.cardId,
       printing_id: entry.printingId,
       quantity: entry.quantity,
-      note: entry.note,
+      ...(entry.note !== undefined ? { note: entry.note } : {}),
       deck_label: entry.deckLabel,
     },
     { onConflict: "player_id,card_id,printing_id" },

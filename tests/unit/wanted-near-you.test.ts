@@ -385,7 +385,7 @@ describe("both platforms", () => {
   it("is a grid of your cards with a count, and a sheet of people per card", () => {
     const app = read("mobile/src/screens/wanted.tsx");
     expect(app).toContain("<WantedTile");
-    expect(app).toContain("<CountBadge count={count} />");
+    expect(app).toContain("<CountBadge count={count} cardWidth={width} />");
     expect(app).toContain("<PeopleForCard");
     expect(app).toContain("<SwipeToClose");
     const web = read("src/components/nearby/wanted-list.tsx");

@@ -602,7 +602,10 @@ export type FlareRow = {
   /** Null means any printing will do. */
   printing_id: string | null;
   quantity: number;
+  /** The post's caption, on its first card only. */
   note: string | null;
+  /** Why this card, in the poster's words (80 at most). See the migration. */
+  card_note: string | null;
   /** Groups a player's Flares under a named hunt ("RG Luffy"). Null = loose. */
   deck_label: string | null;
   /**
@@ -653,8 +656,10 @@ export type FlareInsert = Omit<
   | "accepts_cash"
   | "hunt_request_id"
   | "found_quantity"
+  | "card_note"
 > & {
   id?: string;
+  card_note?: string | null;
   created_at?: string;
   updated_at?: string;
   player_id?: string | null;
@@ -1877,11 +1882,13 @@ export type PlayerWantRow = {
 
 export type PlayerWantInsert = Omit<
   PlayerWantRow,
-  "id" | "created_at" | "deck_label"
+  "id" | "created_at" | "deck_label" | "note"
 > & {
   id?: string;
   created_at?: string;
   deck_label?: string | null;
+  /* Optional, so an upsert can leave an existing note alone. */
+  note?: string | null;
 };
 
 /**

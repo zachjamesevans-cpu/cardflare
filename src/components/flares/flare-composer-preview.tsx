@@ -47,6 +47,7 @@ export function FlareComposerPreview({
       quantity: item.quantity,
       remaining: item.quantity,
       huntRequestId: null,
+      cardNote: item.cardNote?.trim() || null,
     };
   });
   const copies = cards.reduce((sum, card) => sum + (card.quantity ?? 1), 0);

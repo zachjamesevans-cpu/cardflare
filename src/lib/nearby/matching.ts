@@ -85,6 +85,13 @@ export interface NearbyMatch {
   threadId: string | null;
   /** When the wanter asked, for "Newest". */
   when: string;
+  /**
+   * Why they want it, in their words: the Flare's card note, or the
+   * saved want's note. What makes ten people wanting one card ten
+   * different conversations - the founder: "how do you choose who to
+   * message? it should have their note under it."
+   */
+  note: string | null;
 }
 
 /**
@@ -182,7 +189,7 @@ export async function nearbyMatchesForHolder(
     inSlices(cardIds, (slice) =>
       admin
         .from("player_wants")
-        .select("id, player_id, card_id, printing_id, created_at")
+        .select("id, player_id, card_id, printing_id, created_at, note")
         .in("card_id", slice)
         .neq("player_id", holderId)
         .order("created_at", { ascending: false })
@@ -192,7 +199,7 @@ export async function nearbyMatchesForHolder(
       admin
         .from("flares")
         .select(
-          "id, player_id, card_id, printing_id, quantity, found_quantity, created_at",
+          "id, player_id, card_id, printing_id, quantity, found_quantity, created_at, card_note",
         )
         .in("card_id", slice)
         .is("event_id", null)
@@ -213,10 +220,11 @@ export async function nearbyMatchesForHolder(
     card_id: string;
     printing_id: string | null;
     created_at: string;
+    note: string | null;
   }[] = [];
   for (const row of wants) {
     seen.add(`${row.player_id}:${row.card_id}`);
-    rows.push({ ask: { kind: "want", id: row.id }, ...row });
+    rows.push({ ask: { kind: "want", id: row.id }, ...row, note: row.note ?? null });
   }
   for (const row of area) {
     if (!row.player_id || seen.has(`${row.player_id}:${row.card_id}`)) continue;
@@ -229,6 +237,7 @@ export async function nearbyMatchesForHolder(
       card_id: row.card_id,
       printing_id: row.printing_id,
       created_at: row.created_at,
+      note: row.card_note ?? null,
     });
   }
   if (rows.length === 0) return [];
@@ -365,6 +374,7 @@ export async function nearbyMatchesForHolder(
       milesLabel: milesLabel(wanter.miles),
       threadId: threadByAsk.get(`${want.ask.kind}:${want.ask.id}`) ?? null,
       when: want.created_at,
+      note: want.note,
     });
   }
 

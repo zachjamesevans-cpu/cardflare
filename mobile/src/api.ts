@@ -2300,6 +2300,8 @@ export interface NearbyMatch {
   threadId: string | null;
   /** When they asked; absent from an older server. */
   when?: string;
+  /** Why they want it, in their words; absent from an older server. */
+  note?: string | null;
 }
 
 /** The Feed's "Wanted near you": the top cards, a few faces each. */
@@ -3152,6 +3154,8 @@ export interface FeedCard {
   remaining?: number;
   /** The hunt request this card answers, when the post is in a hunt. */
   huntRequestId?: string | null;
+  /** Why this card, in the poster's words (card-note.ts). */
+  cardNote?: string | null;
 }
 
 export type CardState = "open" | "offered" | "found";
@@ -3188,6 +3192,8 @@ export interface PostCard {
   quantity?: number;
   remaining?: number;
   huntRequestId?: string | null;
+  /** Why this card, in the poster's words. */
+  cardNote?: string | null;
 }
 
 /** The whole post, for its own screen. Mirrors the server's PostDetail. */
@@ -3307,7 +3313,13 @@ export const publishFlare = (input: {
   code?: string;
   intent: "want" | "showcase";
   caption?: string | null;
-  items: { cardId: string; printingId?: string | null; quantity: number }[];
+  items: {
+    cardId: string;
+    printingId?: string | null;
+    quantity: number;
+    /** Why this card (card-note.ts). */
+    cardNote?: string | null;
+  }[];
   hunt?: { id: string } | { name: string } | null;
   acceptsTrade?: boolean;
   acceptsCash?: boolean;
@@ -3562,6 +3574,14 @@ export const setFeedView = (view: string) =>
     action: "set-feed-view",
     view,
   });
+
+/** The note on one card of your own post: set, changed, or cleared with null. */
+export const setCardNote = (postId: string, flareId: string, note: string | null) =>
+  call<{ ok: true; note: string | null }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "set-card-note", flareId, note },
+  );
 
 export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {

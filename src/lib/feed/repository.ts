@@ -271,6 +271,11 @@ export interface FeedCard {
   remaining?: number;
   /** The hunt request this card answers, when the post is in a hunt. */
   huntRequestId?: string | null;
+  /**
+   * Why this card, in the poster's words (flares.card_note). Shown under
+   * the card when it is opened; on the tile only as a small mark.
+   */
+  cardNote?: string | null;
 }
 
 export interface BoardItem {
@@ -1571,6 +1576,7 @@ async function boardWithHunts(
         quantity: flare.quantity,
         remaining: Math.max(0, flare.quantity - flare.foundQuantity),
         huntRequestId: flare.huntRequestId,
+        cardNote: flare.cardNote,
       })),
     });
   }
@@ -1635,7 +1641,7 @@ async function ownRoomFlares(viewerId: string) {
   const { data, error } = await admin
     .from("flares")
     .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, card_note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent",
     )
     .in("player_session_id", ids)
     /* Room Flares only: the ones with no event are already in the read
@@ -1656,7 +1662,7 @@ async function ownRoomFlares(viewerId: string) {
 }
 
 const AREA_FLARE_COLUMNS =
-  "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent";
+  "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, card_note, accepts_trade, accepts_cash, posted_postal_code, player_id, hunt_request_id, found_quantity, intent";
 
 async function areaHuntsFor(
   authors: Map<string, FollowedPlayer>,
@@ -1797,6 +1803,7 @@ async function areaHuntsFor(
           quantity: flare.quantity,
           remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
           huntRequestId: flare.hunt_request_id ?? null,
+          cardNote: flare.card_note ?? null,
         };
       }),
       (card) => authorId !== viewerId && card.match !== null,
@@ -2491,7 +2498,7 @@ async function recentItems(
   const { data: flares, error } = await admin
     .from("flares")
     .select(
-      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, accepts_trade, accepts_cash, printing_id, quantity, hunt_request_id, found_quantity",
+      "id, created_at, event_id, player_session_id, card_id, intent, deck_label, posted_batch, note, card_note, accepts_trade, accepts_cash, printing_id, quantity, hunt_request_id, found_quantity",
     )
     .eq("status", "open")
     .gte("created_at", since(FLARE_DAYS))
@@ -2570,6 +2577,7 @@ async function recentItems(
       quantity: flare.quantity,
       remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
       huntRequestId: flare.hunt_request_id ?? null,
+      cardNote: flare.card_note ?? null,
     };
 
     /* Every card is collected; the cap is applied once the group is
@@ -3164,7 +3172,7 @@ export async function guestSampleFeed(origin: Point | null): Promise<FeedEntry[]
   const { data: flares, error } = await admin
     .from("flares")
     .select(
-      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, accepts_trade, accepts_cash, posted_postal_code, player_id, found_quantity, intent",
+      "id, created_at, card_id, printing_id, posted_batch, deck_label, quantity, note, card_note, accepts_trade, accepts_cash, posted_postal_code, player_id, found_quantity, intent",
     )
     .eq("status", "open")
     .in("intent", ["want", "showcase"])
@@ -3223,6 +3231,7 @@ export async function guestSampleFeed(origin: Point | null): Promise<FeedEntry[]
           quantity: flare.quantity,
           remaining: Math.max(0, flare.quantity - (flare.found_quantity ?? 0)),
           huntRequestId: null,
+          cardNote: flare.card_note ?? null,
         };
       },
     );

@@ -47,6 +47,8 @@ interface CardSpec {
   /** You hold it: the green ring and "You have this". */
   held?: "exact" | "other-printing";
   offered?: boolean;
+  /** The card's note (flares.card_note). */
+  note?: string;
 }
 
 interface PostSpec {
@@ -72,8 +74,8 @@ const POSTS: PostSpec[] = [
     hunt: "Straw Hat Crew",
     note: "Last few for the crew binder. Trades over cash 🏴‍☠️",
     cards: [
-      { card: "luffySr", held: "exact" },
-      { card: "zoroSec" },
+      { card: "luffySr", held: "exact", note: "For my PC, the crew binder" },
+      { card: "zoroSec", note: "Need it this week" },
       { card: "nami02", found: true },
       { card: "sanjiSec", held: "other-printing" },
       { card: "robin01", quantity: 2 },
@@ -97,8 +99,8 @@ const POSTS: PostSpec[] = [
     direction: "want",
     note: "Base set grails. Can trade or add cash.",
     cards: [
-      { card: "charizardBase" },
-      { card: "umbreonCol", held: "exact" },
+      { card: "charizardBase", note: "Childhood grail" },
+      { card: "umbreonCol", held: "exact", note: "For my PC" },
       { card: "mewtwoBase" },
       { card: "pikachuBase", quantity: 2 },
     ],
@@ -284,6 +286,7 @@ function feedCard(post: PostSpec, spec: CardSpec, index: number): FeedCard {
     quantity,
     remaining: found ? 0 : quantity,
     huntRequestId: null,
+    cardNote: spec.note ?? null,
   };
 }
 
@@ -384,6 +387,18 @@ const WANTED_DEMO: [DemoCardKey, DemoPersonKey[]][] = [
   ["mewtwoBase", ["priya"]],
 ];
 
+/* Why they want it: the reasons a holder picks between. Not everyone
+   writes one, which is the point of showing the ones who did. */
+const WANTED_NOTES: Record<string, string> = {
+  "0-0": "For my PC",
+  "0-2": "Building an Umbreon deck for locals",
+  "0-3": "Trading up from the reprint",
+  "0-5": "Need it this week",
+  "1-0": "Last card for my Heart Pirates deck",
+  "1-2": "For my PC",
+  "2-0": "Childhood grail",
+};
+
 const nearbyMatches = (): (NearbyMatch & { when: string })[] =>
   WANTED_DEMO.flatMap(([key, people], cardIndex) =>
     people.map((who, index) => {
@@ -413,6 +428,7 @@ const nearbyMatches = (): (NearbyMatch & { when: string })[] =>
         miles,
         milesLabel: milesLabel(miles),
         threadId: cardIndex === 0 && index === 1 ? "demo-thread-wanted" : null,
+        note: WANTED_NOTES[`${cardIndex}-${index}`] ?? null,
         when: new Date(Date.now() - (cardIndex * 7 + index) * 3_600_000).toISOString(),
       };
     }),

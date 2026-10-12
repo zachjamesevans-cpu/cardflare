@@ -1,3 +1,4 @@
+import { CARD_NOTE_MAX, tidyCardNote } from "@/lib/flares/card-note";
 import { z } from "zod";
 
 import { apiPlayer, apiSession, badRequest, unauthorized } from "@/lib/api/auth";
@@ -40,6 +41,12 @@ const schema = z.object({
         cardId: z.string().uuid(),
         printingId: z.string().uuid().nullable().optional(),
         quantity: z.number().int().min(1).max(99),
+        /* Why this card (lib/flares/card-note.ts). */
+        cardNote: z
+          .string()
+          .max(CARD_NOTE_MAX * 2)
+          .nullable()
+          .optional(),
       }),
     )
     .min(1)
@@ -131,6 +138,7 @@ export async function POST(request: Request): Promise<Response> {
       cardId: item.cardId,
       printingId: item.printingId ?? null,
       quantity: item.quantity,
+      cardNote: tidyCardNote(item.cardNote),
     })),
     hunt: body.hunt ?? null,
     acceptsTrade: body.acceptsTrade ?? true,

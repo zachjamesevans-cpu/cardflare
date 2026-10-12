@@ -1,6 +1,7 @@
+import { NoteMark } from "./note-mark";
 import { ScrollView, Text, View } from "react-native";
 
-import type { FeedCard } from "./api";
+import { setCardNote, type FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
 import { HELD_RING_WIDTH, HeldRing } from "./held-ring";
@@ -78,6 +79,18 @@ export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard
     caption: card.printingLabel ?? null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveWithCap(card, post),
+    /* The poster's reason, read when the card is opened; on your own
+       post, the way to add or change it. */
+    note: card.cardNote ?? null,
+    noteEdit:
+      post?.yours && card.flareId
+        ? {
+            save: (note: string | null) =>
+              setCardNote(post.postId, card.flareId as string, note).then(
+                (result) => result.note,
+              ),
+          }
+        : null,
   }));
 }
 
@@ -144,6 +157,7 @@ export function FlareCardSlide({
         />
         {/* Inset: the pager clips anything outside the slide. */}
         <HeldRing match={card.match} inset />
+        {card.cardNote ? <NoteMark /> : null}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text
@@ -319,6 +333,7 @@ export function FlareStrip({
               />
               <HeldRing match={card.match} />
               <NeedBadge card={card} offering={direction === "showcase"} size="md" />
+              {card.cardNote ? <NoteMark /> : null}
             </View>
           </View>
         );

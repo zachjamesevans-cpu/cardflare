@@ -23,6 +23,8 @@ export interface ListEntry {
   id: string;
   quantity: number;
   note: string | null;
+  /** A Flare's note on this one card (flares.card_note); null elsewhere. */
+  cardNote: string | null;
   /** The named hunt this Flare belongs to. Null = a loose card. */
   deckLabel: string | null;
   /**
@@ -81,7 +83,7 @@ const UNIQUE_VIOLATION = "23505";
  * and printings are fetched by id and joined below.
  */
 const FLARE_COLUMNS =
-  "id, quantity, note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id, hunt_request_id, found_quantity";
+  "id, quantity, note, card_note, deck_label, posted_batch, intent, accepts_trade, accepts_cash, created_at, card_id, printing_id, player_session_id, hunt_request_id, found_quantity";
 const BINDER_COLUMNS =
   "id, quantity, note, created_at, card_id, printing_id, player_session_id, confirmed_at, local_trade, position";
 
@@ -91,6 +93,7 @@ interface EntryRow {
   note: string | null;
   /** Flares only; binder selects never ask for either. */
   deck_label?: string | null;
+  card_note?: string | null;
   posted_batch?: string | null;
   hunt_request_id?: string | null;
   found_quantity?: number | null;
@@ -240,6 +243,7 @@ function toEntry(row: EntryRow, lookups: Lookups): ListEntry {
     id: row.id,
     quantity: row.quantity,
     note: row.note,
+    cardNote: row.card_note ?? null,
     deckLabel: row.deck_label ?? null,
     postedBatch: row.posted_batch ?? null,
     cardId: row.card_id,

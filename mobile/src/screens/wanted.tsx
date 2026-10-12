@@ -198,32 +198,52 @@ function WantedTile({
           youHave={{ kind: group.card.match, count: 0 }}
         />
         <HeldRing match={group.card.match} />
-        <CountBadge count={count} />
+        <CountBadge count={count} cardWidth={width} />
       </View>
     </Tap>
   );
 }
 
-/** The green number on a card's corner: how many people near you want it. */
-function CountBadge({ count }: { count: number }) {
+/**
+ * The card's corner, the same curve CardImage draws (ui.tsx frame:
+ * radius.control / 2). The badge takes it on every corner.
+ */
+const CARD_CORNER = radius.control / 2;
+
+/**
+ * How many people near you want it, tucked INTO the card's top-right
+ * corner rather than perched on it. The founder: "i dont like ... how
+ * the number of people is clipping into the card - maybe it can be a
+ * rounded square instead of a circle. the curves on the corners should
+ * match the exact curvature of a card." Flush to the corner, its own
+ * corners the card's radius, so the outer one runs along the card's
+ * curve and the badge reads as part of the card. The website's grid is
+ * the same (src/components/nearby/wanted-list.tsx).
+ */
+function CountBadge({ count, cardWidth }: { count: number; cardWidth: number }) {
+  const side = Math.max(24, Math.round(cardWidth * 0.24));
   return (
     <View
       style={{
         position: "absolute",
-        top: -6,
-        right: -6,
-        minWidth: 28,
-        height: 28,
-        paddingHorizontal: 7,
-        borderRadius: 14,
+        top: 0,
+        right: 0,
+        minWidth: side,
+        height: side,
+        paddingHorizontal: 5,
+        borderRadius: CARD_CORNER,
         backgroundColor: colors.accent,
-        borderWidth: 2,
-        borderColor: colors.canvas,
         alignItems: "center",
         justifyContent: "center",
       }}
     >
-      <Text style={{ color: colors.accentContrast, fontSize: 13, fontWeight: "800" }}>
+      <Text
+        style={{
+          color: colors.accentContrast,
+          fontSize: Math.round(side * 0.5),
+          fontWeight: "800",
+        }}
+      >
         {count}
       </Text>
     </View>

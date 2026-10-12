@@ -216,6 +216,8 @@ export function FlareFeedCard({
     stillNeeds: direction === "want" ? (card.remaining ?? null) : null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: preview ? null : haveFor(card, post),
+    note: card.cardNote ?? null,
+    noteEdit: !preview && item.yours && card.flareId ? { flareId: card.flareId } : null,
   }));
 
   const tiles = item.cards.map((card, index) => (
@@ -229,6 +231,7 @@ export function FlareFeedCard({
       state={card.state}
       direction={direction}
       have={preview ? null : haveFor(card, post)}
+      hasNote={Boolean(card.cardNote)}
       siblings={shelf}
       position={index}
     />

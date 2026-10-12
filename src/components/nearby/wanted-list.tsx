@@ -60,8 +60,11 @@ export function WantedGrid({
                     />
                   )}
                 </span>
-                {/* How many people near you want it. */}
-                <span className="absolute -top-2 -right-2 flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-canvas bg-accent px-1.5 text-[13px] font-extrabold text-accent-contrast">
+                {/* How many people near you want it, tucked into the
+                    card's corner with the card's own 6px curve - the
+                    founder: "the curves on the corners should match the
+                    exact curvature of a card." The app's is the same. */}
+                <span className="absolute top-0 right-0 flex aspect-square min-w-[24%] items-center justify-center rounded-[6px] bg-accent px-1 text-sm font-extrabold text-accent-contrast">
                   {count}
                 </span>
               </button>
@@ -171,6 +174,14 @@ function PersonRow({ person }: { person: NearbyMatch }) {
         <p className="truncate text-sm font-semibold text-text-primary">
           {person.wanter.displayName}
         </p>
+        {/* Why they want it, in their words: how a holder picks who to
+            message out of ten - the founder: "it should have their note
+            under it, so they can make the decision." */}
+        {person.note && (
+          <p className="line-clamp-2 text-sm text-text-secondary italic">
+            &ldquo;{person.note}&rdquo;
+          </p>
+        )}
         {/* Short, and no "Messaged": the filled icon already says it. */}
         <p className="flex items-center gap-1 text-xs text-text-muted">
           <MapPin className="size-3.5" aria-hidden="true" />

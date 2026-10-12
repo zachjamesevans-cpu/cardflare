@@ -220,6 +220,17 @@ export function PersonRow({
         >
           {person.wanter.displayName}
         </Text>
+        {/* Why they want it, in their words: how a holder picks who to
+            message out of ten - the founder: "it should have their note
+            under it, so they can make the decision." */}
+        {person.note ? (
+          <Text
+            numberOfLines={2}
+            style={{ color: colors.textSecondary, fontSize: 13, fontStyle: "italic" }}
+          >
+            {`“${person.note}”`}
+          </Text>
+        ) : null}
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
           <Ionicons name="location-outline" size={12} color={colors.textMuted} />
           {/* Short, and no "Messaged": the filled icon already says it. */}

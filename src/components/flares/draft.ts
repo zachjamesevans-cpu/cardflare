@@ -23,6 +23,8 @@ export interface DraftCard {
   /** Null is any printing. */
   printingId: string | null;
   quantity: number;
+  /** Why this card, in the poster's words (lib/flares/card-note.ts). */
+  cardNote?: string;
 }
 
 export type HuntChoice =

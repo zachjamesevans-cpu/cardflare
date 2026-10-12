@@ -1,5 +1,6 @@
 "use client";
 
+import { CardNoteField } from "@/components/flares/card-note-field";
 import {
   useEffect,
   useState,
@@ -235,6 +236,7 @@ function ComposerBody({
             cardId: item.card.id,
             printingId: item.printingId,
             quantity: item.quantity,
+            cardNote: item.cardNote?.trim() || null,
           })),
         ),
         hunt,
@@ -517,6 +519,7 @@ function ComposerBody({
               setEditing(lineKey(editingCard.card.id, printingId));
             }}
             onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
+            onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
             onCover={() => makeCover(keyOf(editingCard))}
             onRemove={() => remove(keyOf(editingCard))}
           />
@@ -691,6 +694,7 @@ function CardEditor({
   copiesLabel,
   onPrinting,
   onQuantity,
+  onNote,
   onCover,
   onRemove,
 }: {
@@ -700,6 +704,7 @@ function CardEditor({
   copiesLabel: string;
   onPrinting: (printingId: string | null) => void;
   onQuantity: (quantity: number) => void;
+  onNote: (note: string) => void;
   onCover: () => void;
   onRemove: () => void;
 }) {
@@ -757,6 +762,14 @@ function CardEditor({
           onChange={onQuantity}
         />
       </div>
+
+      {/* Why this card: shown under it when it is opened, and on Wanted
+          near you, where it is how a holder picks who to message. */}
+      <CardNoteField
+        value={item.cardNote ?? ""}
+        onChange={onNote}
+        cardName={item.card.exactName}
+      />
 
       {/*
        * "Move left" and "Move right" are gone: the founder asked for a

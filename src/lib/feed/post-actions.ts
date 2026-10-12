@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { LIMITS } from "@/lib/api/throttle";
+import { setCardNote } from "@/lib/flares/card-note-server";
 import { offerFailureMessage } from "@/lib/feed/offer-copy";
 import { getViewer, type Viewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
@@ -225,4 +226,31 @@ export async function offerItemsAction(
     };
   }
   return { ok: true, offered: outcome.offered, refused: outcome.refused ?? [] };
+}
+
+/**
+ * The note on one card of your own post, from "Add a note" / "Edit
+ * note" under the card. The owner check is in setCardNote.
+ */
+export async function setCardNoteAction(
+  flareId: string,
+  note: string | null,
+): Promise<{ ok: true; note: string | null } | { ok: false; message: string }> {
+  const player = await viewerPlayer(await getViewer());
+  if (!player || !flareId) return { ok: false, message: "Sign in first." };
+  if (!checkRateLimit(`card-note:${player.id}`, 60, 60 * 60_000).allowed) {
+    return { ok: false, message: "That is a lot at once. Try again in a moment." };
+  }
+  const result = await setCardNote(player.id, flareId, note);
+  if (!result.ok) {
+    return {
+      ok: false,
+      message:
+        result.reason === "not-yours"
+          ? "That card is not yours."
+          : "Could not save that. Try again in a moment.",
+    };
+  }
+  revalidatePath("/feed");
+  return { ok: true, note: result.note };
 }
