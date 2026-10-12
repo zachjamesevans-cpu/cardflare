@@ -110,7 +110,10 @@ describe("demo mode exists in development builds only", () => {
     const app = read("mobile/App.tsx");
     expect(app).toMatch(/\{__DEV__ \? \(\s*<Stack\.Screen\s*name="DemoShots"/);
     const settings = read("mobile/src/screens/settings.tsx");
-    expect(settings).toMatch(/\{__DEV__ && \(\s*<Card>\s*<Title>Demo mode<\/Title>/);
+    /* Under the Settings menu, in a development build only. */
+    expect(settings).toMatch(
+      /\{__DEV__ \? \([\s\S]*?label="Demo mode"[\s\S]*?\) : null\}/,
+    );
   });
 });
 

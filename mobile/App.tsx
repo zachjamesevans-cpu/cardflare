@@ -184,7 +184,8 @@ export type StackParams = {
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
   Scan: undefined;
-  Settings: undefined;
+  /** No section is the menu; a section opens that category (settings-sections.ts). */
+  Settings: { section?: import("./src/settings-sections").SettingsSection } | undefined;
   /* Paste a deck list: every card goes up as one Flare post. */
   DeckPaste: undefined;
   /** Instagram's Edit profile: picture, effects, name, username,

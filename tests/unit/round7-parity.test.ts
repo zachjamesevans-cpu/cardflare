@@ -32,7 +32,7 @@ const web = {
   blockedList: read("src/components/players/blocked-list.tsx"),
   postMenu: read("src/components/feed/post-actions.tsx"),
   thread: read("src/components/local/local-screen.tsx"),
-  settings: read("src/app/profile/settings/page.tsx"),
+  settings: read("src/app/profile/settings/settings-content.tsx"),
   ownProfile: read("src/app/profile/page.tsx"),
   storePage: read("src/app/s/[storeId]/page.tsx"),
   embersStore: read("src/app/profile/store/page.tsx"),
