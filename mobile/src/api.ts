@@ -2315,7 +2315,57 @@ export interface PackSeries {
   slots: number;
   odds: { rarity: string; slugs: string[]; percent: number }[];
   oddsDetail?: { rarity: string; items: { slug: string; percent: number }[] }[];
+  /** A console-built set's cosmetics by name. Absent from an older server. */
+  names?: Record<string, string>;
 }
+
+/** One milestone: what it is, how far along, and what it pays once. */
+export interface MilestoneEntry {
+  key: string;
+  title: string;
+  goal: number;
+  embers: number;
+  progress: number;
+  done: boolean;
+}
+
+/** The shop's milestones and the pack each badge tier hands over. */
+export interface MilestoneBoard {
+  milestones: MilestoneEntry[];
+  tiers: { tier: string; earned: number; reached: boolean }[];
+  earned: number;
+}
+
+/** Pays anything newly reached, then lists where the player stands. */
+export const getMilestones = () => call<MilestoneBoard>("GET", "/api/v1/milestones");
+
+/** One cosmetic on today's shelf in the daily shop. */
+export interface DailyOffer {
+  slug: string;
+  kind: CustomizeKind;
+  name: string;
+  description: string;
+  costEmbers: number;
+  owned: boolean;
+  requiresEarned: number | null;
+}
+
+export interface DailyShelf {
+  offers: DailyOffer[];
+  /** When the shelf changes: the next UTC midnight. */
+  resetsAt: string;
+}
+
+/** Today's shelf: a few cosmetics, changing at midnight UTC. */
+export const getDailyShop = () => call<DailyShelf>("GET", "/api/v1/shop/daily");
+
+/** Buys from today's shelf and wears it. Refusals are ApiError codes. */
+export const buyDailyOffer = (slug: string) =>
+  call<{ ok: true; outcome: "bought" | "owned"; shelf: DailyShelf }>(
+    "POST",
+    "/api/v1/shop/daily",
+    { slug },
+  );
 
 export interface SealedPack {
   id: string;

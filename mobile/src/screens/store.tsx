@@ -1,14 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useCallback, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import type { StackParams } from "../../App";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 
 import {
   ApiError,
   buyCosmetic,
+  getDailyShop,
+  getMilestones,
   getPacks,
   getProfile,
   type CosmeticItem,
+  type DailyShelf,
+  type MilestoneBoard,
   type EquipSlot,
   type Profile,
   type Wardrobe,
@@ -16,6 +22,8 @@ import {
   type SealedPack,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { DailyShop } from "../daily-shop";
+import { MilestoneList } from "../milestone-list";
 import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
 import { ProMark } from "../pro-mark";
@@ -33,23 +41,34 @@ import { colors, gutter, spacing } from "../theme";
  * No confirmation step, because Embers cannot be bought with money.
  */
 export function StoreScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [packSeries, setPackSeries] = useState<PackSeries[]>([]);
   const [sealed, setSealed] = useState<SealedPack[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [board, setBoard] = useState<MilestoneBoard | null>(null);
+  const [shelf, setShelf] = useState<DailyShelf | null>(null);
 
   const load = useCallback(async () => {
     try {
       const result = await getProfile();
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
+      /* After the profile, which has already paid any milestone newly
+         reached (and handed over its tier pack), so both read fresh. */
       getPacks()
         .then((packs) => {
           setPackSeries(packs.series);
           setSealed(packs.packs);
         })
+        .catch(() => {});
+      getMilestones()
+        .then(setBoard)
+        .catch(() => {});
+      getDailyShop()
+        .then(setShelf)
         .catch(() => {});
     } catch {
       setMessage("Could not load the store. Pull back and try again.");
@@ -145,6 +164,18 @@ export function StoreScreen() {
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>to spend</Text>
       </View>
 
+      {board ? <MilestoneList board={board} /> : null}
+
+      {shelf ? (
+        <DailyShop
+          key={shelf.resetsAt}
+          shelf={shelf}
+          pro={profile.pro !== false}
+          onPro={() => navigation.navigate("Pro")}
+          onBought={() => void load()}
+        />
+      ) : null}
+
       <Card>
         <Title>cardflare packs</Title>
         <Muted>
@@ -157,13 +188,20 @@ export function StoreScreen() {
             key={series.id}
             series={series}
             sealed={sealed}
-            names={packItemLabels([
-              ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
-              ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
-              ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
-              ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
-            ])}
+            names={{
+              /* A console-built set names its own pulls (the server's
+                 lib/packs/catalog.ts); Origin's come from the wardrobe. */
+              ...(series.names ?? {}),
+              ...packItemLabels([
+                ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
+                ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
+                ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
+                ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
+              ]),
+            }}
             onChanged={() => void load()}
+            pro={profile?.pro !== false}
+            onPro={() => navigation.navigate("Pro")}
           />
         ))}
       </Card>
@@ -235,7 +273,7 @@ function Shelf({
   slot: EquipSlot;
   balance: number;
   busy: string | null;
-  /** Anybody can buy; Pro wears. The tile says which. */
+  /** Buying and wearing are both Pro; the tile says which. */
   canWear: boolean;
   onBuy: (item: CosmeticItem, slot: EquipSlot) => void;
 }) {

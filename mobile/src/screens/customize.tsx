@@ -110,7 +110,7 @@ const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
  * The ring goes under and the effect goes over, the same order the
  * avatar draws them in, so what a tile shows is what a profile shows.
  */
-function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) {
+export function CosmeticPreview({ kind, slug }: { kind: CustomizeKind; slug: string }) {
   /* A name style previews on a name - the same one the website uses. */
   if (kind === "nameplate" && hasNameArt(slug)) {
     return (

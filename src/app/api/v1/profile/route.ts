@@ -5,6 +5,7 @@ import { z } from "zod";
 import { apiPlayer, badRequest, forgetApiPlayer, unauthorized } from "@/lib/api/auth";
 import { readJsonPayload } from "@/lib/api/payload";
 import { resolveEquipped, wardrobeFor } from "@/lib/players/cosmetics";
+import { checkMilestones } from "@/lib/players/milestones";
 import {
   addToShowcase,
   dressAllShowcase,
@@ -74,6 +75,11 @@ function absoluteArt(art: CosmeticArtFile | null): CosmeticArtFile | null {
 export async function GET(request: Request): Promise<Response> {
   const player = await apiPlayer(request);
   if (!player) return unauthorized();
+
+  /* Milestones newly reached are paid when the profile is opened, so a
+     reward arrives without a trip to the shop; before the profile is
+     read, so the balance below includes it. */
+  await checkMilestones(player.playerId).catch(() => null);
 
   const profile = await ownProfile(player.playerId);
   if (!profile) return Response.json({ error: "not-found" }, { status: 404 });

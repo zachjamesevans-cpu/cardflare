@@ -53,6 +53,48 @@ export function drawOne(series: SeriesManifest, roll: number): PoolEntry {
  * Rolls beyond the first `slots` cover re-draws; the caller supplies
  * plenty.
  */
+/**
+ * THE PITY RULE: after this many packs of a set in a row without an
+ * Epic or better, the next is guaranteed one. From the Embers review
+ * (2026-10-11), step 5: duplicates came back as 40 Embers of a 300-Ember
+ * pack, so a long run of commons was money down a well. Counted per
+ * player per set, and reset by any Epic or Legendary pull.
+ */
+export const PITY_AFTER = 9;
+
+const TOP: Rarity[] = ["epic", "legendary"];
+
+/** Whether a pull is the kind the pity rule promises. */
+export function isTopPull(entry: Pick<PoolEntry, "rarity">): boolean {
+  return TOP.includes(entry.rarity);
+}
+
+/**
+ * A pack drawn with the pity rule: when `packsWithoutTop` has reached
+ * PITY_AFTER, the first slot is drawn from the set's Epic and Legendary
+ * entries alone (by their own weights), and the rest as usual. A set
+ * with nothing that rare draws as usual.
+ */
+export function drawPackWithPity(
+  series: SeriesManifest,
+  rolls: number[],
+  packsWithoutTop: number,
+): PoolEntry[] {
+  const top = series.pool.filter(isTopPull);
+  if (packsWithoutTop < PITY_AFTER || top.length === 0) return drawPack(series, rolls);
+
+  const guaranteed = drawOne({ ...series, pool: top }, rolls[0] ?? 0);
+  const rest = drawPack(
+    {
+      ...series,
+      slots: series.slots - 1,
+      pool: series.pool.filter((entry) => entry.slug !== guaranteed.slug),
+    },
+    rolls.slice(1),
+  );
+  return [guaranteed, ...rest];
+}
+
 export function drawPack(series: SeriesManifest, rolls: number[]): PoolEntry[] {
   const picked: PoolEntry[] = [];
   for (const roll of rolls) {

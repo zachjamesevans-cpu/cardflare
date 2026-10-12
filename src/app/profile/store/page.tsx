@@ -4,8 +4,11 @@ import { Flame } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
+import { DailyShop } from "@/components/players/daily-shop";
+import { MilestoneList } from "@/components/players/milestone-list";
 import { PackShop } from "@/components/packs/pack-shop";
-import { SERIES, oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { oddsByRarity, oddsPerItem } from "@/lib/packs";
+import { shopSeries } from "@/lib/packs/catalog";
 import { packItemLabels } from "@/lib/packs/labels";
 import { listSealedPacks } from "@/lib/packs/repository";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
@@ -15,6 +18,8 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { wardrobeFor } from "@/lib/players/cosmetics";
+import { dailyShelf } from "@/lib/players/daily-shop";
+import { checkMilestones } from "@/lib/players/milestones";
 import { needsSetup, ownProfile } from "@/lib/players/profile";
 import { tierAllows } from "@/lib/tiers";
 
@@ -48,15 +53,22 @@ export default async function EmberStorePage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
+  /* Milestones first: anything newly reached is paid (and its tier pack
+     handed over) before the balance and the sealed packs are read. */
+  const board = await checkMilestones(playerId);
   /* Both guards at once: one roundtrip, not two in a row. */
   const [setupOwed, profile] = await Promise.all([
     needsSetup(playerId),
     ownProfile(playerId),
   ]);
   if (setupOwed) redirect("/welcome");
-  /* Anybody can buy; Pro wears. The tiles say which. */
+  /* Buying and wearing are both Pro (packs too: lib/packs/repository.ts). */
   const canWear = profile ? tierAllows(profile.tier, "cosmetics") : false;
   const sealed = await listSealedPacks(playerId);
+  /* Every pack on sale: Origin and each ready console-built set. */
+  const onSale = await shopSeries();
+  /* Today's shelf: a few cosmetics, changing at midnight UTC. */
+  const shelf = await dailyShelf(playerId);
   if (!profile) redirect("/profile/settings");
 
   const [wardrobe, areas] = await Promise.all([
@@ -99,6 +111,10 @@ export default async function EmberStorePage() {
             </span>
           </div>
 
+          <MilestoneList board={board} />
+
+          <DailyShop shelf={shelf} pro={canWear} />
+
           <Card className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">
               <h2 className="font-semibold text-text-primary">cardflare packs</h2>
@@ -107,8 +123,9 @@ export default async function EmberStorePage() {
                 was on the house.
               </p>
             </div>
-            {Object.values(SERIES).map((series) => (
+            {onSale.map((series) => (
               <PackShop
+                pro={canWear}
                 key={series.id}
                 series={{
                   id: series.id,
@@ -120,12 +137,18 @@ export default async function EmberStorePage() {
                   oddsDetail: oddsPerItem(series),
                 }}
                 sealed={sealed}
-                names={packItemLabels([
-                  ...wardrobe.avatarFrames.map((item) => ({ ...item, kind: "frame" })),
-                  ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
-                  ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
-                  ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
-                ])}
+                names={{
+                  ...series.names,
+                  ...packItemLabels([
+                    ...wardrobe.avatarFrames.map((item) => ({
+                      ...item,
+                      kind: "frame",
+                    })),
+                    ...wardrobe.cardFrames.map((item) => ({ ...item, kind: "frame" })),
+                    ...wardrobe.holos.map((item) => ({ ...item, kind: "holo" })),
+                    ...wardrobe.effects.map((item) => ({ ...item, kind: "effect" })),
+                  ]),
+                }}
               />
             ))}
           </Card>

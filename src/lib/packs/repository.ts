@@ -1,14 +1,16 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { tierMayWear } from "@/lib/players/cosmetics";
 import { grantSpendableEmbers, spendEmbers } from "@/lib/players/embers";
 import {
   DUPLICATE_EMBERS,
-  drawPack,
+  drawPackWithPity,
+  isTopPull,
   type PoolEntry,
   type SeriesManifest,
 } from "./index";
-import { seriesOrNull } from "./index";
+import { seriesById } from "./catalog";
 
 /**
  * Sealed packs: granting, buying, opening.
@@ -39,7 +41,7 @@ export async function grantPack(
   series: string,
   source: "signup" | "purchase",
 ): Promise<boolean> {
-  if (!isSupabaseConfigured() || !seriesOrNull(series)) return false;
+  if (!isSupabaseConfigured() || !(await seriesById(series))) return false;
 
   const { error } = await getSupabaseAdmin()
     .from("player_packs")
@@ -92,9 +94,18 @@ export async function listSealedPacks(playerId: string): Promise<SealedPack[]> {
 export async function buyPackWithEmbers(
   playerId: string,
   seriesId: string,
-): Promise<"bought" | "cannot-afford" | "failed"> {
-  const series = seriesOrNull(seriesId);
+): Promise<"bought" | "cannot-afford" | "not-pro" | "failed"> {
+  const series = await seriesById(seriesId);
   if (!series || !isSupabaseConfigured()) return "failed";
+
+  /*
+   * Packs are Pro, like buying a cosmetic (buyCosmetic). The Embers
+   * review found a free player could spend 300 Embers on cosmetics they
+   * could not wear; the founder chose to keep wearing Pro and stop the
+   * spend instead ("option b"). Refused before a single Ember moves. The
+   * signup pack is a gift and still arrives for everyone.
+   */
+  if (!(await tierMayWear(playerId))) return "not-pro";
 
   /* A UNIQUE ref per purchase: the ledger's ref index treats a repeat
      as already-paid, which is right for one-off cosmetics and dead
@@ -146,6 +157,20 @@ export async function openPack(
 
   const admin = getSupabaseAdmin();
 
+  /* Which set it is BEFORE it is claimed: a pack whose set cannot be
+     drawn stays sealed rather than being opened into nothing. A set
+     taken off sale since still opens for a pack already held. */
+  const { data: sealed } = await admin
+    .from("player_packs")
+    .select("series")
+    .eq("id", packId)
+    .eq("player_id", playerId)
+    .is("opened_at", null)
+    .maybeSingle();
+  if (!sealed) return null;
+  const series = await seriesById(sealed.series, { opening: true });
+  if (!series) return null;
+
   const { data: claimed, error: claimError } = await admin
     .from("player_packs")
     .update({ opened_at: new Date().toISOString() })
@@ -160,16 +185,36 @@ export async function openPack(
     return null;
   }
 
-  const series = seriesOrNull(claimed.series);
-  if (!series) return null;
-
   /* Plenty of rolls: slots plus re-draw headroom for duplicates. */
   const rolls = Array.from({ length: series.slots * 6 }, () => {
     const buffer = new Uint32Array(1);
     crypto.getRandomValues(buffer);
     return buffer[0] / 0xffffffff;
   });
-  const drawn: PoolEntry[] = drawPack(series, rolls);
+  /* The pity rule (manifest.ts): packs of this set opened in a row
+     without an Epic or better. Missing table or row reads as none. */
+  const { data: pity } = await admin
+    .from("player_pack_pity")
+    .select("packs_without_top")
+    .eq("player_id", playerId)
+    .eq("series", series.id)
+    .maybeSingle();
+  const drawn: PoolEntry[] = drawPackWithPity(
+    series,
+    rolls,
+    pity?.packs_without_top ?? 0,
+  );
+
+  /* Reset by a top pull, otherwise one more in the run. */
+  const { error: pityError } = await admin.from("player_pack_pity").upsert(
+    {
+      player_id: playerId,
+      series: series.id,
+      packs_without_top: drawn.some(isTopPull) ? 0 : (pity?.packs_without_top ?? 0) + 1,
+    },
+    { onConflict: "player_id,series" },
+  );
+  if (pityError) console.error("Could not count the pity run", pityError);
 
   const { data: ownedRows } = await admin
     .from("player_cosmetics")
