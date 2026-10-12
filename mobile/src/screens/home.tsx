@@ -9,6 +9,7 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  withTiming,
   type SharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -183,6 +184,20 @@ const STARTERS = {
  */
 const PULL_TRIGGER = 80;
 
+/**
+ * How much room the list keeps open under the header while a refresh
+ * runs, with the spinner in the middle of it. The founder: "when
+ * refreshing, it should 'hang' at the top of the screen and it won't go
+ * back to normal view until its done refreshing" - the way iOS's own
+ * control holds the content down, which the hand-drawn one never did:
+ * the list snapped home on release and the spinner sat over the top of
+ * whatever scrolled under it.
+ */
+const PULL_HOLD = 56;
+
+/** The spinner's own height (ActivityIndicator "small"). */
+const SPINNER_SIZE = 20;
+
 /** The toast after a block lands, in the website's words. */
 const BLOCKED_LINE = "Blocked. Their posts are hidden and they cannot message you.";
 
@@ -195,36 +210,42 @@ const NO_PICKS: ZoomPicks = Object.freeze({}) as ZoomPicks;
  *
  * Grows and fades in with the drag, so the gesture has an answer while
  * it is still happening, and turns into a real spinner once the load
- * starts. Placed against the header rather than the content, because
- * the content is the thing that moves.
+ * starts. It lives in the GAP the pull opens between the header and the
+ * first post, centred in it, so it never sits over a post or the
+ * header's logo; while the load runs the list holds that gap open
+ * (PULL_HOLD) and the spinner stays in the middle of it.
  */
 function PullSpinner({
   pull,
+  hold,
   refreshing,
   top,
 }: {
   pull: SharedValue<number>;
+  hold: SharedValue<number>;
   refreshing: boolean;
   top: number;
 }) {
-  /* Worked out on the JS side: a worklet cannot call `spacing`, and
-     trying to takes the screen down with a red box rather than failing
-     quietly. */
-  const drop = spacing(2);
-
-  const style = useAnimatedStyle(() => ({
-    opacity: refreshing ? 1 : interpolate(pull.value, [8, PULL_TRIGGER], [0, 1]),
-    transform: [
-      { scale: refreshing ? 1 : interpolate(pull.value, [8, PULL_TRIGGER], [0.6, 1]) },
-      /* Follows the thumb down a little, so it reads as attached to the
-         pull rather than pinned over it. */
-      {
-        translateY: refreshing
-          ? 0
-          : interpolate(pull.value, [0, PULL_TRIGGER], [0, drop]),
-      },
-    ],
-  }));
+  const style = useAnimatedStyle(() => {
+    /* The gap is however far the content has come down: the pull, plus
+       the spacer that holds it open while the load runs. */
+    const gap = pull.value + hold.value;
+    return {
+      opacity: refreshing
+        ? interpolate(gap, [SPINNER_SIZE, PULL_HOLD], [0, 1], "clamp")
+        : interpolate(pull.value, [8, PULL_TRIGGER], [0, 1], "clamp"),
+      transform: [
+        {
+          translateY: Math.max(0, (gap - SPINNER_SIZE) / 2),
+        },
+        {
+          scale: refreshing
+            ? 1
+            : interpolate(pull.value, [8, PULL_TRIGGER], [0.6, 1], "clamp"),
+        },
+      ],
+    };
+  });
 
   return (
     <Animated.View
@@ -232,9 +253,10 @@ function PullSpinner({
       style={[
         {
           position: "absolute",
-          top: top + spacing(2),
+          top,
           left: 0,
           right: 0,
+          height: SPINNER_SIZE,
           alignItems: "center",
           zIndex: 5,
         },
@@ -379,10 +401,15 @@ function WantedRow({
 }
 
 /**
- * The mark is taller than it is wide — BRAND.md's one rule about it. It
- * is sized by height here and its width follows the artwork.
+ * The CF mark, the logo since the soft look (theme.ts BRAND) - the
+ * flame card it replaced was still drawn here. Wider than tall, so it
+ * is sized by width and its height follows the artwork. The founder:
+ * "the logo ... needs to be the new logo png, it still has the old card
+ * logo."
  */
-const MARK_ASPECT = 60 / 72;
+const CF_MARK = require("../../assets/cf-mark.png");
+const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
+const CF_MARK_RATIO = CF_MARK_SOURCE.height / CF_MARK_SOURCE.width;
 
 /** What the Feed keeps between visits: the header, and the items. */
 interface CachedFeed {
@@ -524,6 +551,23 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * do when it lets go.
    */
   const pull = useSharedValue(0);
+  /*
+   * THE HOLD: a spacer at the top of the list, 0 at rest and PULL_HOLD
+   * while a pulled refresh runs. It pushes the content down rather than
+   * asking the scroll view to rest lower - a changed contentInset does
+   * not move the content in this app (measured on the simulator), the
+   * same way RefreshControl never drew. Grows as the thumb lets go, so
+   * the bounce lands on the gap; shrinks when the load is done, so the
+   * content glides home.
+   */
+  const hold = useSharedValue(0);
+  /* Worked out on the JS side: a worklet cannot call `spacing`. */
+  const spacing4 = spacing(4);
+  const holdStyle = useAnimatedStyle(() => ({
+    height: hold.value,
+    /* Cancels the container's gap, so at rest the spacer adds nothing. */
+    marginBottom: -spacing4,
+  }));
 
   const askForRefresh = useCallback(() => {
     if (refreshingRef.current) return;
@@ -750,9 +794,15 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   const refresh = async () => {
     refreshingRef.current = true;
     setRefreshing(true);
+    /* Open the gap as the list springs back, so it comes to rest held. */
+    hold.value = withTiming(PULL_HOLD, { duration: 220 });
     try {
       await load(() => true);
     } finally {
+      /* Close it, and only then call the refresh over, so the spinner
+         stays in the gap until the content has slid home. */
+      hold.value = withTiming(0, { duration: 260 });
+      await new Promise((resolve) => setTimeout(resolve, 260));
       refreshingRef.current = false;
       setRefreshing(false);
     }
@@ -1126,10 +1176,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                         }}
                       >
                         <Image
-                          source={require("../../assets/cardflare-mark.png")}
+                          source={CF_MARK}
                           style={{
-                            height: 20,
-                            width: 20 * MARK_ASPECT,
+                            width: 24,
+                            height: 24 * CF_MARK_RATIO,
                             resizeMode: "contain",
                           }}
                         />
@@ -1795,7 +1845,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
        * it. It fades and grows with the pull, then spins while the load
        * runs - the two states the platform control never gave us.
        */}
-      <PullSpinner pull={pull} refreshing={refreshing} top={headerRoom} />
+      <PullSpinner pull={pull} hold={hold} refreshing={refreshing} top={headerRoom} />
 
       <CollapsingHeader
         state={header}
@@ -1863,6 +1913,8 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
           paddingBottom: spacing(4) + tabInset,
         }}
       >
+        {/* The hold (see `hold`): room for the spinner while a refresh runs. */}
+        <Animated.View style={holdStyle} />
         {/*
          * NO IDENTITY HEADER. The Feed opens on the Feed.
          *

@@ -130,8 +130,9 @@ describe("the centre tab", () => {
     expect(app).not.toContain("function PostButton(");
     expect(app).not.toContain("MarkIcon");
     expect(app).not.toContain("cardflare-mark.png");
-    /* The mark still has a home: the pack shop. */
-    expect(read("mobile/src/pack-shop.tsx")).toContain("cardflare-mark.png");
+    /* The pack shop draws the CF mark now, not the flame card: "the
+       logo ... needs to be the new logo png" (app-pull-hold.test.ts). */
+    expect(read("mobile/src/pack-shop.tsx")).toContain("cf-mark.png");
   });
 });
 
