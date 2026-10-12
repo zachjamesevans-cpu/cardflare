@@ -99,9 +99,11 @@ export default async function InboxPage() {
               </ButtonLink>
             </Card>
           ) : (
-            <Card className="p-2 sm:p-3">
-              <InboxList items={items} />
-            </Card>
+            /* No panel and no lines between notices: the founder
+               (2026-10-11), "doesn't have rounded blocks around each
+               notification. not even lines separating them." The app's
+               Inbox is the same. */
+            <InboxList items={items} />
           )}
         </div>
 
