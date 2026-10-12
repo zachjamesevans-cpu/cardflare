@@ -1233,15 +1233,18 @@ export type PlayerPackRow = {
   source: string;
   created_at: string;
   opened_at: string | null;
+  /** A milestone pack's once-only key (migration 20261118090000). */
+  ref: string | null;
 };
 
 export type PlayerPackInsert = Omit<
   PlayerPackRow,
-  "id" | "created_at" | "opened_at"
+  "id" | "created_at" | "opened_at" | "ref"
 > & {
   id?: string;
   created_at?: string;
   opened_at?: string | null;
+  ref?: string | null;
 };
 
 export type PlayerFollowRow = {
@@ -1479,7 +1482,8 @@ export type PlayerCosmeticRow = {
   acquired_at: string;
 };
 
-export type EmberReason = "trade" | "purchase" | "grant" | "attendance" | "reversal";
+export type EmberReason =
+  "trade" | "purchase" | "grant" | "attendance" | "reversal" | "milestone";
 
 export type EmberLedgerRow = {
   id: string;

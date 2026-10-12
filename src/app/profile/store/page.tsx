@@ -4,6 +4,7 @@ import { Flame } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { CosmeticShop } from "@/components/players/cosmetic-shop";
+import { MilestoneList } from "@/components/players/milestone-list";
 import { PackShop } from "@/components/packs/pack-shop";
 import { oddsByRarity, oddsPerItem } from "@/lib/packs";
 import { shopSeries } from "@/lib/packs/catalog";
@@ -16,6 +17,7 @@ import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { wardrobeFor } from "@/lib/players/cosmetics";
+import { checkMilestones } from "@/lib/players/milestones";
 import { needsSetup, ownProfile } from "@/lib/players/profile";
 import { tierAllows } from "@/lib/tiers";
 
@@ -49,6 +51,9 @@ export default async function EmberStorePage() {
       : ((await playerForUser(viewer.user.id))?.id ?? null);
 
   if (!playerId) redirect("/profile/settings");
+  /* Milestones first: anything newly reached is paid (and its tier pack
+     handed over) before the balance and the sealed packs are read. */
+  const board = await checkMilestones(playerId);
   /* Both guards at once: one roundtrip, not two in a row. */
   const [setupOwed, profile] = await Promise.all([
     needsSetup(playerId),
@@ -101,6 +106,8 @@ export default async function EmberStorePage() {
               <span className="font-medium text-text-muted">to spend</span>
             </span>
           </div>
+
+          <MilestoneList board={board} />
 
           <Card className="flex flex-col gap-4">
             <div className="flex flex-col gap-1">

@@ -2319,6 +2319,26 @@ export interface PackSeries {
   names?: Record<string, string>;
 }
 
+/** One milestone: what it is, how far along, and what it pays once. */
+export interface MilestoneEntry {
+  key: string;
+  title: string;
+  goal: number;
+  embers: number;
+  progress: number;
+  done: boolean;
+}
+
+/** The shop's milestones and the pack each badge tier hands over. */
+export interface MilestoneBoard {
+  milestones: MilestoneEntry[];
+  tiers: { tier: string; earned: number; reached: boolean }[];
+  earned: number;
+}
+
+/** Pays anything newly reached, then lists where the player stands. */
+export const getMilestones = () => call<MilestoneBoard>("GET", "/api/v1/milestones");
+
 export interface SealedPack {
   id: string;
   series: string;

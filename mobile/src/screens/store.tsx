@@ -8,9 +8,11 @@ import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import {
   ApiError,
   buyCosmetic,
+  getMilestones,
   getPacks,
   getProfile,
   type CosmeticItem,
+  type MilestoneBoard,
   type EquipSlot,
   type Profile,
   type Wardrobe,
@@ -18,6 +20,7 @@ import {
   type SealedPack,
 } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
+import { MilestoneList } from "../milestone-list";
 import { packItemLabels } from "../pack-labels";
 import { PackShopSection } from "../pack-shop";
 import { ProMark } from "../pro-mark";
@@ -42,17 +45,23 @@ export function StoreScreen() {
   const [wardrobe, setWardrobe] = useState<Wardrobe | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [board, setBoard] = useState<MilestoneBoard | null>(null);
 
   const load = useCallback(async () => {
     try {
       const result = await getProfile();
       setProfile(result.profile);
       setWardrobe(result.wardrobe);
+      /* After the profile, which has already paid any milestone newly
+         reached (and handed over its tier pack), so both read fresh. */
       getPacks()
         .then((packs) => {
           setPackSeries(packs.series);
           setSealed(packs.packs);
         })
+        .catch(() => {});
+      getMilestones()
+        .then(setBoard)
         .catch(() => {});
     } catch {
       setMessage("Could not load the store. Pull back and try again.");
@@ -147,6 +156,8 @@ export function StoreScreen() {
         </Text>
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>to spend</Text>
       </View>
+
+      {board ? <MilestoneList board={board} /> : null}
 
       <Card>
         <Title>cardflare packs</Title>
