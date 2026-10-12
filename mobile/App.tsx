@@ -79,6 +79,7 @@ import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
 import { registerForPush } from "./src/push";
+import { DockTabBar, restoreDock } from "./src/dock";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 import { StackHeader, TabHeader } from "./src/header";
 import { UnreadDot } from "./src/unread-dot";
@@ -391,11 +392,16 @@ function Tabs() {
 
   return (
     <Tab.Navigator
+      /* The bar shrinks while the Feed scrolls down, Instagram's way
+         (src/dock.tsx). */
+      tabBar={(props) => <DockTabBar {...props} />}
       // The same light tick every other control gives — switching tabs
       // is a tap too, and the bottom bar was the one mute surface left.
       screenListeners={({ route }) => ({
         tabPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          /* A new tab starts with the bar whole. */
+          restoreDock();
         },
         /* Every tab change asks again, so the dot is right by the time
            anybody looks down at the bar. Messages is the exception for

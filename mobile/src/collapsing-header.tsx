@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { HeaderButton } from "./header";
+import { dockCompact } from "./dock";
 import { HEADER } from "./header-metrics";
 import { BRAND, colors } from "./theme";
 
@@ -127,6 +128,7 @@ export function onHeaderScroll(state: HeaderScroll, y: number): void {
   if (y <= 0) {
     state.hidden.value = 0;
     state.lastY.value = y;
+    dockCompact.value = 0;
     return;
   }
 
@@ -135,6 +137,8 @@ export function onHeaderScroll(state: HeaderScroll, y: number): void {
 
   state.hidden.value = Math.min(Math.max(next, 0), HEADER_CONTENT_HEIGHT);
   state.lastY.value = y;
+  /* The tab bar shrinks in step with the header leaving (src/dock.tsx). */
+  dockCompact.value = state.hidden.value / HEADER_CONTENT_HEIGHT;
 }
 
 /**
@@ -150,10 +154,9 @@ export function settleHeader(state: HeaderScroll): void {
   const half = HEADER_CONTENT_HEIGHT / 2;
   if (state.hidden.value <= 0 || state.hidden.value >= HEADER_CONTENT_HEIGHT) return;
 
-  state.hidden.value = withTiming(
-    state.hidden.value > half ? HEADER_CONTENT_HEIGHT : 0,
-    { duration: 160 },
-  );
+  const gone = state.hidden.value > half;
+  state.hidden.value = withTiming(gone ? HEADER_CONTENT_HEIGHT : 0, { duration: 160 });
+  dockCompact.value = withTiming(gone ? 1 : 0, { duration: 160 });
 }
 
 export function CollapsingHeader({
