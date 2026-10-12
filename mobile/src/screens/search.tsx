@@ -506,8 +506,12 @@ export function SearchScreen() {
 const rowsBox = {
   borderRadius: radius.control,
   borderWidth: 1,
-  borderColor: colors.border,
-  backgroundColor: colors.surface,
+  get borderColor() {
+    return colors.border;
+  },
+  get backgroundColor() {
+    return colors.surface;
+  },
   paddingHorizontal: spacing(3),
 } as const;
 

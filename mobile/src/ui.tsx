@@ -1861,8 +1861,12 @@ const styles = StyleSheet.create({
     gap: spacing(2),
   },
   card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    get backgroundColor() {
+      return colors.surface;
+    },
+    get borderColor() {
+      return colors.border;
+    },
     borderWidth: 1,
     borderRadius: radius.card,
     padding: spacing(4),
@@ -1883,14 +1887,20 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   buttonSecondary: {
-    backgroundColor: colors.elevated,
-    borderColor: colors.border,
+    get backgroundColor() {
+      return colors.elevated;
+    },
+    get borderColor() {
+      return colors.border;
+    },
     borderWidth: 1,
   },
   buttonLabel: { color: colors.accentContrast, fontSize: 15, fontWeight: "700" },
   input: {
     backgroundColor: colors.canvas,
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     borderWidth: 1,
     borderRadius: radius.control,
     color: colors.textPrimary,
@@ -1920,8 +1930,12 @@ const styles = StyleSheet.create({
     padding: spacing(5),
   },
   zoomPanel: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    get backgroundColor() {
+      return colors.surface;
+    },
+    get borderColor() {
+      return colors.border;
+    },
     borderWidth: 1,
     borderRadius: radius.card,
     padding: spacing(4),
@@ -1951,14 +1965,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(3),
     paddingVertical: spacing(2),
     borderRadius: radius.control,
-    backgroundColor: colors.elevated,
+    get backgroundColor() {
+      return colors.elevated;
+    },
   },
   zoomStep: {
     width: 32,
     height: 32,
     borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     alignItems: "center",
     justifyContent: "center",
   },

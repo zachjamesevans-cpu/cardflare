@@ -143,6 +143,46 @@ export const colors = {
   goldDeep: "#a8781d",
 } as const;
 
+/*
+ * THE BACKDROP: the player's own choice, in Settings. "green" is the
+ * look above - surfaces in the CF logo's green-black. "black" turns
+ * those surfaces pure black, for profiles, panels and cards; the accent,
+ * the FOUND band and every green highlight stay exactly as they are.
+ * The founder (2026-10-12): "add a dark mode toggle in settings to make
+ * our classic green stuff just pure black ... mainly just for
+ * backgrounds on profile and other elements that are that dark green".
+ *
+ * Applied by changing `colors` in place before the app's screens load
+ * (src/backdrop.ts), so everything that reads a colour - inline styles,
+ * and the stylesheets that read these four live - draws in it.
+ */
+export type Backdrop = "green" | "black";
+
+export const BACKDROPS: Record<
+  Backdrop,
+  { surface: string; elevated: string; border: string; borderStrong: string }
+> = {
+  green: {
+    surface: SURFACES[BRAND].surface,
+    elevated: SURFACES[BRAND].elevated,
+    border: SURFACES[BRAND].border,
+    borderStrong: SURFACES[BRAND].borderStrong,
+  },
+  /* Neutral, not tinted: a raised step and two hairlines just light
+     enough to separate a panel from the black page. */
+  black: {
+    surface: "#000000",
+    elevated: "#121212",
+    border: "#1f1f1f",
+    borderStrong: "#2e2e2e",
+  },
+};
+
+/** Put a backdrop's surfaces into `colors`, in place. */
+export function applyBackdrop(backdrop: Backdrop): void {
+  Object.assign(colors as unknown as Record<string, string>, BACKDROPS[backdrop]);
+}
+
 /** Six hues for initials avatars, matching --color-avatar-N. */
 export const avatarHues = [
   "#8fd3ff",

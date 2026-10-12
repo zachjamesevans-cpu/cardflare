@@ -246,7 +246,7 @@ describe("the recent searches list", () => {
 describe("back is a plain chevron on a player's pages", () => {
   const PAGES = [
     "src/app/profile/edit/page.tsx",
-    "src/app/profile/settings/page.tsx",
+    "src/app/profile/settings/settings-content.tsx",
     "src/app/profile/store/page.tsx",
     "src/app/profile/binders/[binderId]/page.tsx",
     "src/app/profile/customize/page.tsx",
@@ -280,8 +280,9 @@ describe("back is a plain chevron on a player's pages", () => {
   });
 
   it("leaves the store and admin consoles' own links alone", () => {
-    expect(read("src/app/profile/settings/page.tsx")).toContain(
-      'Back to {viewer.kind === "admin" ? "the admin console" : "your store"}',
+    /* Under the Settings menu now; the formatter splits the line. */
+    expect(read("src/app/profile/settings/settings-content.tsx")).toMatch(
+      /Back to\{" "\}\s*\{viewer\.kind === "admin" \? "the admin console" : "your store"\}/,
     );
   });
 });

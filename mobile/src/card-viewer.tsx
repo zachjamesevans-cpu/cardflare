@@ -550,8 +550,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(2),
     borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.surface;
+    },
   },
   pillLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "700" },
   panel: {
@@ -561,8 +565,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.panel,
     borderTopRightRadius: radius.panel,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.surface;
+    },
   },
   panelTop: {
     flexDirection: "row",
@@ -574,18 +582,28 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.border,
+    get backgroundColor() {
+      return colors.border;
+    },
   },
   flag: { flexDirection: "row", alignItems: "flex-start", gap: spacing(1.5) },
   photo: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.surface;
+    },
   },
   empty: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.elevated,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.elevated;
+    },
     alignItems: "center",
     justifyContent: "center",
   },
@@ -594,8 +612,12 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 5,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.elevated,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.elevated;
+    },
   },
   heading: { color: colors.textPrimary, fontSize: 16, fontWeight: "600" },
   label: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },

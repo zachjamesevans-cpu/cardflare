@@ -7,6 +7,7 @@ import { API_BASE } from "./config";
 import { LOCAL_ENABLED } from "./local-enabled";
 import { WANTED_PATH } from "./nearby-shared";
 import { openRoom } from "./open-room";
+import { isSettingsSection } from "./settings-sections";
 
 /**
  * Where a website path goes on a phone.
@@ -57,6 +58,14 @@ export async function followHref(
   if (href === "/profile/settings") {
     navigation.navigate("Settings");
     return;
+  }
+  /* One category of Settings, the website's /profile/settings/<section>. */
+  if (href.startsWith("/profile/settings/")) {
+    const section = segmentAfter(href, "/profile/settings/");
+    if (isSettingsSection(section)) {
+      navigation.navigate("Settings", { section });
+      return;
+    }
   }
   /* One of your binders; with ?scan=, the pages ready to check in it. */
   if (href.startsWith("/profile/binders/")) {

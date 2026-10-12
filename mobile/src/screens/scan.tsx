@@ -133,7 +133,9 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     alignItems: "center",
     gap: spacing(2),
-    backgroundColor: colors.surface,
+    get backgroundColor() {
+      return colors.surface;
+    },
     borderRadius: 10,
     paddingVertical: spacing(2),
     paddingHorizontal: spacing(4),
