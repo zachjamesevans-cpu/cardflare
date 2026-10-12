@@ -5,8 +5,8 @@ import type { StackParams } from "../App";
 import { rememberRoom } from "./api";
 import { API_BASE } from "./config";
 import { LOCAL_ENABLED } from "./local-enabled";
-import { isSettingsSection } from "./settings-sections";
 import { openRoom } from "./open-room";
+import { isSettingsSection } from "./settings-sections";
 
 /**
  * Where a website path goes on a phone.
