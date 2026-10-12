@@ -128,7 +128,6 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
                 state={card.state}
                 direction={offering ? "showcase" : "want"}
                 have={haveFor(card, post)}
-                hasNote={Boolean(card.cardNote)}
                 siblings={shelf}
                 position={index}
               />

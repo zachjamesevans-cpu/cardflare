@@ -102,13 +102,19 @@ describe("reading a note", () => {
     expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
       "note: card.cardNote ?? null",
     );
-    /* On the Feed, a mark: the words are a tap away. */
-    expect(read("mobile/src/flare-deck-pager.tsx")).toContain(
-      "{card.cardNote ? <NoteMark /> : null}",
-    );
-    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
-      "hasNote={Boolean(card.cardNote)}",
-    );
+    /* No mark on the Feed's tiles: the founder, "delete that note icon
+       from the feed ... it mainly applies to nearby feature." The note
+       is read when the card is opened, and on Wanted near you. */
+    for (const file of [
+      "mobile/src/flare-deck-pager.tsx",
+      "mobile/src/flare-feed-card-compact.tsx",
+      "mobile/src/card-rail.tsx",
+      "src/components/feed/feed-tile.tsx",
+      "src/components/feed/flare-feed-card.tsx",
+      "src/components/feed/flare-feed-card-compact.tsx",
+    ]) {
+      expect(read(file), file).not.toMatch(/NoteMark|hasNote/);
+    }
   });
 
   it("is under each person on Wanted near you, from a Flare or a saved want", () => {

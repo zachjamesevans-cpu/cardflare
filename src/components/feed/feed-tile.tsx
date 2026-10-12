@@ -1,4 +1,3 @@
-import { MessageSquareText } from "lucide-react";
 import {
   CardImageZoom,
   type ZoomCard,
@@ -95,7 +94,6 @@ export function CardRail({
             position={index}
             state={card.state}
             have={haveFor(card, post)}
-            hasNote={Boolean(card.cardNote)}
           />
         </div>
       ))}
@@ -131,14 +129,7 @@ export function FeedTile({
   state = "open",
   direction = "want",
   have = null,
-  hasNote = false,
 }: {
-  /**
-   * The card carries its poster's note. Only a small mark here - the
-   * note itself is read when the card is opened, so it costs the Feed
-   * no space - but without the mark nobody would know to open it.
-   */
-  hasNote?: boolean;
   imageUrl: string | null;
   name: string;
   cardNumber: string;
@@ -218,15 +209,6 @@ export function FeedTile({
           />
         )}
       </span>
-      {hasNote && (
-        <span
-          title="Has a note"
-          className="pointer-events-none absolute top-1 right-1 flex size-5 items-center justify-center rounded-[4px] bg-canvas/80 text-accent"
-        >
-          <MessageSquareText className="size-3" aria-hidden="true" />
-          <span className="sr-only">Has a note</span>
-        </span>
-      )}
       {state !== "open" && (
         /* The one-word state, pinned to the foot of the card so the
            art above it still reads as the card it is. */

@@ -231,7 +231,6 @@ export function FlareFeedCard({
       state={card.state}
       direction={direction}
       have={preview ? null : haveFor(card, post)}
-      hasNote={Boolean(card.cardNote)}
       siblings={shelf}
       position={index}
     />

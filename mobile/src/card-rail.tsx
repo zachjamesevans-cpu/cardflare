@@ -1,4 +1,3 @@
-import { NoteMark } from "./note-mark";
 import { ScrollView, View } from "react-native";
 
 import type { FeedCard } from "./api";
@@ -92,7 +91,6 @@ export function CardRail({
           />
           {/* A card you hold: the server put it first, the ring says so. */}
           <HeldRing match={card.match} />
-          {card.cardNote ? <NoteMark /> : null}
         </View>
       ))}
       {more > 0 ? <Muted>{`+${more} more`}</Muted> : null}

@@ -1,4 +1,3 @@
-import { NoteMark } from "./note-mark";
 import { ScrollView, Text, View } from "react-native";
 
 import { setCardNote, type FeedCard } from "./api";
@@ -157,7 +156,6 @@ export function FlareCardSlide({
         />
         {/* Inset: the pager clips anything outside the slide. */}
         <HeldRing match={card.match} inset />
-        {card.cardNote ? <NoteMark /> : null}
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         <Text
@@ -333,7 +331,6 @@ export function FlareStrip({
               />
               <HeldRing match={card.match} />
               <NeedBadge card={card} offering={direction === "showcase"} size="md" />
-              {card.cardNote ? <NoteMark /> : null}
             </View>
           </View>
         );

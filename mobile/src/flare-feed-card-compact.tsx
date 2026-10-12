@@ -1,4 +1,3 @@
-import { NoteMark } from "./note-mark";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -197,7 +196,6 @@ export function FlareFeedCardCompact({
             {/* The copies tag owns the top left. */}
             <HeldRing match={card.match} />
             <NeedBadge card={card} offering={offering} />
-            {card.cardNote ? <NoteMark /> : null}
           </View>
         ))}
       </ScrollView>
