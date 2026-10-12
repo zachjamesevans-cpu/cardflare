@@ -77,6 +77,7 @@ export function CardRail({
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveFor(card, post),
     note: card.cardNote ?? null,
+    state: card.state ?? "open",
     noteEdit: post?.yours && card.flareId ? { flareId: card.flareId } : null,
   }));
 

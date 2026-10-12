@@ -78,6 +78,8 @@ export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard
     caption: card.printingLabel ?? null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveWithCap(card, post),
+    /* FOUND in the full view too, band and all. */
+    state: card.state ?? "open",
     /* The poster's reason, read when the card is opened; on your own
        post, the way to add or change it. */
     note: card.cardNote ?? null,

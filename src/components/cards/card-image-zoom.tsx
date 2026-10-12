@@ -105,6 +105,13 @@ export interface ZoomCard {
    * "Edit note"). Null on anybody else's card.
    */
   noteEdit?: { flareId: string } | null;
+  /**
+   * FOUND or OFFERED, so the open card says what its thumbnail said.
+   * The founder: "when viewing a card in full view, it should still
+   * show that the card was found, and with the green 'found' thing at
+   * bottom." The app's viewer is the same.
+   */
+  state?: "open" | "offered" | "found";
 }
 
 /**
@@ -872,6 +879,14 @@ export function CardImageZoom({
   const have = shown ? (shown.have ?? null) : ownHave;
   const ask = shown ? (shown.ask ?? null) : ownAsk;
   const noteEdit = shown ? (shown.noteEdit ?? null) : null;
+  const cardState = shown ? (shown.state ?? "open") : "open";
+  /* Found: black and white; offered: dimmed - the thumbnail's own rule. */
+  const stateArt =
+    cardState === "found"
+      ? "opacity-60 grayscale"
+      : cardState === "offered"
+        ? "opacity-50 grayscale"
+        : "";
 
   const [warm, setWarm] = useState(false);
   const [sharp, setSharp] = useState(false);
@@ -1411,7 +1426,7 @@ export function CardImageZoom({
                 aria-hidden="true"
                 fill
                 sizes={THUMB_SIZES}
-                className="scale-105 object-contain blur-md"
+                className={`scale-105 object-contain blur-md ${stateArt}`}
               />
             )}
 
@@ -1430,9 +1445,22 @@ export function CardImageZoom({
                 priority
                 onLoad={() => setSharp(true)}
                 className={`object-contain transition-opacity duration-200 ${
-                  sharp ? "opacity-100" : "opacity-0"
+                  sharp ? stateArt || "opacity-100" : "opacity-0"
                 }`}
               />
+            )}
+
+            {/* The card's state at its foot, the band every surface uses. */}
+            {cardState !== "open" && (
+              <span
+                className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 py-1.5 text-center text-base font-extrabold tracking-[0.2em] uppercase ${
+                  cardState === "found"
+                    ? "bg-accent text-accent-contrast"
+                    : "bg-surface/90 text-text-secondary"
+                }`}
+              >
+                {cardState}
+              </span>
             )}
 
             {/*

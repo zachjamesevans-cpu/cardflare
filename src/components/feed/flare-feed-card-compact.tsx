@@ -1,3 +1,4 @@
+import { foundLast } from "@/lib/feed/card-copy";
 import Link from "next/link";
 import { CheckCircle2, Crosshair, PackageOpen } from "lucide-react";
 
@@ -28,10 +29,12 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
  * screen.
  */
 export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
+  /* Found cards at the far right, whatever order they arrived in. */
+  const cards = [...item.cards].sort(foundLast);
   const post = { postId: item.postId, yours: item.yours };
   const offering = item.direction === "showcase";
 
-  const shelf: ZoomCard[] = item.cards.map((card) => ({
+  const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
@@ -42,6 +45,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveFor(card, post),
     note: card.cardNote ?? null,
+    state: card.state ?? "open",
     noteEdit: item.yours && card.flareId ? { flareId: card.flareId } : null,
   }));
 
@@ -102,7 +106,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
           <PostMenu
             post={{
               postId: item.postId,
-              cards: item.cards,
+              cards: cards,
               total: item.total,
               direction: offering ? "showcase" : "want",
               yours: item.yours,
@@ -116,7 +120,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
         {/* The strip. Scrolls inside itself, so a long post never makes
           the page scroll sideways. */}
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
-          {item.cards.map((card, index) => (
+          {cards.map((card, index) => (
             <div key={card.cardId} className="relative shrink-0">
               <FeedTile
                 imageUrl={card.imageUrl}

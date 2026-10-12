@@ -265,6 +265,8 @@ export function HuntBinder({
       stillNeeds: Math.max(0, neededOf(card) - foundFor(card)),
       youHave: null,
       have: yours || done || !card.requestId || !hunt.id ? null : haveFor(card),
+      /* A found pocket opens found: band and all. */
+      state: done ? "found" : "open",
     };
   });
 
