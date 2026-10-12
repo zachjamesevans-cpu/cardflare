@@ -139,6 +139,19 @@
   --color-gold-deep: #a8781d;
 }
 
+/*
+ * PURE BLACK, the player's choice in Settings (lib/players/backdrop.ts):
+ * the green-black surfaces go black, neutral rather than tinted, and the
+ * accent, the FOUND band and every highlight stay. The app's set is the
+ * same four values (mobile/src/theme.ts, BACKDROPS.black).
+ */
+html[data-backdrop="black"] {
+  --color-surface: #000000;
+  --color-elevated: #121212;
+  --color-border: #1f1f1f;
+  --color-border-strong: #2e2e2e;
+}
+
 @layer base {
   html {
     color-scheme: dark;

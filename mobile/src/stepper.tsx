@@ -82,8 +82,12 @@ const step = {
   height: 30,
   borderRadius: radius.control,
   borderWidth: 1,
-  borderColor: colors.border,
-  backgroundColor: colors.elevated,
+  get borderColor() {
+    return colors.border;
+  },
+  get backgroundColor() {
+    return colors.elevated;
+  },
   alignItems: "center" as const,
   justifyContent: "center" as const,
 };
