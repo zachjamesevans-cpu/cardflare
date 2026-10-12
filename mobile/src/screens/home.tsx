@@ -99,7 +99,7 @@ import { MatchRow } from "../nearby";
 import { PlayerAvatar } from "../player-avatar";
 import { VerifiedMark } from "../verified-mark";
 import { API_BASE } from "../config";
-import { colors, gutter, radius, spacing } from "../theme";
+import { colors, FEED_LOOK, gutter, radius, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 import { useUnread } from "../unread";
 import { YoureHereBanner } from "../youre-here";
@@ -1820,7 +1820,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
          * reach it, which looks like the list is broken rather than
          * unbounded.
          */
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: FEED_LOOK === "open" ? colors.surface : undefined }}
         /*
          * Without this a tap on a button is spent dismissing the keyboard
          * instead of pressing the button, and the player has to tap twice.

@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
@@ -12,7 +12,7 @@ import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
-import { colors, radius, spacing, accentGlow } from "./theme";
+import { colors, FEED_LOOK, gutter, radius, spacing, accentGlow } from "./theme";
 import { Button, Tap, type ZoomPicks } from "./ui";
 
 /**
@@ -382,15 +382,27 @@ export function FlareFeedCard({
 
   return (
     <View
-      style={{
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: radius.panel,
-        padding: spacing(3),
-        paddingBottom: spacing(2),
-        gap: spacing(2.5),
-      }}
+      style={
+        FEED_LOOK === "open"
+          ? {
+              /* No panel: the post sits on the Feed's own green, a
+                 hairline under it as the only line between posts. */
+              paddingTop: spacing(1),
+              paddingBottom: spacing(4),
+              gap: spacing(2.5),
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: colors.borderStrong,
+            }
+          : {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: radius.panel,
+              padding: spacing(3),
+              paddingBottom: spacing(2),
+              gap: spacing(2.5),
+            }
+      }
     >
       {/* The header: face, then the name with when and how far beside
           it, then the status line; the three dots at the right. "Your
@@ -524,7 +536,7 @@ export function FlareFeedCard({
           picks={picks}
           onPicks={onPicks}
           onSeeAll={onViewAll}
-          bleed={spacing(3)}
+          bleed={FEED_LOOK === "open" ? gutter : spacing(3)}
         />
       )}
 

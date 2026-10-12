@@ -83,6 +83,19 @@ const SURFACES: Record<
  */
 export const accentGlow = BRAND === "soft" ? 0.25 : 1;
 
+/*
+ * HOW THE FEED SITS: "blocks" or "open". "blocks" is every post in its
+ * own rounded panel on the black page, as it has been. "open" is the
+ * founder's try (2026-10-11): "lets see what it would look like without
+ * the green 'blocks' in the feed. like the full background was just
+ * that dark gray green color and there were no 'blocks' rounded around
+ * ppls stuff" - the Feed's page is the surface green, and posts sit on
+ * it with a hairline between them, the cards running edge to edge.
+ * Declared wide so either word typechecks against the other.
+ */
+export type FeedLook = "blocks" | "open";
+export const FEED_LOOK = "open" as FeedLook;
+
 export const colors = {
   /*
    * True black, matching the website's --color-canvas. The founder:
