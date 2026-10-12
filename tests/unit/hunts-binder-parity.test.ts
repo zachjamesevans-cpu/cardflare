@@ -210,7 +210,8 @@ describe("the Hunts tab: one binder row per hunt", () => {
 
   it("says the empty state the same way on both", () => {
     /* What a hunt is: the app's sheet and empty pane, the web's pane. */
-    const OWNER = 'One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.';
+    const OWNER =
+      "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.";
     expect(web.panel).toContain(OWNER);
     expect(read("mobile/src/hunt-sheet.tsx")).toContain(OWNER);
     expect(app.panel).toContain("HUNT_EXPLAINER");
@@ -220,13 +221,14 @@ describe("the Hunts tab: one binder row per hunt", () => {
   });
 
   it("wears the crosshair, never the list with ticks, on every hunt surface", () => {
+    /* The Hunts tab's rows wear the crosshair. The hunt page itself
+       does not since 2026-10-11: its one mark is the progress ring, the
+       founder having found the header "so jumbled" with more. */
     expect(web.panel).toContain("<Crosshair");
-    expect(web.binder).toContain("<Crosshair");
     for (const [name, source] of Object.entries(web)) {
       expect(source, `web ${name}`).not.toContain("ListChecks");
     }
     expect(app.panel).toContain('name="locate-outline"');
-    expect(app.binder).toContain('name="locate-outline"');
     for (const [name, source] of Object.entries(app)) {
       expect(source, `app ${name}`).not.toContain("format-list-checks");
     }
@@ -234,11 +236,32 @@ describe("the Hunts tab: one binder row per hunt", () => {
 });
 
 describe("the hunt page: the open binder", () => {
-  it("has the crosshair, the name, and the description or the row line under it", () => {
-    expect(web.binder).toContain(
-      "hunt.description || huntRowLine(cards.length, looking)",
-    );
-    expect(app.binder).toContain("huntRowLine(");
+  it("heads with the ring, the name and the owner's face, and says nothing twice", () => {
+    /* The founder: "the block on top needs to change ... make it more
+       pretty", then of the first ring: "says 3 to go and 4 cards twice
+       on all hunts ... just looks so jumbled". Progress is the ring and
+       only the ring; the owner is one line; their words only when they
+       wrote some. Both platforms draw the same header. */
+    for (const [name, source] of [
+      ["web", web.binder],
+      ["app", app.binder],
+    ] as const) {
+      expect(source, name).toContain("<HuntRing");
+      expect(source, name).toContain("<PlayerAvatar");
+      expect(source, name).toContain("Your hunt");
+      expect(source, name).not.toContain("} to go");
+      expect(source, name).not.toContain("huntRowLine(");
+      expect(source, name).not.toContain(`{"'s hunt"}`);
+      expect(source, name).not.toContain("&rsquo;s hunt");
+    }
+    expect(web.binder).toContain("{hunt.description && (");
+    expect(app.binder).toContain("{hunt.description ? (");
+    /* The ring names its count, so it can be the only one. */
+    expect(read("src/components/players/hunt-detail.tsx")).toContain("FOUND");
+    expect(app.panel).toContain("FOUND");
+    /* The owner's face comes with the hunt, nested so the app API makes
+       its path whole. */
+    expect(read("src/lib/players/hunts.ts")).toContain("owner: {");
   });
 
   it("gives the owner the pencil and Share, and a visitor the owner's name and Share", () => {
@@ -267,21 +290,28 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toContain('side="prev"');
     expect(web.binder).toContain('side="next"');
     expect(web.binder).toContain("<PageDots");
-    expect(web.binder).toContain("<HuntProgress");
+    /* The progress is the ring in the header (2026-10-11), not a bar. */
+    expect(web.binder).toContain(
+      "<HuntRing found={foundCopies} needed={neededCopies} />",
+    );
     /* No hold to move: a hunt has no order of its own. */
     expect(web.binder).not.toContain("draggable");
     expect(web.binder).not.toContain("onDragStart");
     expect(app.binder).toContain("POCKETS_PER_PAGE");
     expect(app.binder).toContain("<PageDots");
-    expect(app.binder).toContain("<HuntProgress");
+    expect(app.binder).toContain(
+      "<HuntRing found={totalFound} needed={totalNeeded} />",
+    );
     expect(app.binder).not.toContain("onLongPress");
   });
 
-  it("dims a found pocket with a check, chips found/needed when more than one is wanted", () => {
+  it("marks a found pocket with the FOUND band, chips found/needed when more than one is wanted", () => {
+    /* One way of saying found across the product (2026-10-11): black
+       and white with the Feed's green band, never a check. */
     expect(web.binder).toContain("dim={card.found}");
-    expect(web.pockets).toContain('dim && "opacity-50"');
+    expect(web.pockets).toContain('dim && "opacity-60 grayscale"');
     expect(web.binder).toMatch(
-      /card\.found \? \(\s*<span\s+aria-label="Found"[\s\S]*?<Check /,
+      /card\.found \? \([\s\S]*?bg-accent py-0\.5[\s\S]*?found\s*<\/span>/,
     );
     expect(web.binder).toMatch(
       /card\.needed > 1 \? \(\s*<span[^>]*>\s*\{card\.foundCopies\}\/\{card\.needed\}/,
@@ -290,16 +320,27 @@ describe("the hunt page: the open binder", () => {
     expect(web.binder).toMatch(
       /\{card\.foundCopies\}\/\{card\.needed\}\s*<\/span>\s*\) : null\}/,
     );
-    expect(app.binder).toContain("dimmed={done}");
-    expect(app.pockets).toContain("opacity: dimmed ? 0.5 : 1");
-    expect(app.binder).toContain('name="checkmark"');
+    expect(app.binder).toContain('{done ? <StateBand state="found" /> : null}');
+    expect(app.binder).not.toContain('name="checkmark"');
     expect(app.binder).toContain("{`${found}/${needed}`}");
+  });
+
+  it("puts found cards last, on the last pages, on both platforms", () => {
+    /* The founder: "found cards in hunts need to filter to the bottom /
+       last pages." Ordered by what the server last said, stably. */
+    for (const source of [web.binder, app.binder]) {
+      expect(source).toContain(
+        ".sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)",
+      );
+    }
   });
 
   it("gives the owner + pockets into the Flare composer, and a visitor empty ones", () => {
     expect(web.binder).toMatch(
-      /yours \? \(\s*<AddPocket href=\{`\/flare\?hunt=\$\{encodeURIComponent\(hunt\.id\)\}`\} \/>\s*\) : \(\s*<EmptyPocket \/>/,
+      /yours \? \(\s*<AddPocket href=\{`\/flare\?hunt=\$\{encodeURIComponent\(hunt\.id\)\}`\} \/>\s*\) : \(\s*<EmptyPocket faint \/>/,
     );
+    /* A visitor's empty pockets are faint dashed outlines, not black. */
+    expect(app.binder).toMatch(/<EmptyPocket[\s\S]*?faint\s*\/>/);
     /* The trailing page always has them: one more page once the last is full. */
     expect(web.binder).toContain("Math.floor(cards.length / perPage) + 1");
     expect(web.binder).toContain("Math.max(1, Math.ceil(cards.length / perPage))");

@@ -2,7 +2,12 @@ import Image from "next/image";
 
 import { cn } from "@/lib/cn";
 import { SITE } from "@/lib/site";
-import wordmark from "@public/brand/cardflare-wordmark-cut.png";
+/* The founder's flat "cardflare" wordmark in the CF logo's green
+   (2026-10-11: "now update the website with our new color scheme ...
+   and new color logo png"), the same artwork the app's Feed header
+   wears. The glowing lime cut it replaced is public/brand/
+   cardflare-wordmark-cut.png, still generated from the master. */
+import wordmark from "@public/brand/cardflare-wordmark-soft.png";
 
 /*
  * THE WORDMARK ALONE, FOR NOW.
@@ -24,13 +29,12 @@ const WORDMARK_ASPECT = wordmark.width / wordmark.height;
  * The name is ARTWORK now, not text: the founder supplied the drawn
  * wordmark after three rounds of font-matching and said "Just put this
  * everywhere" (2026-08-25), so every place the name used to be set in a
- * display face draws his file instead. The image carries its own glow
- * padding — about a sixth of its height above and below the lettering —
- * so it renders taller than the letters look; 0.62 puts the visible
- * lettering at the height the old text sat at, riding alongside a mark
- * of any size.
+ * display face draws his file instead. The flat wordmark is cropped
+ * close - its letters are about four fifths of its height, where the
+ * glowing one's were two thirds - so 0.5 keeps the visible lettering at
+ * the height it has always had.
  */
-const WORDMARK_SCALE = 0.62;
+const WORDMARK_SCALE = 0.5;
 
 interface LogoProps {
   /** The height the mark had, in pixels; the name is scaled from it. */

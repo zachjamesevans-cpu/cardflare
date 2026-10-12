@@ -284,9 +284,7 @@ describe("Remove from hunt", () => {
     expect(web.binder).toContain(
       "setRemoved((current) => new Set([...current, card.requestId]));",
     );
-    expect(web.binder).toContain(
-      "const cards = progress.cards.filter((card) => !removed.has(card.requestId));",
-    );
+    expect(web.binder).toContain(".filter((card) => !removed.has(card.requestId))");
     expect(web.binder).toContain("setOpenId(null);");
     expect(web.binder).toContain("router.refresh();");
 

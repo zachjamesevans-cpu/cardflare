@@ -1,5 +1,3 @@
-import { Layers, PackageCheck } from "lucide-react";
-
 import {
   CardImageZoom,
   type ZoomCard,
@@ -129,7 +127,6 @@ export function FeedTile({
   state = "open",
   direction = "want",
   have = null,
-  corner = "left",
 }: {
   imageUrl: string | null;
   name: string;
@@ -147,8 +144,6 @@ export function FeedTile({
   direction?: "want" | "showcase";
   /** The offer in the large view, when the viewer can make one. */
   have?: ZoomHave | null;
-  /** Where the held icon sits, for a tile whose top left holds a count. */
-  corner?: "left" | "right";
   /**
    * What the viewer's binder says, or null for nothing.
    *
@@ -169,11 +164,15 @@ export function FeedTile({
             ? "You have another printing"
             : name
       }
-      /* The board's own mark for a card you are holding, so the feed and
-         the room are not two dialects of the same fact. */
+      /* The ring alone says you hold it: three pixels and a stronger glow,
+         no corner icon. The founder (2026-10-11): "let's remove that
+         little 'box' icon ... make the green ring around the card more
+         pronounced, maybe just thicker and more visible." The viewer
+         still says exact or another printing in words. The app's
+         HeldRing is the same. */
       className={`relative block ${TILE_CLASS[size]} shrink-0 overflow-hidden rounded-[6px] border bg-elevated ${
         match
-          ? "border-border shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
+          ? "border-border shadow-[0_0_14px_rgba(206,252,132,0.5)] ring-[3px] ring-accent"
           : "border-border"
       }`}
     >
@@ -219,19 +218,6 @@ export function FeedTile({
           }`}
         >
           {state === "found" && direction === "showcase" ? "gone" : state}
-        </span>
-      )}
-      {match && (
-        <span
-          className={`pointer-events-none absolute top-0.5 rounded-full bg-surface/90 p-0.5 ${
-            corner === "left" ? "left-0.5" : "right-0.5"
-          }`}
-        >
-          {match === "exact" ? (
-            <PackageCheck className="size-3 text-accent" aria-hidden="true" />
-          ) : (
-            <Layers className="size-3 text-accent" aria-hidden="true" />
-          )}
         </span>
       )}
     </span>

@@ -3147,6 +3147,8 @@ export interface HuntView extends Hunt {
   playerId: string;
   ownerName: string;
   yours: boolean;
+  /** The owner's face and worn ring, for the header. Absent from an older server. */
+  owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
 }
 
 export const getHunts = () =>

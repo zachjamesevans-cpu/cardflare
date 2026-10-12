@@ -59,7 +59,11 @@ export function goingLabel(count: number): string {
 
 export function StorePostCard({ item }: { item: StorePostItem }) {
   return (
-    <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
+    /* No panel: the post sits on the Feed's own green with a hairline
+       under it, the app's FEED_LOOK "open". The founder (2026-10-11):
+       "without the green 'blocks' in the feed ... the full background was
+       just that dark gray green color". */
+    <article className="flex flex-col gap-2.5 border-b border-border-strong/70 px-3 pt-1 pb-4">
       {/* The header: logo, name with its mark, the status line; time on
           the right. The same row a Flare has, with a shop in it. */}
       <div className="flex items-start gap-3">

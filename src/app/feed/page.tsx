@@ -88,6 +88,7 @@ function Shell({
   return (
     <TabPageShell
       title="Feed"
+      surface
       /* The + at the top left posts a Flare, the way Instagram's posts:
          the founder gave the tab bar's middle to Messages, which gets
          opened far more often than a Flare gets posted. A player's: a

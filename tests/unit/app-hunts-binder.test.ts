@@ -180,12 +180,16 @@ describe("the Hunts tab: one binder row per hunt", () => {
     expect(src.panel).toContain('onPress={() => setSheet({ kind: "new" })}');
     expect(src.panel).toContain('onPress={() => setSheet({ kind: "about" })}');
     expect(src.panel).toContain("`${hunts.length} of ${limit} hunts`");
-    expect(src.panel).toContain("`You are at ${limit} hunts. Finish one to start another.`");
+    expect(src.panel).toContain(
+      "`You are at ${limit} hunts. Finish one to start another.`",
+    );
     expect(src.panel.indexOf('accessibilityLabel="New hunt"')).toBeLessThan(
       src.panel.indexOf("{hunts.map((hunt) => ("),
     );
-    expect(src.panel).not.toContain('placeholder={\'Name it, like "Green Zoro"\'}');
-    expect(sheet).toContain('One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.');
+    expect(src.panel).not.toContain("placeholder={'Name it, like \"Green Zoro\"'}");
+    expect(sheet).toContain(
+      "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares.",
+    );
     expect(sheet).toContain('<Modal visible transparent animationType="fade"');
     expect(sheet).toContain("createHunt({");
     expect(sheet).not.toContain("visibility");
@@ -216,29 +220,27 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.huntScreen).not.toContain("HuntExpanded");
   });
 
-  it("heads with the crosshair, the name, the description or the row's line, and the owner's controls", () => {
-    expect(src.page).toContain('name="locate-outline"');
-    expect(src.page).toContain("<Title>{hunt.name}</Title>");
-    expect(src.page).toContain("{hunt.description}");
-    expect(src.page).toContain(
-      "{huntRowLine(hunt.looking + hunt.found, hunt.looking)}",
-    );
+  it("heads with the ring, the name, the owner, their words when written, and the owner's controls", () => {
+    /* Each fact once: the ring is the progress, the name the page's
+       biggest line, the description only when there is one. */
+    expect(src.page).toContain("{hunt.name}");
+    expect(src.page).toContain("{hunt.description ? (");
+    expect(src.page).not.toContain("huntRowLine(");
     /* The pencil opens the same sheet that starts a hunt; Share is beside it. */
     expect(src.page).toContain('accessibilityLabel="Edit hunt"');
     expect(src.page).toContain('name="pencil-outline"');
     expect(src.page).toContain('accessibilityLabel="Share hunt"');
-    expect(src.page).toContain('mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}');
-    expect(src.page).toContain("huntUrl(hunt.id)");
-    /* A visitor sees the owner's name, a link to their profile. */
-    expect(src.page).toContain("accessibilityLabel={`${owner}'s profile`}");
-    expect(src.page).toContain('{"\'s hunt"}');
-    /* The progress bar stays, above the pages. */
     expect(src.page).toContain(
-      "<HuntProgress found={totalFound} needed={totalNeeded} />",
+      'mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}',
     );
-    expect(src.page.indexOf("<HuntProgress")).toBeLessThan(
-      src.page.indexOf("<PageFrame"),
-    );
+    expect(src.page).toContain("huntUrl(hunt.id)");
+    /* A visitor sees the owner's face and name, a link to their profile. */
+    expect(src.page).toContain("accessibilityLabel={`${owner}'s profile`}");
+    expect(src.page).not.toContain('{"\'s hunt"}');
+    expect(src.page).toContain("avatarUrl={hunt.owner?.avatarUrl ?? null}");
+    /* The progress is the ring in the header, above the pages. */
+    expect(src.page).toContain("<HuntRing found={totalFound} needed={totalNeeded} />");
+    expect(src.page.indexOf("<HuntRing")).toBeLessThan(src.page.indexOf("<PageFrame"));
   });
 
   it("draws the binder's pages: the shared frame, nine pockets, the dots", () => {
@@ -283,24 +285,22 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.page).not.toContain('label="Add cards"');
   });
 
-  it("dims a found pocket with a check, chips a partly found one, leaves the rest bare", () => {
+  it("marks a found pocket with the FOUND band, chips a partly found one, leaves the rest bare", () => {
     const pocket = between(
       src.page,
       "function HuntPocket(",
       "function HuntPocketSheet(",
     );
     expect(pocket).toContain("const done = found >= needed;");
-    expect(pocket).toContain("dimmed={done}");
-    expect(src.pockets).toContain("opacity: dimmed ? 0.5 : 1");
-    /* The check: accent, top right, only when done. */
-    const check = between(pocket, "{done ? (", ") : null}");
-    expect(check).toContain('accessibilityLabel="All found"');
-    expect(check).toContain("top: 4,");
-    expect(check).toContain("right: 4,");
-    expect(check).toContain("backgroundColor: colors.accent");
-    expect(check).toContain(
-      '<Ionicons name="checkmark" size={12} color={colors.accentContrast} />',
-    );
+    /* The founder: "make sure that it has the green found thing at
+       bottom like there is elsewhere in the app ... see how there's also
+       checkmarks here in this screen? delete those." Black and white
+       with the Feed's band; no check, no plain dimming. */
+    expect(pocket).toContain('{done ? <StateBand state="found" /> : null}');
+    expect(pocket).toContain("<FoundArt");
+    expect(pocket).toContain('state={done ? "found" : "open"}');
+    expect(pocket).not.toContain('name="checkmark"');
+    expect(pocket).not.toContain("dimmed={done}");
     /* The chip: found over needed, bottom right, only when more than one
        is wanted and not all are found. */
     const chip = between(pocket, "{!done && needed > 1 ? (", ") : null}");

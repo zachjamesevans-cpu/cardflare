@@ -16,12 +16,12 @@ import type { EmailMessage } from "./client";
  * reason: email has no access to the stylesheet.
  */
 const COLOR = {
-  surface: "#151a21",
-  border: "#2a323d",
-  accent: "#c6ee4f",
+  surface: "#111710",
+  border: "#242d22",
+  accent: "#cefc84",
   textPrimary: "#f2f5f7",
-  textSecondary: "#b3becc",
-  textMuted: "#8593a4",
+  textSecondary: "#bcc4b8",
+  textMuted: "#8a9386",
 };
 
 function escapeHtml(value: string): string {

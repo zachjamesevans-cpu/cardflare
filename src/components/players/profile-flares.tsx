@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Layers, PackageCheck } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { buttonStyles } from "@/components/ui/button";
@@ -145,25 +144,13 @@ export function ProfileFlares({
                   /* A want in your binder: the green ring a card you
                      have wears everywhere, and the server put it
                      first. Inset, because the grid runs tile to tile
-                     and a ring outside would sit on the neighbour. The
-                     corner icon goes top right: the copies tag owns
-                     top left on this grid. */
-                  <>
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-accent ring-inset"
-                    />
-                    <span className="pointer-events-none absolute top-1 right-1 rounded-full bg-surface/90 p-0.5">
-                      {flare.match === "exact" ? (
-                        <PackageCheck
-                          className="size-3 text-accent"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <Layers className="size-3 text-accent" aria-hidden="true" />
-                      )}
-                    </span>
-                  </>
+                     and a ring outside would sit on the neighbour.
+                     Three pixels and no corner icon (2026-10-11): the
+                     ring alone says it. */
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-[6px] ring-[3px] ring-accent ring-inset"
+                  />
                 )}
                 <QuantityBadge
                   quantity={flare.quantity}

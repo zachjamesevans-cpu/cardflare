@@ -575,6 +575,7 @@ export function demoHunt(id: string): HuntView | null {
     id,
     playerId: p.playerId,
     ownerName: p.displayName,
+    owner: { avatarUrl: p.avatarUrl, frame: p.frame, ring: p.ring },
     yours: false,
     name: state.spec.hunt ?? "Hunt",
     description: state.spec.note ?? null,

@@ -123,7 +123,6 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
                 match={card.match}
                 size="pager"
                 /* The copies tag owns the top left. */
-                corner="right"
                 state={card.state}
                 direction={offering ? "showcase" : "want"}
                 have={haveFor(card, post)}

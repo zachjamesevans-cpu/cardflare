@@ -232,7 +232,7 @@ export function Item({
                  board uses, for the same "this one concerns you". */
               className={`block w-14 shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated ${
                 card.onYourList
-                  ? "shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent"
+                  ? "shadow-[0_0_14px_rgba(206,252,132,0.5)] ring-[3px] ring-accent"
                   : ""
               }`}
             >

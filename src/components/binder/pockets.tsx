@@ -56,8 +56,9 @@ export function PocketTile({
 
   return (
     <div className={POCKET}>
-      {/* The art alone fades when dimmed, so a badge over it stays crisp. */}
-      <div className={cn("size-full", dim && "opacity-50")}>
+      {/* The art alone goes black and white when dimmed - the Feed's
+          found card, FeedTile - so the FOUND band over it stays crisp. */}
+      <div className={cn("size-full", dim && "opacity-60 grayscale")}>
         {art ? (
           /* The picture is not its own drag source: the pocket is, so
              the whole tile travels, not the image out of it. */
@@ -95,8 +96,20 @@ export function PocketTile({
   );
 }
 
-/** A visitor's empty pocket: black, and nothing to press. */
-export function EmptyPocket() {
+/**
+ * A visitor's empty pocket: black, and nothing to press. `faint` draws
+ * a dashed outline instead, for a visitor's hunt, where solid black
+ * slots under a few cards read as "9 boxes, mostly black".
+ */
+export function EmptyPocket({ faint = false }: { faint?: boolean }) {
+  if (faint) {
+    return (
+      <div
+        aria-hidden="true"
+        className="aspect-[63/88] w-full rounded-[5px] border border-dashed border-white/[0.08]"
+      />
+    );
+  }
   return <div aria-hidden="true" className={POCKET} />;
 }
 

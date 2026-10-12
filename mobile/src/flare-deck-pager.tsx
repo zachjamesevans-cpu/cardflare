@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
-import { HeldRing } from "./held-ring";
+import { HELD_RING_WIDTH, HeldRing } from "./held-ring";
 import { QuantityBadge } from "./quantity-badge";
 import { haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
@@ -234,7 +234,7 @@ export function NeedBadge({
 }
 
 /** How far outside a card its held ring reaches: HeldRing's outset and a little. */
-const RING_ROOM = 4;
+const RING_ROOM = HELD_RING_WIDTH + 3;
 
 /** A strip tile's width: two and a half across a phone, so it scrolls. */
 export const STRIP_TILE = 108;
@@ -317,7 +317,7 @@ export function FlareStrip({
                 picks={picks}
                 onPicks={onPicks}
               />
-              <HeldRing match={card.match} corner="right" />
+              <HeldRing match={card.match} />
               <NeedBadge card={card} offering={direction === "showcase"} size="md" />
             </View>
           </View>

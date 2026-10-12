@@ -321,6 +321,140 @@ export function UndoLine({ label, onUndo }: { label: string; onUndo: () => void 
   );
 }
 
+/**
+ * The hunt page's progress as a ring: "2/9" inside, the arc in the
+ * accent, the rest of the track quiet. The founder, of the old header
+ * (four small grey lines and a hairline bar): "the block on top needs
+ * to change ... any better ideas to display this information and make
+ * it more pretty?"
+ *
+ * Plain Views, not Skia: the Skia kit is loaded late on purpose (see
+ * foil.tsx) and a header must draw on the first frame. Two clipped
+ * halves of a ring, each a circle whose top and right borders are the
+ * accent - a half-ring - turned so it ends where the progress does.
+ */
+export function HuntRing({
+  found,
+  needed,
+  size = 76,
+}: {
+  found: number;
+  needed: number;
+  size?: number;
+}) {
+  const stroke = 7;
+  const half = size / 2;
+  const share = needed > 0 ? Math.min(1, Math.max(0, found / needed)) : 0;
+  const degrees = share * 360;
+  const complete = needed > 0 && found >= needed;
+
+  /* A half-ring covering the 180 degrees that end at `end`. */
+  const arc = (end: number) => (
+    <View
+      style={{
+        position: "absolute",
+        top: 0,
+        width: size,
+        height: size,
+        borderRadius: half,
+        borderWidth: stroke,
+        borderColor: "transparent",
+        borderTopColor: colors.accent,
+        borderRightColor: colors.accent,
+        transform: [{ rotate: `${end - 135}deg` }],
+      }}
+    />
+  );
+
+  return (
+    <View
+      accessibilityRole="progressbar"
+      accessibilityLabel={`${found} of ${copiesLabel(needed)} collected`}
+      accessibilityValue={{ min: 0, max: needed, now: found }}
+      style={{ width: size, height: size }}
+    >
+      <View
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: half,
+          borderWidth: stroke,
+          borderColor: colors.elevated,
+        }}
+      />
+      {degrees > 0 ? (
+        /* The right half shows 0 to 180 degrees. */
+        <View
+          style={{
+            position: "absolute",
+            left: half,
+            top: 0,
+            width: half,
+            height: size,
+            overflow: "hidden",
+          }}
+        >
+          <View style={{ position: "absolute", left: -half, top: 0 }}>
+            {arc(Math.min(degrees, 180))}
+          </View>
+        </View>
+      ) : null}
+      {degrees > 180 ? (
+        /* The left half shows 180 to 360. */
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            top: 0,
+            width: half,
+            height: size,
+            overflow: "hidden",
+          }}
+        >
+          {arc(degrees)}
+        </View>
+      ) : null}
+      <View
+        style={{
+          position: "absolute",
+          inset: 0,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {/* No check when it is done: the founder wants found said one way,
+            and the ring says it by closing, "9/9" all in the accent. The
+            word under the count is what makes it the page's only count. */}
+        <Text style={{ fontVariant: ["tabular-nums"] }}>
+          <Text style={{ color: colors.accent, fontSize: 22, fontWeight: "800" }}>
+            {found}
+          </Text>
+          <Text
+            style={{
+              color: complete ? colors.accent : colors.textMuted,
+              fontSize: 15,
+              fontWeight: "700",
+            }}
+          >
+            {`/${needed}`}
+          </Text>
+        </Text>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 10,
+            fontWeight: "700",
+            letterSpacing: 0.6,
+            marginTop: -2,
+          }}
+        >
+          FOUND
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 /** "5 of 10 copies collected", and a slim bar saying the same. */
 export function HuntProgress({ found, needed }: { found: number; needed: number }) {
   const share = needed > 0 ? Math.min(1, found / needed) : 0;

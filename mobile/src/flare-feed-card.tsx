@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
@@ -12,7 +12,7 @@ import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
-import { colors, radius, spacing, accentGlow } from "./theme";
+import { colors, FEED_LOOK, gutter, radius, spacing, accentGlow } from "./theme";
 import { Button, Tap, type ZoomPicks } from "./ui";
 
 /**
@@ -136,15 +136,16 @@ export function FlareStatus({
   onOpenHunt?: (huntId: string) => void;
 }) {
   /*
-   * THE HUNT AS A PILL, NOT AS WORDS.
+   * THE HUNT AS A NAME, NOT A BUTTON.
    *
-   * Hunts are named like cards - "Green Zoro", "Sabo" - so "is hunting
-   * Green Zoro" in plain bold read as wanting one Green Zoro. A pill
-   * says it is the name of a thing, and that it opens. The founder
-   * asked whether "looking for" and "is hunting" would blur together
-   * under one icon. The icon stays: the crosshair IS the hunts mark
-   * (the hunts-as-binders round), and both lines mean "tap a card to
-   * offer". The pill is the difference.
+   * Hunts are named like cards - "Green Zoro", "Sabo" - so the name
+   * has to read as a thing that opens, not as the card wanted. It was
+   * an accent pill, and the founder: "still dont think that big button
+   * for straw hat crew is the best option", then "lets try option a":
+   * plain words in white, then a small grey chevron. The chevron does
+   * the pill's job - this is a place, it opens - at a fraction of the
+   * weight, and the line reads as one sentence: "is hunting Straw Hat
+   * Crew ›". The crosshair stays the mark of both lines.
    */
   const huntPill = hunt ? (
     <View
@@ -152,24 +153,22 @@ export function FlareStatus({
         flexDirection: "row",
         alignItems: "center",
         gap: 2,
-        borderWidth: 1,
-        borderColor: `${colors.accent}59`,
-        backgroundColor: colors.accentTint,
-        borderRadius: 999,
-        paddingLeft: spacing(2),
-        paddingRight: onOpenHunt ? spacing(1) : spacing(2),
-        paddingVertical: 1,
         minWidth: 0,
       }}
     >
       <Text
         numberOfLines={1}
-        style={{ color: colors.accent, fontSize: 13, fontWeight: "800", flexShrink: 1 }}
+        style={{
+          color: colors.textPrimary,
+          fontSize: 14,
+          fontWeight: "700",
+          flexShrink: 1,
+        }}
       >
         {hunt.name}
       </Text>
       {onOpenHunt ? (
-        <Ionicons name="chevron-forward" size={12} color={colors.accent} />
+        <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
       ) : null}
     </View>
   ) : null;
@@ -358,6 +357,13 @@ export function FlareFeedCard({
   const single = item.total === 1 && lead;
   const shelf = shelfFor(item.cards, post);
   const completed = item.completed ?? false;
+  /* "28m · nearby": when it went up and how far, beside the name. */
+  const meta = [
+    item.postedAt ? agoFrom(item.postedAt) : null,
+    typeof item.milesAway === "number" ? awayLabel(item.milesAway) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const [menu, setMenu] = useState(false);
   /* Whether the post's review is up over the Feed (the viewer draws
      its own while it is open). The picks themselves are the post's. */
@@ -376,19 +382,32 @@ export function FlareFeedCard({
 
   return (
     <View
-      style={{
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: radius.panel,
-        padding: spacing(3),
-        paddingBottom: spacing(2),
-        gap: spacing(2.5),
-      }}
+      style={
+        FEED_LOOK === "open"
+          ? {
+              /* No panel: the post sits on the Feed's own green, a
+                 hairline under it as the only line between posts. */
+              paddingTop: spacing(1),
+              paddingBottom: spacing(4),
+              gap: spacing(2.5),
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: colors.borderStrong,
+            }
+          : {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: radius.panel,
+              padding: spacing(3),
+              paddingBottom: spacing(2),
+              gap: spacing(2.5),
+            }
+      }
     >
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+      {/* The header: face, then the name with when and how far beside
+          it, then the status line; the three dots at the right. "Your
+          Flare" is a small label inside the name's row, never a line
+          between posts. */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}>
         {/*
          * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
@@ -455,6 +474,21 @@ export function FlareFeedCard({
                     YOUR FLARE
                   </Text>
                 ) : null}
+                {/* When and how far, on the name's line the way Instagram
+                    writes "name • 2h": it used to be a column of its own
+                    at the right, which left the status line too narrow
+                    for "is hunting" and its hunt, and pushed a hunt post
+                    to three rows. The founder: "see how this screen has
+                    three rows for maya chen ... make it look less
+                    cluttered". The name gives way before these do. */}
+                {meta ? (
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}
+                  >
+                    {`· ${meta}`}
+                  </Text>
+                ) : null}
               </View>
               <FlareStatus
                 label={statusLabel(item)}
@@ -468,42 +502,12 @@ export function FlareFeedCard({
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: the time and the distance as
-            muted facts with dots between, then the three dots when the
-            post has extras to offer. The room moved to the line above
-            the actions, where it has the width to be read whole. */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            flexShrink: 1,
-            maxWidth: "50%",
-          }}
-        >
-          {item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-              {agoFrom(item.postedAt)}
-            </Text>
-          ) : null}
-          {typeof item.milesAway === "number" ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              {item.postedAt ? (
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
-              ) : (
-                <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-              )}
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                {awayLabel(item.milesAway)}
-              </Text>
-            </View>
-          ) : null}
-          {actions.length > 0 ? (
-            <View style={{ marginLeft: spacing(1) }}>
-              <DotsButton onPress={() => setMenu(true)} label="More about this post" />
-            </View>
-          ) : null}
-        </View>
+        {/* Only the three dots stay at the right, when the post has
+            extras to offer; the time and distance moved up beside the
+            name, so the status line has the width for a hunt's pill. */}
+        {actions.length > 0 ? (
+          <DotsButton onPress={() => setMenu(true)} label="More about this post" />
+        ) : null}
       </View>
       <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
 
@@ -532,7 +536,7 @@ export function FlareFeedCard({
           picks={picks}
           onPicks={onPicks}
           onSeeAll={onViewAll}
-          bleed={spacing(3)}
+          bleed={FEED_LOOK === "open" ? gutter : spacing(3)}
         />
       )}
 

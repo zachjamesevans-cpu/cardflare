@@ -37,7 +37,7 @@ export function FeedTabFace({
       className={cn(
         "flex w-full items-center justify-center gap-1.5 rounded-[14px] border px-2 py-2.5 text-[13px] font-bold transition-colors",
         lit
-          ? "border-accent bg-accent/[0.08] text-accent shadow-[0_0_12px_rgba(198,238,79,0.25)]"
+          ? "border-accent bg-accent/[0.08] text-accent shadow-[0_0_12px_rgba(206,252,132,0.25)]"
           : "border-border bg-surface text-text-secondary hover:border-border-strong hover:text-text-primary",
       )}
     >

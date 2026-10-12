@@ -5,6 +5,9 @@ import { cardFacts } from "@/lib/feed/repository";
 import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repository";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { splitFound } from "./found-split";
+import { avatarWearFor } from "./equips";
+import { avatarPathFor, avatarSrc } from "./profile-image";
+import { wornFrame } from "@/lib/players/worn-frame";
 import { tierAllows } from "@/lib/tiers";
 
 /**
@@ -85,6 +88,13 @@ export interface Hunt {
 export interface HuntView extends Hunt {
   playerId: string;
   ownerName: string;
+  /**
+   * The owner's face, worn ring and frame, for the hunt page's header:
+   * "(●) Maya Chen's hunt". Nested as `avatarUrl` so the app API's
+   * absoluteAvatars makes the path whole. Optional so an older reader
+   * ignores it.
+   */
+  owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
 }
 
 /**
@@ -303,15 +313,25 @@ export async function huntById(
   if (error || !data) return null;
   if (data.visibility === "private" && data.player_id !== viewerId) return null;
 
-  const [[hunt], { data: owner }] = await Promise.all([
+  const [[hunt], { data: owner }, wear] = await Promise.all([
     assemble([data]),
-    admin.from("players").select("display_name").eq("id", data.player_id).maybeSingle(),
+    admin
+      .from("players")
+      .select("display_name, avatar_url, avatar_animated, tier, equipped_avatar_frame")
+      .eq("id", data.player_id)
+      .maybeSingle(),
+    avatarWearFor([data.player_id]),
   ]);
   if (!hunt) return null;
   return {
     ...hunt,
     playerId: data.player_id,
     ownerName: owner?.display_name ?? "A player",
+    owner: {
+      avatarUrl: owner ? avatarSrc(avatarPathFor(owner)) : null,
+      frame: owner ? wornFrame(owner) : null,
+      ring: wear.get(data.player_id)?.ring ?? null,
+    },
   };
 }
 

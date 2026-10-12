@@ -40,11 +40,11 @@ export interface GiftFacts {
  * the width follow from the ratio, never both by hand.
  */
 const WORDMARK = {
-  path: "/brand/cardflare-wordmark-cut.png",
-  width: 1522,
-  height: 256,
+  path: "/brand/cardflare-wordmark-soft.png",
+  width: 1732,
+  height: 269,
 };
-const WORDMARK_HEIGHT = 30;
+const WORDMARK_HEIGHT = 24;
 
 export function emailWordmark(origin: string): string {
   const width = Math.round((WORDMARK.width / WORDMARK.height) * WORDMARK_HEIGHT);
