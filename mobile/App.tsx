@@ -53,6 +53,7 @@ import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
+import { keepNavigation, takeNavigation } from "./src/backdrop";
 import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
@@ -283,9 +284,13 @@ const theme: Theme = {
   colors: {
     ...DarkTheme.colors,
     background: colors.canvas,
-    card: colors.surface,
+    get card() {
+      return colors.surface;
+    },
     text: colors.textPrimary,
-    border: colors.border,
+    get border() {
+      return colors.border;
+    },
     primary: colors.accent,
   },
 };
@@ -820,6 +825,9 @@ function AppGates() {
    * if storage is slow.
    */
   const [gate, setGate] = useState<"checking" | "welcome" | "open">("checking");
+  /* Where the player was before a backdrop change redrew the app
+     (src/backdrop.ts), taken once so they land back on Settings. */
+  const [restored] = useState(takeNavigation);
 
   useEffect(() => {
     let live = true;
@@ -938,6 +946,8 @@ function AppGates() {
         ref={navigationRef}
         linking={linking}
         theme={theme}
+        initialState={restored as never}
+        onStateChange={(state) => keepNavigation(state)}
         onReady={() => {
           void Notifications.getLastNotificationResponseAsync()
             .then(openNotificationLink)

@@ -166,9 +166,10 @@ describe("the switches", () => {
   it("are the four groups, drawn the way the Rooms switch is", () => {
     expect(settings).toContain("PUSH_GROUPS.map(({ key, label, line })");
     expect(settings).toContain('accessibilityLabel={`${label}, ${on ? "on" : "off"}`}');
-    /* The same glyph pair as the auto-post switch. */
+    /* The same glyph pair as the auto-post switch and the Pure black
+       one (backdrop.test.ts). */
     expect(settings.match(/name=\{\w+ \? "toggle" : "toggle-outline"\}/g)?.length).toBe(
-      2,
+      3,
     );
   });
 

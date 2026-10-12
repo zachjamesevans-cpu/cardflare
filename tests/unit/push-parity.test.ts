@@ -135,7 +135,7 @@ describe("push copy, both platforms", () => {
 });
 
 describe("the website's settings page", () => {
-  it("has a notifications card right after the rooms card, in both orders", () => {
+  it("has a notifications card after the rooms and look cards, in both orders", () => {
     expect(webSettings).toMatch(/<Card key="notifications"/);
     expect(webSettings).toContain("{PUSH_HEADING}");
     expect(webSettings).toContain("{PUSH_LINE}");
@@ -145,7 +145,8 @@ describe("the website's settings page", () => {
     expect(webSettings).toContain(
       "<PushPrefToggles initial={await pushPrefsFor(playerId)} />",
     );
-    const orders = webSettings.match(/roomsCard,\s*notificationsCard,/g) ?? [];
+    const orders =
+      webSettings.match(/roomsCard,\s*lookCard,\s*notificationsCard,/g) ?? [];
     expect(orders).toHaveLength(2);
   });
 

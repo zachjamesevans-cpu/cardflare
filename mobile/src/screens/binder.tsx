@@ -207,8 +207,12 @@ const bannerStyle = {
   padding: spacing(3),
   borderRadius: radius.card,
   borderWidth: 1,
-  borderColor: colors.border,
-  backgroundColor: colors.surface,
+  get borderColor() {
+    return colors.border;
+  },
+  get backgroundColor() {
+    return colors.surface;
+  },
 } as const;
 
 /** Under the Up for trade switch, the create sheet's line word for word. */

@@ -42,6 +42,13 @@ import {
   Tap,
   Title,
 } from "../ui";
+import {
+  LOOK_HEADING,
+  PURE_BLACK_LABEL,
+  PURE_BLACK_LINE,
+  backdrop,
+  setBackdrop,
+} from "../backdrop";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { restorePro } from "../pro";
 import { APPLE_SUBSCRIPTIONS_URL, CLAIMED_MESSAGE } from "../pro-copy";
@@ -376,6 +383,8 @@ export function SettingsScreen() {
         {autoPostError ? <ErrorLine message={autoPostError} /> : null}
       </Card>
 
+      <LookCard />
+
       <PushPrefSwitches initial={prefs} />
 
       <BlockedPlayers initial={blocked} />
@@ -440,6 +449,52 @@ export function SettingsScreen() {
         <DeleteAccount handle={deleteFallback.handle} />
       ) : null}
     </ScrollView>
+  );
+}
+
+/**
+ * LOOK: the backdrop switch (src/backdrop.ts). The website's settings
+ * draw the same row in the same words (src/components/players/
+ * backdrop-toggle.tsx). Kept on the phone, not the account: it is how
+ * this screen looks, and a tap redraws the app where it is.
+ */
+function LookCard() {
+  const [on, setOn] = useState(backdrop() === "black");
+  return (
+    <Card>
+      <Title>{LOOK_HEADING}</Title>
+      <Tap
+        accessibilityLabel={`${PURE_BLACK_LABEL}, ${on ? "on" : "off"}`}
+        onPress={() => {
+          const next = !on;
+          setOn(next);
+          void setBackdrop(next ? "black" : "green");
+        }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(3),
+          borderRadius: radius.control,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          padding: spacing(3),
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+            {PURE_BLACK_LABEL}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>{PURE_BLACK_LINE}</Text>
+        </View>
+        <Ionicons
+          name={on ? "toggle" : "toggle-outline"}
+          size={32}
+          color={on ? colors.accent : colors.textMuted}
+        />
+      </Tap>
+    </Card>
   );
 }
 

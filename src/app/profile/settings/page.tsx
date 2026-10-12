@@ -10,6 +10,7 @@ import {
   Library,
   Mail,
   MapPin,
+  Moon,
   UserPen,
 } from "lucide-react";
 
@@ -20,6 +21,8 @@ import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FeedViewPicker } from "@/components/feed/feed-view-picker";
 import { AutoPostToggle } from "@/components/players/auto-post-toggle";
+import { BackdropToggle } from "@/components/players/backdrop-toggle";
+import { LOOK_HEADING } from "@/lib/players/backdrop";
 import { PushPrefToggles } from "@/components/players/push-pref-toggles";
 import { PUSH_HEADING, PUSH_LINE } from "@/lib/notifications/push-prefs";
 import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
@@ -180,6 +183,18 @@ export default async function ProfileSettingsPage() {
     </Card>
   );
 
+  /* Pure black backgrounds: this browser's own, as the app's is the
+     phone's (lib/players/backdrop.ts). */
+  const lookCard = (
+    <Card key="look" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Moon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <p className="font-semibold text-text-primary">{LOOK_HEADING}</p>
+      </div>
+      <BackdropToggle />
+    </Card>
+  );
+
   /*
    * Which notices reach the phone. Four groups, each a switch, saved
    * to the account so the app draws the same four. Nothing here
@@ -337,6 +352,7 @@ export default async function ProfileSettingsPage() {
     ? [
         feedViewCard,
         roomsCard,
+        lookCard,
         notificationsCard,
         deckListCard,
         collectionCard,
@@ -353,6 +369,7 @@ export default async function ProfileSettingsPage() {
         locationCard,
         feedViewCard,
         roomsCard,
+        lookCard,
         notificationsCard,
         deckListCard,
         collectionCard,

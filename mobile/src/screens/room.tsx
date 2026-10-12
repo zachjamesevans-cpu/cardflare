@@ -2610,12 +2610,16 @@ function FlareRow({
 const styles = StyleSheet.create({
   flare: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    get borderTopColor() {
+      return colors.border;
+    },
     paddingTop: spacing(3),
     gap: spacing(2),
   },
   offer: {
-    backgroundColor: colors.elevated,
+    get backgroundColor() {
+      return colors.elevated;
+    },
     borderRadius: radius.control,
     padding: spacing(3),
     gap: spacing(2),
@@ -2651,7 +2655,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.control / 2,
     borderWidth: 1,
     borderStyle: "dashed",
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     alignItems: "center",
     justifyContent: "center",
     padding: spacing(1),
@@ -2660,7 +2666,9 @@ const styles = StyleSheet.create({
      above it. */
   foldRow: {
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    get borderTopColor() {
+      return colors.border;
+    },
     paddingTop: spacing(3),
   },
   foldText: {
@@ -2704,7 +2712,9 @@ const styles = StyleSheet.create({
     height: 78,
     borderRadius: radius.control / 2,
     borderWidth: 1,
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     backgroundColor: colors.canvas,
     opacity: 0.4,
   },
@@ -2715,7 +2725,9 @@ const styles = StyleSheet.create({
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: `${colors.surface}E6`,
+    get backgroundColor() {
+      return `${colors.surface}E6`;
+    },
     alignItems: "center",
     justifyContent: "center",
   },
@@ -2745,7 +2757,9 @@ const styles = StyleSheet.create({
     minHeight: 44,
     minWidth: 44,
     borderWidth: 1,
-    borderColor: colors.border,
+    get borderColor() {
+      return colors.border;
+    },
     borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
