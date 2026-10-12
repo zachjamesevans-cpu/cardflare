@@ -1,16 +1,17 @@
 import "server-only";
 
-import { milesApart, pointForPostalCode, zipsWithin, type Point } from "@/lib/geo/zip";
+import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { heldByCard, matchFor, type MatchKind } from "@/lib/matching/schema";
 import { notifyNearbyMatch } from "@/lib/notifications/notify";
 import { sessionForPlayer } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
+import { blockedSet } from "@/lib/players/safety";
 import { DEFAULT_LOCAL_RADIUS, isLocalRadius } from "@/lib/local/shared";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 
-import { milesLabel } from "./shared";
+import { milesLabel, roundedMiles } from "./shared";
 import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
@@ -70,6 +71,8 @@ export interface NearbyMatch {
     /** How well the holder's marked cards answer the want's printing. */
     match: MatchKind;
   };
+  /** Rounded the way the label is (roundedMiles), never the exact
+      centroid-to-centroid figure, which would pin the wanter's ZIP. */
   miles: number;
   milesLabel: string;
   /** The thread already open between these two about this want, if any. */
@@ -193,9 +196,16 @@ export async function nearbyMatchesForHolder(
   if (rows.length === 0) return [];
 
   /* Only wanters who opted in, and only within the holder's radius,
-     measured to the ZIP they typed. A wanter with no ZIP is nowhere. */
-  const zips = new Set(zipsWithin(holder.point, holder.radius));
-  const wanterIds = [...new Set(rows.map((row) => row.player_id))];
+     measured to their profile ZIP (typed, or snapped from the phone's
+     location - see savePostalCode). A wanter with no ZIP is nowhere.
+     Measured directly rather than against zipsWithin's list, which
+     knows only the Census table: a PO-box ZIP from the extras table is
+     a real place too. Nobody blocked, in either direction. */
+  const blocked = await blockedSet(holderId);
+  const wanterIds = [...new Set(rows.map((row) => row.player_id))].filter(
+    (id) => !blocked.has(id),
+  );
+  if (wanterIds.length === 0) return [];
 
   const { data: wanters } = await admin
     .from("players")
@@ -206,10 +216,11 @@ export async function nearbyMatchesForHolder(
     .eq("nearby_matching", true);
 
   const near = (wanters ?? []).flatMap((row) => {
-    if (!row.postal_code || !zips.has(row.postal_code)) return [];
     const point = pointForPostalCode(row.postal_code);
     if (!point) return [];
-    return [{ ...row, miles: milesApart(holder.point, point) }];
+    const miles = milesApart(holder.point, point);
+    if (miles > holder.radius) return [];
+    return [{ ...row, miles }];
   });
   if (near.length === 0) return [];
 
@@ -292,7 +303,7 @@ export async function nearbyMatchesForHolder(
           null,
         match: kind,
       },
-      miles: wanter.miles,
+      miles: roundedMiles(wanter.miles),
       milesLabel: milesLabel(wanter.miles),
       threadId: threadByAsk.get(`${want.ask.kind}:${want.ask.id}`) ?? null,
     });
@@ -336,6 +347,40 @@ export async function afterHolderChanged(
     await tellHolder(holderId, onlyCardId);
   } catch (error) {
     console.error("Could not look for nearby matches", error);
+  }
+}
+
+/**
+ * A player's ZIP was set or changed: look both ways from the new place.
+ *
+ * As a holder, their marked cards against the wants near them now; as
+ * a wanter, each thing they are hunting against the holders near them
+ * now. Without this, the usual order - switch matching on, then type
+ * the ZIP - scanned from nowhere and never again, and everything saved
+ * before the ZIP never rang anybody. The dedupe keys make a repeat free.
+ */
+export async function afterLocationChanged(playerId: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await afterHolderChanged(playerId);
+  try {
+    const admin = getSupabaseAdmin();
+    const [{ data: wants }, { data: area }] = await Promise.all([
+      admin.from("player_wants").select("card_id").eq("player_id", playerId).limit(200),
+      admin
+        .from("flares")
+        .select("card_id")
+        .eq("player_id", playerId)
+        .is("event_id", null)
+        .eq("status", "open")
+        .eq("intent", "want")
+        .limit(200),
+    ]);
+    const cardIds = new Set(
+      [...(wants ?? []), ...(area ?? [])].map((row) => row.card_id),
+    );
+    for (const cardId of cardIds) await afterWantSaved(playerId, cardId);
+  } catch (error) {
+    console.error("Could not look for holders from a new ZIP", error);
   }
 }
 

@@ -16,6 +16,16 @@ export function milesLabel(miles: number): string {
   return `About ${Math.round(miles)} mi away`;
 }
 
+/**
+ * The same distance as a number, no finer than the label: 1 for
+ * anything under two miles, whole miles past it. This is what leaves
+ * the server, so a client can sort by it but cannot work back from it
+ * to the other person's ZIP.
+ */
+export function roundedMiles(miles: number): number {
+  return miles < 2 ? 1 : Math.round(miles);
+}
+
 /** The first message "I have this" sends, with or without a place to suggest. */
 export function haveThisMessage(storeName: string | null): string {
   return storeName

@@ -33,9 +33,7 @@ describe("every binder is one of the player's own", () => {
     expect(read("supabase/migrations/20261114090000_binder_public.sql")).toContain(
       "set is_public = for_trade",
     );
-    expect(lib).toContain(
-      "is_public: forTrade || input.isPublic === true,",
-    );
+    expect(lib).toContain("is_public: forTrade || input.isPublic === true,");
     /* New binders are private unless the switch was on. */
     expect(lib).toContain("const forTrade = input.forTrade === true;");
   });
@@ -66,7 +64,9 @@ describe("every binder is one of the player's own", () => {
     expect(lib).toContain(
       "if (!yours && !shownToOthers(row) && !sharedForNight) return null;",
     );
-    expect(lib).toContain("const visible = rows.filter((row) => yours || shownToOthers(row));");
+    expect(lib).toContain(
+      "const visible = rows.filter((row) => yours || shownToOthers(row));",
+    );
     expect(lib).toContain('.order("position")');
     expect(lib).not.toContain("[trade, ...customs]");
   });
@@ -114,7 +114,11 @@ describe("the Have list is derived from the binders up for trade", () => {
     );
     expect(sync).toContain('.eq("for_trade", true)');
     expect(sync).toContain(".update({ local_trade: true, quantity })");
-    expect(sync).toContain("void afterHolderChanged(playerId, cardId);");
+    /* After the response, so the ping is not frozen with the function
+       (nearby-real-users.test.ts). */
+    expect(sync).toContain(
+      "afterResponse(() => afterHolderChanged(playerId, cardId));",
+    );
     expect(sync).toContain("await removeFromBinder(entry.id, session.id);");
     /* Never an embed: the hand-kept types declare no relationships. */
     expect(sync).not.toContain("!inner");
@@ -181,7 +185,13 @@ describe("a profile's binder list, read as summaries", () => {
     const summaries = summarizeBinders(
       [
         { id: "b1", name: "Trade", for_trade: true, is_public: true, cover: "lime" },
-        { id: "b2", name: "Playables", for_trade: true, is_public: true, cover: "not-a-cover" },
+        {
+          id: "b2",
+          name: "Playables",
+          for_trade: true,
+          is_public: true,
+          cover: "not-a-cover",
+        },
       ],
       [
         { binder_id: "b1", card_id: "c1" },

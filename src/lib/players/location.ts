@@ -1,7 +1,14 @@
 import "server-only";
 
+import { afterResponse } from "@/lib/after-response";
+import {
+  nearestPostalCode,
+  normalisePostalCode,
+  pointForPostalCode,
+  type Point,
+} from "@/lib/geo/zip";
+import { afterLocationChanged } from "@/lib/nearby/matching";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { normalisePostalCode, pointForPostalCode, type Point } from "@/lib/geo/zip";
 
 /**
  * Where a player is, and how cardflare came to know.
@@ -58,7 +65,7 @@ export async function originForPlayer(
   const point = pointForPostalCode(postal);
 
   /* A ZIP that resolves to nothing is the same as no ZIP: five digits
-     that are not a real ZCTA (a PO-box-only prefix, a typo) must not
+     that are not a real ZIP (a typo; PO-box ZIPs now resolve) must not
      anchor somebody's feed anywhere. */
   return point ? { point, source: "postal" } : NO_ORIGIN;
 }
@@ -113,5 +120,35 @@ export async function savePostalCode(
     return { ok: false, postalCode: null, error: "Could not save that. Try again?" };
   }
 
+  /* A new place means new neighbours: look for nearby matches from it,
+     both ways, once the response is out (nearby/matching.ts). */
+  if (postalCode) afterResponse(() => afterLocationChanged(playerId));
+
   return { ok: true, postalCode };
+}
+
+/**
+ * Save where the phone is, as a ZIP.
+ *
+ * "Use my location" in the app. The coordinate is snapped to the
+ * nearest ZIP here and only those five digits are written - the same
+ * thing the player could have typed, never the position itself, which
+ * is the standing rule. Before this, granting location satisfied the
+ * Feed for one request and left nearby matching, which needs a stored
+ * anchor because the other person is not online, with nothing: the app
+ * asked again, forever.
+ */
+export async function savePostalCodeFromPoint(
+  playerId: string,
+  point: Point,
+): Promise<{ ok: boolean; postalCode: string | null; error?: string }> {
+  const postalCode = nearestPostalCode(point);
+  if (!postalCode) {
+    return {
+      ok: false,
+      postalCode: null,
+      error: "That location is outside the US ZIP codes we know. Enter a ZIP instead?",
+    };
+  }
+  return savePostalCode(playerId, postalCode);
 }

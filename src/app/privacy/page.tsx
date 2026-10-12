@@ -30,7 +30,14 @@ export default function PrivacyPage() {
           <li>
             What you add to your profile: a picture, the games you play, your wants and
             decks, and optionally a five-digit ZIP. A device location, when you grant
-            one, rides a single request and is never stored.
+            one, rides a single request and is never stored. If you use your location to
+            turn on nearby matching, we keep only the ZIP code it falls in, the same
+            five digits you could have typed. ZIP locations come from the US Census
+            Bureau and from{" "}
+            <a href="https://www.geonames.org" className="underline">
+              GeoNames
+            </a>{" "}
+            (CC BY 4.0).
           </li>
           <li>
             Messages you send other players about a card, so both sides of the

@@ -2,6 +2,7 @@ import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
+import { afterResponse } from "@/lib/after-response";
 import { afterHolderChanged } from "./matching";
 
 /**
@@ -51,7 +52,7 @@ export async function setNearbyMatching(
 
   /* Switching on is the moment to look: everything already marked on
      the list may have a wanter waiting. */
-  if (on) void afterHolderChanged(playerId);
+  if (on) afterResponse(() => afterHolderChanged(playerId));
 
   return true;
 }

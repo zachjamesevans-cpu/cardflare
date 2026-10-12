@@ -1,4 +1,5 @@
 import centroids from "@/../data/geo/zcta-centroids.json";
+import extras from "@/../data/geo/zip-extras.json";
 
 /**
  * Where a ZIP code is, roughly.
@@ -26,17 +27,39 @@ import centroids from "@/../data/geo/zcta-centroids.json";
    re-checked at the point of use rather than asserted here. */
 const CENTROIDS = centroids as unknown as Record<string, number[]>;
 
+/*
+ * The real ZIPs the Census table has no area for: PO-box-only and
+ * single-organisation ZIPs, and ones newer than its 2023 edition, about
+ * eight thousand (data/geo/README.md). Somebody whose mailing ZIP is
+ * one of them was told "We don't know that ZIP code" and could not use
+ * anything near them. Each is a point, not an area, so it answers
+ * "where is this ZIP" and is searched by zipsWithin, but a phone's
+ * position is never snapped to one (nearestPostalCode): a coordinate
+ * belongs to the area it is in, not to the post office down the road.
+ */
+const EXTRAS = extras as unknown as Record<string, number[]>;
+
+/** Every ZIP with a point: the Census areas, then the extras. */
+const ALL_ZIPS: [string, number[]][] = [
+  ...Object.entries(CENTROIDS),
+  ...Object.entries(EXTRAS),
+];
+
 export interface Point {
   latitude: number;
   longitude: number;
 }
 
-/** The five digits, or null. Accepts "97477-1234" and "  97477 ". */
+/**
+ * The five digits, or null. Accepts "97477-1234", "974771234" and
+ * "  97477 "; refuses "974770" and "97477abc", which used to be read
+ * as their first five characters and saved as somebody's ZIP.
+ */
 export function normalisePostalCode(raw: string | null | undefined): string | null {
   if (!raw) return null;
 
-  const digits = raw.trim().slice(0, 5);
-  return /^\d{5}$/.test(digits) ? digits : null;
+  const match = /^(\d{5})(?:-?\d{4})?$/.exec(raw.trim());
+  return match ? match[1] : null;
 }
 
 /** The centroid of a ZIP, or null if it is not a real one. */
@@ -44,7 +67,7 @@ export function pointForPostalCode(raw: string | null | undefined): Point | null
   const zip = normalisePostalCode(raw);
   if (!zip) return null;
 
-  const found = CENTROIDS[zip];
+  const found = CENTROIDS[zip] ?? EXTRAS[zip];
   if (found?.length !== 2) return null;
 
   return { latitude: found[0], longitude: found[1] };
@@ -93,7 +116,7 @@ export function zipsWithin(origin: Point, miles: number): string[] {
 
   const out: string[] = [];
 
-  for (const [zip, pair] of Object.entries(CENTROIDS)) {
+  for (const [zip, pair] of ALL_ZIPS) {
     if (pair?.length !== 2) continue;
 
     const [latitude, longitude] = pair as [number, number];
