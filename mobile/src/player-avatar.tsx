@@ -110,7 +110,7 @@ export const RING_COLOR: Record<string, string> = {
  */
 export const AURA_COLOR: Record<string, string> = {
   "aura-hearts": "#ff8fb3",
-  "aura-sakura": "#f7b6cf",
+  "aura-sakura": "#f59ac0",
   "aura-sparks": "#ffb45e",
   "aura-stars": "#eef4ff",
   "aura-snow": "#dcecff",
