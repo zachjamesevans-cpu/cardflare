@@ -6,6 +6,8 @@ import type { RoomTimerWire } from "./room-timer-wire";
 
 import { API_BASE } from "./config";
 import type { ArtFile } from "./cosmetic-film";
+import { demoReady, demoOn } from "./demo/demo-mode";
+import { demoAnswer, demoSaw } from "./demo/demo-server";
 import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
@@ -539,6 +541,19 @@ async function call<T>(
      probe below has seen a body arrive on this network. */
   asBody = false,
 ): Promise<T> {
+  /*
+   * Demo mode, in a development build only: the phone answers itself
+   * and no write ever leaves it. A read it has not scripted still goes
+   * out below, and what comes back is noted for the writes that need
+   * it (src/demo/demo-mode.ts).
+   */
+  await demoReady();
+  const demo = demoOn();
+  if (demo) {
+    const answer = demoAnswer(method, path, body);
+    if (answer) return answer.value as T;
+  }
+
   const headers: Record<string, string> = {};
 
   const access = await freshAccessToken();
@@ -621,11 +636,13 @@ async function call<T>(
   /* A 200 that is not JSON is a captive portal or a CDN error page,
      not our server. Named, so the screen says "bad-json" rather than
      "JSON Parse error: Unexpected character: <". */
+  let parsed: T;
   try {
-    return (await response.json()) as T;
+    parsed = (await response.json()) as T;
   } catch {
     throw new ApiError(response.status, "bad-json");
   }
+  return demo ? (demoSaw(method, path, parsed) as T) : parsed;
 }
 
 /* ------------------------------------------------------------------ */
@@ -2298,7 +2315,57 @@ export interface PackSeries {
   slots: number;
   odds: { rarity: string; slugs: string[]; percent: number }[];
   oddsDetail?: { rarity: string; items: { slug: string; percent: number }[] }[];
+  /** A console-built set's cosmetics by name. Absent from an older server. */
+  names?: Record<string, string>;
 }
+
+/** One milestone: what it is, how far along, and what it pays once. */
+export interface MilestoneEntry {
+  key: string;
+  title: string;
+  goal: number;
+  embers: number;
+  progress: number;
+  done: boolean;
+}
+
+/** The shop's milestones and the pack each badge tier hands over. */
+export interface MilestoneBoard {
+  milestones: MilestoneEntry[];
+  tiers: { tier: string; earned: number; reached: boolean }[];
+  earned: number;
+}
+
+/** Pays anything newly reached, then lists where the player stands. */
+export const getMilestones = () => call<MilestoneBoard>("GET", "/api/v1/milestones");
+
+/** One cosmetic on today's shelf in the daily shop. */
+export interface DailyOffer {
+  slug: string;
+  kind: CustomizeKind;
+  name: string;
+  description: string;
+  costEmbers: number;
+  owned: boolean;
+  requiresEarned: number | null;
+}
+
+export interface DailyShelf {
+  offers: DailyOffer[];
+  /** When the shelf changes: the next UTC midnight. */
+  resetsAt: string;
+}
+
+/** Today's shelf: a few cosmetics, changing at midnight UTC. */
+export const getDailyShop = () => call<DailyShelf>("GET", "/api/v1/shop/daily");
+
+/** Buys from today's shelf and wears it. Refusals are ApiError codes. */
+export const buyDailyOffer = (slug: string) =>
+  call<{ ok: true; outcome: "bought" | "owned"; shelf: DailyShelf }>(
+    "POST",
+    "/api/v1/shop/daily",
+    { slug },
+  );
 
 export interface SealedPack {
   id: string;
@@ -2347,8 +2414,13 @@ export const peekPlayer = (playerId: string) =>
  * carries `forTrade`: on, it is public to signed-in players and its
  * cards are available to trade (they feed nearby matching and the
  * room); off, it is private, only the owner opens it, and its cards
- * take no part in anything. `isPublic` is the same fact, read back.
- * A player can have several up for trade at once.
+ * take no part in anything. A player can have several up for trade.
+ *
+ * `isPublic` is its own switch now: shown on the profile to anyone,
+ * without the cards being up for trade. The founder: "sometimes you
+ * don't necessarily want something up for trade, but also want it
+ * visible on your profile". For trade is always public, and private is
+ * never for trade.
  */
 
 export type { BinderCoverId };
@@ -2418,6 +2490,8 @@ export type BinderSettingsPatch = {
   name?: string;
   cover?: BinderCoverId;
   forTrade?: boolean;
+  /** Shown on your profile. For trade is always public; private is never for trade. */
+  isPublic?: boolean;
 };
 
 /*
@@ -2476,6 +2550,7 @@ export const createBinder = (input: {
   name: string;
   cover?: BinderCoverId;
   forTrade?: boolean;
+  isPublic?: boolean;
 }) => call<{ binder: Binder }>("POST", "/api/v1/binders", input);
 
 /** A binder, gone with its cards. Any of them, the last one too. */
@@ -3122,6 +3197,8 @@ export interface HuntView extends Hunt {
   playerId: string;
   ownerName: string;
   yours: boolean;
+  /** The owner's face and worn ring, for the header. Absent from an older server. */
+  owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
 }
 
 export const getHunts = () =>
@@ -4089,6 +4166,14 @@ export const getPostalCode = () =>
 
 export const savePostalCode = (postalCode: string) =>
   call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", { postalCode });
+
+/** "Use my location" for nearby matching: the server keeps the nearest
+    ZIP and drops the position (savePostalCodeFromPoint). */
+export const savePostalCodeFromCoords = (latitude: number, longitude: number) =>
+  call<{ postalCode: string | null }>("PUT", "/api/v1/me/location", {
+    latitude,
+    longitude,
+  });
 
 /**
  * A store as a player sees it — claimed or not.

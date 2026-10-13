@@ -1,6 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type RouteProp,
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
@@ -15,6 +20,7 @@ import {
   deleteAccount,
   friendlyError,
   getMe,
+  getNearbySettings,
   getProfile,
   getPostalCode,
   getPushPrefs,
@@ -29,6 +35,15 @@ import {
   unblockPlayer,
 } from "../api";
 import { GiftBar } from "../gift-bar";
+import { NearbyCard } from "../nearby";
+import {
+  SETTINGS_SECTIONS,
+  displaySummary,
+  notificationsSummary,
+  privacySummary,
+  sectionTitle,
+  type SettingsSection,
+} from "../settings-sections";
 import { formatHandle } from "../handle";
 import {
   AsyncButton,
@@ -42,6 +57,13 @@ import {
   Tap,
   Title,
 } from "../ui";
+import {
+  LOOK_HEADING,
+  PURE_BLACK_LABEL,
+  PURE_BLACK_LINE,
+  backdrop,
+  setBackdrop,
+} from "../backdrop";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { restorePro } from "../pro";
 import { APPLE_SUBSCRIPTIONS_URL, CLAIMED_MESSAGE } from "../pro-copy";
@@ -87,6 +109,14 @@ interface SettingsData {
 
 export function SettingsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const route = useRoute<RouteProp<StackParams, "Settings">>();
+  /* No section is the menu; a section is one category's page. */
+  const section = route.params?.section ?? null;
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: section ? sectionTitle(section) : "Settings" });
+  }, [navigation, section]);
+  /* Nearby matching, for the Privacy & safety row's summary. */
+  const [nearbyOn, setNearbyOn] = useState<boolean | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   /* Set when /me failed with nothing cached but the phone is signed
      in: what Delete account knows of the handle (null for nothing). */
@@ -170,13 +200,15 @@ export function SettingsScreen() {
     useCallback(() => {
       let live = true;
       void (async () => {
-        const [account, zip, push, blocks] = await Promise.allSettled([
+        const [account, zip, push, blocks, nearby] = await Promise.allSettled([
           getMe(),
           getPostalCode(),
           getPushPrefs(),
           listBlockedPlayers(),
+          getNearbySettings(),
         ]);
         if (!live) return;
+        if (nearby.status === "fulfilled") setNearbyOn(nearby.value.enabled);
         if (account.status !== "fulfilled") {
           /* Draw what can be drawn rather than spin forever. */
           setReady(true);
@@ -219,7 +251,170 @@ export function SettingsScreen() {
     row.role === "owner" && row.gift ? [{ ...row, gift: row.gift }] : [],
   );
 
-  return (
+  /*
+   * The cards, each once, placed by section below. Built here so the
+   * menu and every section page read the same state and the same one
+   * batch of data.
+   */
+  const storesBlock =
+    ownedGifts.length > 0 ? (
+      <View style={{ gap: spacing(2) }}>
+        {ownedGifts.map((row) => (
+          <GiftBar key={row.storeId} bar={row.gift} storeName={row.name} />
+        ))}
+      </View>
+    ) : (
+      <Muted>You do not run a store on cardflare.</Muted>
+    );
+
+  const collectionBlock = (
+    <Card>
+      <Title>Your collection</Title>
+      <Body>
+        {me?.collection
+          ? `${me.collection.cardsMatched.toLocaleString()} cards imported. Rooms quietly flag the Flares you could answer; nobody else ever sees it.`
+          : "Import your Collectr export and rooms quietly flag the Flares you could answer. Nobody else ever sees it."}
+      </Body>
+      {/* The Collectr import is a file upload, which the website does
+          well and a phone does badly. */}
+      <Tap
+        accessibilityLabel="Update your collection on cardflare.gg"
+        onPress={() => void Linking.openURL(`${API_BASE}/profile/settings/collection`)}
+      >
+        <Text style={{ color: colors.accent, fontWeight: "600" }}>
+          {me?.collection ? "Update it on cardflare.gg →" : "Import it on cardflare.gg →"}
+        </Text>
+      </Tap>
+    </Card>
+  );
+
+  /*
+   * HOW THE FEED IS DRAWN. The founder: "lets develop a few 'views'
+   * for the feed, that can be changed under settings in the
+   * profile." On the account rather than the device, so picking
+   * Compact on a phone holds on the website too.
+   */
+  const feedViewBlock = (
+    <Card>
+      <Title>Feed view</Title>
+      <Body>Pick how a Flare is drawn in your Feed.</Body>
+      <View style={{ gap: spacing(2) }}>
+        {FEED_VIEWS.map((option) => {
+          const on = view === option;
+          return (
+            <Tap
+              key={option}
+              accessibilityLabel={`${FEED_VIEW_TITLES[option]}${on ? ", selected" : ""}`}
+              onPress={() => {
+                if (on || savingView) return;
+                const previous = view;
+                setView(option);
+                setViewError(null);
+                setSavingView(true);
+                /* Optimistic: the Feed redraws at once and the write
+                   follows. A failure puts the choice back rather than
+                   leaving a setting that did not save. */
+                setFeedView(option)
+                  .catch(() => {
+                    setView(previous);
+                    setViewError("Could not save that. Try again in a moment.");
+                  })
+                  .finally(() => setSavingView(false));
+              }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: spacing(2.5),
+                borderRadius: radius.control,
+                borderWidth: 1,
+                borderColor: on ? colors.accent : colors.border,
+                backgroundColor: on ? colors.accentTint : colors.elevated,
+                padding: spacing(3),
+              }}
+            >
+              <Ionicons
+                name={on ? "radio-button-on" : "radio-button-off"}
+                size={18}
+                color={on ? colors.accent : colors.textMuted}
+              />
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text
+                  style={{
+                    color: on ? colors.accent : colors.textPrimary,
+                    fontWeight: "700",
+                  }}
+                >
+                  {FEED_VIEW_TITLES[option]}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                  {FEED_VIEW_BLURBS[option]}
+                </Text>
+              </View>
+            </Tap>
+          );
+        })}
+      </View>
+      {viewError ? <ErrorLine message={viewError} /> : null}
+    </Card>
+  );
+
+  /*
+   * ROOMS. The founder: "I wonder if it's best to just join a room
+   * and all the flares immediately get posted. That's kinda the
+   * whole point of cardflare." So joining does, and this is the one
+   * way to say no: for the person who wants to walk in and browse
+   * first. The website's settings draw the same switch.
+   */
+  const roomsBlock = (
+    <Card>
+      <Title>Rooms</Title>
+      <Body>
+        When you join a room, your open Flares go up on its board. Turn this off to walk
+        in and browse first.
+      </Body>
+      <Tap
+        accessibilityLabel={`Post my Flares when I join a room, ${autoPost ? "on" : "off"}`}
+        onPress={() => {
+          const next = !autoPost;
+          setAutoPost(next);
+          setAutoPostError(null);
+          saveAutoPost(next).catch(() => {
+            setAutoPost(!next);
+            setAutoPostError("Could not save that. Try again in a moment.");
+          });
+        }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(3),
+          borderRadius: radius.control,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          padding: spacing(3),
+        }}
+      >
+        <Text style={{ color: colors.textPrimary, fontWeight: "700", flexShrink: 1 }}>
+          Post my Flares when I join a room
+        </Text>
+        <Ionicons
+          name={autoPost ? "toggle" : "toggle-outline"}
+          size={32}
+          color={autoPost ? colors.accent : colors.textMuted}
+        />
+      </Tap>
+      {autoPostError ? <ErrorLine message={autoPostError} /> : null}
+    </Card>
+  );
+
+  const deleteBlock = me?.player.handle ? (
+    <DeleteAccount handle={me.player.handle} />
+  ) : deleteFallback ? (
+    <DeleteAccount handle={deleteFallback.handle} />
+  ) : null;
+
+  const page = (children: React.ReactNode) => (
     <ScrollView
       contentContainerStyle={{
         paddingHorizontal: gutter,
@@ -227,186 +422,153 @@ export function SettingsScreen() {
         gap: spacing(4),
       }}
     >
-      {/*
-       * YOUR STORE: the console's green bar, for an owner whose store has
-       * one (a beta gift's days, a Founding Store, or the trial's). Said
-       * once per store, named, and absent for everyone else.
-       */}
-      {ownedGifts.length > 0 ? (
-        <View style={{ gap: spacing(2) }}>
-          <Title>{ownedGifts.length === 1 ? "Your store" : "Your stores"}</Title>
-          {ownedGifts.map((row) => (
-            <GiftBar key={row.storeId} bar={row.gift} storeName={row.name} />
-          ))}
+      {children}
+    </ScrollView>
+  );
+
+  /* ONE CATEGORY: its cards, nothing else. */
+  if (section) {
+    switch (section) {
+      case "account":
+        return page(
+          <>
+            <AccountCard
+              email={me?.player.email ?? null}
+              onEditProfile={() => navigation.navigate("EditProfile")}
+            />
+            <ProCard />
+            {/* Always here when the account is: App Review's 5.1.1(v).
+                Last and on its own, never in the menu itself. */}
+            {deleteBlock}
+          </>,
+        );
+      case "notifications":
+        return page(<PushPrefSwitches initial={prefs} />);
+      case "privacy":
+        return page(
+          <>
+            <PostalCard postalCode={postalCode} onPostalCode={setPostalCode} />
+            {/* Nearby matching has a home here as well as in the Flare
+                composer, so turning it off never means finding the
+                composer again. */}
+            <NearbyCard />
+            <BlockedPlayers initial={blocked} />
+          </>,
+        );
+      case "display":
+        return page(
+          <>
+            {feedViewBlock}
+            <LookCard />
+          </>,
+        );
+      case "collection":
+        return page(
+          <>
+            {collectionBlock}
+            <Card>
+              <Title>Paste a deck list</Title>
+              <Body>
+                Every card in it goes up as one Flare post, so people nearby and your
+                friends see what you are after.
+              </Body>
+              <Button
+                label="Paste a deck list"
+                variant="secondary"
+                onPress={() => navigation.navigate("DeckPaste")}
+              />
+            </Card>
+            {roomsBlock}
+          </>,
+        );
+      case "stores":
+        return page(storesBlock);
+      case "help":
+        return page(<HelpCard />);
+    }
+  }
+
+  /*
+   * THE MENU. One row per category, each saying where it stands, the
+   * way Instagram's settings read; Sign out under it on its own.
+   */
+  const summaries: Record<SettingsSection, string | null> = {
+    account: me?.player.email ?? null,
+    notifications: notificationsSummary(prefs),
+    privacy: privacySummary({
+      nearbyOn: nearbyOn,
+      blocked: blocked ? blocked.length : null,
+    }),
+    display: displaySummary(FEED_VIEW_TITLES[view], backdrop() === "black"),
+    collection: me?.collection
+      ? `${me.collection.cardsMatched.toLocaleString()} cards imported`
+      : null,
+    stores: ownedGifts.length > 0 ? ownedGifts.map((row) => row.name).join(", ") : null,
+    help: null,
+  };
+
+  return page(
+    <>
+      <View
+        style={{
+          borderRadius: radius.card,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.surface,
+          overflow: "hidden",
+        }}
+      >
+        {SETTINGS_SECTIONS.filter(
+          /* Only somebody who runs a store has one to show. */
+          (entry) => entry.key !== "stores" || ownedGifts.length > 0,
+        ).map((entry, index) => (
+          <Tap
+            key={entry.key}
+            accessibilityLabel={entry.title}
+            onPress={() => navigation.push("Settings", { section: entry.key })}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(3),
+              paddingHorizontal: spacing(4),
+              paddingVertical: spacing(3.5),
+              borderTopWidth: index === 0 ? 0 : 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Ionicons name={SECTION_ICONS[entry.key]} size={20} color={colors.accent} />
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+                {entry.title}
+              </Text>
+              <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+                {summaries[entry.key] ?? entry.blurb}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </Tap>
+        ))}
+      </View>
+
+      {/* Tooling, for a development build only, under the menu. */}
+      {__DEV__ ? (
+        <View style={{ flexDirection: "row", gap: spacing(2) }}>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Design lab"
+              variant="secondary"
+              onPress={() => navigation.navigate("Lab")}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Button
+              label="Demo mode"
+              variant="secondary"
+              onPress={() => navigation.navigate("DemoShots")}
+            />
+          </View>
         </View>
       ) : null}
-
-      {me?.collection && (
-        <Card>
-          <Title>Your collection</Title>
-          <Body>
-            {`${me.collection.cardsMatched.toLocaleString()} cards imported. Rooms quietly flag the Flares you could answer; nobody else ever sees it.`}
-          </Body>
-          {/* The Collectr import is a file upload, which the website does
-              well and a phone does badly. */}
-          <Tap
-            accessibilityLabel="Update your collection on cardflare.gg"
-            onPress={() => void Linking.openURL(`${API_BASE}/profile/settings`)}
-          >
-            <Text style={{ color: colors.accent, fontWeight: "600" }}>
-              Update it on cardflare.gg →
-            </Text>
-          </Tap>
-        </Card>
-      )}
-
-      {/*
-       * HOW THE FEED IS DRAWN. The founder: "lets develop a few 'views'
-       * for the feed, that can be changed under settings in the
-       * profile." On the account rather than the device, so picking
-       * Compact on a phone holds on the website too.
-       */}
-      <Card>
-        <Title>Feed view</Title>
-        <Body>Pick how a Flare is drawn in your Feed.</Body>
-        <View style={{ gap: spacing(2) }}>
-          {FEED_VIEWS.map((option) => {
-            const on = view === option;
-            return (
-              <Tap
-                key={option}
-                accessibilityLabel={`${FEED_VIEW_TITLES[option]}${on ? ", selected" : ""}`}
-                onPress={() => {
-                  if (on || savingView) return;
-                  const previous = view;
-                  setView(option);
-                  setViewError(null);
-                  setSavingView(true);
-                  /* Optimistic: the Feed redraws at once and the write
-                     follows. A failure puts the choice back rather than
-                     leaving a setting that did not save. */
-                  setFeedView(option)
-                    .catch(() => {
-                      setView(previous);
-                      setViewError("Could not save that. Try again in a moment.");
-                    })
-                    .finally(() => setSavingView(false));
-                }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing(2.5),
-                  borderRadius: radius.control,
-                  borderWidth: 1,
-                  borderColor: on ? colors.accent : colors.border,
-                  backgroundColor: on ? colors.accentTint : colors.elevated,
-                  padding: spacing(3),
-                }}
-              >
-                <Ionicons
-                  name={on ? "radio-button-on" : "radio-button-off"}
-                  size={18}
-                  color={on ? colors.accent : colors.textMuted}
-                />
-                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <Text
-                    style={{
-                      color: on ? colors.accent : colors.textPrimary,
-                      fontWeight: "700",
-                    }}
-                  >
-                    {FEED_VIEW_TITLES[option]}
-                  </Text>
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                    {FEED_VIEW_BLURBS[option]}
-                  </Text>
-                </View>
-              </Tap>
-            );
-          })}
-        </View>
-        {viewError ? <ErrorLine message={viewError} /> : null}
-      </Card>
-
-      {/*
-       * ROOMS. The founder: "I wonder if it's best to just join a room
-       * and all the flares immediately get posted. That's kinda the
-       * whole point of cardflare." So joining does, and this is the one
-       * way to say no: for the person who wants to walk in and browse
-       * first. The website's settings draw the same switch.
-       */}
-      <Card>
-        <Title>Rooms</Title>
-        <Body>
-          When you join a room, your open Flares go up on its board. Turn this off to
-          walk in and browse first.
-        </Body>
-        <Tap
-          accessibilityLabel={`Post my Flares when I join a room, ${autoPost ? "on" : "off"}`}
-          onPress={() => {
-            const next = !autoPost;
-            setAutoPost(next);
-            setAutoPostError(null);
-            saveAutoPost(next).catch(() => {
-              setAutoPost(!next);
-              setAutoPostError("Could not save that. Try again in a moment.");
-            });
-          }}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: spacing(3),
-            borderRadius: radius.control,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.elevated,
-            padding: spacing(3),
-          }}
-        >
-          <Text style={{ color: colors.textPrimary, fontWeight: "700", flexShrink: 1 }}>
-            Post my Flares when I join a room
-          </Text>
-          <Ionicons
-            name={autoPost ? "toggle" : "toggle-outline"}
-            size={32}
-            color={autoPost ? colors.accent : colors.textMuted}
-          />
-        </Tap>
-        {autoPostError ? <ErrorLine message={autoPostError} /> : null}
-      </Card>
-
-      <PushPrefSwitches initial={prefs} />
-
-      <BlockedPlayers initial={blocked} />
-
-      {/* Tooling, for a development build only. A player's settings
-          page is not the place for a design lab or a connection probe;
-          both stay in the binary for the person holding a dev client. */}
-      {__DEV__ && (
-        <Card>
-          <Title>Design lab</Title>
-          <Body>
-            Every shape a Feed post can take, drawn with made-up data. Nothing in it
-            reaches the server.
-          </Body>
-          <Button
-            label="Open the design lab"
-            variant="secondary"
-            onPress={() => navigation.navigate("Lab")}
-          />
-        </Card>
-      )}
-
-      <AccountCard
-        email={me?.player.email ?? null}
-        postalCode={postalCode}
-        onPostalCode={setPostalCode}
-      />
-
-      <ProCard />
-
-      <HelpCard />
 
       <AsyncButton
         label="Sign out"
@@ -416,16 +578,64 @@ export function SettingsScreen() {
           await signOut();
         }}
       />
+    </>,
+  );
+}
 
-      {/* Always here when the account is: App Review's 5.1.1(v). It used
-          to wait on a separate profile read and vanished when that one
-          failed. */}
-      {me?.player.handle ? (
-        <DeleteAccount handle={me.player.handle} />
-      ) : deleteFallback ? (
-        <DeleteAccount handle={deleteFallback.handle} />
-      ) : null}
-    </ScrollView>
+/** Each category's mark in the menu. */
+const SECTION_ICONS: Record<SettingsSection, React.ComponentProps<typeof Ionicons>["name"]> = {
+  account: "person-circle-outline",
+  notifications: "notifications-outline",
+  privacy: "shield-checkmark-outline",
+  display: "color-palette-outline",
+  collection: "albums-outline",
+  stores: "storefront-outline",
+  help: "help-circle-outline",
+};
+
+/**
+ * LOOK: the backdrop switch (src/backdrop.ts). The website's settings
+ * draw the same row in the same words (src/components/players/
+ * backdrop-toggle.tsx). Kept on the phone, not the account: it is how
+ * this screen looks, and a tap redraws the app where it is.
+ */
+function LookCard() {
+  const [on, setOn] = useState(backdrop() === "black");
+  return (
+    <Card>
+      <Title>{LOOK_HEADING}</Title>
+      <Tap
+        accessibilityLabel={`${PURE_BLACK_LABEL}, ${on ? "on" : "off"}`}
+        onPress={() => {
+          const next = !on;
+          setOn(next);
+          void setBackdrop(next ? "black" : "green");
+        }}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: spacing(3),
+          borderRadius: radius.control,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          padding: spacing(3),
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+            {PURE_BLACK_LABEL}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>{PURE_BLACK_LINE}</Text>
+        </View>
+        <Ionicons
+          name={on ? "toggle" : "toggle-outline"}
+          size={32}
+          color={on ? colors.accent : colors.textMuted}
+        />
+      </Tap>
+    </Card>
   );
 }
 
@@ -791,10 +1001,35 @@ function Row({
  */
 function AccountCard({
   email,
+  onEditProfile,
+}: {
+  email: string | null;
+  onEditProfile: () => void;
+}) {
+  const version = Constants.expoConfig?.version ?? "?";
+  const build = Constants.expoConfig?.ios?.buildNumber;
+
+  return (
+    <Card>
+      {/* No title: the screen already says Account. Name and username live on Edit profile, where Instagram keeps
+          them; this is the way there. */}
+      <Row label="Name and username" value="Edit profile" onPress={onEditProfile} />
+      <Row label="Email" value={email ?? "Not available"} />
+      <Muted>To change your email, get in touch from Help.</Muted>
+      <Row label="Password" value="Reset it from the sign-in screen" />
+      <Row label="Version" value={build ? `${version} (${build})` : version} />
+    </Card>
+  );
+}
+
+/**
+ * YOUR ZIP CODE, in Privacy & safety: the only position cardflare
+ * keeps, and what nearby matching and distances read.
+ */
+function PostalCard({
   postalCode,
   onPostalCode,
 }: {
-  email: string | null;
   postalCode: string | null;
   onPostalCode: (zip: string | null) => void;
 }) {
@@ -802,17 +1037,13 @@ function AccountCard({
   const [typed, setTyped] = useState(postalCode ?? "");
   const [said, setSaid] = useState<string | null>(null);
 
-  const version = Constants.expoConfig?.version ?? "?";
-  const build = Constants.expoConfig?.ios?.buildNumber;
-
   return (
     <Card>
-      <Title>Account</Title>
-      <Row label="Email" value={email ?? "Not available"} />
+      <Title>Your ZIP code</Title>
       <Muted>
-        To change your email, get in touch below. Passwords reset from the sign-in screen.
+        Used only to match you with players and stores nearby. It is never shown to
+        anyone.
       </Muted>
-
       {editing ? (
         <View style={{ gap: spacing(2) }}>
           <Input
@@ -864,8 +1095,6 @@ function AccountCard({
           }}
         />
       )}
-
-      <Row label="Version" value={build ? `${version} (${build})` : version} />
     </Card>
   );
 }

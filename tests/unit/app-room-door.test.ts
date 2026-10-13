@@ -189,7 +189,8 @@ describe("a long section folds", () => {
   it("draws the controls in the theme's colours", () => {
     const styles = room.slice(room.indexOf("const styles = StyleSheet.create({"));
     expect(styles).toMatch(
-      /foldTile: \{[^}]*borderStyle: "dashed",[^}]*borderColor: colors\.border,/,
+      /* A getter, so it follows the Pure black switch (backdrop.test.ts). */
+      /foldTile: \{[^}]*borderStyle: "dashed",\s*get borderColor\(\) \{\s*return colors\.border;/,
     );
     expect(styles).toMatch(/foldText: \{[^}]*color: colors\.accent,/);
   });

@@ -241,7 +241,7 @@ describe("Share, its own round button", () => {
        weird 'bubbles' around icons". */
     expect(share).toContain("className={HEADER_BUTTON}");
     expect(view).toContain('aria-label="Binder settings"');
-    expect(view).toContain("{(binder.yours || settings.forTrade) && (");
+    expect(view).toContain("{(binder.yours || shareable) && (");
   });
 
   it("hands out the short link, and keeps the private line and Link copied", () => {

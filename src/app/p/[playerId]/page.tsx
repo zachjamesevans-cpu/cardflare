@@ -270,6 +270,7 @@ export default async function PublicProfilePage({
                   yours={yours}
                   imagesEnabled={imagesEnabled}
                   heading={false}
+                  ownerName={profile.displayName}
                 />
               ),
               /* Their hunts: one binder row each, saying what is left,

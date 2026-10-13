@@ -42,7 +42,7 @@ const web = {
   roomDoor: read("src/components/events/room-door.tsx"),
   notify: read("src/lib/notifications/notify.ts"),
   profile: read("src/app/profile/page.tsx"),
-  settings: read("src/app/profile/settings/page.tsx"),
+  settings: read("src/app/profile/settings/settings-content.tsx"),
   embersStore: read("src/app/profile/store/page.tsx"),
   zoom: read("src/components/cards/card-image-zoom.tsx"),
 };
@@ -273,6 +273,8 @@ describe("copy the audit sent back", () => {
       app.ui.indexOf('accessibilityLabel="Close"'),
     );
 
-    expect(web.settings).toContain("Your account, Feed and room preferences.");
+    expect(web.settings).toContain(
+      "Your account, notifications, privacy and how cardflare looks.",
+    );
   });
 });

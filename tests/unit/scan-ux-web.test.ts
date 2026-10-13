@@ -393,7 +393,7 @@ describe("the PRO mark", () => {
       ["src/app/pro/page.tsx", /<ProMark \/> goes on top of it/],
       ["src/app/pro/page.tsx", /then cardflare <ProMark \/>\./],
       ["src/app/pro/page.tsx", /\{SITE\.name\} <ProMark \/>/],
-      ["src/app/profile/settings/page.tsx", /<ProMark \/> through the App Store/],
+      ["src/app/profile/settings/settings-content.tsx", /<ProMark \/> through the App Store/],
     ];
     for (const [path, pattern] of spots) {
       expect(read(path), path).toMatch(pattern);
@@ -409,7 +409,7 @@ describe("the PRO mark", () => {
       "src/components/players/cosmetic-shop.tsx",
       "src/components/marketing/pricing.tsx",
       "src/app/profile/customize/page.tsx",
-      "src/app/profile/settings/page.tsx",
+      "src/app/profile/settings/settings-content.tsx",
     ]) {
       const source = code(read(path));
       expect(source, path).not.toContain("gold-text");

@@ -1,6 +1,7 @@
+import { foundLast } from "./found-last";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
@@ -12,7 +13,7 @@ import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
 import { PlayerAvatar } from "./player-avatar";
 import { PostSocialRow, type PostRef } from "./post-social";
-import { colors, radius, spacing } from "./theme";
+import { colors, FEED_LOOK, gutter, radius, spacing, accentGlow } from "./theme";
 import { Button, Tap, type ZoomPicks } from "./ui";
 
 /**
@@ -85,6 +86,8 @@ export function statusLabel(item: {
   /** How many cards: `total` on a Feed post, the cards themselves on the post screen. */
   total?: number;
   cards?: unknown[];
+  /** The hunt the post went up in: "is hunting", and the hunt's name after it. */
+  hunt?: { id: string; name: string } | null;
 }): string {
   const offering = item.direction === "showcase";
   if (item.completed) {
@@ -93,7 +96,11 @@ export function statusLabel(item: {
       ? "found it"
       : "found them all";
   }
-  return offering ? "is offering" : "is looking for";
+  if (offering) return "is offering";
+  /* The founder: "soupie posted 17 cards to her ace hunt. but it just
+     says 'is looking for' with a little tiny ace 'view hunt' button
+     below". A post in a hunt says so, and names it (see FlareStatus). */
+  return item.hunt ? "is hunting" : "is looking for";
 }
 
 /**
@@ -112,22 +119,82 @@ export function FlareStatus({
   label = "is looking for",
   detail,
   done = false,
+  hunt,
+  onOpenHunt,
 }: {
   label?: string;
   /** "3 cards", in the quiet colour after the status. */
   detail?: string | null;
   /** Every copy in hand or given away: the check instead of the crosshair. */
   done?: boolean;
+  /**
+   * The hunt the post went up in, named after the words - "is hunting
+   * Ace <3" - and the door to it. This replaced the small "◇ Ace <3 ·
+   * View hunt" row under the cards, which was the only sign a post
+   * belonged to a hunt, and the easiest thing on it to miss.
+   */
+  hunt?: { id: string; name: string } | null;
+  onOpenHunt?: (huntId: string) => void;
 }) {
+  /*
+   * THE HUNT AS A NAME, NOT A BUTTON.
+   *
+   * Hunts are named like cards - "Green Zoro", "Sabo" - so the name
+   * has to read as a thing that opens, not as the card wanted. It was
+   * an accent pill, and the founder: "still dont think that big button
+   * for straw hat crew is the best option", then "lets try option a":
+   * plain words in white, then a small grey chevron. The chevron does
+   * the pill's job - this is a place, it opens - at a fraction of the
+   * weight, and the line reads as one sentence: "is hunting Straw Hat
+   * Crew ›". The crosshair stays the mark of both lines.
+   */
+  const huntPill = hunt ? (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 2,
+        minWidth: 0,
+      }}
+    >
+      <Text
+        numberOfLines={1}
+        style={{
+          color: colors.textPrimary,
+          fontSize: 14,
+          fontWeight: "700",
+          flexShrink: 1,
+        }}
+      >
+        {hunt.name}
+      </Text>
+      {onOpenHunt ? (
+        <Ionicons name="chevron-forward" size={13} color={colors.textMuted} />
+      ) : null}
+    </View>
+  ) : null;
+
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        /* Wraps rather than squeezing: a hunt named "Straw Hat Crew"
+           beside "· 8 cards" shrank the pill to "S…" on a phone. Now the
+           count goes to the next line and the name stays readable. */
+        flexWrap: "wrap",
+        columnGap: spacing(1.5),
+        rowGap: 2,
+        minWidth: 0,
+      }}
+    >
       {done ? (
         <Ionicons name="checkmark-circle" size={17} color={colors.accent} />
       ) : (
         <View
           style={{
             shadowColor: colors.accent,
-            shadowOpacity: 0.7,
+            shadowOpacity: 0.7 * accentGlow,
             shadowRadius: 5,
             shadowOffset: { width: 0, height: 0 },
           }}
@@ -138,8 +205,26 @@ export function FlareStatus({
       <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
         {label}
       </Text>
+      {hunt && onOpenHunt ? (
+        /* Its own tap, inside the header's: the pill opens the hunt,
+           the rest of the header still opens the profile. The shrink
+           lives on this wrapper - Tap puts its style on an inner view. */
+        <View style={{ flexShrink: 1, minWidth: 0, maxWidth: "100%" }}>
+          <Tap
+            onPress={() => onOpenHunt(hunt.id)}
+            accessibilityLabel={`View hunt ${hunt.name}`}
+            hitSlop={6}
+          >
+            {huntPill}
+          </Tap>
+        </View>
+      ) : hunt ? (
+        <View style={{ flexShrink: 1, minWidth: 0, maxWidth: "100%" }}>{huntPill}</View>
+      ) : null}
       {detail ? (
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>{`· ${detail}`}</Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}>
+          {`· ${detail}`}
+        </Text>
       ) : null}
     </View>
   );
@@ -269,10 +354,19 @@ export function FlareFeedCard({
   onOpenHunt?: (huntId: string) => void;
 }) {
   const direction = item.direction ?? "want";
-  const lead = item.cards[0];
+  /* Found cards at the far right (found-last.ts). */
+  const cards = [...item.cards].sort(foundLast);
+  const lead = cards[0];
   const single = item.total === 1 && lead;
-  const shelf = shelfFor(item.cards, post);
+  const shelf = shelfFor(cards, post);
   const completed = item.completed ?? false;
+  /* "28m · nearby": when it went up and how far, beside the name. */
+  const meta = [
+    item.postedAt ? agoFrom(item.postedAt) : null,
+    typeof item.milesAway === "number" ? awayLabel(item.milesAway) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const [menu, setMenu] = useState(false);
   /* Whether the post's review is up over the Feed (the viewer draws
      its own while it is open). The picks themselves are the post's. */
@@ -291,19 +385,32 @@ export function FlareFeedCard({
 
   return (
     <View
-      style={{
-        backgroundColor: colors.surface,
-        borderColor: colors.border,
-        borderWidth: 1,
-        borderRadius: radius.panel,
-        padding: spacing(3),
-        paddingBottom: spacing(2),
-        gap: spacing(2.5),
-      }}
+      style={
+        FEED_LOOK === "open"
+          ? {
+              /* No panel: the post sits on the Feed's own green, a
+                 hairline under it as the only line between posts. */
+              paddingTop: spacing(1),
+              paddingBottom: spacing(4),
+              gap: spacing(2.5),
+              borderBottomWidth: StyleSheet.hairlineWidth,
+              borderBottomColor: colors.borderStrong,
+            }
+          : {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderWidth: 1,
+              borderRadius: radius.panel,
+              padding: spacing(3),
+              paddingBottom: spacing(2),
+              gap: spacing(2.5),
+            }
+      }
     >
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+      {/* The header: face, then the name with when and how far beside
+          it, then the status line; the three dots at the right. "Your
+          Flare" is a small label inside the name's row, never a line
+          between posts. */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(3) }}>
         {/*
          * THE FLEX LIVES ON THIS WRAPPER, NOT ON THE TAP.
@@ -370,51 +477,40 @@ export function FlareFeedCard({
                     YOUR FLARE
                   </Text>
                 ) : null}
+                {/* When and how far, on the name's line the way Instagram
+                    writes "name • 2h": it used to be a column of its own
+                    at the right, which left the status line too narrow
+                    for "is hunting" and its hunt, and pushed a hunt post
+                    to three rows. The founder: "see how this screen has
+                    three rows for maya chen ... make it look less
+                    cluttered". The name gives way before these do. */}
+                {meta ? (
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textMuted, fontSize: 13, flexShrink: 0 }}
+                  >
+                    {`· ${meta}`}
+                  </Text>
+                ) : null}
               </View>
               <FlareStatus
                 label={statusLabel(item)}
                 done={completed}
-                detail={item.total > 1 ? cardsLabel(item.total) : null}
+                /* No count beside a hunt's pill: the two did not fit one
+                   line, and the strip under the post shows the cards. */
+                detail={item.total > 1 && !item.hunt ? cardsLabel(item.total) : null}
+                hunt={item.hunt}
+                onOpenHunt={onOpenHunt}
               />
             </View>
           </Tap>
         </View>
-        {/* One line, not a stacked block: the time and the distance as
-            muted facts with dots between, then the three dots when the
-            post has extras to offer. The room moved to the line above
-            the actions, where it has the width to be read whole. */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 4,
-            flexShrink: 1,
-            maxWidth: "50%",
-          }}
-        >
-          {item.postedAt ? (
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-              {agoFrom(item.postedAt)}
-            </Text>
-          ) : null}
-          {typeof item.milesAway === "number" ? (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-              {item.postedAt ? (
-                <Text style={{ color: colors.textMuted, fontSize: 13 }}>·</Text>
-              ) : (
-                <Ionicons name="location-outline" size={13} color={colors.textMuted} />
-              )}
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                {awayLabel(item.milesAway)}
-              </Text>
-            </View>
-          ) : null}
-          {actions.length > 0 ? (
-            <View style={{ marginLeft: spacing(1) }}>
-              <DotsButton onPress={() => setMenu(true)} label="More about this post" />
-            </View>
-          ) : null}
-        </View>
+        {/* Only the three dots stay at the right, when the post has
+            extras to offer; the time and distance moved up beside the
+            name, so the status line has the width for a hunt's pill. */}
+        {actions.length > 0 ? (
+          <DotsButton onPress={() => setMenu(true)} label="More about this post" />
+        ) : null}
       </View>
       <ActionSheet items={menu ? actions : null} onClose={() => setMenu(false)} />
 
@@ -436,14 +532,14 @@ export function FlareFeedCard({
         />
       ) : (
         <FlareStrip
-          cards={item.cards}
+          cards={cards}
           total={item.total}
           direction={direction}
           post={post}
           picks={picks}
           onPicks={onPicks}
           onSeeAll={onViewAll}
-          bleed={spacing(3)}
+          bleed={FEED_LOOK === "open" ? gutter : spacing(3)}
         />
       )}
 
@@ -476,7 +572,7 @@ export function FlareFeedCard({
           postId={post.postId}
           posterName={post.posterName ?? item.displayName}
           lines={Object.entries(picks).map(([flareId, quantity]) => {
-            const card = item.cards.find((entry) => entry.flareId === flareId);
+            const card = cards.find((entry) => entry.flareId === flareId);
             return {
               flareId,
               name: card?.cardName ?? "one card",
@@ -513,30 +609,10 @@ export function FlareFeedCard({
         </Text>
       ) : null}
 
-      {/* The hunt it is part of, and the door to it. No room line: the
-          store a post was made in used to be named here, and before
-          that as a full-width "Go to Mox Valley Games"; the founder:
+      {/* No hunt row: the hunt is named in the status line and opens
+          from there ("is hunting Ace <3"). No room line either: the
+          store a post was made in used to be named here; the founder:
           "kinda redundant. remove that type of... CTA everywhere". */}
-      {item.hunt ? (
-        <Tap
-          onPress={onOpenHunt ? () => onOpenHunt(item.hunt?.id ?? "") : undefined}
-          accessibilityLabel={`View hunt ${item.hunt.name}`}
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-        >
-          <Ionicons name="locate-outline" size={14} color={colors.textMuted} />
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
-          >
-            {item.hunt.name}
-          </Text>
-          {onOpenHunt ? (
-            <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
-              · View hunt
-            </Text>
-          ) : null}
-        </Tap>
-      ) : null}
 
       {/* No offer button: a tap on any card opens the zoom with "I have
           this card" in it, as on compact. The founder: "no need for i

@@ -31,12 +31,11 @@ import {
 } from "./api";
 import { POCKETS_PER_PAGE } from "./binder-covers";
 import { printingLabel } from "./flare-copy";
-import { huntRowLine } from "./hunt-copy";
+import { HuntSheet } from "./hunt-sheet";
 import {
-  HuntEditForm,
   HuntOfferFooter,
   HuntOfferReview,
-  HuntProgress,
+  HuntRing,
   UndoLine,
   foundOf,
   huntOfferSentLine,
@@ -55,6 +54,7 @@ import {
   pocketLabel,
   type Geometry,
 } from "./pockets";
+import { PlayerAvatar } from "./player-avatar";
 import { RemoteImage } from "./remote-image";
 import { Stepper } from "./stepper";
 import { colors, radius, spacing } from "./theme";
@@ -63,8 +63,10 @@ import {
   Button,
   CardImage,
   ErrorLine,
+  FoundArt,
   Muted,
   SheetClose,
+  StateBand,
   Tap,
   Title,
   type ZoomCard,
@@ -107,7 +109,12 @@ export function HuntBinder({
   onOwner,
 }: {
   /** The Hunt screen passes its HuntView, which already names the owner. */
-  hunt: Hunt & { ownerName?: string };
+  hunt: Hunt & {
+    ownerName?: string;
+    playerId?: string;
+    /** The owner's face and ring, for a visitor's header. */
+    owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
+  };
   yours: boolean;
   ownerName?: string;
   /** Add cards to this hunt: the composer, with the hunt preselected. */
@@ -125,9 +132,18 @@ export function HuntBinder({
    * what the server removes.
    */
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
-  const cards = (hunt.cards ?? []).filter(
-    (card) => !card.requestId || !removed.has(card.requestId),
-  );
+  /*
+   * Found cards last, on the last pages: the founder, "found cards in
+   * hunts need to filter to the bottom / last pages". Ordered by what
+   * the server last said, not by a tap this second, so a card marked
+   * found does not jump pages under the finger; it moves on the
+   * re-read. Otherwise the server's order stands (a stable sort).
+   */
+  const cards = (hunt.cards ?? [])
+    .filter((card) => !card.requestId || !removed.has(card.requestId))
+    .map((card, at) => ({ card, at, done: foundOf(card) >= neededOf(card) }))
+    .sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)
+    .map(({ card }) => card);
   const owner = ownerName ?? hunt.ownerName ?? "them";
 
   /*
@@ -249,6 +265,8 @@ export function HuntBinder({
       stillNeeds: Math.max(0, neededOf(card) - foundFor(card)),
       youHave: null,
       have: yours || done || !card.requestId || !hunt.id ? null : haveFor(card),
+      /* A found pocket opens found: band and all. */
+      state: done ? "found" : "open",
     };
   });
 
@@ -310,55 +328,76 @@ export function HuntBinder({
 
   return (
     <View style={{ gap: spacing(3) }}>
-      {/* The header: the crosshair, the name, the description or the
-          row's line under it, and the owner's pencil and Share to the
-          right. A visitor sees the owner's name, a link to their
-          profile, and Share. */}
-      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(2) }}>
-        <Ionicons
-          name="locate-outline"
-          size={18}
-          color={colors.accent}
-          style={{ marginTop: 2 }}
-        />
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-          <Title>{hunt.name}</Title>
-          {hunt.description ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              {hunt.description}
-            </Text>
-          ) : (
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              {huntRowLine(hunt.looking + hunt.found, hunt.looking)}
-            </Text>
-          )}
+      {/*
+       * THE RING, THE NAME, WHOSE IT IS - AND NOTHING SAID TWICE.
+       *
+       * This was the crosshair, the name, and three small grey lines over
+       * a hairline bar, all one weight - the founder: "the block on top
+       * needs to change ... make it more pretty". The first ring added a
+       * "to go" pill, a cards pill and a fallback line, and a hunt with
+       * no description said its count three times: "says 3 to go and 4
+       * cards twice ... just looks so jumbled". So each fact lives in one
+       * place: progress is the ring and only the ring, the owner is one
+       * line - their face and name, which opens their profile - and the
+       * owner's own words appear only when they wrote some. The ring is
+       * the page's one accent. The pencil and Share stay top right.
+       */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+        <HuntRing found={totalFound} needed={totalNeeded} />
+        <View style={{ flex: 1, minWidth: 0, gap: spacing(1.5) }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              color: colors.textPrimary,
+              fontSize: 24,
+              lineHeight: 28,
+              fontWeight: "800",
+            }}
+          >
+            {hunt.name}
+          </Text>
           {!yours ? (
             <Tap
               onPress={onOwner}
               accessibilityLabel={`${owner}'s profile`}
               hitSlop={6}
+              style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
             >
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-                <Text style={{ color: colors.textSecondary, fontWeight: "600" }}>
-                  {owner}
-                </Text>
-                {"'s hunt"}
+              <PlayerAvatar
+                displayName={owner}
+                seed={hunt.playerId ?? owner}
+                avatarUrl={hunt.owner?.avatarUrl ?? null}
+                frame={hunt.owner?.frame ?? null}
+                ring={hunt.owner?.ring ?? null}
+                size={22}
+              />
+              <Text
+                numberOfLines={1}
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: "700",
+                  flexShrink: 1,
+                }}
+              >
+                {owner}
               </Text>
             </Tap>
-          ) : null}
+          ) : (
+            <Text style={{ color: colors.textMuted, fontSize: 14 }}>Your hunt</Text>
+          )}
         </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(3),
+            alignSelf: "flex-start",
+          }}
+        >
           {yours && hunt.id ? (
-            <Tap
-              onPress={() => setEditing((value) => !value)}
-              hitSlop={8}
-              accessibilityLabel={editing ? "Cancel" : "Edit hunt"}
-            >
-              <Ionicons
-                name={editing ? "close-outline" : "pencil-outline"}
-                size={22}
-                color={colors.textPrimary}
-              />
+            <Tap onPress={() => setEditing(true)} hitSlop={8} accessibilityLabel="Edit hunt">
+              <Ionicons name="pencil-outline" size={22} color={colors.textPrimary} />
             </Tap>
           ) : null}
           {hunt.id ? (
@@ -369,17 +408,21 @@ export function HuntBinder({
         </View>
       </View>
 
-      {yours && editing && hunt.id ? (
-        <HuntEditForm
-          hunt={hunt}
-          onSaved={() => {
-            setEditing(false);
-            onChanged?.();
-          }}
-        />
-      ) : null}
+      {/* Name and what it's for, in the same sheet that starts a hunt;
+          there is no Private - every hunt is public. */}
+      <HuntSheet
+        mode={yours && editing && hunt.id ? { kind: "edit", hunt } : null}
+        onClose={() => setEditing(false)}
+        onSaved={() => onChanged?.()}
+      />
 
-      <HuntProgress found={totalFound} needed={totalNeeded} />
+      {/* The owner's own words, only when they wrote some. No stand-in
+          line when they did not: the ring already says what it holds. */}
+      {hunt.description ? (
+        <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21 }}>
+          {hunt.description}
+        </Text>
+      ) : null}
 
       {copies.undoLabel ? (
         <UndoLine label={copies.undoLabel} onUndo={copies.undoLast} />
@@ -416,6 +459,7 @@ export function HuntBinder({
                         key={`empty-${slot}`}
                         width={geometry.pocketWidth}
                         height={geometry.pocketHeight}
+                        faint
                       />
                     );
                   }
@@ -518,11 +562,15 @@ export function HuntBinder({
 }
 
 /**
- * A card the hunt wants, in its pocket. Found: dimmed, with a small
- * accent check at the top right. More than one copy wanted and not
+ * A card the hunt wants, in its pocket. Found: black and white with the
+ * green FOUND band at its foot, the same mark the Feed's cards wear -
+ * it used to be dimmed with a small check at the top right, and the
+ * founder: "make sure that it has the green found thing at bottom like
+ * there is elsewhere in the app ... see how there's also checkmarks
+ * here in this screen? delete those." More than one copy wanted and not
  * all found: a chip at the bottom right, found over needed. Otherwise
- * nothing on it. The owner's tap opens the progress sheet; a
- * visitor's opens the viewer, with the picks the hunt holds.
+ * nothing on it. The owner's tap opens the progress sheet; a visitor's
+ * opens the viewer, with the picks the hunt holds.
  */
 function HuntPocket({
   card,
@@ -556,28 +604,8 @@ function HuntPocket({
     <Pocket
       geometry={geometry}
       accessibilityLabel={pocketLabel(card.cardName, index, done ? ", found" : "")}
-      dimmed={done}
       corner={
         <>
-          {done ? (
-            <View
-              pointerEvents="none"
-              accessibilityLabel="All found"
-              style={{
-                position: "absolute",
-                top: 4,
-                right: 4,
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                backgroundColor: colors.accent,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="checkmark" size={12} color={colors.accentContrast} />
-            </View>
-          ) : null}
           {!done && needed > 1 ? (
             <View
               pointerEvents="none"
@@ -608,16 +636,30 @@ function HuntPocket({
           accessibilityLabel={`Update progress on ${card.cardName}`}
           style={{ width: inner, height: innerHeight }}
         >
-          <RemoteImage
-            uri={card.imageUrl}
-            contentFit="contain"
+          <View
             style={{
               width: inner,
               height: innerHeight,
               borderRadius: radius.control / 2,
-              backgroundColor: colors.canvas,
+              overflow: "hidden",
             }}
-          />
+          >
+            {done ? (
+              <FoundArt uri={card.imageUrl} width={inner} height={innerHeight} />
+            ) : (
+              <RemoteImage
+                uri={card.imageUrl}
+                contentFit="contain"
+                style={{
+                  width: inner,
+                  height: innerHeight,
+                  borderRadius: radius.control / 2,
+                  backgroundColor: colors.canvas,
+                }}
+              />
+            )}
+            {done ? <StateBand state="found" /> : null}
+          </View>
         </Tap>
       ) : (
         <CardImage
@@ -626,6 +668,7 @@ function HuntPocket({
           name={card.cardName}
           cardNumber={card.cardNumber}
           caption={card.printingLabel ?? null}
+          state={done ? "found" : "open"}
           lookingFor={needed}
           stillNeeds={Math.max(0, needed - found)}
           siblings={shelf}

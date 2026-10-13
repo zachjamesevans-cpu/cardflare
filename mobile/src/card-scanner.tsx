@@ -810,7 +810,9 @@ const styles = StyleSheet.create({
     minHeight: 240,
     borderRadius: radius.card,
     overflow: "hidden",
-    backgroundColor: colors.surface,
+    get backgroundColor() {
+      return colors.surface;
+    },
   },
   /* One soft outline: a card, or a nine-pocket page, the same shape. */
   frame: {
@@ -828,8 +830,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing(1.5),
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.surface;
+    },
   },
   chipLabel: {
     color: colors.textPrimary,
@@ -862,8 +868,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing(4),
     borderRadius: radius.control,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.elevated,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.elevated;
+    },
     overflow: "hidden",
   },
   door: {
@@ -877,7 +887,9 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing(10),
     marginBottom: spacing(10),
     borderRadius: 2,
-    backgroundColor: colors.elevated,
+    get backgroundColor() {
+      return colors.elevated;
+    },
     overflow: "hidden",
   },
   fill: { height: 3, backgroundColor: colors.accent },

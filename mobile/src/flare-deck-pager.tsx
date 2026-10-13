@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from "react-native";
 import type { FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
-import { HeldRing } from "./held-ring";
+import { HELD_RING_WIDTH, HeldRing } from "./held-ring";
 import { QuantityBadge } from "./quantity-badge";
 import { haveFor, type PostRef } from "./post-social";
 import { colors, radius, spacing } from "./theme";
@@ -78,6 +78,8 @@ export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard
     caption: card.printingLabel ?? null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveWithCap(card, post),
+    /* FOUND in the full view too, band and all. */
+    state: card.state ?? "open",
   }));
 }
 
@@ -233,6 +235,9 @@ export function NeedBadge({
   );
 }
 
+/** How far outside a card its held ring reaches: HeldRing's outset and a little. */
+const RING_ROOM = HELD_RING_WIDTH + 3;
+
 /** A strip tile's width: two and a half across a phone, so it scrolls. */
 export const STRIP_TILE = 108;
 
@@ -245,7 +250,10 @@ export const STRIP_TILE = 108;
  * own, with a dot per card and "See all 17 cards" under it. A seventeen-
  * card hunt showed one card and a sliver; the founder: "compact is great
  * because it just shows the cards simply". So classic is compact, bigger:
- * the art first, the words beneath, no inner panel and no dots. The strip
+ * the art and nothing under it, no inner panel and no dots. The name
+ * under each card went too - the founder: "we should have more faith in
+ * our users - plus they can always click on the card to see the name".
+ * The zoom titles it, and VoiceOver reads it off the card. The strip
  * runs to the post's edges (`bleed`) so the card that peeks in is cut by
  * the post, not by a box inside it. The printing lives in the zoom a tap
  * away, and the full list behind the three dots, as before.
@@ -284,16 +292,18 @@ export function FlareStrip({
       style={{ marginHorizontal: -bleed }}
       contentContainerStyle={{
         gap: GAP,
-        paddingHorizontal: bleed,
-        /* Room for a held card's ring, which sits just outside. */
-        paddingVertical: 4,
+        /* Room for a held card's ring, which sits just outside, on all
+           four sides. The sides used to have only the bleed, so a screen
+           that passed none cut the first card's ring off at its left
+           edge - the founder, of a Flare opened from a chat: "the shanks
+           card outline is kinda clipping on the left hand side". */
+        paddingHorizontal: Math.max(bleed, RING_ROOM),
+        paddingVertical: RING_ROOM,
       }}
     >
       {cards.map((card, index) => {
-        const done =
-          card.state === "found" || (direction === "want" && remainingOf(card) === 0);
         return (
-          <View key={card.cardId} style={{ width: STRIP_TILE, gap: 3 }}>
+          <View key={card.cardId} style={{ width: STRIP_TILE }}>
             <View>
               <CardImage
                 imageUrl={card.imageUrl}
@@ -309,20 +319,9 @@ export function FlareStrip({
                 picks={picks}
                 onPicks={onPicks}
               />
-              <HeldRing match={card.match} corner="right" />
+              <HeldRing match={card.match} />
               <NeedBadge card={card} offering={direction === "showcase"} size="md" />
             </View>
-            <Text
-              numberOfLines={1}
-              style={{
-                color: done ? colors.textMuted : colors.textPrimary,
-                fontSize: 13,
-                fontWeight: "700",
-                marginTop: 3,
-              }}
-            >
-              {card.cardName}
-            </Text>
           </View>
         );
       })}

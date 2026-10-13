@@ -85,7 +85,7 @@ const AURA_CURATION = {
   "aura-sparks": { colors: ["#ffd27a", "#ff8c2e"], count: 14, scale: 0.035 },
   "aura-bubbles": { colors: ["#bfe4ff", "#eaf7ff"], count: 11, scale: 0.05 },
   "aura-hearts": { colors: ["#ff8fb1", "#ffd0dd"], count: 10, scale: 0.045 },
-  "aura-sakura": { colors: ["#ffc9dd", "#fff0f5"], count: 12, scale: 0.045 },
+  "aura-sakura": { colors: ["#f59ac0", "#ffd3e3"], count: 16, scale: 0.055 },
   "aura-holo-shards": { colors: ["#a5b4fc", "#7fe3d4"], count: 12, scale: 0.04 },
   "aura-snow": { colors: ["#eaf7ff", "#bfe4ff"], count: 14, scale: 0.035 },
   "aura-stars": { colors: ["#ffe08a", "#fff6d5"], count: 13, scale: 0.035 },
@@ -1397,7 +1397,7 @@ const banner = `/**
 
 const body = `${banner}
 
-export type AuraMotion = "rise" | "fall" | "drift" | "twinkle" | "flicker";
+export type AuraMotion = "rise" | "fall" | "drift" | "petalfall" | "twinkle" | "flicker";
 
 /** The particle shapes, one Skia path each in \`cosmetic-worn.tsx\`. */
 export type AuraShape =

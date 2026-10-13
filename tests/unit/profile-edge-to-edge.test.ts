@@ -70,9 +70,15 @@ describe("the app's profile runs edge to edge", () => {
       expect(block).toContain("radius={0}");
       expect(block).toContain("paddingHorizontal: PROFILE_INSET");
     }
-    /* Same block on both screens: what you see is what they see. */
-    expect(appBlock(app.theirs).block.replace(/\s+/g, "")).toContain(
-      appBlock(app.own).block.replace(/\s+/g, "").slice(0, 200),
+    /* Same block on both screens: what you see is what they see. Both
+       run full screen under the status bar now, padding and cover
+       stepping down by the inset; theirs adds a back button. */
+    const flat = (block: string) => block.replace(/\s+/g, "").replace(/\+insets\.top/g, "");
+    expect(app.own).toContain("height={COVER_HEIGHT + insets.top}");
+    expect(app.theirs).toContain("height={COVER_HEIGHT + insets.top}");
+    expect(app.theirs).toContain('accessibilityLabel="Back"');
+    expect(flat(appBlock(app.theirs).block)).toContain(
+      flat(appBlock(app.own).block).slice(0, 200),
     );
   });
 

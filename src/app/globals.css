@@ -22,21 +22,30 @@
    * this block moved.
    */
   --color-canvas: #000000;
-  --color-surface: #151a21;
-  --color-elevated: #1d242d;
-  --color-border: #2a323d;
-  --color-border-strong: #3a4553;
+  /*
+   * The surfaces and quiet text are the app's "soft" look (mobile/src/
+   * theme.ts, BRAND "soft"): the CF logo's own deep green-black, #111710,
+   * with the raised steps, borders and grey text in the same green
+   * family. The founder (2026-10-11): "now update the website with our
+   * new color scheme". The navy they replaced: #151a21 / #1d242d /
+   * #2a323d / #3a4553, text #b3becc / #8593a4.
+   */
+  --color-surface: #111710;
+  --color-elevated: #1a2118;
+  --color-border: #242d22;
+  --color-border-strong: #333e30;
 
-  /* Accent — the faded neon lime from the approved cardflare mark. */
-  --color-accent: #c6ee4f;
-  --color-accent-hover: #d3fa5f;
-  --color-accent-muted: #8ba635;
+  /* Accent — the CF logo's soft green; the lime it replaced was #c6ee4f
+     (hover #d3fa5f, muted #8ba635). */
+  --color-accent: #cefc84;
+  --color-accent-hover: #dbfda2;
+  --color-accent-muted: #93ae63;
   --color-accent-contrast: #0e1116;
 
   /* Text */
   --color-text-primary: #f2f5f7;
-  --color-text-secondary: #b3becc;
-  --color-text-muted: #8593a4;
+  --color-text-secondary: #bcc4b8;
+  --color-text-muted: #8a9386;
 
   /* Status */
   --color-success: #6ee7a8;
@@ -128,6 +137,19 @@
   --color-rose-deep: #b8367d;
   --color-gold: #f0c24b;
   --color-gold-deep: #a8781d;
+}
+
+/*
+ * PURE BLACK, the player's choice in Settings (lib/players/backdrop.ts):
+ * the green-black surfaces go black, neutral rather than tinted, and the
+ * accent, the FOUND band and every highlight stay. The app's set is the
+ * same four values (mobile/src/theme.ts, BACKDROPS.black).
+ */
+html[data-backdrop="black"] {
+  --color-surface: #000000;
+  --color-elevated: #121212;
+  --color-border: #1f1f1f;
+  --color-border-strong: #2e2e2e;
 }
 
 @layer base {

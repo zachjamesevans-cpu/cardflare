@@ -202,19 +202,32 @@ describe("the ring on a row that is all yours", () => {
     }
   });
 
-  it("app: one ring, the accent, the website's two corner icons", () => {
+  it("app: one ring, the accent, three points, no corner icon", () => {
+    /* The founder (2026-10-11): "let's remove that little 'box' icon
+       that's in the top right of a card if someone has it. let's make
+       the green ring around the card more pronounced". */
     const ring = read("mobile/src/held-ring.tsx");
     expect(ring).toContain("borderColor: colors.accent");
-    expect(ring).toContain('"package-variant-closed-check"');
-    expect(ring).toContain('"layers-outline"');
+    expect(ring).toContain("export const HELD_RING_WIDTH = 3;");
+    expect(ring).not.toContain('"package-variant-closed-check"');
+    expect(ring).not.toContain('"layers-outline"');
     /* Read by these tests in node: never the API module. */
     expect(ring).not.toContain('from "./api"');
   });
 
-  it("web: a held want on a profile's grid wears the ring", () => {
+  it("web: a held card wears the thicker ring and no corner icon", () => {
     const grid = read("src/components/players/profile-flares.tsx");
     expect(grid).toContain("{flare.match && (");
-    expect(grid).toContain("ring-2 ring-accent ring-inset");
+    expect(grid).toContain("ring-[3px] ring-accent ring-inset");
+    for (const path of [
+      "src/components/players/profile-flares.tsx",
+      "src/components/feed/feed-tile.tsx",
+    ]) {
+      expect(read(path), path).not.toContain("PackageCheck");
+    }
+    expect(read("src/components/feed/feed-tile.tsx")).toContain(
+      "ring-[3px] ring-accent",
+    );
   });
 });
 

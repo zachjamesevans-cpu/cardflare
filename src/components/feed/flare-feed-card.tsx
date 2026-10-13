@@ -1,5 +1,12 @@
+import { foundLast } from "@/lib/feed/card-copy";
 import Link from "next/link";
-import { CheckCircle2, Crosshair, Heart, MessageCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Crosshair,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
 
 import { FeedTile, haveFor } from "@/components/feed/feed-tile";
 import { FlareCarousel, SingleFlare } from "@/components/feed/flare-carousel";
@@ -23,8 +30,8 @@ import type { HuntItem } from "@/lib/feed/repository";
  *
  * A post is one person, one caption, one or many cards. The header
  * says who and which way ("is looking for" or "is offering") and how many
- * cards; the caption is theirs; a hunt the post belongs to is one line
- * with a door to it. The cards are slides - the picture beside what
+ * cards, and a post in a hunt says "is hunting" and names it, the name
+ * the door to it; the caption is theirs. The cards are slides - the picture beside what
  * matters about it - and the whole list is one press away with the
  * toggles to say which you have. The heart and the thread belong to
  * the post. The app draws the same card natively
@@ -84,7 +91,11 @@ function statusLabel(item: HuntItem): string {
     if (item.direction === "showcase") return "offered it all";
     return item.total === 1 ? "found it" : "found them all";
   }
-  return item.direction === "showcase" ? "is offering" : "is looking for";
+  if (item.direction === "showcase") return "is offering";
+  /* The founder: "soupie posted 17 cards to her ace hunt. but it just
+     says 'is looking for' with a little tiny ace 'view hunt' button
+     below". A post in a hunt says so, and names it (see FlareStatus). */
+  return item.hunt ? "is hunting" : "is looking for";
 }
 
 /**
@@ -102,14 +113,25 @@ export function FlareStatus({
   label = "is looking for",
   glow = true,
   done = false,
+  hunt = null,
+  linkHunt = true,
 }: {
   label?: string;
   glow?: boolean;
   /** The post is complete: the check-circle instead of the crosshair, no glow. */
   done?: boolean;
+  /**
+   * The hunt the post went up in, named after the words - "is hunting
+   * Ace <3" - and the door to it. This replaced the "Ace <3 · View
+   * hunt" line under the post, which was the only sign it belonged to
+   * a hunt and the easiest thing on it to miss.
+   */
+  hunt?: { id: string; name: string } | null;
+  /** False in the composer's preview, where there is nowhere to go yet. */
+  linkHunt?: boolean;
 }) {
   return (
-    <span className="flex items-center gap-1.5 text-sm font-semibold text-accent">
+    <span className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-accent">
       {done ? (
         <CheckCircle2
           className="size-[17px] shrink-0"
@@ -120,13 +142,36 @@ export function FlareStatus({
         <Crosshair
           className={cn(
             "size-[17px] shrink-0",
-            glow && "drop-shadow-[0_0_5px_rgba(198,238,79,0.7)]",
+            glow && "drop-shadow-[0_0_5px_rgba(206,252,132,0.7)]",
           )}
           strokeWidth={1.75}
           aria-hidden="true"
         />
       )}
-      {label}
+      <span className="shrink-0">{label}</span>
+      {/* The hunt as a name, not a button: white words and a small grey
+          chevron, so it reads as a place that opens rather than the card
+          wanted ("Green Zoro"), without the weight of a pill. The founder:
+          "still dont think that big button for straw hat crew is the best
+          option" - "lets try option a". The app draws the same. */}
+      {hunt &&
+        (linkHunt ? (
+          <Link
+            href={`/hunts/${hunt.id}`}
+            aria-label={`View hunt ${hunt.name}`}
+            className="flex min-w-0 items-center gap-0.5 font-bold text-text-primary hover:underline"
+          >
+            <span className="truncate">{hunt.name}</span>
+            <ChevronRight
+              className="size-3.5 shrink-0 text-text-muted"
+              aria-hidden="true"
+            />
+          </Link>
+        ) : (
+          <span className="flex min-w-0 items-center font-bold text-text-primary">
+            <span className="truncate">{hunt.name}</span>
+          </span>
+        ))}
     </span>
   );
 }
@@ -144,13 +189,15 @@ export function FlareFeedCard({
 }) {
   const direction: "want" | "showcase" =
     item.direction === "showcase" ? "showcase" : "want";
-  const lead = item.cards[0];
+  /* Found cards at the far right, whatever order they arrived in. */
+  const cards = [...item.cards].sort(foundLast);
+  const lead = cards[0];
   const single = item.total === 1 && lead;
   const post = { postId: item.postId, yours: item.yours || preview };
   /* What the menu, the offer button and the offer itself read. */
   const shape = {
     postId: item.postId,
-    cards: item.cards,
+    cards: cards,
     total: item.total,
     direction,
     yours: item.yours,
@@ -161,7 +208,7 @@ export function FlareFeedCard({
   };
 
   /* The zoom pages along the whole deck from any card. */
-  const shelf: ZoomCard[] = item.cards.map((card) => ({
+  const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
@@ -172,9 +219,10 @@ export function FlareFeedCard({
     stillNeeds: direction === "want" ? (card.remaining ?? null) : null,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: preview ? null : haveFor(card, post),
+    state: card.state ?? "open",
   }));
 
-  const tiles = item.cards.map((card, index) => (
+  const tiles = cards.map((card, index) => (
     <FeedTile
       key={card.cardId}
       imageUrl={card.imageUrl}
@@ -191,64 +239,86 @@ export function FlareFeedCard({
   ));
 
   const article = (
-    <article className="flex flex-col gap-2.5 rounded-[20px] border border-border bg-surface p-3 shadow-[var(--shadow-card)]">
-      {/* The header: face, name, the status line; time and distance on
-          the right. "Your Flare" is a small label inside this row, never
-          a line between posts. */}
+    /* No panel: the post sits on the Feed's own green with a hairline
+       under it, the app's FEED_LOOK "open". The founder (2026-10-11):
+       "without the green 'blocks' in the feed ... the full background was
+       just that dark gray green color". */
+    <article className="flex flex-col gap-2.5 border-b border-border-strong/70 px-3 pt-1 pb-4">
+      {/* The header: face, then the name with when and how far beside it,
+          then the status line; the three dots at the right. "Your Flare"
+          is a small label inside the name's row, never a line between
+          posts. */}
+      {/*
+       * The face and the name open the profile; the status line sits
+       * outside that link, because the hunt's name in it is a link of
+       * its own and a link cannot hold another.
+       */}
       <div className="flex items-start gap-3">
-        <Link
-          href={`/p/${item.playerId}`}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[var(--radius-control)] transition-colors hover:bg-elevated/60"
-        >
-          <PlayerAvatar
-            displayName={item.displayName}
-            seed={item.playerId}
-            avatarUrl={item.avatarUrl}
-            frame={item.frame}
-            ring={item.ring}
-            size="md"
-          />
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <Link
+            href={`/p/${item.playerId}`}
+            tabIndex={-1}
+            aria-hidden="true"
+            className="shrink-0 rounded-full"
+          >
+            <PlayerAvatar
+              displayName={item.displayName}
+              seed={item.playerId}
+              avatarUrl={item.avatarUrl}
+              frame={item.frame}
+              ring={item.ring}
+              size="md"
+            />
+          </Link>
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="flex items-center gap-1.5">
-              <span className="truncate text-base font-extrabold text-text-primary">
-                {item.displayName}
-              </span>
-              {!item.playerId && <GuestChip />}
-              {item.yours && !preview && (
-                <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
-                  Your Flare
+            {/* When and how far sit on the name's line, the way Instagram
+                writes "name • 2h", so the status line below has the width
+                for a hunt's pill. The app draws the same. */}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Link
+                href={`/p/${item.playerId}`}
+                className="flex min-w-0 items-center gap-1.5 hover:underline"
+              >
+                <span className="truncate text-base font-extrabold text-text-primary">
+                  {item.displayName}
                 </span>
-              )}
+                {!item.playerId && <GuestChip />}
+                {item.yours && !preview && (
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
+                    Your Flare
+                  </span>
+                )}
+              </Link>
+              <span className="shrink-0 text-[13px] text-text-muted">
+                · {agoFrom(item.postedAt)}
+                {typeof item.milesAway === "number" &&
+                  ` · ${awayLabel(item.milesAway)}`}
+              </span>
             </span>
-            <span className="flex flex-wrap items-center gap-1.5">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5">
               <FlareStatus
                 label={statusLabel(item)}
                 glow={direction === "want"}
                 done={item.completed}
+                hunt={item.hunt}
+                linkHunt={!preview}
               />
-              {item.total > 1 && (
-                <span className="rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
+              {item.total > 1 && !item.hunt && (
+                <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[11px] font-bold text-text-secondary tabular-nums">
                   {item.total} cards
                 </span>
               )}
             </span>
           </span>
-        </Link>
-        <div className="flex shrink-0 items-center gap-2 text-[13px] text-text-muted">
-          <span className="flex items-center gap-1">
-            <span>{agoFrom(item.postedAt)}</span>
-            {typeof item.milesAway === "number" && (
-              <span className="flex items-center gap-1">
-                <span aria-hidden="true">·</span>
-                {awayLabel(item.milesAway)}
-              </span>
-            )}
-          </span>
-          {/* The three dots: the full list and, on your own post, the
-              progress ticks. Nothing renders when there is nothing to
-              offer. */}
-          {!preview && <PostMenu post={shape} />}
         </div>
+        {/* The three dots alone at the right: the full list and, on your
+            own post, the progress ticks. Nothing renders when there is
+            nothing to offer. */}
+        {!preview && (
+          <div className="flex shrink-0 items-center">
+            <PostMenu post={shape} />
+          </div>
+        )}
       </div>
 
       {/* What they wrote with it. Nothing at all when they wrote nothing. */}
@@ -258,27 +328,8 @@ export function FlareFeedCard({
         </p>
       )}
 
-      {/* The hunt it belongs to, with a door: "Green Zoro · View hunt". */}
-      {item.hunt && (
-        <p className="flex items-center gap-1.5 text-sm">
-          <span className="truncate font-semibold text-text-primary">
-            {item.hunt.name}
-          </span>
-          <span className="text-text-muted" aria-hidden="true">
-            ·
-          </span>
-          {preview ? (
-            <span className="shrink-0 text-text-secondary">View hunt</span>
-          ) : (
-            <Link
-              href={`/hunts/${item.hunt.id}`}
-              className="shrink-0 font-semibold text-accent hover:underline"
-            >
-              View hunt
-            </Link>
-          )}
-        </p>
-      )}
+      {/* No hunt line: the hunt is named in the status line and opens
+          from there ("is hunting Ace <3"). */}
 
       {/* The cards: one beside its details, or slides. */}
       {single ? (
@@ -301,7 +352,7 @@ export function FlareFeedCard({
         </SingleFlare>
       ) : (
         <FlareCarousel
-          cards={item.cards}
+          cards={cards}
           direction={direction}
           tiles={tiles}
           post={preview ? null : shape}

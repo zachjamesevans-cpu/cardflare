@@ -5,6 +5,9 @@ import { cardFacts } from "@/lib/feed/repository";
 import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repository";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { splitFound } from "./found-split";
+import { avatarWearFor } from "./equips";
+import { avatarPathFor, avatarSrc } from "./profile-image";
+import { wornFrame } from "@/lib/players/worn-frame";
 import { tierAllows } from "@/lib/tiers";
 
 /**
@@ -85,6 +88,13 @@ export interface Hunt {
 export interface HuntView extends Hunt {
   playerId: string;
   ownerName: string;
+  /**
+   * The owner's face, worn ring and frame, for the hunt page's header:
+   * "(●) Maya Chen's hunt". Nested as `avatarUrl` so the app API's
+   * absoluteAvatars makes the path whole. Optional so an older reader
+   * ignores it.
+   */
+  owner?: { avatarUrl: string | null; frame: string | null; ring: string | null };
 }
 
 /**
@@ -303,15 +313,25 @@ export async function huntById(
   if (error || !data) return null;
   if (data.visibility === "private" && data.player_id !== viewerId) return null;
 
-  const [[hunt], { data: owner }] = await Promise.all([
+  const [[hunt], { data: owner }, wear] = await Promise.all([
     assemble([data]),
-    admin.from("players").select("display_name").eq("id", data.player_id).maybeSingle(),
+    admin
+      .from("players")
+      .select("display_name, avatar_url, avatar_animated, tier, equipped_avatar_frame")
+      .eq("id", data.player_id)
+      .maybeSingle(),
+    avatarWearFor([data.player_id]),
   ]);
   if (!hunt) return null;
   return {
     ...hunt,
     playerId: data.player_id,
     ownerName: owner?.display_name ?? "A player",
+    owner: {
+      avatarUrl: owner ? avatarSrc(avatarPathFor(owner)) : null,
+      frame: owner ? wornFrame(owner) : null,
+      ring: wear.get(data.player_id)?.ring ?? null,
+    },
   };
 }
 
@@ -384,7 +404,11 @@ export async function createHunt(
       player_id: playerId,
       name,
       description: input.description?.trim().slice(0, HUNT_DESCRIPTION_MAX) || null,
-      visibility: input.visibility ?? "public",
+      /* Always public: a hunt exists to be seen. The founder: "there is
+         zero reason to keep a hunt private - it's the whole point of a
+         hunt." `visibility` is still accepted and ignored, for the builds
+         that send it. */
+      visibility: "public",
     })
     .select("id")
     .single();
@@ -396,7 +420,7 @@ export async function createHunt(
   return { ok: true, huntId: data.id, created: true };
 }
 
-/** Renames, describes or hides a hunt. The owner only. */
+/** Renames or describes a hunt. The owner only. Hunts are never hidden. */
 export async function updateHunt(
   playerId: string,
   huntId: string,
@@ -422,7 +446,8 @@ export async function updateHunt(
     update.description =
       patch.description?.trim().slice(0, HUNT_DESCRIPTION_MAX) || null;
   }
-  if (patch.visibility !== undefined) update.visibility = patch.visibility;
+  /* `patch.visibility` is ignored: every hunt is public. */
+  void patch.visibility;
 
   const { data, error } = await getSupabaseAdmin()
     .from("hunts")

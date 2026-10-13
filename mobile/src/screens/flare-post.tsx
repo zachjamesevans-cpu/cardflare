@@ -34,7 +34,7 @@ import { FeedPerson } from "../feed-person";
 import { FlareCardsSheet, type FlareSheetPost } from "../flare-cards-sheet";
 import { cardsLabel } from "../flare-copy";
 import { FlareCardSlide, FlareStrip, shelfFor } from "../flare-deck-pager";
-import { postActions, statusLabel } from "../flare-feed-card";
+import { FlareStatus, postActions, statusLabel } from "../flare-feed-card";
 import { FlareProgressSheet } from "../flare-progress-sheet";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { PlayerAvatar } from "../player-avatar";
@@ -427,9 +427,21 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   frame={post.author.frame}
                   ring={post.author.ring}
                   aura={post.author.aura ?? null}
-                  detail={`${statusLabel(post)}${total > 1 ? ` · ${cardsLabel(total)}` : ""}${
-                    post.eventName ? ` · ${post.eventName}` : ""
-                  }`}
+                  /* The Feed's status line, hunt and all: "is hunting
+                     Ace <3 · 17 cards", the name opening the hunt. */
+                  detail={
+                    <FlareStatus
+                      label={statusLabel(post)}
+                      done={Boolean(post.completed)}
+                      detail={
+                        [total > 1 && !post.hunt ? cardsLabel(total) : null, post.eventName ?? null]
+                          .filter(Boolean)
+                          .join(" · ") || null
+                      }
+                      hunt={post.hunt}
+                      onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+                    />
+                  }
                   onOpen={(id) =>
                     navigation.navigate("PlayerProfile", { playerId: id })
                   }
@@ -459,6 +471,8 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             ) : (
               <FlareStrip
                 cards={post.cards}
+                /* To the screen's edges, the way the Feed runs it to the post's. */
+                bleed={gutter}
                 direction={direction}
                 post={ref}
                 picks={picks}
@@ -475,24 +489,6 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             ) : null}
           </>
         )}
-
-        {post.hunt ? (
-          <Tap
-            onPress={() => navigation.navigate("Hunt", { huntId: post.hunt?.id ?? "" })}
-            accessibilityLabel={`View hunt ${post.hunt.name}`}
-            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
-          >
-            <Text
-              numberOfLines={1}
-              style={{ color: colors.textSecondary, fontSize: 13, flexShrink: 1 }}
-            >
-              {post.hunt.name}
-            </Text>
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
-              · View hunt
-            </Text>
-          </Tap>
-        ) : null}
 
         {/* No offer button, as on the Feed: a card's tap is the offer. */}
         {!post.store && !post.yours && direction === "want" && !post.completed ? (

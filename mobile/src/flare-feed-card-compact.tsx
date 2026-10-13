@@ -1,3 +1,4 @@
+import { foundLast } from "./found-last";
 import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import { ScrollView, Text, View } from "react-native";
@@ -77,7 +78,9 @@ export function FlareFeedCardCompact({
   /** "Block" on somebody else's, after Report; behind the three dots. */
   onBlock?: () => void;
 }) {
-  const shelf = shelfFor(item.cards, post);
+  /* Found cards at the far right (found-last.ts). */
+  const cards = [...item.cards].sort(foundLast);
+  const shelf = shelfFor(cards, post);
   const direction = item.direction ?? "want";
   const offering = direction === "showcase";
   const [menu, setMenu] = useState(false);
@@ -182,7 +185,7 @@ export function FlareFeedCardCompact({
         style={{ marginHorizontal: -spacing(0.5) }}
         contentContainerStyle={{ gap: spacing(1.5), padding: spacing(0.5) }}
       >
-        {item.cards.map((card, index) => (
+        {cards.map((card, index) => (
           <View key={card.cardId}>
             <CardImage
               imageUrl={card.imageUrl}
@@ -194,7 +197,7 @@ export function FlareFeedCardCompact({
               position={index}
             />
             {/* The copies tag owns the top left. */}
-            <HeldRing match={card.match} corner="right" />
+            <HeldRing match={card.match} />
             <NeedBadge card={card} offering={offering} />
           </View>
         ))}

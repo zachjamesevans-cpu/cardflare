@@ -82,7 +82,14 @@ const SHAPES: Record<
   heart: {
     d: "M32 40s-7-4.6-7-9.6c0-2.9 2-4.4 4-4.4 1.3 0 2.4.7 3 1.7.6-1 1.7-1.7 3-1.7 2 0 4 1.5 4 4.4 0 5-7 9.6-7 9.6z",
   },
-  petal: { d: "M32 23c4 4.5 6 7 6 10a6 6 0 1 1-12 0c0-3 2-5.5 6-10z" },
+  /* A cherry-blossom petal, notched at the tip, with a paler heart:
+     the stylesheet's --cfa-p-petal (2026-10-11), which replaced a plain
+     teardrop the founder called "chopped". */
+  petal: {
+    d: "M32 47c-7.6-3.2-11.1-9.5-10.5-16.3.4-5 3.4-9.3 7.3-11.4l3.2 4.4 3.2-4.4c3.9 2.1 6.9 6.4 7.3 11.4.6 6.8-2.9 13.1-10.5 16.3z",
+    inner:
+      "M32 43.5c-4.8-2.4-7-6.8-6.6-11.4.3-3.3 2-6.1 4.4-7.6l2.2 3 2.2-3c2.4 1.5 4.1 4.3 4.4 7.6.4 4.6-1.8 9-6.6 11.4z",
+  },
   star: { d: "M32 23l1.8 7.2 7.2 1.8-7.2 1.8L32 41l-1.8-7.2L23 32l7.2-1.8z" },
   bolt: { d: "M34 20l-8 13h5l-1 11 9-15h-5z" },
   shard: { d: "M29 23L36 26L35 40L27 36Z" },
@@ -364,6 +371,30 @@ function makeKit(S: Skia) {
             y,
           };
         }
+        case "petalfall": {
+          /* Sakura: petals falling past the picture with a lazy sway,
+             each in its own lane and kept clear of the face, the way
+             "fall" does. A ring of petals marching round in step was
+             what read as "chopped". */
+          /* Inside the layer's own box, always: the biggest petal's
+             reach from the edge is the margin, so none is ever cut by
+             the canvas - a petal sliced by a straight edge is exactly
+             the "chopped" this replaced. */
+          const reach = centre - dot * 1.35;
+          const y = centre - reach + t * reach * 2;
+          /* Lanes spread evenly across the width, not bunched at the
+             sides the way a circle's cosine bunches them. */
+          const lane = (((index + 0.5) / art.count) * 2 - 1) * reach * 0.92;
+          const sway = Math.sin(t * Math.PI * 2 * 1.3 + phase * 6.283) * dot * 1.4;
+          const blocked = clear * clear - (y - centre) * (y - centre);
+          const push = blocked > 0 ? Math.sqrt(blocked) : 0;
+          const x = lane + sway;
+          const pushed = Math.abs(x) < push ? (x < 0 ? -push : push) : x;
+          return {
+            x: centre + Math.max(-reach, Math.min(reach, pushed)),
+            y,
+          };
+        }
         case "drift": {
           const a = angle + t * Math.PI * 2;
           return { x: centre + Math.cos(a) * orbit, y: centre + Math.sin(a) * orbit };
@@ -386,6 +417,7 @@ function makeKit(S: Skia) {
       switch (art.motion) {
         case "rise":
         case "fall":
+        case "petalfall":
           /* Fades in and out at the ends of its travel, so nothing pops
              into existence at the edge of the picture. */
           return art.opacity * Math.sin(t * Math.PI);
@@ -407,11 +439,26 @@ function makeKit(S: Skia) {
      */
     const drawn = PARTICLE[art.shape];
 
+    /* Falling petals tumble and vary: each its own size (70% to 130%)
+       and its own slow turn, so no two neighbours match. Every other
+       aura keeps one size and no spin. */
+    const tumbling = art.motion === "petalfall";
+    const size = tumbling ? dot * (0.7 + 0.6 * ((index * 0.3719) % 1)) : dot;
+    const spin = (index % 2 === 0 ? 1 : -1) * (0.6 + 0.5 * phase);
     const transform = useDerivedValue(() => [
       { translateX: position.value.x },
       { translateY: position.value.y },
-      { scale: dot },
+      {
+        rotate: tumbling
+          ? phase * Math.PI * 2 + ((clock.value + phase) % 1) * Math.PI * 2 * spin
+          : 0,
+      },
+      { scale: size },
     ]);
+    /* A petal's paler heart; on a petal already in the pale shade, a
+       near-white one, so both shades keep their two tones. */
+    const innerColour =
+      tumbling && colour === art.colors[1] ? "#fff4f8" : art.colors[1];
 
     if (!drawn) {
       return <Circle cx={cx} cy={cy} r={dot} color={colour} opacity={opacity} />;
@@ -427,7 +474,9 @@ function makeKit(S: Skia) {
           strokeCap="round"
           strokeJoin="round"
         />
-        {drawn.inner ? <Path path={drawn.inner} color={art.colors[1]} /> : null}
+        {drawn.inner ? (
+          <Path path={drawn.inner} color={innerColour} opacity={tumbling ? 0.8 : 1} />
+        ) : null}
       </Group>
     );
   }

@@ -43,7 +43,7 @@ describe("account deletion", () => {
   });
 
   it("is offered on the website's settings page in the same words", () => {
-    const page = read("src/app/profile/settings/page.tsx");
+    const page = read("src/app/profile/settings/settings-content.tsx");
     const form = read("src/components/players/delete-account-form.tsx");
 
     expect(page).toContain("Delete your account");

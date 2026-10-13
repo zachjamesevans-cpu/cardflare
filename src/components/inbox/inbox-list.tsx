@@ -56,10 +56,8 @@ export function InboxList({ items }: { items: InboxItem[] }) {
         return (
           <li
             key={item.id}
-            className={cn(
-              "flex items-center gap-3 rounded-[var(--radius-control)] px-2 py-2.5",
-              unread && "bg-accent/6",
-            )}
+            /* Unread is the accent dot at the right, no tinted block. */
+            className="flex items-center gap-3 py-2.5"
           >
             {item.actor ? (
               <Link

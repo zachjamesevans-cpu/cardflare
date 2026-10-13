@@ -365,7 +365,7 @@ describe("Remove from hunt", () => {
     expect(remove).toContain("onChanged?.();");
     /* Gone on the next paint: the page's cards are filtered by what was removed. */
     expect(src.binder).toContain(
-      "const cards = (hunt.cards ?? []).filter(\n    (card) => !card.requestId || !removed.has(card.requestId),\n  );",
+      ".filter((card) => !card.requestId || !removed.has(card.requestId))",
     );
     /* The question is answered fresh for every pocket opened. */
     expect(src.binder).toContain('key={open?.requestId ?? open?.cardId ?? "closed"}');

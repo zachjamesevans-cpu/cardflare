@@ -30,6 +30,8 @@ export function BinderList({
 }: {
   binders: (Pick<BinderSummary, "id" | "name" | "cover" | "count"> & {
     forTrade?: boolean;
+    /** Shown on the profile without being up for trade. */
+    isPublic?: boolean;
   })[];
   yours: boolean;
   onOpen: (binderId: string) => void;
@@ -113,7 +115,9 @@ export function BinderList({
                     </Text>
                   </View>
                 ) : (
-                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>Private</Text>
+                  <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+                    {binder.isPublic ? "On profile" : "Private"}
+                  </Text>
                 )
               ) : null}
             </View>

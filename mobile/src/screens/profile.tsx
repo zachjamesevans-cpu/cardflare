@@ -53,8 +53,8 @@ import { CreateBinderSheet } from "../create-binder-sheet";
 import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
-import { OwnPosts } from "../own-posts";
-import { ProfileFlares } from "../profile-flares";
+import { ProfileFlares, stillWanted } from "../profile-flares";
+import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { HuntsPanel } from "../hunts-panel";
@@ -144,6 +144,9 @@ interface CachedProfile {
 
 export function ProfileScreen() {
   const tabInset = useTabBarInset();
+  /* No navigator header on this tab: the cover runs up behind the
+     status bar, so everything at the top steps down by its height. */
+  const insets = useSafeAreaInsets();
   /* The scroll offset, which stretches the cover on a pull past the top. */
   const pull = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -175,6 +178,9 @@ export function ProfileScreen() {
 
   /* The list open over the page: the followers or following number. */
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
+
+  /* The wand's two doors - your look, and the Embers shop - when open. */
+  const [wandMenu, setWandMenu] = useState<ActionItem[] | null>(null);
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -354,6 +360,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -395,6 +402,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -434,6 +442,7 @@ export function ProfileScreen() {
         contentContainerStyle={{
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
+          paddingTop: spacing(4) + insets.top,
           gap: spacing(4),
           /* Clear of the floating tab bar. */
           paddingBottom: spacing(4) + tabInset,
@@ -780,21 +789,17 @@ export function ProfileScreen() {
     content: (() => {
       switch (tab) {
         case "flares":
-          /* Every Flare up right now, newest first, three across: the
-             same list the Flares number counts. */
+          /* The cards you are still looking for, three across, and
+             nothing else: no list of posts above them (the founder: "it
+             would literally just show cards im still actively looking
+             for"), no found cards (those are in Trades' history), no
+             offers (the TRADES binder is the standing for-trade list). */
           return (
-            <>
-              {/* Your posts, each a door to its own screen where it is
-                  managed: what the Feed's My Flares tab used to be. */}
-              <OwnPosts
-                onOpen={(postId) => navigation.navigate("FlarePost", { postId })}
-              />
-              <ProfileFlares
-                flares={profile.flares ?? []}
-                yours
-                onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
-              />
-            </>
+            <ProfileFlares
+              flares={stillWanted(profile.flares)}
+              yours
+              onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+            />
           );
         case "hunts":
           /* The panel the Hunts screen draws, with exactly its wiring:
@@ -872,9 +877,14 @@ export function ProfileScreen() {
           profile where they see Follow. The founder's rule: what you
           see is what they see. One block, no panels inside it: the
           founder, "fewer giant bordered boxes". */}
+      {/* Full screen: no "Profile" bar above, so the block starts under
+          the status bar and the cover reaches up behind it. The founder:
+          "what if the profile block at the top of the screen was full
+          screen and went all the way to the top?" Somebody else's
+          profile keeps its back bar, and so its plain padding. */}
       <View
         style={{
-          paddingTop: spacing(6),
+          paddingTop: spacing(6) + insets.top,
           paddingBottom: spacing(4),
           gap: spacing(4),
           /* No overflow clip: the cover stretches up out of the block
@@ -892,7 +902,7 @@ export function ProfileScreen() {
             mockup, and the same shape the website draws. */}
         <CoverBanner
           coverUrl={profile.coverUrl}
-          height={COVER_HEIGHT}
+          height={COVER_HEIGHT + insets.top}
           fade
           corner={0}
           pull={pull}
@@ -919,17 +929,35 @@ export function ProfileScreen() {
         <View
           style={{
             position: "absolute",
-            top: spacing(1),
+            top: insets.top + spacing(1),
             right: spacing(1),
             flexDirection: "row",
           }}
         >
           <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+          {/* The wand: your look, and the Embers shop that pays for it.
+              The shop was a tab of its own until the strip went to three. */}
           <HeaderButton
             icon="color-wand"
-            label="Customize your profile"
-            onPress={() => navigation.navigate("Customize", { area: "profile" })}
+            label="Customize and Embers shop"
+            onPress={() =>
+              setWandMenu([
+                {
+                  key: "customize",
+                  label: "Customize your look",
+                  icon: "color-wand-outline",
+                  onPress: () => navigation.navigate("Customize", { area: "profile" }),
+                },
+                {
+                  key: "store",
+                  label: `Embers shop · ${profile.embersBalance.toLocaleString()}`,
+                  icon: "storefront-outline",
+                  onPress: () => navigation.navigate("Store"),
+                },
+              ])
+            }
           />
+          <ActionSheet items={wandMenu} onClose={() => setWandMenu(null)} />
           <HeaderButton
             icon="settings-outline"
             label="Settings"

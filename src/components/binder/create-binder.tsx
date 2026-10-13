@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { BinderCover } from "@/components/binder/binder-cover";
-import { ForTradeSwitch } from "@/components/binder/for-trade-switch";
+import { ForTradeSwitch, PublicSwitch } from "@/components/binder/for-trade-switch";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { Sheet } from "@/components/ui/sheet";
@@ -46,6 +46,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
   const [forTrade, setForTrade] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -55,6 +56,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
     setName("");
     setCover(DEFAULT_BINDER_COVER);
     setForTrade(false);
+    setIsPublic(false);
     setError(null);
   };
 
@@ -67,7 +69,12 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
     }
     setError(null);
     start(async () => {
-      const result = await createBinderAction({ name: trimmed, cover, forTrade });
+      const result = await createBinderAction({
+        name: trimmed,
+        cover,
+        forTrade,
+        isPublic: isPublic || forTrade,
+      });
       if (!result.ok) {
         setError(result.message);
         return;
@@ -181,6 +188,12 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
             </div>
           </div>
 
+          <PublicSwitch
+            on={isPublic}
+            forTrade={forTrade}
+            disabled={pending}
+            onChange={setIsPublic}
+          />
           <ForTradeSwitch on={forTrade} disabled={pending} onChange={setForTrade} />
         </form>
       </Sheet>

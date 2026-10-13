@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Linking, Text, View } from "react-native";
 
-import { savePostalCode } from "./api";
+import { savePostalCode, savePostalCodeFromCoords } from "./api";
 import { requestCoords } from "./location";
 import { colors, spacing } from "./theme";
 import { AsyncButton, ErrorLine, Input, Muted } from "./ui";
@@ -43,10 +43,19 @@ export function NearbyLocationAsk({
   intro = "cardflare knows about shops whether or not they use it yet. Tell us roughly where you are and we’ll list the close ones.",
   /** The ZIP button: what saving the ZIP shows you. */
   saveLabel = "Show stores",
+  /**
+   * Keep a granted position as its nearest ZIP. Nearby matching needs a
+   * stored anchor, because a match is found while the other person is
+   * offline; without one, granting location satisfied nothing and this
+   * same ask came straight back. Only the five digits are kept. Stores
+   * near you does not need it: its coordinate rides the request.
+   */
+  keepAsZip = false,
 }: {
   onDone: () => void;
   intro?: string | null;
   saveLabel?: string;
+  keepAsZip?: boolean;
 }) {
   /* Calm: a refusal, or a device with Location Services off. */
   const [note, setNote] = useState<string | null>(null);
@@ -65,7 +74,21 @@ export function NearbyLocationAsk({
     const outcome = await requestCoords();
 
     if (outcome.status === "granted") {
-      onDone();
+      if (!keepAsZip) {
+        onDone();
+        return;
+      }
+      try {
+        await savePostalCodeFromCoords(
+          outcome.coords.latitude,
+          outcome.coords.longitude,
+        );
+        onDone();
+      } catch (problem) {
+        /* Outside the US ZIPs, or the save failed: the field, not a loop. */
+        setTyping(true);
+        setError(readable(problem));
+      }
       return;
     }
 

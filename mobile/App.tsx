@@ -52,6 +52,9 @@ import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
+import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
+import { keepNavigation, takeNavigation } from "./src/backdrop";
+import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
 import { NightMatchesScreen } from "./src/screens/night-matches";
@@ -77,6 +80,7 @@ import { LOCAL_ENABLED } from "./src/local-enabled";
 import { openRoom } from "./src/open-room";
 import { followHref } from "./src/follow-href";
 import { registerForPush } from "./src/push";
+import { DockTabBar, restoreDock } from "./src/dock";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 import { StackHeader, TabHeader } from "./src/header";
 import { UnreadDot } from "./src/unread-dot";
@@ -172,14 +176,16 @@ export type StackParams = {
       src/open-room.ts, never by name. */
   Room: undefined;
   /** One conversation about one Flare, from Local, Messages or the Inbox. */
-  LocalThread: { threadId: string };
+  /** `draft`: words already in the box, from a profile's "Ask what they're after". */
+  LocalThread: { threadId: string; draft?: string };
   /** The notices, from the bell at the Feed's top right. It was a tab. */
   Inbox: undefined;
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
   Scan: undefined;
-  Settings: undefined;
+  /** No section is the menu; a section opens that category (settings-sections.ts). */
+  Settings: { section?: import("./src/settings-sections").SettingsSection } | undefined;
   /* Paste a deck list: every card goes up as one Flare post. */
   DeckPaste: undefined;
   /** Instagram's Edit profile: picture, effects, name, username,
@@ -213,6 +219,8 @@ export type StackParams = {
   /** Every shape a Feed post can take, drawn with made-up data. See
       src/screens/lab.tsx - it reaches nothing and posts nothing. */
   Lab: undefined;
+  /** Demo mode's shot list: development builds only (src/demo/demo-mode.ts). */
+  DemoShots: undefined;
   /** The Embers store, the website's /profile/store. */
   Store: undefined;
   /** Getting dressed, the website's /profile/customize. Two wands, two
@@ -277,9 +285,13 @@ const theme: Theme = {
   colors: {
     ...DarkTheme.colors,
     background: colors.canvas,
-    card: colors.surface,
+    get card() {
+      return colors.surface;
+    },
     text: colors.textPrimary,
-    border: colors.border,
+    get border() {
+      return colors.border;
+    },
     primary: colors.accent,
   },
 };
@@ -386,11 +398,16 @@ function Tabs() {
 
   return (
     <Tab.Navigator
+      /* The bar shrinks while the Feed scrolls down, Instagram's way
+         (src/dock.tsx). */
+      tabBar={(props) => <DockTabBar {...props} />}
       // The same light tick every other control gives — switching tabs
       // is a tap too, and the bottom bar was the one mute surface left.
       screenListeners={({ route }) => ({
         tabPress: () => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+          /* A new tab starts with the bar whole. */
+          restoreDock();
         },
         /* Every tab change asks again, so the dot is right by the time
            anybody looks down at the bar. Messages is the exception for
@@ -577,7 +594,13 @@ function Tabs() {
         component={SearchScreen}
         options={{ title: "Search", tabBarLabel: "Search" }}
       />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      {/* No header: the profile's cover runs to the top of the screen,
+          under the status bar, and its own buttons ride the cover. */}
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
       {/* Rooms, kept as a route with no slot in the bar, as Post a Flare
           is below: links, pushes and Nearby's "All nights" still land
           here while it is decided whether it goes for good. */}
@@ -803,6 +826,9 @@ function AppGates() {
    * if storage is slow.
    */
   const [gate, setGate] = useState<"checking" | "welcome" | "open">("checking");
+  /* Where the player was before a backdrop change redrew the app
+     (src/backdrop.ts), taken once so they land back on Settings. */
+  const [restored] = useState(takeNavigation);
 
   useEffect(() => {
     let live = true;
@@ -921,10 +947,20 @@ function AppGates() {
         ref={navigationRef}
         linking={linking}
         theme={theme}
+        initialState={restored as never}
+        onStateChange={(state) => keepNavigation(state)}
         onReady={() => {
           void Notifications.getLastNotificationResponseAsync()
             .then(openNotificationLink)
             .catch(() => {});
+          /* Demo mode's queued shot, development builds only: launch
+             straight onto one screen of the shot list. */
+          if (__DEV__) {
+            void takeQueuedShot().then((index) => {
+              const shot = index === null ? undefined : SHOTS[index];
+              if (shot) setTimeout(() => shot.go(navigationRef as never), 600);
+            });
+          }
         }}
       >
         <StatusBar style="light" />
@@ -1013,6 +1049,13 @@ function AppGates() {
               name="Lab"
               component={LabScreen}
               options={{ title: "Design lab" }}
+            />
+          ) : null}
+          {__DEV__ ? (
+            <Stack.Screen
+              name="DemoShots"
+              component={DemoShotsScreen}
+              options={{ title: "Demo mode" }}
             />
           ) : null}
           <Stack.Screen

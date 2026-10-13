@@ -12,8 +12,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { HeaderButton } from "./header";
+import { dockCompact } from "./dock";
 import { HEADER } from "./header-metrics";
-import { colors } from "./theme";
+import { BRAND, colors } from "./theme";
 
 /**
  * The name is the founder's ARTWORK, not text in a font. He supplied
@@ -25,8 +26,17 @@ import { colors } from "./theme";
  * renders taller than the letters look; 24 points puts the lettering
  * where the old 20-point text sat.
  */
-const wordmark = require("../assets/wordmark.png");
-const WORDMARK_HEIGHT = 24;
+/* "soft": the founder's flat "cardflare" wordmark (2026-10-11, "make
+   this a png and make it the new header on the feed"), cut off its
+   ground in the accent, no glow; it took the place of the CF mark the
+   header wore before. "lime": the glowing wordmark. See BRAND in
+   theme.ts. The cut-out is cropped close, so its height is the
+   letters' own; 20 sits it level with the + and the bell. */
+const wordmark =
+  BRAND === "soft"
+    ? require("../assets/wordmark-soft.png")
+    : require("../assets/wordmark.png");
+const WORDMARK_HEIGHT = BRAND === "soft" ? 20 : 24;
 const WORDMARK_SOURCE = Image.resolveAssetSource(wordmark);
 const WORDMARK_ASPECT = WORDMARK_SOURCE.width / WORDMARK_SOURCE.height;
 
@@ -118,6 +128,7 @@ export function onHeaderScroll(state: HeaderScroll, y: number): void {
   if (y <= 0) {
     state.hidden.value = 0;
     state.lastY.value = y;
+    dockCompact.value = 0;
     return;
   }
 
@@ -126,6 +137,8 @@ export function onHeaderScroll(state: HeaderScroll, y: number): void {
 
   state.hidden.value = Math.min(Math.max(next, 0), HEADER_CONTENT_HEIGHT);
   state.lastY.value = y;
+  /* The tab bar shrinks in step with the header leaving (src/dock.tsx). */
+  dockCompact.value = state.hidden.value / HEADER_CONTENT_HEIGHT;
 }
 
 /**
@@ -141,10 +154,9 @@ export function settleHeader(state: HeaderScroll): void {
   const half = HEADER_CONTENT_HEIGHT / 2;
   if (state.hidden.value <= 0 || state.hidden.value >= HEADER_CONTENT_HEIGHT) return;
 
-  state.hidden.value = withTiming(
-    state.hidden.value > half ? HEADER_CONTENT_HEIGHT : 0,
-    { duration: 160 },
-  );
+  const gone = state.hidden.value > half;
+  state.hidden.value = withTiming(gone ? HEADER_CONTENT_HEIGHT : 0, { duration: 160 });
+  dockCompact.value = withTiming(gone ? 1 : 0, { duration: 160 });
 }
 
 export function CollapsingHeader({
@@ -169,8 +181,20 @@ export function CollapsingHeader({
 }) {
   const insets = useSafeAreaInsets();
 
+  /*
+   * The bar is the status-bar strip AND the row, so it travels both to
+   * leave. It used to travel the row's height alone and an empty pane of
+   * glass the height of the status bar stayed up top - the founder: "it
+   * leaves still the liquid glass element at top, showing no info. it
+   * should disappear completely". `hidden` still counts 0…row height, and
+   * the bar moves in proportion, so the snap and the fade keep their
+   * thresholds.
+   */
+  const full = insets.top + HEADER_CONTENT_HEIGHT;
   const bar = useAnimatedStyle(() => ({
-    transform: [{ translateY: -state.hidden.value }],
+    transform: [
+      { translateY: -(state.hidden.value / HEADER_CONTENT_HEIGHT) * full },
+    ],
   }));
 
   /*

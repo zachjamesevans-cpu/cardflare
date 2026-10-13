@@ -32,6 +32,8 @@ import {
   isLocalRadius,
   type LocalRadius,
 } from "@/lib/local/shared";
+import { SERIES } from "@/lib/packs";
+import { shopSeries } from "@/lib/packs/catalog";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { threadsOnFlaresFor } from "@/lib/local/threads";
 import { blockedSet } from "@/lib/players/safety";
@@ -2681,28 +2683,22 @@ async function nearbyStoreItems(
  * one" is news and "there is a cheap one" is inventory.
  */
 async function packItem(balance: number): Promise<PackItem[]> {
-  const { data, error } = await getSupabaseAdmin()
-    .from("pack_series")
-    .select("slug, name, description, price_embers, art_path")
-    .eq("status", "live")
-    .order("set_number", { ascending: false })
-    .limit(1);
-
-  if (error || !data || data.length === 0) {
-    if (error) console.error("Could not read the pack shop for the feed", error);
-    return [];
-  }
-
-  const pack = data[0];
+  /* The newest pack that can actually be BOUGHT: a set that is live but
+     not released, short of items or not adding up used to be advertised
+     here and could not be opened (lib/packs/catalog.ts). */
+  /* A set built in the console is news; Origin, on sale forever and in
+     every new account's hands already, is not. */
+  const pack = (await shopSeries()).find((series) => !(series.id in SERIES));
+  if (!pack) return [];
 
   return [
     {
       kind: "pack",
-      slug: pack.slug,
+      slug: pack.id,
       name: pack.name,
       description: pack.description,
-      priceEmbers: pack.price_embers,
-      artUrl: pack.art_path,
+      priceEmbers: pack.priceEmbers,
+      artUrl: pack.artUrl,
       balance,
     },
   ];

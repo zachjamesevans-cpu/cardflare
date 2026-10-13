@@ -3,6 +3,7 @@ import "server-only";
 import { cardArt, type CardPrinting } from "@/lib/cards/schema";
 import { markCardFound } from "@/lib/players/found";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { afterResponse } from "@/lib/after-response";
 import { afterWantSaved } from "@/lib/nearby/matching";
 import { liveEventIds } from "@/lib/events/rooms";
 
@@ -99,7 +100,7 @@ export async function saveWant(
 
   /* Nearby matching looks for holders the moment a want lands. Fire
      and forget: the want is saved, and the notice dedupes itself. */
-  void afterWantSaved(playerId, entry.cardId);
+  afterResponse(() => afterWantSaved(playerId, entry.cardId));
 
   return "saved";
 }

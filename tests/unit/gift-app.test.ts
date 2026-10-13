@@ -77,7 +77,9 @@ describe("where the app draws the bar", () => {
     expect(settings).toContain('from "../gift-bar"');
     expect(settings).toMatch(/<GiftBar[^>]*storeName=/);
     expect(settings).toContain('row.role === "owner" && row.gift');
-    expect(settings).toContain("Your store");
+    /* Its own category, "Your stores", shown only to an owner. */
+    expect(read("mobile/src/settings-sections.ts")).toContain('title: "Your stores"');
+    expect(settings).toContain('entry.key !== "stores" || ownedGifts.length > 0');
   });
 });
 

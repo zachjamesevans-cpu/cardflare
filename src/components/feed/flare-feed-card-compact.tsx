@@ -1,3 +1,4 @@
+import { foundLast } from "@/lib/feed/card-copy";
 import Link from "next/link";
 import { CheckCircle2, Crosshair, PackageOpen } from "lucide-react";
 
@@ -28,10 +29,12 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
  * screen.
  */
 export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
+  /* Found cards at the far right, whatever order they arrived in. */
+  const cards = [...item.cards].sort(foundLast);
   const post = { postId: item.postId, yours: item.yours };
   const offering = item.direction === "showcase";
 
-  const shelf: ZoomCard[] = item.cards.map((card) => ({
+  const shelf: ZoomCard[] = cards.map((card) => ({
     imageUrl: card.imageUrl,
     exactName: card.cardName,
     cardNumber: card.cardNumber,
@@ -41,6 +44,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
     anyPrinting: !card.printingId,
     youHave: card.match ? { kind: card.match, count: 0 } : null,
     have: haveFor(card, post),
+    state: card.state ?? "open",
   }));
 
   /* Cash is the only term that is not the default, so it is the only
@@ -100,7 +104,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
           <PostMenu
             post={{
               postId: item.postId,
-              cards: item.cards,
+              cards: cards,
               total: item.total,
               direction: offering ? "showcase" : "want",
               yours: item.yours,
@@ -114,7 +118,7 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
         {/* The strip. Scrolls inside itself, so a long post never makes
           the page scroll sideways. */}
         <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1">
-          {item.cards.map((card, index) => (
+          {cards.map((card, index) => (
             <div key={card.cardId} className="relative shrink-0">
               <FeedTile
                 imageUrl={card.imageUrl}
@@ -123,7 +127,6 @@ export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
                 match={card.match}
                 size="pager"
                 /* The copies tag owns the top left. */
-                corner="right"
                 state={card.state}
                 direction={offering ? "showcase" : "want"}
                 have={haveFor(card, post)}

@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { nearestPostalCode, normalisePostalCode, type Point } from "@/lib/geo/zip";
+import { afterResponse } from "@/lib/after-response";
 import { afterWantSaved } from "@/lib/nearby/matching";
 import { keepShowcaseAsHave } from "@/lib/nearby/showcase";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -215,18 +216,20 @@ function afterAreaPost(playerId: string, input: AreaFlareInput): void {
   if (input.intent === "showcase") {
     /* "I have this", posted from the couch: onto the Have list, marked
        for nearby matching. See nearby/showcase.ts. */
-    void keepShowcaseAsHave(
-      { playerSessionId: null, playerId },
-      {
-        cardId: input.cardId,
-        printingId: input.printingId ?? null,
-        quantity: input.quantity ?? 1,
-        note: input.note ?? null,
-      },
+    afterResponse(() =>
+      keepShowcaseAsHave(
+        { playerSessionId: null, playerId },
+        {
+          cardId: input.cardId,
+          printingId: input.printingId ?? null,
+          quantity: input.quantity ?? 1,
+          note: input.note ?? null,
+        },
+      ),
     );
   } else {
     /* A Flare posted with no room is an ask nearby matching can answer. */
-    void afterWantSaved(playerId, input.cardId);
+    afterResponse(() => afterWantSaved(playerId, input.cardId));
   }
 }
 

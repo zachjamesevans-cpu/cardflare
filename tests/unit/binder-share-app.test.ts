@@ -61,9 +61,10 @@ describe("the share link", () => {
   it("goes to the share sheet, and a private binder is told how to get one", () => {
     expect(binder).toContain("Share.share({ message: url, url })");
     expect(binder).toContain('name="share-outline"');
-    expect(binder).toContain("if (!binder.forTrade) {");
+    /* Shown is enough for a link: public, or up for trade. */
+    expect(binder).toContain("if (!binder.forTrade && !binder.isPublic) {");
     expect(binder).toContain(
-      'Alert.alert("Turn on Up for trade to share this binder.");',
+      'Alert.alert("Turn on Show on your profile to share this binder.");',
     );
   });
 });

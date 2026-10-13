@@ -180,7 +180,8 @@ describe("the Binders list", () => {
     for (const [name, source] of platforms) {
       expect(source.list, name).toContain("binder.forTrade");
       expect(source.list, name).toMatch(/>\s*Up for trade\s*</);
-      expect(source.list, name).toMatch(/>\s*Private\s*</);
+      /* Private, or On profile: shown without being up for trade. */
+      expect(source.list, name).toContain('binder.isPublic ? "On profile" : "Private"');
       expect(source.list, name).not.toContain("Private, only you");
       expect(source.list, name).not.toMatch(/>\s*Trade\s*</);
       expect(source.list, name).not.toMatch(/>\s*Public\s*</);
@@ -207,9 +208,9 @@ describe("the create dialog", () => {
       expect(create, name).not.toContain("Private");
     }
     expect(web.create).toContain("useState(false)");
-    expect(web.create).toContain(
-      "createBinderAction({ name: trimmed, cover, forTrade })",
-    );
+    expect(web.create).toContain("createBinderAction({");
+    expect(web.create).toContain("isPublic: isPublic || forTrade,");
+    expect(web.create).toContain("<PublicSwitch");
     expect(web.create).toContain("<ForTradeSwitch");
     expect(web.forTrade).toContain('role="switch"');
     expect(web.forTrade).toContain("checked={on}");
@@ -229,13 +230,14 @@ describe("the binder page", () => {
       expect(page, name).toContain(OWN_FOR_TRADE);
       expect(page, name).toContain(OWN_PRIVATE);
       expect(page, name).toContain("will trade.");
-      expect(page, name).not.toContain("isPublic");
       expect(page, name).not.toContain("Anyone on cardflare can open it");
     }
     expect(web.view).toContain("`Cards ${ownerName} will trade.`");
+    expect(web.settings).toContain("<PublicSwitch");
     expect(web.settings).toContain("<ForTradeSwitch");
-    expect(web.settings).toContain("save({ forTrade: on })");
+    expect(appPage).toContain("Show on your profile");
     expect(web.forTrade).toContain("export function ForTradeSwitch");
+    expect(web.forTrade).toContain("export function PublicSwitch");
   });
 
   it("has no 2 x 2 and no layout picker anywhere, on either platform", () => {

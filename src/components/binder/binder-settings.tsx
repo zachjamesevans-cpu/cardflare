@@ -6,7 +6,7 @@ import { Trash2 } from "lucide-react";
 
 import { BinderCover } from "@/components/binder/binder-cover";
 import { BINDER_NAME_MAX } from "@/components/binder/create-binder";
-import { ForTradeSwitch } from "@/components/binder/for-trade-switch";
+import { ForTradeSwitch, PublicSwitch } from "@/components/binder/for-trade-switch";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { Sheet } from "@/components/ui/sheet";
@@ -41,6 +41,7 @@ export function BinderSettings({
   name,
   count,
   forTrade,
+  isPublic,
   cover,
   onChange,
 }: {
@@ -50,6 +51,8 @@ export function BinderSettings({
   /** How many cards would leave with it. */
   count: number;
   forTrade: boolean;
+  /** Shown on the profile; always so while up for trade. */
+  isPublic: boolean;
   cover: BinderCoverId;
   /** Paint the page with the new value, before the server answers. */
   onChange: (patch: BinderSettingsPatch) => void;
@@ -123,10 +126,16 @@ export function BinderSettings({
         />
       </label>
 
+      <PublicSwitch
+        on={isPublic}
+        forTrade={forTrade}
+        disabled={pending}
+        onChange={(on) => save({ isPublic: on })}
+      />
       <ForTradeSwitch
         on={forTrade}
         disabled={pending}
-        onChange={(on) => save({ forTrade: on })}
+        onChange={(on) => save(on ? { forTrade: true, isPublic: true } : { forTrade: false })}
       />
 
       <div className="flex flex-col gap-2">

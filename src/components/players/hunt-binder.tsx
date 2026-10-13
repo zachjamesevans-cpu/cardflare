@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Crosshair, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
 
 import {
   AddPocket,
@@ -24,20 +24,20 @@ import { OfferReview } from "@/components/flares/offer-review";
 import {
   HuntEditForm,
   HuntOfferFooter,
-  HuntProgress,
+  HuntRing,
   HuntSentLine,
   UndoLine,
   useHuntOffer,
   useHuntProgress,
   type LiveHuntCard,
 } from "@/components/players/hunt-detail";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
 import { Stepper } from "@/components/ui/stepper";
 import { wantsLine } from "@/lib/feed/offer-copy";
 import { removeHuntCardAction } from "@/lib/players/hunt-actions";
-import { huntRowLine } from "@/lib/players/hunt-copy";
 import type { HuntView } from "@/lib/players/hunts";
 
 /**
@@ -95,7 +95,21 @@ export function HuntBinder({
    * of that is this screen's concern beyond the words.
    */
   const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
-  const cards = progress.cards.filter((card) => !removed.has(card.requestId));
+  /*
+   * Found cards last, on the last pages: the founder, "found cards in
+   * hunts need to filter to the bottom / last pages". Ordered by what
+   * the server last said (hunt.cards), not by a tick this second, so a
+   * card does not jump pages under the pointer; it moves on the
+   * refresh. Otherwise the server's order stands. The app does the same.
+   */
+  const foundBefore = new Set(
+    (hunt.cards ?? []).filter((card) => card.found).map((card) => card.requestId),
+  );
+  const cards = progress.cards
+    .filter((card) => !removed.has(card.requestId))
+    .map((card, at) => ({ card, at, done: foundBefore.has(card.requestId) }))
+    .sort((a, b) => Number(a.done) - Number(b.done) || a.at - b.at)
+    .map(({ card }) => card);
   const offer = useHuntOffer(hunt, cards);
   const [at, setAt] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -120,7 +134,6 @@ export function HuntBinder({
   const looking = cards.filter((card) => !card.found).length;
   const neededCopies = cards.reduce((sum, card) => sum + card.needed, 0);
   const foundCopies = cards.reduce((sum, card) => sum + card.foundCopies, 0);
-  const line = hunt.description || huntRowLine(cards.length, looking);
 
   /* The pocket the owner has open, read from the live rows so the
      numbers in the sheet move with the stepper. */
@@ -188,6 +201,8 @@ export function HuntBinder({
     lookingFor: card.needed,
     stillNeeds: card.remaining,
     youHave: null,
+    /* A found pocket opens found: band and all, as the app's does. */
+    state: card.found ? "found" : "open",
     /* The pick control, for a signed-in visitor on a card still open.
        A found card cannot be picked, so it carries none. */
     have:
@@ -203,21 +218,46 @@ export function HuntBinder({
 
   return (
     <div className="flex w-full flex-col gap-4">
-      {/* The title row: the crosshair and the name on the left; on the
-          right the owner's pencil and Share, or the owner's name and
-          Share for a visitor. */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
-          <Crosshair className="mt-1 size-5 shrink-0 text-accent" aria-hidden="true" />
-          <div className="flex min-w-0 flex-col gap-0.5">
-            <h1 className="truncate text-xl leading-tight font-extrabold text-text-primary">
-              {hunt.name}
-            </h1>
-            <p className="text-sm text-text-secondary">{line}</p>
-          </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      {/*
+       * THE RING, THE NAME, WHOSE IT IS - AND NOTHING SAID TWICE. This was
+       * the crosshair, the name and small grey lines over a hairline bar;
+       * the founder: "the block on top needs to change ... make it more
+       * pretty", then, of a first ring with count pills: "says 3 to go
+       * and 4 cards twice ... just looks so jumbled". So the progress is
+       * the ring and only the ring, the name is the biggest thing on the
+       * page, the owner is one line - a face with their worn ring, and
+       * their name - and their words appear only when they wrote some.
+       * The app's hunt-binder.tsx draws the same header.
+       */}
+      <div className="flex items-center gap-3">
+        <HuntRing found={foundCopies} needed={neededCopies} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <h1 className="line-clamp-2 text-2xl leading-tight font-extrabold text-text-primary">
+            {hunt.name}
+          </h1>
           {yours ? (
+            <p className="text-sm text-text-muted">Your hunt</p>
+          ) : (
+            <Link
+              href={`/p/${hunt.playerId}`}
+              className="flex min-w-0 items-center gap-2 text-sm text-text-muted hover:underline"
+            >
+              <PlayerAvatar
+                displayName={hunt.ownerName}
+                seed={hunt.playerId}
+                avatarUrl={hunt.owner?.avatarUrl ?? null}
+                frame={hunt.owner?.frame ?? null}
+                ring={hunt.owner?.ring ?? null}
+                size="sm"
+              />
+              <span className="truncate text-[15px] font-bold text-text-primary">
+                {hunt.ownerName}
+              </span>
+            </Link>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2 self-start">
+          {yours && (
             <button
               type="button"
               aria-label="Edit hunt"
@@ -226,13 +266,6 @@ export function HuntBinder({
             >
               <Pencil className={HEADER_ICON} aria-hidden="true" />
             </button>
-          ) : (
-            <Link
-              href={`/p/${hunt.playerId}`}
-              className="max-w-32 truncate text-sm font-semibold text-text-secondary hover:text-text-primary hover:underline"
-            >
-              {hunt.ownerName}
-            </Link>
           )}
           <ShareProfileButton
             url={`/hunts/${hunt.id}`}
@@ -243,7 +276,14 @@ export function HuntBinder({
         </div>
       </div>
 
-      <HuntProgress found={foundCopies} needed={neededCopies} />
+      {/* The owner's own words, only when they wrote some. No stand-in
+          line and no count pills: the ring already says what it holds,
+          and the founder found it said three times "so jumbled". */}
+      {hunt.description && (
+        <p className="text-[15px] leading-snug text-text-secondary">
+          {hunt.description}
+        </p>
+      )}
 
       {progress.error && (
         <p role="alert" className="text-sm text-danger">
@@ -300,7 +340,7 @@ export function HuntBinder({
                 ) : yours ? (
                   <AddPocket href={`/flare?hunt=${encodeURIComponent(hunt.id)}`} />
                 ) : (
-                  <EmptyPocket />
+                  <EmptyPocket faint />
                 )}
               </li>
             ))}
@@ -542,11 +582,10 @@ function HuntPocket({
       dim={card.found}
     >
       {card.found ? (
-        <span
-          aria-label="Found"
-          className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-accent text-accent-contrast ring-1 ring-canvas/60"
-        >
-          <Check className="size-3" aria-hidden="true" />
+        /* The Feed's FOUND band (FeedTile), not a check: one way of
+           saying found across the product. */
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[9px] font-bold tracking-wider text-accent-contrast uppercase">
+          found
         </span>
       ) : card.needed > 1 ? (
         <span className="absolute right-1 bottom-1 rounded-full bg-canvas/85 px-1.5 py-px text-[9px] font-bold text-text-primary tabular-nums ring-1 ring-border-strong">

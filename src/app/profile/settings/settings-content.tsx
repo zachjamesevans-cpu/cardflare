@@ -1,0 +1,592 @@
+import { redirect } from "next/navigation";
+import Link from "next/link";
+import {
+  Ban,
+  Bell,
+  ChevronRight,
+  CircleUser,
+  ClipboardList,
+  KeyRound,
+  Library,
+  LifeBuoy,
+  Mail,
+  MapPin,
+  Moon,
+  Palette,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  UserPen,
+} from "lucide-react";
+
+import { AppShell } from "@/components/layout/app-shell";
+import { SyncCollectionForm } from "@/components/players/sync-collection-form";
+import { BackLink } from "@/components/ui/back-link";
+import { Button, buttonStyles } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { FeedViewPicker } from "@/components/feed/feed-view-picker";
+import { AutoPostToggle } from "@/components/players/auto-post-toggle";
+import { BackdropToggle } from "@/components/players/backdrop-toggle";
+import { LOOK_HEADING } from "@/lib/players/backdrop";
+import { PushPrefToggles } from "@/components/players/push-pref-toggles";
+import { PUSH_HEADING, PUSH_LINE } from "@/lib/notifications/push-prefs";
+import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
+import { autoPostFor } from "@/lib/events/auto-post";
+import { feedViewFor } from "@/lib/feed/view-settings";
+import { FEED_VIEW_TITLES } from "@/lib/feed/views";
+import { NearbyCard } from "@/components/nearby/nearby-card";
+import { nearbySettingsFor } from "@/lib/nearby/settings";
+import {
+  SETTINGS_SECTIONS,
+  notificationsSummary,
+  privacySummary,
+  sectionTitle,
+  type SettingsSection,
+} from "@/lib/players/settings-sections";
+import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
+import { signOut } from "@/lib/auth/actions";
+import { areasForUser } from "@/lib/auth/areas";
+import { getViewer } from "@/lib/auth/session";
+import { playerForUser } from "@/lib/players/accounts";
+import { collectionSyncFor } from "@/lib/players/collection";
+import { postalCodeForPlayer } from "@/lib/players/location";
+import { PostalAsk } from "@/components/feed/postal-ask";
+import { BlockedList } from "@/components/players/blocked-list";
+import { DeckListForm } from "@/components/players/deck-list-form";
+import { DeleteAccountForm } from "@/components/players/delete-account-form";
+import { ProMark } from "@/components/stores/ultra-mark";
+import { formatHandle } from "@/lib/players/handle";
+import { ownProfile } from "@/lib/players/profile";
+import { listBlocked } from "@/lib/players/safety";
+
+/**
+ * Settings: everything that used to be the account page.
+ *
+ * This was `/account`, and it was a player's home. It is not any more —
+ * the profile is, and this is what sits behind the cog on it. The
+ * founder's instruction was exactly that: "the normal account settings
+ * will exist in the profile page, maybe as a settings cog... so just
+ * moving it basically". Nothing here changed but where it lives.
+ *
+ * Housekeeping only. The lists that used to live here have one home
+ * each now: saved wants are the Flare tab's "Flares", and the
+ * stores you follow are the Room tab's "Following". What is left is
+ * what is about the account itself.
+ *
+ * Two audiences still, ordered by who is looking. For a player their
+ * collection and deck paste lead and sign-in housekeeping follows; for
+ * an operator email and password come first. The email address is fixed
+ * either way: it is what the invitation was addressed to and what
+ * `claimPendingInvite` matches on, so letting it be edited here would
+ * quietly detach an account from what it was invited to.
+ */
+export async function SettingsContent({
+  section,
+}: {
+  section: SettingsSection | null;
+}) {
+  const viewer = await getViewer();
+
+  if (viewer.kind === "anonymous") {
+    redirect(`/login?next=/profile/settings${section ? `/${section}` : ""}`);
+  }
+
+  const home =
+    viewer.kind === "admin" ? "/admin" : viewer.kind === "store" ? "/store" : null;
+
+  /*
+   * The player behind this account, whatever else it is — the founder is an
+   * admin with a player account, and both halves should work at once.
+   */
+  const playerId =
+    viewer.kind === "player"
+      ? viewer.playerId
+      : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const profile = playerId ? await ownProfile(playerId) : null;
+  const displayName = profile?.displayName ?? "";
+  const handle = profile?.handle ?? "";
+  const postalCode = playerId ? await postalCodeForPlayer(playerId) : null;
+
+  const sync = playerId ? await collectionSyncFor(playerId) : null;
+  const lastSync = sync
+    ? {
+        when: new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(
+          new Date(sync.synced_at),
+        ),
+        cardsMatched: sync.cards_matched,
+        linesUnmatched: sync.lines_unmatched,
+      }
+    : null;
+
+  /*
+   * The same switcher the admin and store headers carry, so an account
+   * that is several things at once (the founder; a store owner who plays)
+   * can leave this page the way they arrived. Marked current only when
+   * the player entry actually exists — for a pure operator this page is
+   * not one of the switcher's destinations.
+   */
+  const areas = await areasForUser(viewer.user.id, viewer.kind === "admin");
+  const currentArea = areas.some((area) => area.href === "/profile")
+    ? "/profile"
+    : undefined;
+
+  const isPlayerHome = viewer.kind === "player";
+
+  /*
+   * Your name and username moved to Edit profile, with the pronouns
+   * and bio beside them, because that is where Instagram keeps them
+   * and where the founder asked for them. This card is the pointer,
+   * so somebody who comes here for their name is one tap away rather
+   * than lost.
+   */
+  const nameCard = !playerId ? null : (
+    <Link
+      key="name"
+      href="/profile/edit"
+      className="flex items-center gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-6 shadow-[var(--shadow-card)] transition-colors hover:border-border-strong"
+    >
+      <UserPen className="size-5 shrink-0 text-accent" aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="font-semibold text-text-primary">Name and username</span>
+        <span className="text-sm break-words text-text-secondary">
+          {displayName} · {formatHandle(handle)}. Change them on Edit profile.
+        </span>
+      </span>
+      <ChevronRight className="size-4 shrink-0 text-text-muted" aria-hidden="true" />
+    </Link>
+  );
+
+  /*
+   * Where the player is, roughly, and the only place a saved ZIP can be
+   * changed once the Feed has stopped asking for it.
+   *
+   * A ZIP rather than a stored coordinate is the whole design: the
+   * device position the app can ask for is never written down, so this
+   * five-digit field is the entirety of what cardflare keeps about
+   * where somebody is. Emptying it is how you take it back. The card
+   * is named for what it holds, not for what it finds: the stores it
+   * finds are on the Room tab, and this is the setting behind them.
+   */
+  const locationCard = !playerId ? null : (
+    <Card key="location" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <MapPin className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Your ZIP code</p>
+          <p className="text-sm text-text-secondary">
+            Used only to match you with players and stores nearby. It is never shown to
+            anyone.
+          </p>
+        </div>
+      </div>
+      <PostalAsk defaultValue={postalCode ?? ""} allowClear submitLabel="Save" />
+    </Card>
+  );
+
+  /* How the Feed is drawn. Account-level, so it follows to the app. */
+  const feedViewCard = !playerId ? null : (
+    <Card key="feed-view">
+      <FeedViewPicker current={await feedViewFor(playerId)} />
+    </Card>
+  );
+
+  /* Whether joining a room posts your Flares to it. On by default. */
+  const roomsCard = !playerId ? null : (
+    <Card key="rooms">
+      <AutoPostToggle current={await autoPostFor(playerId)} />
+    </Card>
+  );
+
+  /* Pure black backgrounds: this browser's own, as the app's is the
+     phone's (lib/players/backdrop.ts). */
+  const lookCard = (
+    <Card key="look" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Moon className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <p className="font-semibold text-text-primary">{LOOK_HEADING}</p>
+      </div>
+      <BackdropToggle />
+    </Card>
+  );
+
+  /*
+   * Which notices reach the phone. Four groups, each a switch, saved
+   * to the account so the app draws the same four. Nothing here
+   * touches the Inbox: every notice is kept whatever the switches say,
+   * and this is only about the buzz.
+   */
+  const notificationsCard = !playerId ? null : (
+    <Card key="notifications" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Bell className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">{PUSH_HEADING}</p>
+          <p className="text-sm text-text-secondary">{PUSH_LINE}</p>
+        </div>
+      </div>
+      <PushPrefToggles initial={await pushPrefsFor(playerId)} />
+    </Card>
+  );
+
+  /*
+   * Everyone this player has blocked, with the way back. A block is
+   * taken on a profile and is never announced; this is the one list
+   * of them, and the app shows the same chip and Unblock on the
+   * profile itself.
+   */
+  const blockedCard = !playerId ? null : (
+    <Card key="blocked" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Ban className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Blocked players</p>
+          <p className="text-sm text-text-secondary">
+            You do not see their posts, and neither of you can message the other. They
+            are not told.
+          </p>
+        </div>
+      </div>
+      <BlockedList people={await listBlocked(playerId)} />
+    </Card>
+  );
+
+  const emailCard = (
+    <Card key="email" className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <Mail className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <p className="font-semibold text-text-primary">Email address</p>
+          <p className="truncate text-text-secondary">{viewer.user.email}</p>
+        </div>
+      </div>
+      <p className="text-sm text-text-muted">
+        {isPlayerHome
+          ? "This is the address your invitation was sent to. Get in touch if it needs to change."
+          : "This is the address your store was invited on. Get in touch if it needs to change."}
+      </p>
+    </Card>
+  );
+
+  /*
+   * The paste box, as its own card. The wants it produces are not
+   * listed here: "the 'saved wants' section in the settings is kinda
+   * redundant, since it's just the flare section, just elsewhere", so
+   * the Flare tab's "Flares" is the one list and this card
+   * only feeds it. The app carries a card under exactly this title.
+   */
+  const deckListCard = !playerId ? null : (
+    <Card key="deck-list" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <ClipboardList
+          className="mt-0.5 size-5 shrink-0 text-accent"
+          aria-hidden="true"
+        />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Paste a deck list</p>
+          <p className="text-sm text-text-secondary">
+            Every card in it goes up as one Flare post, so people nearby and your
+            friends see what you are after.
+          </p>
+        </div>
+      </div>
+
+      <DeckListForm />
+
+      <Link
+        href="/flare"
+        className="w-fit text-sm font-semibold text-accent underline-offset-4 hover:underline"
+      >
+        Your Flares live on the Flare tab
+      </Link>
+    </Card>
+  );
+
+  const collectionCard = playerId ? (
+    <Card key="collection" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <Library className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Your collection</p>
+          <p className="text-sm text-text-secondary">
+            Import your Collectr export and rooms will quietly flag the Flares you could
+            answer. Nobody else ever sees it, and your name appears only when you choose
+            to offer.
+          </p>
+        </div>
+      </div>
+
+      <SyncCollectionForm lastSync={lastSync} />
+    </Card>
+  ) : null;
+
+  const passwordCard = (
+    <Card key="password" className="flex flex-col gap-4">
+      <div className="flex items-start gap-3">
+        <KeyRound className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">Password</p>
+          <p className="text-text-secondary">
+            Set one and you can sign in straight away, without waiting for an email.
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <Link href="/profile/password" className={buttonStyles("secondary")}>
+          Set or change your password
+        </Link>
+      </div>
+    </Card>
+  );
+
+  /*
+   * Closing the account, last and quiet. The same act the app offers
+   * from its settings, because the App Store requires it there, and a
+   * website that could not do what the app can would be the odd one.
+   */
+  const deleteCard = playerId ? (
+    <Card key="delete" className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="font-semibold text-text-primary">Delete your account</p>
+        <p className="text-sm text-text-secondary">
+          Everything goes: your profile, Flares, hunts, binders, showcase, trade
+          history, Embers and unlocks. There is no undo.
+        </p>
+        <p className="text-sm text-text-muted">
+          <ProMark /> through the App Store is billed by Apple: cancel it in your Apple
+          ID subscriptions too, or it keeps renewing.
+        </p>
+      </div>
+      <DeleteAccountForm handle={handle} />
+    </Card>
+  ) : null;
+
+  /* Nearby matching, in Privacy & safety beside the ZIP it reads. */
+  const nearby = playerId ? await nearbySettingsFor(playerId) : null;
+  const nearbyCard = nearby ? (
+    <NearbyCard key="nearby" enabled={nearby.enabled} postalCode={nearby.postalCode} />
+  ) : null;
+
+  /* Cardflare Pro, under Account: one row, not a category. */
+  const proCard = playerId ? (
+    <Card key="pro" className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold text-text-primary">
+            <ProMark />
+          </p>
+          <p className="text-sm text-text-secondary">
+            What Pro adds, and your subscription. Bought in the app, Apple bills it and
+            manages it from your Apple ID.
+          </p>
+        </div>
+      </div>
+      <div>
+        <Link href="/pro" className={buttonStyles("secondary")}>
+          Open Pro
+        </Link>
+      </div>
+    </Card>
+  ) : null;
+
+  /* Help: getting in touch, and the pages App Review reads for. */
+  const helpCard = (
+    <Card key="help" className="flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <LifeBuoy className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+        <p className="font-semibold text-text-primary">Help</p>
+      </div>
+      <ul className="flex flex-col divide-y divide-border">
+        {[
+          { href: "/contact", label: "Contact us" },
+          { href: "/terms", label: "Terms of use" },
+          { href: "/privacy", label: "Privacy policy" },
+        ].map((link) => (
+          <li key={link.href}>
+            <Link
+              href={link.href}
+              className="flex items-center justify-between py-3 text-sm font-medium text-text-primary hover:text-accent"
+            >
+              {link.label}
+              <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+
+  /* The stores this account runs, each a way into its console. */
+  const storeAreas = areas.filter((area) => area.href.startsWith("/store"));
+  const storesCard =
+    storeAreas.length > 0 ? (
+      <Card key="stores" className="flex flex-col gap-3">
+        <ul className="flex flex-col divide-y divide-border">
+          {storeAreas.map((area) => (
+            <li key={area.href}>
+              <Link
+                href={area.href}
+                className="flex items-center justify-between py-3 text-sm font-medium text-text-primary hover:text-accent"
+              >
+                {area.label}
+                <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    ) : (
+      <Card key="stores">
+        <p className="text-sm text-text-secondary">
+          You do not run a store on cardflare.
+        </p>
+      </Card>
+    );
+
+  /*
+   * EACH CATEGORY'S CARDS, the same as the app's (mobile/src/screens/
+   * settings.tsx): the founder, "group settings into categories".
+   */
+  const bySection: Record<SettingsSection, React.ReactNode[]> = {
+    account: [nameCard, emailCard, passwordCard, proCard, deleteCard],
+    notifications: [notificationsCard],
+    privacy: [locationCard, nearbyCard, blockedCard],
+    display: [feedViewCard, lookCard],
+    collection: [collectionCard, deckListCard, roomsCard],
+    stores: [storesCard],
+    help: [helpCard],
+  };
+
+  /* The menu's one-line summaries, where there is state to say. */
+  const prefs = playerId ? await pushPrefsFor(playerId) : null;
+  const blockedCount = playerId ? (await listBlocked(playerId)).length : null;
+  const view = playerId ? await feedViewFor(playerId) : null;
+  const summaries: Record<SettingsSection, string | null> = {
+    account: viewer.user.email ?? null,
+    notifications: notificationsSummary(prefs),
+    privacy: privacySummary({
+      nearbyOn: nearby?.enabled ?? null,
+      blocked: blockedCount,
+    }),
+    /* Pure black is this browser's, so the server cannot say it. */
+    display: view ? FEED_VIEW_TITLES[view] : null,
+    collection: lastSync
+      ? `${lastSync.cardsMatched.toLocaleString()} cards imported`
+      : null,
+    stores:
+      storeAreas.length > 0 ? storeAreas.map((area) => area.label).join(", ") : null,
+    help: null,
+  };
+  const shown = SETTINGS_SECTIONS.filter(
+    (entry) =>
+      (entry.key !== "stores" || storeAreas.length > 0) &&
+      /* An operator without a player has no Feed, collection or
+         notifications to set. */
+      (playerId ||
+        entry.key === "account" ||
+        entry.key === "help" ||
+        entry.key === "stores"),
+  );
+
+  return (
+    <>
+      <AppShell
+        area="Profile"
+        email={viewer.user.email ?? ""}
+        title={section ? sectionTitle(section) : "Settings"}
+        description={
+          section
+            ? (SETTINGS_SECTIONS.find((entry) => entry.key === section)?.blurb ?? "")
+            : "Your account, notifications, privacy and how cardflare looks."
+        }
+        areas={areas}
+        currentArea={currentArea}
+      >
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+          {/* The way out, at the top: a category goes back to the menu,
+              the menu back to the profile. */}
+          {section ? (
+            <BackLink href="/profile/settings" />
+          ) : (
+            playerId && <BackLink href="/profile" />
+          )}
+
+          {section ? (
+            bySection[section]
+          ) : (
+            <>
+              <nav
+                aria-label="Settings"
+                className="overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface"
+              >
+                <ul className="flex flex-col divide-y divide-border">
+                  {shown.map((entry) => {
+                    const Icon = SECTION_ICONS[entry.key];
+                    return (
+                      <li key={entry.key}>
+                        <Link
+                          href={`/profile/settings/${entry.key}`}
+                          className="flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-elevated"
+                        >
+                          <Icon
+                            className="size-5 shrink-0 text-accent"
+                            aria-hidden="true"
+                          />
+                          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                            <span className="font-semibold text-text-primary">
+                              {entry.title}
+                            </span>
+                            <span className="truncate text-xs text-text-muted">
+                              {summaries[entry.key] ?? entry.blurb}
+                            </span>
+                          </span>
+                          <ChevronRight
+                            className="size-4 shrink-0 text-text-muted"
+                            aria-hidden="true"
+                          />
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+
+              <div className="flex flex-wrap items-center gap-4">
+                <form action={signOut}>
+                  <Button type="submit" variant="secondary">
+                    Sign out
+                  </Button>
+                </form>
+
+                {home && (
+                  <Link
+                    href={home}
+                    className="text-sm text-text-muted underline underline-offset-4 hover:text-text-secondary"
+                  >
+                    Back to{" "}
+                    {viewer.kind === "admin" ? "the admin console" : "your store"}
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
+          <TabBarSpacer />
+        </div>
+      </AppShell>
+
+      <PlayerTabBar />
+    </>
+  );
+}
+
+/** Each category's mark in the menu. */
+const SECTION_ICONS: Record<SettingsSection, typeof Bell> = {
+  account: CircleUser,
+  notifications: Bell,
+  privacy: ShieldCheck,
+  display: Palette,
+  collection: Library,
+  stores: Store,
+  help: LifeBuoy,
+};

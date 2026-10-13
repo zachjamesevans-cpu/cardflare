@@ -104,7 +104,7 @@ export function HuntsPanel({
       {hunts.length === 0 ? (
         <p className="text-sm text-text-secondary">
           {yours
-            ? "Start a hunt and add the cards you are after. Post a Flare into it and the whole hunt follows you, with what is found and what is left."
+            ? "One home for the cards you’re after: the grails you’re chasing, the deck you’re building, the set you’re finishing. Everything in one tidy place, instead of a pile of separate Flares."
             : "No hunts yet."}
         </p>
       ) : (
@@ -122,10 +122,8 @@ export function HuntsPanel({
                   </span>
                   {/* The chip rides the count line, so the name keeps the row's width. */}
                   <span className="flex items-center gap-2 text-sm text-text-secondary">
+                    {/* No Private chip: every hunt is public. */}
                     {huntRowLine(hunt.cards.length, hunt.looking)}
-                    {yours && hunt.visibility === "private" && (
-                      <span className="shrink-0 text-xs text-text-muted">Private</span>
-                    )}
                   </span>
                 </span>
                 <ChevronRight

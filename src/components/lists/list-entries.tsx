@@ -446,7 +446,7 @@ function CarouselEntry({
        */}
       <div
         className={`relative flex rounded-[6px] ${
-          match ? "shadow-[0_0_10px_rgba(198,238,79,0.35)] ring-2 ring-accent" : ""
+          match ? "shadow-[0_0_14px_rgba(206,252,132,0.5)] ring-[3px] ring-accent" : ""
         }`}
       >
         {Array.from({ length: ghosts }, (_, i) => ghosts - i).map((depth) => (
@@ -495,19 +495,11 @@ function CarouselEntry({
          * a fixed grid: one name line, one caption slot. Same anatomy
          * on every tile, always.
          */}
+        {/* No corner icon on a card you hold: the ring says it
+            (2026-10-11), and screen readers hear it here. */}
         {match && (
-          <span
-            aria-label={
-              match === "exact" ? "You have this" : "You have another printing"
-            }
-            title={match === "exact" ? "You have this" : "You have another printing"}
-            className="pointer-events-none absolute top-0.5 left-0.5 z-10 rounded-full bg-surface/90 p-0.5"
-          >
-            {match === "exact" ? (
-              <PackageCheck className="size-3 text-accent" aria-hidden="true" />
-            ) : (
-              <Layers className="size-3 text-accent" aria-hidden="true" />
-            )}
+          <span className="sr-only">
+            {match === "exact" ? "You have this" : "You have another printing"}
           </span>
         )}
         {entry.note && (

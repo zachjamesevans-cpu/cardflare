@@ -217,7 +217,7 @@ describe("feed views", () => {
 
   it("is switched from settings on both platforms", async () => {
     const appSettings = await read("mobile/src/screens/settings.tsx");
-    const webSettings = await read("src/app/profile/settings/page.tsx");
+    const webSettings = await read("src/app/profile/settings/settings-content.tsx");
 
     expect(appSettings).toContain("<Title>Feed view</Title>");
     expect(appSettings).toContain("setFeedView(option)");

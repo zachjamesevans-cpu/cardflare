@@ -19,7 +19,7 @@ import { syncBadge } from "../push";
 import { setUnread } from "../unread";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Loading, Muted, Tap } from "../ui";
-import { colors, gutter, radius, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import { useTabBarInset } from "../glass";
 
 /**
@@ -220,7 +220,12 @@ export function InboxScreen() {
       )}
 
       {items !== null && items.length > 0 && (
-        <Card style={{ padding: spacing(2), gap: 0 }}>
+        /* No panel and no lines: the notices sit straight on the page,
+           one under another. The founder (2026-10-11): "make it so the
+           inbox/notification screen doesn't have rounded blocks around
+           each notification. not even lines separating them." Unread is
+           the accent dot at the right, no tinted block behind the row. */
+        <View style={{ gap: 0 }}>
           {collapseRuns(items).map(({ item, count, anyUnread }) => {
             const unread = fresh && anyUnread;
             const actor = item.actor ?? null;
@@ -235,10 +240,6 @@ export function InboxScreen() {
                   alignItems: "center",
                   gap: spacing(3),
                   paddingVertical: spacing(2.5),
-                  paddingHorizontal: spacing(2),
-                  borderRadius: radius.control,
-                  /* The website's bg-accent/6: the lime at six percent. */
-                  backgroundColor: unread ? `${colors.accent}0f` : "transparent",
                 }}
               >
                 {actor ? (
@@ -345,7 +346,7 @@ export function InboxScreen() {
               </View>
             );
           })}
-        </Card>
+        </View>
       )}
     </ScrollView>
   );

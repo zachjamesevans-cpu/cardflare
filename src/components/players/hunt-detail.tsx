@@ -6,7 +6,7 @@ import { Check, Undo2 } from "lucide-react";
 
 import { useSelection, type OfferLine } from "@/components/flares/offer-review";
 import { Button } from "@/components/ui/button";
-import { Select, TextInput, Textarea } from "@/components/ui/controls";
+import { TextInput, Textarea } from "@/components/ui/controls";
 import { reviewLabel, selectionSummary } from "@/lib/feed/offer-copy";
 import { setRequestFoundAction, updateHuntAction } from "@/lib/players/hunt-actions";
 import { offerOnHuntAction } from "@/lib/players/hunt-offer-actions";
@@ -244,6 +244,68 @@ export function UndoLine({ label, onUndo }: { label: string; onUndo: () => void 
   );
 }
 
+/**
+ * The hunt page's progress as a ring: "2/9" inside, the arc in the
+ * accent. The founder, of the old header (small grey lines over a
+ * hairline bar): "the block on top needs to change ... make it more
+ * pretty". The app's HuntRing (mobile/src/hunts-panel.tsx) is the same.
+ */
+export function HuntRing({ found, needed }: { found: number; needed: number }) {
+  const share = needed > 0 ? Math.min(1, Math.max(0, found / needed)) : 0;
+  const complete = needed > 0 && found >= needed;
+  const radius = 34.5;
+  const around = 2 * Math.PI * radius;
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={needed}
+      aria-valuenow={found}
+      aria-label={`${found} of ${needed} ${needed === 1 ? "copy" : "copies"} collected`}
+      className="relative size-[76px] shrink-0"
+    >
+      <svg viewBox="0 0 76 76" className="size-full -rotate-90" aria-hidden="true">
+        <circle
+          cx="38"
+          cy="38"
+          r={radius}
+          fill="none"
+          strokeWidth="7"
+          className="stroke-elevated"
+        />
+        {share > 0 && (
+          <circle
+            cx="38"
+            cy="38"
+            r={radius}
+            fill="none"
+            strokeWidth="7"
+            className="stroke-accent transition-[stroke-dashoffset]"
+            strokeDasharray={around}
+            strokeDashoffset={around * (1 - share)}
+          />
+        )}
+      </svg>
+      <span className="absolute inset-0 flex flex-col items-center justify-center tabular-nums">
+        <span>
+          {/* No check when done: the ring says it by closing, all in the
+            accent. Found is said one way across the product. */}
+          <span className="text-[22px] font-extrabold text-accent">{found}</span>
+          <span
+            className={`text-[15px] font-bold ${complete ? "text-accent" : "text-text-muted"}`}
+          >
+            /{needed}
+          </span>
+        </span>
+        {/* The word that makes it the page's only count. */}
+        <span className="-mt-0.5 text-[10px] font-bold tracking-wide text-text-muted">
+          FOUND
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /** "5 of 10 copies collected", and the bar that says the same. */
 export function HuntProgress({ found, needed }: { found: number; needed: number }) {
   const percent = needed > 0 ? Math.round((found / needed) * 100) : 0;
@@ -291,11 +353,12 @@ export function HuntOfferFooter({
   );
 }
 
-/** Name, description and who can see it. The owner only. */
+/** Name and description. The owner only. Every hunt is public: no
+    "who can see it" - the founder, "there is zero reason to keep a hunt
+    private - it's the whole point of a hunt". */
 export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void }) {
   const [name, setName] = useState(hunt.name);
   const [description, setDescription] = useState(hunt.description ?? "");
-  const [visibility, setVisibility] = useState(hunt.visibility);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -309,7 +372,6 @@ export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void 
           const result = await updateHuntAction(hunt.id, {
             name,
             description: description || null,
-            visibility,
           });
           if (!result.ok) {
             setError(result.error);
@@ -340,18 +402,6 @@ export function HuntEditForm({ hunt, onDone }: { hunt: Hunt; onDone: () => void 
           rows={2}
           className="min-h-0"
         />
-      </label>
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Who can see it</span>
-        <Select
-          value={visibility}
-          onChange={(event) =>
-            setVisibility(event.target.value === "private" ? "private" : "public")
-          }
-        >
-          <option value="public">Public</option>
-          <option value="private">Private</option>
-        </Select>
       </label>
       {error && (
         <p role="alert" className="text-sm text-danger">

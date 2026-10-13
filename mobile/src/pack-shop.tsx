@@ -33,6 +33,13 @@ import { colors, radius, spacing } from "./theme";
  * exact percent.
  */
 
+/* The CF mark on the pack and the card backs, as everywhere the logo
+   is drawn (the flame card it replaced lingered here). Wider than tall:
+   sized by width, height from the artwork. */
+const CF_MARK = require("../assets/cf-mark.png");
+const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
+const CF_MARK_RATIO = CF_MARK_SOURCE.height / CF_MARK_SOURCE.width;
+
 const RARITY_COLOR: Record<string, string> = {
   common: colors.textSecondary,
   uncommon: "#7bd88a",
@@ -96,8 +103,12 @@ export function PackArt({
       <View style={crimp(true)} />
       <View style={crimp(false)} />
       <Image
-        source={require("../assets/cardflare-mark.png")}
-        style={{ height: 72 * scale, width: 60 * scale, resizeMode: "contain" }}
+        source={CF_MARK}
+        style={{
+          width: 72 * scale,
+          height: 72 * scale * CF_MARK_RATIO,
+          resizeMode: "contain",
+        }}
       />
       <Text
         style={{
@@ -134,11 +145,21 @@ export function PackShopSection({
   sealed,
   names,
   onChanged,
+  pro,
+  onPro,
 }: {
   series: PackSeries;
   sealed: SealedPack[];
   names: Record<string, string>;
   onChanged: () => void;
+  /**
+   * Whether the viewer may buy packs. Packs are Pro, like wearing what is
+   * in them; a free player gets the door to Pro instead of a Buy that
+   * would spend Embers on things they cannot wear (the founder's
+   * "option b"). The website's PackShop does the same.
+   */
+  pro: boolean;
+  onPro: () => void;
 }) {
   const [packs, setPacks] = useState(sealed);
   const [busy, setBusy] = useState(false);
@@ -159,13 +180,17 @@ export function PackShopSection({
         setMessage("Pack added. Tear it open when ready.");
         onChanged();
       })
-      .catch((caught) =>
+      .catch((caught) => {
+        if (describeError(caught).includes("not-pro")) {
+          onPro();
+          return;
+        }
         setMessage(
           describeError(caught).includes("402")
             ? "Not enough Embers for a pack yet."
             : `That did not go through. ${friendlyError(caught)}`,
-        ),
-      )
+        );
+      })
       .finally(() => setBusy(false));
   };
 
@@ -201,7 +226,8 @@ export function PackShopSection({
         <View style={{ flex: 1, justifyContent: "center", gap: spacing(2) }}>
           <Muted>
             {series.slots} cosmetics per pack, drawn the moment you open it.
-            Duplicates come back as Embers, so no pull is ever nothing.
+            Duplicates come back as Embers, so no pull is ever nothing. Nine
+            packs without an Epic or better, and the tenth has one.
           </Muted>
           <Muted>
             {mine > 0
@@ -213,11 +239,15 @@ export function PackShopSection({
 
       <View style={{ flexDirection: "row", alignItems: "stretch", gap: spacing(2) }}>
         <View style={{ flex: 1 }}>
-          <Button
-            label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
-            busy={busy}
-            onPress={buy}
-          />
+          {pro ? (
+            <Button
+              label={busy ? "Buying…" : `Buy · ${series.priceEmbers}`}
+              busy={busy}
+              onPress={buy}
+            />
+          ) : (
+            <Button label="Packs are Pro" onPress={onPro} />
+          )}
         </View>
         {mine > 0 && (
           <View style={{ flex: 1 }}>
@@ -495,8 +525,13 @@ function FlipCard({
           }}
         >
           <Image
-            source={require("../assets/cardflare-mark.png")}
-            style={{ height: 90, width: 76, resizeMode: "contain", opacity: 0.8 }}
+            source={CF_MARK}
+            style={{
+              width: 84,
+              height: 84 * CF_MARK_RATIO,
+              resizeMode: "contain",
+              opacity: 0.8,
+            }}
           />
           {last && <Muted>Your best pull waits here</Muted>}
           <Muted>Tap to flip</Muted>
