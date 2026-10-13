@@ -26,6 +26,12 @@ const SECURITY_HEADERS = [
   },
 ];
 
+/** OpenCV's files: its package.json (which require resolves through) and its one build. */
+const OPENCV = [
+  "./node_modules/@techstark/opencv-js/package.json",
+  "./node_modules/@techstark/opencv-js/dist/opencv.js",
+];
+
 const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
@@ -43,6 +49,14 @@ const nextConfig: NextConfig = {
   },
 
   /**
+   * Loaded from node_modules at run time rather than bundled. OpenCV's
+   * WebAssembly build (the binder-page scanner's eyes, page-vision.ts)
+   * is one ten-megabyte file; bundling it would slow every build and
+   * gains nothing, since only the page scan route ever loads it.
+   */
+  serverExternalPackages: ["@techstark/opencv-js"],
+
+  /**
    * What the server bundle leaves out.
    *
    * Vercel stores every deployment's server files, and the free plan
@@ -53,6 +67,18 @@ const nextConfig: NextConfig = {
    * megabytes of dead weight per deployment. The glibc build stays;
    * the pin test in tests/unit/native-modules.test.ts holds it.
    */
+  /**
+   * OpenCV is loaded with a require the tracer cannot follow, so the
+   * routes that read binder pages carry it by name: the app's page
+   * route, the binder pages whose Server Actions send and check pages,
+   * and the admin's scanner bench. No other route pays its ten megabytes.
+   */
+  outputFileTracingIncludes: {
+    "/api/v1/scans/pages": OPENCV,
+    "/profile/binder": OPENCV,
+    "/profile/binders/*": OPENCV,
+    "/admin/scanner": OPENCV,
+  },
   outputFileTracingExcludes: {
     "*": [
       "node_modules/@img/sharp-libvips-linuxmusl-x64/**",

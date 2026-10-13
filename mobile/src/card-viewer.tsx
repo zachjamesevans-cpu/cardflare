@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Pressable,
   ScrollView,
@@ -15,9 +16,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { CardHit, ScanMatch } from "./api";
 import { CardSelectSheet } from "./card-select";
 import { leadArt } from "./flare-bits";
+import { STATUS_TOKEN, statusWord, type PocketStatus } from "./page-scan";
 import { RemoteImage } from "./remote-image";
 import {
+  CHOOSE_PRINTING,
   FIND_THE_CARD,
+  GLARE_ON_CARD,
   LEAVE_EMPTY,
   MIGHT_BE_THESE,
   NOT_SURE,
@@ -29,8 +33,13 @@ import {
   POCKET_TAKEN,
   POCKET_UNREAD,
   POCKETS_PER_PAGE,
+  RESCAN_FAILED,
+  RESCAN_POCKET,
+  RESCANNING_POCKET,
   THATS_IT,
   YOUR_PHOTO,
+  binderPocketName,
+  pocketAt,
 } from "./scan-copy";
 import { scanHit } from "./scan-hit";
 import { colors, gutter, radius, spacing } from "./theme";
@@ -45,14 +54,22 @@ import { Button, SheetClose, Tap } from "./ui";
  * scroll down." The website's viewer (src/components/cards/) in the
  * website's order:
  *
- * - "Page 4" and nine dots on a pocket; NOT_SURE and the reader's note
- *   at the top when it was not sure.
+ * - "Page 4 B2" and nine dots on a pocket; its status in its colour and
+ *   a word, or NOT_SURE and the reader's note when it was not sure, and
+ *   GLARE_ON_CARD when the photo has glare over the card.
  * - "Your photo" beside "Our match", the card's name and number under
- *   the match, and the note there when the reader was sure.
+ *   the match, and the note there when the reader was sure. Under both,
+ *   the reasons it gave, small, in its own plain words (the confidence
+ *   behind them is never shown as a number).
+ * - A pocket whose card is known and whose printing is the player's
+ *   choice opens on the printings, headed "Which printing is it?".
  * - "That's it", then "Other printing" (the printings in a small panel),
  *   "Not this card" (the other guesses, then "Find the card": the Flare
  *   picker itself, src/card-select.tsx, the read name typed, where a tap
  *   chooses the card and closes it), and "Leave empty" on a pocket.
+ *   Under them, on a pocket of a read page, "Rescan this pocket": the
+ *   server reads that one card again, more carefully, with the accent
+ *   spinner and "Reading it again..." while it does.
  * - A pocket the reader could not place but the catalogue has guesses
  *   for: "Might be one of these" and those cards under the photo, a tap
  *   choosing one the way a found pocket's other guesses do.
@@ -92,6 +109,14 @@ export interface ViewerPocket {
   lookFor: string;
   /** The pocket already holds a card in this binder. */
   taken?: boolean;
+  /** The reader's status for a pocket: the tile's colour. */
+  status?: PocketStatus;
+  /** Why, in the reader's plain words. */
+  reasons?: string[];
+  /** Glare over part of the card in the photo. */
+  glare?: boolean;
+  /** The card is known, its printing (alternate art...) is the player's to choose. */
+  printingUncertain?: boolean;
 }
 
 /** The art a pick shows: its printing's, else the card's lead art. */
@@ -104,6 +129,13 @@ export function pickArt(pick: ViewerPick): string | null {
 
 type Panel = "printing" | "others";
 
+/** The card is known, its printing is not: the printings open at once. */
+function choosesPrinting(pocket: ViewerPocket | undefined): boolean {
+  return (
+    pocket?.printingUncertain === true && (pocket.pick?.hit.printings.length ?? 0) > 1
+  );
+}
+
 export function CardViewer({
   pockets,
   index,
@@ -111,6 +143,7 @@ export function CardViewer({
   onPick,
   onConfirm,
   onLeaveEmpty,
+  onRescan,
   onClose,
 }: {
   pockets: ViewerPocket[];
@@ -123,12 +156,23 @@ export function CardViewer({
   onConfirm: (index: number) => void;
   /** "Leave empty": a pocket of a page only. */
   onLeaveEmpty?: (index: number) => void;
+  /**
+   * "Rescan this pocket": a pocket of a read page only. True once the
+   * pocket has been read again (the check replaces it), false if not.
+   */
+  onRescan?: (index: number) => Promise<boolean>;
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const window = useWindowDimensions();
   const list = useRef<FlatList<ViewerPocket>>(null);
-  const [panel, setPanel] = useState<Panel | null>(null);
+  /* A pocket whose printing is the player's to choose opens on the
+     printings, asked, as the website's does. */
+  const [panel, setPanel] = useState<Panel | null>(() =>
+    choosesPrinting(pockets[index]) ? "printing" : null,
+  );
+  const now = useRef(pockets);
+  now.current = pockets;
   /* "Find the card": the words for the picker's search while it is open. */
   const [finding, setFinding] = useState<{ text: string } | null>(null);
   /* The pager's own height, so each pocket scrolls inside it. */
@@ -136,9 +180,22 @@ export function CardViewer({
   /* The pocket the pager is on, so a swipe and a move from outside
      never chase each other. */
   const shown = useRef(index);
+  /* The pocket being read again, by key, and the one that could not be:
+     one at a time, so a second tap while it reads does nothing. */
+  const [rescanning, setRescanning] = useState<string | null>(null);
+  const [rescanFailed, setRescanFailed] = useState<string | null>(null);
+  const rescanBusy = useRef(false);
+  const alive = useRef(true);
 
   useEffect(() => {
-    setPanel(null);
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setPanel(choosesPrinting(now.current[index]) ? "printing" : null);
     setFinding(null);
     if (shown.current === index) return;
     shown.current = index;
@@ -159,6 +216,20 @@ export function CardViewer({
     setPanel(null);
     setFinding({ text: pocket.lookFor });
   };
+  const rescan = async () => {
+    if (!onRescan || rescanBusy.current) return;
+    rescanBusy.current = true;
+    const key = pocket.key;
+    setRescanning(key);
+    setRescanFailed(null);
+    try {
+      const done = await onRescan(index);
+      if (alive.current && !done) setRescanFailed(key);
+    } finally {
+      rescanBusy.current = false;
+      if (alive.current) setRescanning(null);
+    }
+  };
 
   return (
     <View
@@ -173,7 +244,9 @@ export function CardViewer({
         <View style={{ flex: 1, gap: spacing(1.5) }}>
           {pocket.page !== undefined ? (
             <Text accessibilityRole="header" style={styles.heading}>
-              {`Page ${pocket.page}`}
+              {pocket.slot !== undefined
+                ? binderPocketName(pocketAt(pocket.page, pocket.slot))
+                : `Page ${pocket.page}`}
             </Text>
           ) : null}
           {pocket.slot !== undefined ? <Dots slot={pocket.slot} /> : null}
@@ -230,6 +303,27 @@ export function CardViewer({
             <Pill label={LEAVE_EMPTY} onPress={() => onLeaveEmpty(index)} />
           ) : null}
         </View>
+        {onRescan && pocket.slot !== undefined ? (
+          rescanning === pocket.key ? (
+            <View accessibilityLiveRegion="polite" style={styles.rescanning}>
+              <ActivityIndicator size="small" color={colors.accent} />
+              <Text style={styles.line}>{RESCANNING_POCKET}</Text>
+            </View>
+          ) : (
+            <View style={{ flexDirection: "row" }}>
+              <Pill
+                label={RESCAN_POCKET}
+                disabled={rescanning !== null}
+                onPress={() => void rescan()}
+              />
+            </View>
+          )
+        ) : null}
+        {rescanFailed === pocket.key ? (
+          <Text accessibilityLiveRegion="polite" style={styles.failed}>
+            {RESCAN_FAILED}
+          </Text>
+        ) : null}
       </View>
 
       {panel ? (
@@ -243,7 +337,11 @@ export function CardViewer({
           <View style={[styles.panel, { paddingBottom: insets.bottom + spacing(3) }]}>
             <View style={styles.panelTop}>
               <Text accessibilityRole="header" style={styles.heading}>
-                {panel === "printing" ? OTHER_PRINTING : NOT_THIS_CARD}
+                {panel === "printing"
+                  ? choosesPrinting(pocket)
+                    ? CHOOSE_PRINTING
+                    : OTHER_PRINTING
+                  : NOT_THIS_CARD}
               </Text>
               <SheetClose onPress={() => setPanel(null)} />
             </View>
@@ -354,6 +452,8 @@ function Pane({
   const note = (pocket.note ?? "").trim();
   const frame = { width: column, height, borderRadius: radius.control / 2 };
   const suggestions = pocket.state === "unread" ? (pocket.suggestions ?? []) : [];
+  const reasons = (pocket.reasons ?? []).filter((reason) => reason.trim() !== "");
+  const status = pocket.status;
 
   return (
     <ScrollView
@@ -364,6 +464,20 @@ function Pane({
         gap: spacing(3),
       }}
     >
+      {/* The pocket's status in its colour; an unsure one says more below. */}
+      {status && !unsure ? (
+        <View style={styles.status}>
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: colors[STATUS_TOKEN[status]] },
+            ]}
+          />
+          <Text style={[styles.statusWord, { color: colors[STATUS_TOKEN[status]] }]}>
+            {statusWord(status)}
+          </Text>
+        </View>
+      ) : null}
       {unsure ? (
         <View style={styles.flag}>
           <Ionicons name="help-circle" size={16} color={colors.warning} />
@@ -377,6 +491,12 @@ function Pane({
         <View style={styles.flag}>
           <Ionicons name="alert-circle" size={16} color={colors.warning} />
           <Text style={[styles.line, { flex: 1 }]}>{POCKET_TAKEN}</Text>
+        </View>
+      ) : null}
+      {pocket.glare ? (
+        <View style={styles.flag}>
+          <Ionicons name="sunny-outline" size={16} color={colors.warning} />
+          <Text style={[styles.line, { flex: 1 }]}>{GLARE_ON_CARD}</Text>
         </View>
       ) : null}
 
@@ -424,6 +544,17 @@ function Pane({
         </View>
       </View>
 
+      {/* Why, in the reader's own plain words, small: never a score. */}
+      {reasons.length > 0 ? (
+        <View style={styles.reasons}>
+          {reasons.map((reason, at) => (
+            <Text key={at} style={styles.small}>
+              {reason}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
       {/* What it might be, when the reader could not place it: each a
           tap to choose, as a found pocket's other guesses are. A plain
           wrapping row, not a scroller, so a swipe is still the pager's. */}
@@ -466,9 +597,22 @@ function Pane({
 }
 
 /** One of the menu's smaller actions, side by side under "That's it". */
-function Pill({ label, onPress }: { label: string; onPress: () => void }) {
+function Pill({
+  label,
+  onPress,
+  disabled = false,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}) {
   return (
-    <Tap onPress={onPress} accessibilityLabel={label} style={styles.pill}>
+    <Tap
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityLabel={label}
+      style={styles.pill}
+    >
       <Text numberOfLines={1} adjustsFontSizeToFit style={styles.pillLabel}>
         {label}
       </Text>
@@ -558,6 +702,29 @@ const styles = StyleSheet.create({
     },
   },
   pillLabel: { color: colors.textPrimary, fontSize: 13, fontWeight: "700" },
+  rescanning: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(2),
+    paddingVertical: spacing(3),
+  },
+  failed: { color: colors.danger, fontSize: 13, lineHeight: 18, textAlign: "center" },
+  status: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing(1.5),
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusWord: { fontSize: 13, fontWeight: "600" },
+  reasons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    columnGap: spacing(3),
+    rowGap: spacing(1),
+  },
   panel: {
     gap: spacing(3),
     paddingTop: spacing(4),

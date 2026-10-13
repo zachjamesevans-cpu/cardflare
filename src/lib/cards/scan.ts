@@ -67,7 +67,13 @@ export function scannerKey(): string {
  * header it refuses, word for word. Nothing logged here may do that.
  */
 export function withoutKeys(text: string): string {
-  return text.replace(/sk-ant-[A-Za-z0-9_\-\s]+/g, "sk-ant-[hidden]");
+  return (
+    text
+      .replace(/sk-ant-[A-Za-z0-9_\-\s]+/g, "sk-ant-[hidden]")
+      /* OpenAI's keys too: sk-, sk-proj-, sk-svcacct-, and a bearer header. */
+      .replace(/sk-(?!ant-\[hidden\])[A-Za-z0-9_-]{16,}/g, "sk-[hidden]")
+      .replace(/Bearer\s+[A-Za-z0-9._\-]+/gi, "Bearer [hidden]")
+  );
 }
 
 /**
@@ -228,8 +234,9 @@ export async function scanCard(
 
 /**
  * The page reader's look at one card the quick reader was unsure of:
- * the stronger model describes it, the catalogue narrows by what it saw,
- * and the cheap tiebreak compares pictures when that leaves a few. Its
+ * the scanner's reader describes it (by the scanner settings' mode), the
+ * catalogue narrows by what it saw, and the picture comparison decides
+ * when that leaves a few. Its
  * pick first, then the quick reader's guesses. Null when it found
  * nothing either, or could not run.
  */
@@ -241,16 +248,14 @@ async function secondLook(
 ): Promise<Extract<ScanOutcome, { ok: true }> | null> {
   if (!allowReads(playerId, 1)) return null;
   /* Loaded when needed: the reader imports this module back. */
-  const [{ readCards }, { listPlayerGames }] = await Promise.all([
+  const [{ readCrops, recordRun }, { listPlayerGames }] = await Promise.all([
     import("@/lib/cards/page-reader"),
     import("@/lib/players/games"),
   ]);
-  const outcome = await readCards({
-    mode: "card",
-    page: null,
-    pockets: [photo],
+  const outcome = await readCrops([{ slot: 0, ...photo }], {
     games: await listPlayerGames(playerId),
   });
+  await recordRun(outcome.run, { playerId, kind: "card" });
   if (!outcome.ok) return null;
   const pocket = outcome.pockets[0];
   if (!pocket || pocket.state === "empty") return null;
@@ -282,7 +287,22 @@ async function secondLook(
  * or a card we could not read or could not find (the player finds it).
  */
 export type PocketOutcome =
-  | { slot: number; state: "empty" }
+  | {
+      slot: number;
+      state: "empty";
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
+    }
   | {
       slot: number;
       state: "found";
@@ -292,6 +312,18 @@ export type PocketOutcome =
       sure?: boolean;
       /** How it decided, in a few words, for the check. */
       note?: string;
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
     }
   | {
       slot: number;
@@ -303,6 +335,18 @@ export type PocketOutcome =
        * reader saw (name, colour, power), for "Might be one of these".
        */
       suggestions?: ScanMatch[];
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
     };
 
 export type PageOutcome =

@@ -24,6 +24,8 @@ vi.mock("@/lib/cards/page-job-actions", () => ({
   queueViewAction: vi.fn(),
   placeQueueAction: vi.fn(),
   discardQueueAction: vi.fn(),
+  realignPageAction: vi.fn(),
+  rescanPocketAction: vi.fn(),
 }));
 vi.mock("@/lib/cards/scan-actions", () => ({
   scanCardAction: vi.fn(),
@@ -181,6 +183,7 @@ describe("the check is the server's queue", () => {
         status,
         error: null,
         pockets: status === "ready" ? [] : null,
+        vision: null,
         photos: { page: url, pockets: [] },
       }) as QueuedPage;
     const before = [page("a", "ready", "first"), page("b", "reading", "first")];
@@ -238,8 +241,9 @@ describe("a guess the reader was not sure of", () => {
     );
     /* Sure, or a quick read: the note under the match. */
     expect(viewer).toContain("{!unsure && item.note && (");
+    /* Unsure by its status, or by sure === false on a page read before statuses. */
     expect(check).toContain(
-      'sure: pocket.state === "found" ? pocket.sure : undefined,',
+      'sure: pocket.state === "found" ? !unsure(pocket) : undefined,',
     );
     expect(check).toContain(
       'note: pocket.state === "empty" ? undefined : pocket.note,',
@@ -304,10 +308,34 @@ describe("placing", () => {
 
   it("places with placeQueueAction from the Add button, then the binder redraws", () => {
     expect(queueCheck).toContain(
-      "const result = await placeQueueAction(batchId, { placements });",
+      "const result = await placeQueueAction(batchId, { placements }, mode)",
     );
-    expect(queueCheck).toMatch(/onClick=\{place\}\s*>\s*\{addPagesLabel\(chosen\)\}/);
+    expect(queueCheck).toMatch(
+      /onClick=\{\(\) => place\("ask"\)\}\s*>\s*\{addPagesLabel\(chosen\)\}/,
+    );
     expect(view).toMatch(/closeCheck\(\);\s*router\.refresh\(\);/);
+  });
+
+  it('asks first, and only a yes sends "replace"', () => {
+    /* The Add button never replaces: "ask" places nothing over another card. */
+    expect(code(queueCheck).match(/place\("ask"\)/g)).toHaveLength(1);
+    expect(code(queueCheck).match(/place\("replace"\)/g)).toHaveLength(1);
+    /* An occupied pocket comes back as the server's question, in the footer. */
+    expect(queueCheck).toMatch(
+      /if \(mode === "ask" && result\.occupied && result\.occupied\.length > 0\) \{\s*setAsking\(result\.message\);/,
+    );
+    expect(queueCheck).toContain('role="alertdialog"');
+    const question = queueCheck.slice(queueCheck.indexOf("{asking ? ("));
+    const yes = question.indexOf("{MOVE_AND_PLACE}");
+    const no = question.indexOf("{CANCEL_PLACING}");
+    expect(yes).toBeGreaterThan(-1);
+    expect(no).toBeGreaterThan(yes);
+    expect(question).toMatch(
+      /onClick=\{\(\) => place\("replace"\)\}\s*>\s*\{MOVE_AND_PLACE\}/,
+    );
+    expect(question).toMatch(
+      /onClick=\{\(\) => setAsking\(null\)\}\s*>\s*\{CANCEL_PLACING\}/,
+    );
   });
 
   it("throws the pages away only after asking, with discardQueueAction", () => {

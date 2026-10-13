@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { CircleAlert, CircleHelp } from "lucide-react";
 
 import {
@@ -8,14 +8,18 @@ import {
   type Choice,
   type ViewerItem,
 } from "@/components/cards/card-viewer";
+import { STATUS_LOOK, pocketStatus } from "@/components/cards/pocket-status";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import type { PocketOutcome } from "@/lib/cards/scan";
 import {
+  BLURRY_PAGE,
   CHECK_PAGES,
+  LINE_UP_PAGE,
   NOT_SURE,
   POCKET_EMPTY,
+  POCKET_NAMES,
   POCKET_UNREAD,
   POCKETS_PER_PAGE,
   RETAKE,
@@ -48,6 +52,13 @@ import { cn } from "@/lib/cn";
  * While any pocket is unsure or unread and not yet looked at, "Check 2
  * unsure" opens the viewer stepping through only those.
  *
+ * The founder (2026-10-13): every pocket is named A1 to C3 and coloured
+ * by its status, matched green, check this one yellow, empty grey and
+ * can't identify red (`pocketStatus`), the word under the colour. One
+ * pocket can be read again on its own from the viewer, and a page whose
+ * pockets could not be found is lined up by hand (`PageAlign`) rather
+ * than guessed at.
+ *
  * The outline the product draws for "you have this" is not used on a
  * tile: here a card is only a guess until it is placed.
  */
@@ -72,15 +83,35 @@ export interface CheckedPage {
   reading?: boolean;
   /** A page that did not read, shot again; absent when it cannot be. */
   onRetake?: () => void;
+  /** A page whose pockets could not be found: its corners, by hand. */
+  onLineUp?: () => void;
+  /** The photo is soft overall: a steadier one would read better. */
+  blurry?: boolean;
 }
 
 /** Where one pocket is: its page's id and its slot. */
 type At = { id: string; slot: number };
 
-/** A pocket worth a second look: one the reader was unsure of, or could not read. */
+/**
+ * A pocket worth a second look: one the reader was unsure of, could not
+ * read, or knows the card of but not the printing.
+ */
 export function doubtful(pocket: Pocket): boolean {
-  return unsure(pocket) || pocket.state === "unread";
+  const status = pocketStatus(pocket);
+  return (
+    status === "ambiguous" ||
+    status === "unrecognized" ||
+    (pocket.state === "found" && pocket.printingUncertain === true)
+  );
 }
+
+/** A set with one key more, or one fewer, for state. */
+const plus = (set: ReadonlySet<string>, key: string) => new Set(set).add(key);
+const minus = (set: ReadonlySet<string>, key: string) => {
+  const next = new Set(set);
+  next.delete(key);
+  return next;
+};
 
 export function PageCheck({
   pages,
@@ -88,6 +119,7 @@ export function PageCheck({
   imagesEnabled,
   playerGames,
   onChoose,
+  onRescan,
 }: {
   pages: readonly CheckedPage[];
   /** Pockets this cardflare binder already has a card in. */
@@ -95,11 +127,18 @@ export function PageCheck({
   imagesEnabled: boolean;
   playerGames: readonly string[];
   onChoose: (pageId: string, slot: number, choice: Choice) => void;
+  /** One pocket read again, more carefully; whether it was. */
+  onRescan?: (pageId: string, slot: number) => Promise<boolean>;
 }) {
   /* The viewer, open: the pockets it steps through and the one on screen. */
   const [walk, setWalk] = useState<{ list: At[]; at: number } | null>(null);
   /* Pockets the player has looked at and said yes to, or changed. */
   const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
+  /* Pockets being read again, and those whose second read did not come. */
+  const [rescanning, setRescanning] = useState<ReadonlySet<string>>(new Set());
+  const [rescanFailed, setRescanFailed] = useState<ReadonlySet<string>>(new Set());
+  /* The same, at once: a second tap before the redraw sends nothing. */
+  const asked = useRef(new Set<string>());
 
   const keyOf = (at: At) => `${at.id}:${at.slot}`;
   const pocketOf = (at: At) => {
@@ -124,20 +163,45 @@ export function PageCheck({
     const page = found?.page;
     const pocket = found?.pocket ?? { slot: at.slot, state: "empty" as const };
     const read = pocket.state === "empty" ? null : pocket.read;
+    const key = keyOf(at);
     return {
-      key: keyOf(at),
+      key,
       place: { page: page?.page ?? 1, slot: at.slot },
       photo: page?.cellUrls[at.slot] ?? null,
       choice: page?.read?.choices[at.slot] ?? null,
       matches: pocket.state === "found" ? pocket.matches : [],
       suggestions: pocket.state === "unread" ? pocket.suggestions : undefined,
       state: pocket.state,
-      sure: pocket.state === "found" ? pocket.sure : undefined,
+      sure: pocket.state === "found" ? !unsure(pocket) : undefined,
       note: pocket.state === "empty" ? undefined : pocket.note,
       lookFor: read ? read.englishName || read.name : "",
       taken: page ? taken.has(pocketAt(page.page, at.slot)) : false,
+      status: pocketStatus(pocket),
+      reasons: pocket.reasons,
+      glare: pocket.glare,
+      printingUncertain: pocket.printingUncertain,
+      rescan: onRescan
+        ? rescanning.has(key)
+          ? "busy"
+          : rescanFailed.has(key)
+            ? "failed"
+            : "idle"
+        : undefined,
     };
   });
+
+  /* One pocket read again: once, however often it is tapped. */
+  const rescan = async (at: At) => {
+    const key = keyOf(at);
+    if (!onRescan || asked.current.has(key)) return;
+    asked.current.add(key);
+    setRescanning((all) => plus(all, key));
+    setRescanFailed((all) => minus(all, key));
+    const ok = await onRescan(at.id, at.slot).catch(() => false);
+    asked.current.delete(key);
+    setRescanning((all) => minus(all, key));
+    if (!ok) setRescanFailed((all) => plus(all, key));
+  };
 
   const looked = (at: At) => setChecked((all) => new Set(all).add(keyOf(at)));
   /* On to the next pocket; past the last, back to the grid. */
@@ -172,6 +236,7 @@ export function PageCheck({
           <h3 className="text-base font-semibold text-text-primary">
             Page {page.page}
           </h3>
+          {page.blurry && <p className="text-sm text-warning">{BLURRY_PAGE}</p>}
           {page.read ? (
             <ul className="grid grid-cols-3 gap-2">
               {page.read.pockets.map((pocket) => (
@@ -206,6 +271,11 @@ export function PageCheck({
                 {page.reading && <Spinner size="sm" />}
                 {page.line}
               </p>
+              {page.onLineUp && (
+                <Button type="button" size="sm" onClick={page.onLineUp}>
+                  {LINE_UP_PAGE}
+                </Button>
+              )}
               {page.onRetake && (
                 <Button
                   type="button"
@@ -242,6 +312,7 @@ export function PageCheck({
             looked(here);
             onward();
           }}
+          onRescan={onRescan ? () => void rescan(here) : undefined}
           onClose={() => setWalk(null)}
         />
       )}
@@ -254,7 +325,8 @@ export function PageCheck({
  * player's own photo of the pocket when card art is off; an unread
  * pocket is a "?"; an empty one is faint. A pocket already full in this
  * binder wears a small mark, and the viewer says why; so does a guess
- * the reader was not sure of, in the other corner.
+ * the reader was not sure of, in the other corner. Under the card, the
+ * pocket's name (A1 to C3) and its status in its colour.
  */
 function PocketTile({
   pocket,
@@ -272,17 +344,65 @@ function PocketTile({
   /** The card viewer, on this pocket. */
   onOpen: () => void;
 }) {
+  const name = POCKET_NAMES[pocket.slot];
+  const look = STATUS_LOOK[pocketStatus(pocket)];
   const label = choice
-    ? `Pocket ${pocket.slot + 1}: ${choice.card.exactName}${unsure(pocket) ? `. ${NOT_SURE}` : ""}`
-    : `Pocket ${pocket.slot + 1}: ${pocket.state === "unread" ? POCKET_UNREAD : POCKET_EMPTY}`;
+    ? `${name}: ${choice.card.exactName}. ${unsure(pocket) ? NOT_SURE : look.word}`
+    : `${name}: ${pocket.state === "unread" ? POCKET_UNREAD : POCKET_EMPTY}`;
   return (
     <button
       type="button"
       aria-haspopup="dialog"
       aria-label={label}
       onClick={onOpen}
-      className="relative block aspect-[63/88] w-full cursor-pointer overflow-hidden rounded-[5px] border border-border bg-elevated transition-colors hover:border-border-strong"
+      className="flex w-full cursor-pointer flex-col overflow-hidden rounded-[5px] border border-border bg-elevated text-left transition-colors hover:border-border-strong"
     >
+      <span className="relative block aspect-[63/88] w-full">
+        <PocketFace
+          pocket={pocket}
+          choice={choice}
+          photo={photo}
+          imagesEnabled={imagesEnabled}
+        />
+        {unsure(pocket) && (
+          <span className="absolute top-1 left-1 rounded-full bg-canvas/80 p-0.5">
+            <CircleHelp className="size-3.5 text-warning" aria-hidden="true" />
+          </span>
+        )}
+        {taken && (
+          <span className="absolute top-1 right-1 rounded-full bg-canvas/80 p-0.5">
+            <CircleAlert className="size-3.5 text-warning" aria-hidden="true" />
+          </span>
+        )}
+      </span>
+      <span
+        className={cn(
+          "flex items-center gap-1 px-1.5 py-1 text-[10px] leading-tight",
+          look.band,
+        )}
+      >
+        <span className={cn("size-1.5 shrink-0 rounded-full", look.dot)} />
+        <span className="font-semibold text-text-primary tabular-nums">{name}</span>
+        <span className={cn("min-w-0 truncate", look.text)}>{look.word}</span>
+      </span>
+    </button>
+  );
+}
+
+/** What a tile shows of its pocket: the chosen card, a "?", or nothing. */
+function PocketFace({
+  pocket,
+  choice,
+  photo,
+  imagesEnabled,
+}: {
+  pocket: Pocket;
+  choice: Choice;
+  photo: string | null;
+  imagesEnabled: boolean;
+}) {
+  return (
+    <>
       {choice ? (
         <ChoiceFace choice={choice} photo={photo} imagesEnabled={imagesEnabled} />
       ) : pocket.state === "unread" ? (
@@ -290,21 +410,10 @@ function PocketTile({
           ?
         </span>
       ) : (
-        <span className="flex size-full items-center justify-center bg-canvas text-xs text-text-muted">
-          {POCKET_EMPTY}
-        </span>
+        /* Empty: the band under it already says so. */
+        <span className="block size-full bg-canvas" />
       )}
-      {unsure(pocket) && (
-        <span className="absolute top-1 left-1 rounded-full bg-canvas/80 p-0.5">
-          <CircleHelp className="size-3.5 text-warning" aria-hidden="true" />
-        </span>
-      )}
-      {taken && (
-        <span className="absolute top-1 right-1 rounded-full bg-canvas/80 p-0.5">
-          <CircleAlert className="size-3.5 text-warning" aria-hidden="true" />
-        </span>
-      )}
-    </button>
+    </>
   );
 }
 
@@ -332,7 +441,11 @@ function ChoiceFace({
   );
 }
 
-/** A found pocket the careful reader was not sure of. A quick read says nothing either way. */
+/**
+ * A found pocket the careful reader was not sure of: its status says
+ * so, or, read before there were statuses, `sure` was false. A quick
+ * read says nothing either way.
+ */
 export function unsure(pocket: Pocket): boolean {
-  return pocket.state === "found" && pocket.sure === false;
+  return pocket.state === "found" && pocketStatus(pocket) === "ambiguous";
 }

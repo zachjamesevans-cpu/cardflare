@@ -1,15 +1,26 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent } from "react";
-import { ChevronLeft, ChevronRight, CircleAlert, CircleHelp } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  CircleAlert,
+  CircleHelp,
+  RotateCw,
+  Sun,
+} from "lucide-react";
 
+import { STATUS_LOOK, type PocketStatus } from "@/components/cards/pocket-status";
 import { OtherMatch, PrintingChips, ScannedCard } from "@/components/cards/scan-card";
 import { CardPicker } from "@/components/flares/card-picker";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FullScreen } from "@/components/ui/full-screen";
+import { Spinner } from "@/components/ui/spinner";
 import {
+  CHOOSE_PRINTING,
   FIND_THE_CARD,
+  GLARE_ON_CARD,
   LEAVE_EMPTY,
   MIGHT_BE_THESE,
   NOT_SURE,
@@ -19,8 +30,12 @@ import {
   OUR_MATCH,
   POCKETS_PER_PAGE,
   POCKET_EMPTY,
+  POCKET_NAMES,
   POCKET_TAKEN,
   POCKET_UNREAD,
+  RESCAN_FAILED,
+  RESCAN_POCKET,
+  RESCANNING_POCKET,
   THATS_IT,
   YOUR_PHOTO,
 } from "@/lib/cards/scan-rules";
@@ -51,8 +66,14 @@ import { cn } from "@/lib/cn";
  *    except that "it's just one card, so adding the card should close
  *    that screen." So it picks one card, and the tap closes it.
  * 4. On a page, the arrows, the keyboard's arrows and a swipe step to
- *    the pocket before or after, across every page; "Page 4" and nine
+ *    the pocket before or after, across every page; "Page 4 B2" and nine
  *    dots say where. That's it keeps the card and steps on.
+ * 5. A page's pocket also says its status in its colour (pocket-status),
+ *    glare on the card, the reader's reasons in a few plain words, "Which
+ *    printing is it?" with the printings open when the card is known but
+ *    its printing is the player's call, and "Rescan this pocket", which
+ *    reads that one pocket again, more carefully, with the spinner while
+ *    it does. The reader's confidence is never shown as a number.
  *
  * Every word is from scan-rules.ts, which the app mirrors.
  */
@@ -86,6 +107,16 @@ export interface ViewerItem {
   lookFor: string;
   /** The binder already has a card in this pocket. */
   taken?: boolean;
+  /** A page's pocket: matched, for review, empty or not identified. */
+  status?: PocketStatus;
+  /** Why the reader decided, in a few plain words each. */
+  reasons?: readonly string[];
+  /** Glare over part of the card in the photo. */
+  glare?: boolean;
+  /** The card is known; which printing it is, is the player's to say. */
+  printingUncertain?: boolean;
+  /** Read again on its own: not asked, on its way, or it did not come. */
+  rescan?: "idle" | "busy" | "failed";
 }
 
 /** How far a finger has to travel sideways to step to the next card. */
@@ -101,6 +132,7 @@ export function CardViewer({
   onChoose,
   onConfirm,
   onLeaveEmpty,
+  onRescan,
   onClose,
 }: {
   /** What a screen reader hears the viewer called. */
@@ -117,6 +149,8 @@ export function CardViewer({
   onConfirm: () => void;
   /** A page's pocket only: nothing goes in it. */
   onLeaveEmpty?: () => void;
+  /** A page's pocket only: read it again, more carefully. */
+  onRescan?: () => void;
   /** Back to the camera, or to the check's grid. */
   onClose: () => void;
 }) {
@@ -200,6 +234,7 @@ export function CardViewer({
               onChoose={onChoose}
               onConfirm={onConfirm}
               onLeaveEmpty={onLeaveEmpty}
+              onRescan={onRescan}
               onFind={() => setPicking(true)}
             />
             {steps && (
@@ -218,12 +253,12 @@ export function CardViewer({
   );
 }
 
-/** "Page 4" and nine dots, the one on screen lit. */
+/** "Page 4 B2" and nine dots, the one on screen lit. */
 function Whereabouts({ page, slot }: { page: number; slot: number }) {
   return (
     <div className="flex flex-col items-center gap-2">
       <h2 className="text-sm font-semibold text-text-primary tabular-nums">
-        Page {page}
+        Page {page} {POCKET_NAMES[slot]}
       </h2>
       <ol aria-hidden="true" className="flex gap-1.5">
         {Array.from({ length: POCKETS_PER_PAGE }, (_, dot) => (
@@ -271,6 +306,7 @@ function Shown({
   onChoose,
   onConfirm,
   onLeaveEmpty,
+  onRescan,
   onFind,
 }: {
   item: ViewerItem;
@@ -278,12 +314,18 @@ function Shown({
   onChoose: (choice: Choice) => void;
   onConfirm: () => void;
   onLeaveEmpty?: () => void;
+  onRescan?: () => void;
   /** Find the card: the picker, over the card. */
   onFind: () => void;
 }) {
   const { choice } = item;
+  /* The card is known, its printing is not: the printings open at once. */
+  const choosePrinting =
+    item.printingUncertain === true && (choice?.card.printings.length ?? 0) > 1;
   /* The menu's open part: the printings or the other guesses. */
-  const [menu, setMenu] = useState<"printing" | "other" | null>(null);
+  const [menu, setMenu] = useState<"printing" | "other" | null>(
+    choosePrinting ? "printing" : null,
+  );
   /* On a narrow screen, the face showing. */
   const [face, setFace] = useState<"photo" | "match">("match");
   const unsure = item.sure === false;
@@ -297,8 +339,23 @@ function Shown({
   };
   const flip = () => item.photo && setFace(face === "match" ? "photo" : "match");
 
+  const look = item.status ? STATUS_LOOK[item.status] : null;
+  const busy = item.rescan === "busy";
+
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
+      {/* The pocket's status in its colour; an unsure one says more below. */}
+      {look && !unsure && (
+        <p
+          className={cn(
+            "flex items-center justify-center gap-1.5 text-sm font-semibold",
+            look.text,
+          )}
+        >
+          <span className={cn("size-2 rounded-full", look.dot)} aria-hidden="true" />
+          {look.word}
+        </p>
+      )}
       {unsure && (
         <div className="flex flex-col gap-1 text-sm">
           <p className="flex items-start gap-1.5 text-text-secondary">
@@ -318,6 +375,12 @@ function Shown({
             aria-hidden="true"
           />
           {POCKET_TAKEN}
+        </p>
+      )}
+      {item.glare && (
+        <p className="flex items-start gap-1.5 text-sm text-text-secondary">
+          <Sun className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
+          {GLARE_ON_CARD}
         </p>
       )}
 
@@ -402,6 +465,14 @@ function Shown({
       {!unsure && item.note && (
         <p className="text-center text-xs text-text-muted">{item.note}</p>
       )}
+      {/* Why, in its own plain words: never a score. */}
+      {item.reasons && item.reasons.length > 0 && (
+        <ul className="flex flex-wrap justify-center gap-x-3 gap-y-1 text-xs text-text-muted">
+          {item.reasons.map((reason, at) => (
+            <li key={at}>{reason}</li>
+          ))}
+        </ul>
+      )}
 
       {/*
        * A pocket the reader could not place: what it might be, each a
@@ -457,10 +528,40 @@ function Shown({
             {LEAVE_EMPTY}
           </Button>
         )}
+        {/* Disabled while it reads, so a second tap sends nothing. */}
+        {onRescan && item.rescan && (
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={onRescan}
+          >
+            {busy ? (
+              <>
+                <Spinner size="sm" />
+                {RESCANNING_POCKET}
+              </>
+            ) : (
+              <>
+                <RotateCw className="size-4" aria-hidden="true" />
+                {RESCAN_POCKET}
+              </>
+            )}
+          </Button>
+        )}
       </div>
+      {item.rescan === "failed" && (
+        <p role="alert" className="text-center text-sm text-danger">
+          {RESCAN_FAILED}
+        </p>
+      )}
 
       {menu === "printing" && choice && (
         <Popover>
+          {choosePrinting && (
+            <p className="text-sm font-semibold text-text-primary">{CHOOSE_PRINTING}</p>
+          )}
           <PrintingChips
             card={choice.card}
             printingId={choice.printingId}
@@ -521,8 +622,9 @@ function Guesses({
             : "[scrollbar-width:none] overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden",
         )}
       >
-        {guesses.map((match) => (
-          <li key={match.card.id} className="shrink-0">
+        {/* By place, not by card: one card may come back in two printings. */}
+        {guesses.map((match, at) => (
+          <li key={`${match.card.id}:${at}`} className="shrink-0">
             <OtherMatch
               card={match.card}
               chosen={chosen === null ? undefined : match.card.id === chosen}

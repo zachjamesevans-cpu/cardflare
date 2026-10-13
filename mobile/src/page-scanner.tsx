@@ -13,28 +13,45 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  ApiError,
+  type PlaceMode,
+  type PlaceResume,
   type PocketOutcome,
   type QueuedPage,
   discardPageQueue,
   friendlyError,
   getPageQueue,
   placePageQueue,
+  placedAny,
+  realignPage,
+  rescanPagePocket,
   serverMessage,
 } from "./api";
 import { CardScanner } from "./card-scanner";
 import { CardViewer, pickArt, type ViewerPick, type ViewerPocket } from "./card-viewer";
+import { PageAlignSheet } from "./page-align";
+import type { Quad } from "./page-geometry";
 import {
+  STATUS_TOKEN,
   needsLook,
   pagePlacements,
   pagesWithCards,
+  pocketName,
   queueSettled,
+  pocketStatus,
+  statusWord,
   type PocketChoice,
 } from "./page-scan";
 import { RemoteImage } from "./remote-image";
 import {
+  BLURRY_PAGE,
+  CANCEL_PLACING,
   CHECK_PAGES,
+  LINE_UP_PAGE,
+  MOVE_AND_PLACE,
   NOT_SURE,
   PAGE_FAILED,
+  PAGE_NEEDS_LINING_UP,
   PAGE_TOOK_TOO_LONG,
   POCKET_EMPTY,
   POCKET_UNREAD,
@@ -45,6 +62,7 @@ import {
   THROW_PAGES_AWAY,
   addPagesLabel,
   checkUnsureLabel,
+  pagesPlacedLine,
   pocketAt,
 } from "./scan-copy";
 import { scanHit } from "./scan-hit";
@@ -65,16 +83,23 @@ import { Button, ErrorLine, Loading, SheetClose, Tap, Title } from "./ui";
  *
  * a. The binder says "Reading 5 pages..." and then "5 pages ready to
  *    check" with "Check now"; the notice opens the same check.
- * b. Every page as its 3x3 grid, each pocket showing the card we matched
- *    (a "?" for one we could not read, a mark on one we were not sure
- *    of). A tap on any pocket opens the card viewer (src/card-viewer.tsx)
- *    on it, and a swipe walks every pocket of every page. "Check 2
- *    unsure" walks only the doubtful ones. A page that did not read says
- *    so with "Retake", into the same queue.
+ * b. Every page as its 3x3 grid, each pocket named A1 to C3 and
+ *    coloured by its status (matched green, check this one yellow, empty
+ *    grey, can't identify red) with the status in a word, showing the
+ *    card we matched (a "?" for one we could not read). A blurry photo
+ *    says so over its grid. A tap on any pocket opens the card viewer
+ *    (src/card-viewer.tsx) on it, where it can also be read again on its
+ *    own, and a swipe walks every pocket of every page. "Check 2 unsure"
+ *    walks only the doubtful ones. A page that did not read says so with
+ *    "Retake", into the same queue; one the scanner could not find the
+ *    pockets on (it never guesses) says so with "Line up the page"
+ *    (src/page-align.tsx) as well.
  * c. "Add 5 pages to binder" places each chosen card in the pocket it
  *    sat in, on its page's own number. Nothing is placed before the
- *    player has looked. "Throw these pages away" ends the queue with
- *    nothing placed.
+ *    player has looked, and nothing in the binder is overwritten without
+ *    a yes: a pocket already holding a different card is asked about,
+ *    "Move them and place" or "Cancel". "Throw these pages away" ends the
+ *    queue with nothing placed.
  */
 
 /** A read page's nine pockets in slot order, an empty one for any not sent back. */
@@ -192,6 +217,8 @@ function PageCheck({
   const [walk, setWalk] = useState<{ keys: string[]; at: number } | null>(null);
   /* A failed page being shot again, by its number. */
   const [retaking, setRetaking] = useState<number | null>(null);
+  /* A page being lined up by hand, by its scan. */
+  const [aligning, setAligning] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const alive = useRef(true);
@@ -244,10 +271,10 @@ function PageCheck({
   /* Asked again every ten seconds until every page is read or failed. */
   const settled = pages !== null && queueSettled(pages);
   useEffect(() => {
-    if (pages === null || settled || retaking !== null) return;
+    if (pages === null || settled || retaking !== null || aligning !== null) return;
     const timer = setTimeout(() => void load(), CHECK_POLL_MS);
     return () => clearTimeout(timer);
-  }, [pages, settled, retaking, load]);
+  }, [pages, settled, retaking, aligning, load]);
 
   if (pages === null) {
     return loadError ? (
@@ -271,6 +298,7 @@ function PageCheck({
         const key = `${page.scanId}:${pocket.slot}`;
         where.set(key, { scanId: page.scanId, slot: pocket.slot });
         const read = pocket.state === "empty" ? null : pocket.read;
+        const seen = page.vision?.pockets.find((each) => each.slot === pocket.slot);
         return {
           key,
           page: page.page,
@@ -284,6 +312,10 @@ function PageCheck({
           suggestions: pocket.state === "unread" ? pocket.suggestions : undefined,
           lookFor: read ? read.englishName || read.name : "",
           taken: taken.has(pocketAt(page.page, pocket.slot)),
+          status: pocket.status,
+          reasons: pocket.reasons,
+          glare: pocket.glare ?? seen?.glare ?? false,
+          printingUncertain: pocket.printingUncertain,
         };
       }),
     );
@@ -332,24 +364,122 @@ function PageCheck({
     }));
   const chosenPages = pagesWithCards(choices.map((page) => page.choices));
 
-  const place = async () => {
-    if (busy) return;
+  /*
+   * Placed with "ask": a pocket already holding a different card places
+   * nothing and asks, "Move them and place" sending that part and the
+   * rest again with "replace". A long queue goes in parts, so the parts
+   * before the one that asked are in already: on Cancel the check says
+   * what went in, and the rest waits.
+   */
+  const place = async (mode: PlaceMode = "ask", resume?: PlaceResume) => {
+    if (busy && !resume) return;
     const placements = pagePlacements(choices);
     if (placements.length === 0) return;
     setBusy(true);
     setError(null);
     try {
-      const result = await placePageQueue(batchId, placements);
-      if (alive.current) onPlaced(result.message);
+      const result = await placePageQueue(batchId, placements, mode, resume);
+      if (!alive.current) return;
+      if (result.ok) {
+        onPlaced(result.message);
+        setBusy(false);
+        return;
+      }
+      const cancel = () => {
+        if (!alive.current) return;
+        setBusy(false);
+        if (placedAny(result.resume.totals)) {
+          setError(pagesPlacedLine(result.resume.totals));
+        }
+      };
+      Alert.alert(
+        result.message,
+        undefined,
+        [
+          { text: CANCEL_PLACING, style: "cancel", onPress: cancel },
+          {
+            text: MOVE_AND_PLACE,
+            onPress: () => void place("replace", result.resume),
+          },
+        ],
+        { cancelable: true, onDismiss: cancel },
+      );
     } catch (caught) {
       if (alive.current) {
+        setBusy(false);
         setError(
           serverMessage(caught) ?? `That did not save. ${friendlyError(caught)}`,
         );
       }
-    } finally {
-      if (alive.current) setBusy(false);
     }
+  };
+
+  /* One pocket read again on its own: the new pocket replaces the old,
+     its first guess chosen afresh, and it is to be looked at again. */
+  const rescan = async (key: string): Promise<boolean> => {
+    const at = where.get(key);
+    if (!at) return false;
+    try {
+      const answer = await rescanPagePocket(at.scanId, at.slot);
+      if (!answer.ok) return false;
+      if (!alive.current) return true;
+      setPages((current) =>
+        current
+          ? current.map((page) =>
+              page.scanId === at.scanId && page.pockets
+                ? {
+                    ...page,
+                    pockets: [
+                      ...page.pockets.filter((pocket) => pocket.slot !== at.slot),
+                      answer.pocket,
+                    ],
+                  }
+                : page,
+            )
+          : current,
+      );
+      setPicks((current) => ({
+        ...current,
+        [at.scanId]: (current[at.scanId] ?? []).map((each, slot) =>
+          slot === at.slot ? firstPick(answer.pocket) : each,
+        ),
+      }));
+      setLooked((current) =>
+        Object.fromEntries(Object.entries(current).filter(([each]) => each !== key)),
+      );
+      return true;
+    } catch (caught) {
+      console.warn("[cardflare] pocket rescan failed", friendlyError(caught));
+      return false;
+    }
+  };
+
+  /* The page the player is lining up, and its corners sent: the page is
+     read again, so it is back to reading here until it has been. */
+  const lining = aligning ? pages.find((page) => page.scanId === aligning) : undefined;
+  const readAgain = async (scanId: string, corners: Quad) => {
+    try {
+      await realignPage(scanId, corners);
+    } catch (caught) {
+      /* Busy is a read already on its way; gone is gone. Either way the
+         queue says how it stands. */
+      if (!(
+        caught instanceof ApiError &&
+        (caught.status === 409 || caught.status === 404)
+      )) {
+        throw new Error(friendlyError(caught));
+      }
+    }
+    if (!alive.current) return;
+    setPages((current) =>
+      current
+        ? current.map((page) =>
+            page.scanId === scanId ? { ...page, status: "queued", error: null } : page,
+          )
+        : current,
+    );
+    setAligning(null);
+    void load();
   };
 
   const throwAway = () =>
@@ -398,6 +528,12 @@ function PageCheck({
               <Text accessibilityRole="header" style={styles.heading}>
                 {`Page ${number}`}
               </Text>
+              {page.vision?.blurry ? (
+                <View style={styles.flag}>
+                  <Ionicons name="eye-off-outline" size={16} color={colors.warning} />
+                  <Text style={[styles.line, { flex: 1 }]}>{BLURRY_PAGE}</Text>
+                </View>
+              ) : null}
               {page.status === "ready" ? (
                 <View
                   style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}
@@ -408,7 +544,6 @@ function PageCheck({
                       <PocketTile
                         key={pocket.key}
                         pocket={pocket}
-                        looked={looked[pocket.key] === true}
                         width={tile}
                         onPress={() =>
                           setWalk({
@@ -418,6 +553,21 @@ function PageCheck({
                         }
                       />
                     ))}
+                </View>
+              ) : page.status === "failed" && page.error === "needs-alignment" ? (
+                <View style={{ gap: spacing(2) }}>
+                  <Text style={styles.body}>{PAGE_NEEDS_LINING_UP}</Text>
+                  {page.photos.page && page.vision ? (
+                    <Button
+                      label={LINE_UP_PAGE}
+                      onPress={() => setAligning(page.scanId)}
+                    />
+                  ) : null}
+                  <Button
+                    label={RETAKE}
+                    variant="secondary"
+                    onPress={() => setRetaking(number)}
+                  />
                 </View>
               ) : page.status === "failed" ? (
                 <View style={{ gap: spacing(2) }}>
@@ -485,10 +635,24 @@ function PageCheck({
               choose(shown[index].key, null);
               onward(index);
             }}
+            onRescan={(index) => rescan(shown[index].key)}
             onClose={() => setWalk(null)}
           />
         ) : null}
       </Modal>
+
+      {/* A page the scanner could not find the pockets on, lined up by
+          hand from where it last put the page. */}
+      {lining?.photos.page && lining.vision ? (
+        <PageAlignSheet
+          visible
+          photo={lining.photos.page}
+          size={{ width: lining.vision.width, height: lining.vision.height }}
+          start={lining.vision.corners ?? lining.vision.page}
+          onRead={(corners) => readAgain(lining.scanId, corners)}
+          onClose={() => setAligning(null)}
+        />
+      ) : null}
 
       {/* The failed page shot again, in this queue under its own number. */}
       <CardScanner
@@ -506,73 +670,93 @@ function PageCheck({
 }
 
 /**
- * One pocket on the check grid: the card we matched (or the player's
- * own photo when the card has no art), a "?" for one we could not read,
- * a faint "Empty" for nothing there. A plain border: the accent outline
- * means "you have this" elsewhere, and here a card is only a guess
- * until it is placed. A pocket already full in this binder wears a small
- * mark, and a guess we were not sure of another, in the other corner,
- * until the player has looked at it.
+ * One pocket on the check grid, the website's tile: the card we matched
+ * (or the player's own photo when the card has no art), a "?" for one we
+ * could not read, nothing for an empty one. Under it a band in its
+ * status's colour: a dot, its name (A1 to C3), and its status in a word
+ * (matched in the success colour, check this one in the warning colour,
+ * can't identify in the danger colour, empty muted). A plain border: the
+ * accent outline means "you have this" elsewhere, and here a card is
+ * only a guess until it is placed. A guess the reader was not sure of
+ * wears a small mark in one top corner, a pocket already full in this
+ * binder another in the other.
  */
 function PocketTile({
   pocket,
-  looked,
   width,
   onPress,
 }: {
   pocket: ViewerPocket;
-  looked: boolean;
   width: number;
   onPress: () => void;
 }) {
   const height = Math.round((width * 88) / 63);
   const pick = pocket.pick;
   const art = pick ? (pickArt(pick) ?? pocket.photo) : null;
-  const unsure = pocket.state === "found" && pocket.sure === false && !looked;
-  const unread = pocket.state === "unread" && !pick && !looked;
-  const slot = (pocket.slot ?? 0) + 1;
+  const status = pocketStatus(pocket);
+  const tone = colors[STATUS_TOKEN[status]];
+  const word = statusWord(status);
+  const unsure = pocket.state === "found" && status === "ambiguous";
+  const unread = pocket.state === "unread";
+  const name = pocketName({ slot: pocket.slot ?? 0 });
   const label = pick
-    ? `Pocket ${slot}: ${pick.hit.name}`
-    : `Pocket ${slot}: ${unread ? POCKET_UNREAD : POCKET_EMPTY}`;
+    ? `${name}: ${pick.hit.name}. ${unsure ? NOT_SURE : word}`
+    : `${name}: ${unread ? POCKET_UNREAD : POCKET_EMPTY}`;
   return (
     <Tap
       onPress={onPress}
-      accessibilityLabel={unsure ? `${label}. ${NOT_SURE}` : label}
+      accessibilityLabel={label}
       style={{
         width,
-        height,
         borderRadius: radius.control / 2,
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: pick || unread ? colors.elevated : colors.canvas,
+        backgroundColor: colors.elevated,
         overflow: "hidden",
-        alignItems: "center",
-        justifyContent: "center",
       }}
     >
-      {pick ? (
-        art ? (
-          <RemoteImage uri={art} contentFit="cover" style={{ width, height }} />
-        ) : (
-          <Text numberOfLines={4} style={styles.tileName}>
-            {pick.hit.name}
-          </Text>
-        )
-      ) : unread ? (
-        <Text style={styles.unknown}>?</Text>
-      ) : (
-        <Text style={styles.small}>{POCKET_EMPTY}</Text>
-      )}
-      {pocket.taken ? (
-        <View style={styles.takenMark}>
-          <Ionicons name="alert-circle" size={14} color={colors.warning} />
-        </View>
-      ) : null}
-      {unsure ? (
-        <View style={styles.unsureMark}>
-          <Ionicons name="help-circle" size={14} color={colors.warning} />
-        </View>
-      ) : null}
+      <View
+        style={{
+          width: "100%",
+          height,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: pick || unread ? colors.elevated : colors.canvas,
+        }}
+      >
+        {pick ? (
+          art ? (
+            <RemoteImage uri={art} contentFit="cover" style={{ width, height }} />
+          ) : (
+            <Text numberOfLines={4} style={styles.tileName}>
+              {pick.hit.name}
+            </Text>
+          )
+        ) : unread ? (
+          <Text style={styles.unknown}>?</Text>
+        ) : null}
+        {unsure ? (
+          <View style={styles.unsureMark}>
+            <Ionicons name="help-circle" size={14} color={colors.warning} />
+          </View>
+        ) : null}
+        {pocket.taken ? (
+          <View style={styles.takenMark}>
+            <Ionicons name="alert-circle" size={14} color={colors.warning} />
+          </View>
+        ) : null}
+      </View>
+      {/* The band: the status's colour, faint, under its dot, name and word. */}
+      <View style={styles.band}>
+        <View
+          style={[StyleSheet.absoluteFill, { backgroundColor: tone, opacity: 0.15 }]}
+        />
+        <View style={[styles.statusDot, { backgroundColor: tone }]} />
+        <Text style={styles.name}>{name}</Text>
+        <Text numberOfLines={1} style={[styles.statusWord, { color: tone }]}>
+          {word}
+        </Text>
+      </View>
     </Tap>
   );
 }
@@ -594,6 +778,23 @@ const styles = StyleSheet.create({
     padding: 1,
     backgroundColor: colors.scrim,
   },
+  band: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    overflow: "hidden",
+  },
+  name: {
+    color: colors.textPrimary,
+    fontSize: 10,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusWord: { flexShrink: 1, fontSize: 10 },
+  flag: { flexDirection: "row", alignItems: "flex-start", gap: spacing(1.5) },
   heading: { color: colors.textPrimary, fontSize: 16, fontWeight: "600" },
   body: { color: colors.textPrimary, fontSize: 14, lineHeight: 20 },
   line: { color: colors.textSecondary, fontSize: 13, lineHeight: 18 },

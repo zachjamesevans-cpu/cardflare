@@ -45,10 +45,12 @@ describe("adding at once", () => {
     );
   });
 
-  it("counts up a card already in the binder instead of a second pocket", () => {
-    expect(add).toContain(
-      "const quantity = Math.min(99, had.quantity + item.quantity);",
-    );
+  it("gives a card already in the binder a pocket of its own, never counting up another", () => {
+    /* The founder (2026-10-13): "two identical cards in different physical
+       pockets must appear in two separate digital pockets." */
+    expect(add).not.toContain("had.quantity + item.quantity");
+    expect(add).toContain("const merged = 0;");
+    expect(add).toContain("for (const item of lines.values()) {");
   });
 
   it("keeps the old single add working, after the last card", () => {

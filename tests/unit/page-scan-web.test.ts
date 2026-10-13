@@ -29,6 +29,8 @@ vi.mock("@/lib/cards/page-job-actions", () => ({
   queueViewAction: vi.fn(),
   placeQueueAction: vi.fn(),
   discardQueueAction: vi.fn(),
+  realignPageAction: vi.fn(),
+  rescanPocketAction: vi.fn(),
 }));
 vi.mock("@/lib/binder/actions", () => ({ placeBinderPagesAction: vi.fn() }));
 vi.mock("@/lib/cards/actions", () => ({ searchCardsAction: vi.fn() }));
@@ -65,7 +67,7 @@ describe("pages come through the one scanner, never the tray", () => {
       scanner.indexOf("const sendAsPage = async"),
       scanner.indexOf("const shoot = async"),
     );
-    expect(send).toContain("await sendPage(binderId, batchId, number, cut)");
+    expect(send).toContain("await sendPage(binderId, batchId, number, ready)");
     expect(send).not.toContain("onAdd");
     expect(pages).not.toContain("addBinderCardsAction");
     expect(pages).not.toContain("onAdd");
@@ -102,23 +104,35 @@ describe("the queue starts at the binder's first empty page", () => {
     expect(scanner).toContain("label={START_LATER}");
   });
 
-  it("takes a photo with the camera, and a retake only the one page", () => {
+  it("takes a photo with the camera, or chooses one, and a retake only the one page", () => {
     expect(scanner).toContain('accept="image/*"');
     expect(scanner).toContain('capture="environment"');
     expect(scanner).toContain("const canShoot = !finishing && !(retake && anyPage);");
-    expect(scanner).toMatch(/canShoot && \(\s*<Button/);
+    expect(scanner).toMatch(/canShoot && \(\s*<>\s*<Button/);
+    /* The library: a second input without capture, from its own button. */
+    expect(scanner.match(/type="file"/g)).toHaveLength(2);
+    expect(scanner.match(/capture="environment"/g)).toHaveLength(1);
+    expect(scanner).toContain("ref={library}");
+    expect(scanner).toMatch(
+      /onClick=\{\(\) => library\.current\?\.click\(\)\}\s*>\s*<Images[^>]*\/>\s*\{CHOOSE_PHOTO\}/,
+    );
     expect(scanner).toContain("setNextPage(Math.min(BINDER_PAGES, number + 1));");
   });
 });
 
-describe("each photo is cut into nine pockets in the browser", () => {
+describe("each photo is sent whole, and the server finds the pockets", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("cuts with pocketCrop and shrinks each pocket to SCAN_LONG_EDGE, never larger", async () => {
+  /** A canvas that records what was drawn and answers toBlob with `bytes` per quality. */
+  const stub = (
+    natural: { width: number; height: number },
+    bytes: (q: number) => number,
+  ) => {
     const draws: number[][] = [];
     const sizes: { width: number; height: number }[] = [];
+    const qualities: number[] = [];
     const canvas = () => {
       const self = {
         width: 0,
@@ -126,9 +140,10 @@ describe("each photo is cut into nine pockets in the browser", () => {
         getContext: () => ({
           drawImage: (...args: unknown[]) => draws.push(args.slice(1) as number[]),
         }),
-        toBlob: (done: (blob: Blob | null) => void) => {
+        toBlob: (done: (blob: Blob | null) => void, _type: string, quality: number) => {
           sizes.push({ width: self.width, height: self.height });
-          done(new Blob([new Uint8Array(10)], { type: "image/jpeg" }));
+          qualities.push(quality);
+          done(new Blob([new Uint8Array(bytes(quality))], { type: "image/jpeg" }));
         },
       };
       return self;
@@ -138,89 +153,61 @@ describe("each photo is cut into nine pockets in the browser", () => {
       "Image",
       class {
         src = "";
-        naturalWidth = 3024;
-        naturalHeight = 4032;
+        naturalWidth = natural.width;
+        naturalHeight = natural.height;
         decode() {
           return Promise.resolve();
         }
       },
     );
+    return { draws, sizes, qualities };
+  };
 
-    const { cutPage } = await import("@/components/cards/page-scan");
-    const cut = await cutPage(new Blob());
-    expect(cut?.cells).toHaveLength(rules.POCKETS_PER_PAGE);
-    for (let slot = 0; slot < rules.POCKETS_PER_PAGE; slot += 1) {
-      const crop = rules.pocketCrop(slot, 3024, 4032);
-      expect(draws[slot]?.slice(0, 4)).toEqual([
-        crop.x,
-        crop.y,
-        crop.width,
-        crop.height,
-      ]);
-      const size = sizes[slot]!;
-      expect(Math.max(size.width, size.height)).toBeLessThanOrEqual(
-        rules.SCAN_LONG_EDGE,
-      );
-      /* Shrunk in proportion, so a card is not squashed. */
-      expect(size.width / size.height).toBeCloseTo(crop.width / crop.height, 2);
-    }
+  it("draws the whole photo once, at PAGE_LONG_EDGE on its long side, and cuts nothing", async () => {
+    const seen = stub({ width: 3024, height: 4032 }, () => 10);
+    const { preparePage, PAGE_LONG_EDGE } =
+      await import("@/components/cards/page-scan");
+    expect(PAGE_LONG_EDGE).toBe(2800);
+    const page = await preparePage(new Blob());
+    expect(page).toBeInstanceOf(Blob);
+    expect(seen.draws).toHaveLength(1);
+    const size = seen.sizes[0]!;
+    expect(Math.max(size.width, size.height)).toBe(PAGE_LONG_EDGE);
+    /* Shrunk in proportion, so the page is not squashed. */
+    expect(size.width / size.height).toBeCloseTo(3024 / 4032, 2);
+    expect(seen.qualities[0]).toBe(0.85);
   });
 
-  it("never enlarges a small photo's pockets", async () => {
-    const { scanSize } = await import("@/components/cards/scan-card");
-    const crop = rules.pocketCrop(4, 900, 1260);
-    expect(scanSize(crop.width, crop.height)).toEqual({
-      width: crop.width,
-      height: crop.height,
-    });
+  it("never enlarges a small photo", async () => {
+    const seen = stub({ width: 1200, height: 1600 }, () => 10);
+    const { preparePage } = await import("@/components/cards/page-scan");
+    await preparePage(new Blob());
+    expect(seen.sizes[0]).toEqual({ width: 1200, height: 1600 });
   });
 
-  it("cuts the whole page too, at PAGE_LONG_EDGE, after its pockets", async () => {
-    const draws: number[][] = [];
-    const sizes: { width: number; height: number }[] = [];
-    const canvas = () => {
-      const self = {
-        width: 0,
-        height: 0,
-        getContext: () => ({
-          drawImage: (...args: unknown[]) => draws.push(args.slice(1) as number[]),
-        }),
-        toBlob: (done: (blob: Blob | null) => void) => {
-          sizes.push({ width: self.width, height: self.height });
-          done(new Blob([new Uint8Array(10)], { type: "image/jpeg" }));
-        },
-      };
-      return self;
-    };
-    vi.stubGlobal("document", { createElement: canvas });
-    vi.stubGlobal(
-      "Image",
-      class {
-        src = "";
-        naturalWidth = 3024;
-        naturalHeight = 4032;
-        decode() {
-          return Promise.resolve();
-        }
-      },
+  it("steps the quality down until it is under PAGE_MAX_BYTES, and gives up past the last", async () => {
+    const { preparePage, PAGE_MAX_BYTES } =
+      await import("@/components/cards/page-scan");
+    /* The server's limit (page-jobs.ts), restated because that file is server-only. */
+    expect(PAGE_MAX_BYTES).toBe(rules.SCAN_MAX_BYTES * 2);
+    expect(PAGE_MAX_BYTES).toBe(3_000_000);
+    const fits = stub({ width: 3024, height: 4032 }, (q) =>
+      q > 0.6 ? PAGE_MAX_BYTES + 1 : PAGE_MAX_BYTES,
     );
-    const { cutPage, PAGE_LONG_EDGE } = await import("@/components/cards/page-scan");
-    const cut = await cutPage(new Blob());
-    expect(cut?.page).toBeInstanceOf(Blob);
-    expect(draws[rules.POCKETS_PER_PAGE]?.slice(0, 4)).toEqual([0, 0, 3024, 4032]);
-    const whole = sizes[rules.POCKETS_PER_PAGE]!;
-    expect(Math.max(whole.width, whole.height)).toBe(PAGE_LONG_EDGE);
-    expect(PAGE_LONG_EDGE).toBe(1568);
+    const page = await preparePage(new Blob());
+    expect(page?.size).toBe(PAGE_MAX_BYTES);
+    expect(fits.qualities).toEqual([0.85, 0.7, 0.55]);
+    vi.unstubAllGlobals();
+    stub({ width: 3024, height: 4032 }, () => PAGE_MAX_BYTES + 1);
+    expect(await preparePage(new Blob())).toBeNull();
   });
 
-  it("sends the whole page and the nine pockets, each JPEG under SCAN_MAX_BYTES", () => {
-    expect(pages).toContain("const crop = pocketCrop(slot, width, height);");
-    expect(pages).toContain("const size = scanSize(crop.width, crop.height);");
-    expect(pages).toContain("page.size <= SCAN_MAX_BYTES &&");
-    expect(pages).toContain("fitted.every((cell) => cell.size <= SCAN_MAX_BYTES) &&");
-    expect(pages).toContain('form.append("page", photos.page, "page.jpg");');
-    expect(pages).toContain("form.append(`pocket${slot}`, cell, `pocket${slot}.jpg`),");
+  it("sends only the page: no pocket cuts, no pocket fields", () => {
+    expect(pages).not.toContain("pocketCrop");
+    expect(pages).not.toMatch(/pocket\$\{slot\}/);
+    expect(pages).toContain('form.append("page", page, "page.jpg");');
     expect(pages).toContain("const outcome = await sendPageAction(form);");
+    expect(scanner).toContain("photo = await preparePage(file);");
   });
 });
 
@@ -230,7 +217,7 @@ describe("the queue is sent one page at a time, in order", () => {
       "const chain = useRef<Promise<void>>(Promise.resolve());",
     );
     expect(scanner).toMatch(
-      /chain\.current = chain\.current\.then\(async \(\) => \{\s*const outcome = await sendPage\(binderId, batchId, number, cut\);/,
+      /chain\.current = chain\.current\.then\(async \(\) => \{\s*const outcome = await sendPage\(binderId, batchId, number, ready\);/,
     );
   });
 
@@ -291,7 +278,8 @@ describe("the pages are checked from the server before anything is placed", () =
     expect(viewer).toContain("{POCKET_TAKEN}");
     expect(viewer).toContain("{POCKET_UNREAD}");
     expect(viewer).toContain("{POCKET_EMPTY}");
-    expect(check).toContain("{POCKET_EMPTY}");
+    /* An empty tile is blank: its status band says Empty. */
+    expect(check).toContain("POCKET_EMPTY}");
     /* Not the "you have this" accent: a guess is not a card in hand. */
     expect(code(check)).not.toMatch(/(border|ring)-(accent|success)\b/);
   });

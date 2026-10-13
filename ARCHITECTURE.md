@@ -1255,3 +1255,56 @@ unreadable combination would otherwise ship silently.
 Display names are read from `player_sessions` at query time rather than copied
 onto the participant row, so fixing a typo renames the player in every room
 they are in.
+
+## The binder-page scanner
+
+A player photographs a binder page once; cardflare recreates it, the same
+cards in the same pockets. Accuracy first, then speed, then cost.
+
+**Pipeline** (all server side, after the response, `page-jobs.ts`):
+
+1. One full-resolution photo per page is stored privately (`scans` bucket).
+2. `page-vision.ts` (OpenCV.js, WebAssembly, loaded with `createRequire`
+   and kept out of the bundle by `serverExternalPackages`) finds the card
+   outlines, and `page-geometry.ts` fits the 3x3 grid: every outline
+   proposes a placing, the one explaining the most outlines wins, and it is
+   fitted with perspective and the binder's own gaps. Pockets are A1 to C3,
+   top row first, fixed. A sideways page, a loose fit, or two placings that
+   fit equally well set `needsAlignment`: the page comes back as
+   `needs-alignment` and the player drags four corners (`realignPage`).
+   Each pocket is cut straight from the full photo; empty pockets and
+   glare are flagged; blur is measured.
+3. `page-reader.ts` reads the cut pockets: the read cache
+   (`scan_recognitions`, by SHA-256 of the picture), then one batched call
+   to the primary provider (`scan-providers.ts`: Anthropic Haiku 5.5, or
+   OpenAI gpt-5.4-mini through the Responses API at `detail: "original"`
+   with a strict JSON schema). Empty pockets are not sent. The catalogue
+   resolves every read (`findScanned`); models never choose a card id.
+4. Hybrid mode sends only the pockets the evidence left unsure to OpenAI,
+   in one call, and keeps the better-supported read.
+5. One cheap picture comparison settles pockets still open between cards
+   or printings. An alternate art is taken only when the reader also saw
+   one and was sure.
+6. `scan-confidence.ts` scores each pocket from evidence (collector
+   number, name, traits, pictures, agreement as a small bonus) against the
+   thresholds in `scanner_settings`: matched, ambiguous, unrecognized,
+   empty. A page whose cards read upside down is cut again from its far
+   corner.
+
+**Placing** is one transaction, `binder_place_scanned`: each card in its
+own pocket (two copies are two pockets; a binder may hold the same card
+in several since `20261120091000_binder_pocket_copies.sql`), a full pocket
+asked about (`ask`) and only moved to the back of the binder on the
+player's yes (`replace`), and a retried placement replayed by its key.
+
+**Settings and numbers** live on `/admin/scanner`: provider mode,
+thresholds, the per-page spending cap, model prices, and the bench (one
+photo through all three modes, labelled by hand, scored by
+`scan-bench-rules.ts`). Every run is logged in `scan_runs` with its calls,
+tokens and cents; nothing logged carries a key or a picture.
+
+**Testing**: `tests/unit/page-vision.test.ts` and `npm run scan:sweep`
+(122 made-up photos) for the page finder; `tests/unit/page-reader.test.ts`
+with both providers faked; `tests/unit/real-binder-photos.test.ts` runs
+any real photos in `tests/fixtures/binder-photos`; `npm run scan:compare`
+runs real photos through real providers and scores them against answers.

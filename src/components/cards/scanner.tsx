@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import Link from "next/link";
-import { Camera, Minus, Plus, ScanLine } from "lucide-react";
+import { Camera, Images, Minus, Plus, ScanLine } from "lucide-react";
 
 import {
   CardViewer,
   type Choice,
   type ViewerItem,
 } from "@/components/cards/card-viewer";
-import { cutPage, sendPage, sendRefusalLine } from "@/components/cards/page-scan";
+import { preparePage, sendPage, sendRefusalLine } from "@/components/cards/page-scan";
 import { readPhoto } from "@/components/cards/scan-card";
 import { ProMark } from "@/components/stores/ultra-mark";
 import { ProWords } from "@/components/stores/pro-words";
@@ -20,6 +20,7 @@ import type { ScanRights } from "@/lib/cards/scan";
 import { scanRightsAction } from "@/lib/cards/scan-actions";
 import {
   BINDER_PAGES,
+  CHOOSE_PHOTO,
   DONE_SCANNING,
   FILL_THE_FRAME,
   GET_PRO,
@@ -52,16 +53,18 @@ import type { CardPrinting, CardResult } from "@/lib/cards/schema";
  *
  * 1. "Scan a card.", "Scan a whole binder page with PRO", the hint, and
  *    the free scans left today when there is a limit. "Take photo", a
- *    file input that on a phone opens the camera; nothing opens on its
- *    own.
+ *    file input that on a phone opens the camera, and "Choose a photo",
+ *    one that opens the library, for a page shot earlier; nothing opens
+ *    on its own.
  * 2. Every photo goes first through the single scan (`readPhoto`),
  *    shrunk to SCAN_LONG_EDGE; the photo itself is kept at full size
  *    until the answer comes. "Reading the card..." meanwhile.
  *    - A card: the card viewer on it. That's it puts it in the sheet's
  *      tray, the tray the search fills, and the camera is back.
- *    - "is-page", for somebody who scans pages: the kept photo is cut
- *      into the page and its nine pockets and sent to be read in the
- *      background (`sendPage`), every page of this scanner in one queue.
+ *    - "is-page", for somebody who scans pages: the kept photo is sent
+ *      as one picture, upright and at full resolution (`preparePage`),
+ *      to be found, cut and read in the background (`sendPage`), every
+ *      page of this scanner in one queue.
  *      The first lands on the binder's first empty page; after it, a
  *      "Page 5" chip says where the next one goes, and steps it. "Page 4
  *      added..." shows for a moment, and the camera stays.
@@ -132,6 +135,8 @@ export function Scanner({
   /* Done was pressed: the scanner closes once the sends still out land. */
   const [finishing, setFinishing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  /* The same, without the camera: the photo library. */
+  const library = useRef<HTMLInputElement>(null);
   /* The photo at full size, until its answer comes. */
   const kept = useRef<Blob | null>(null);
   /* Pages go one after another, in the order they were shot. */
@@ -171,8 +176,8 @@ export function Scanner({
   const canShoot = !finishing && !(retake && anyPage);
 
   /**
-   * The kept photo as a page: cut here, then sent behind whatever page
-   * is still going. The camera is back at once.
+   * The kept photo as a page: made ready here, then sent behind
+   * whatever page is still going. The camera is back at once.
    */
   const sendAsPage = async (file: Blob) => {
     if (leftNow === 0) {
@@ -181,22 +186,22 @@ export function Scanner({
     }
     const number = nextPage;
     setStep({ kind: "reading" });
-    let photos: { page: Blob; cells: Blob[] } | null;
+    let photo: Blob | null;
     try {
-      photos = await cutPage(file);
+      photo = await preparePage(file);
     } catch {
-      photos = null;
+      photo = null;
     }
-    if (!photos) {
+    if (!photo) {
       setStep({ kind: "refused", line: SCAN_REFUSALS["too-big"] });
       return;
     }
-    const cut = photos;
+    const ready = photo;
     setNextPage(Math.min(BINDER_PAGES, number + 1));
     setInFlight((count) => count + 1);
     setStep({ kind: "camera" });
     chain.current = chain.current.then(async () => {
-      const outcome = await sendPage(binderId, batchId, number, cut);
+      const outcome = await sendPage(binderId, batchId, number, ready);
       setInFlight((count) => count - 1);
       if (outcome.ok) {
         setSent((count) => count + 1);
@@ -273,6 +278,14 @@ export function Scanner({
     setStep({ kind: "refused", line: SCAN_REFUSALS[reason] });
   };
 
+  /* A photo from either input. */
+  const picked = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    /* Cleared, so the same photo picked twice still counts. */
+    event.target.value = "";
+    if (file) void shoot(file);
+  };
+
   const again = () => {
     release();
     setStep({ kind: "camera" });
@@ -289,12 +302,17 @@ export function Scanner({
         className="sr-only"
         tabIndex={-1}
         aria-hidden="true"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          /* Cleared, so the same photo picked twice still counts. */
-          event.target.value = "";
-          if (file) void shoot(file);
-        }}
+        onChange={picked}
+      />
+      {/* No capture, so a phone offers its library as well as the camera. */}
+      <input
+        ref={library}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={picked}
       />
 
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center gap-5 pt-10 text-center">
@@ -339,10 +357,24 @@ export function Scanner({
             <div className="flex aspect-[5/7] w-full max-w-60 flex-col items-center justify-center gap-4 rounded-[var(--radius-card)] border-2 border-dashed border-border-strong">
               <ScanLine className="size-10 text-accent" aria-hidden="true" />
               {canShoot && (
-                <Button type="button" size="lg" onClick={() => input.current?.click()}>
-                  <Camera className="size-5" aria-hidden="true" />
-                  {retake ? takePageLabel(retake.page) : TAKE_PHOTO}
-                </Button>
+                <>
+                  <Button
+                    type="button"
+                    size="lg"
+                    onClick={() => input.current?.click()}
+                  >
+                    <Camera className="size-5" aria-hidden="true" />
+                    {retake ? takePageLabel(retake.page) : TAKE_PHOTO}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => library.current?.click()}
+                  >
+                    <Images className="size-4" aria-hidden="true" />
+                    {CHOOSE_PHOTO}
+                  </Button>
+                </>
               )}
             </div>
 

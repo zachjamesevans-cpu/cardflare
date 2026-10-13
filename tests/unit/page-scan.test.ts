@@ -69,26 +69,22 @@ describe("a page and its pockets", () => {
 
 /* ---- Placing pages, with the database faked ---------------------------- */
 
-const inserted: unknown[] = [];
-const updated: { quantity: number; id: string }[] = [];
+/*
+ * Placing is one database function (binder_place_scanned, in
+ * supabase/migrations/20261120090000_scanner_v2.sql), so a failure part
+ * way places nothing. Its own behaviour (a pocket per copy, a full pocket
+ * asked about, a retry replayed) was run against Postgres; here, what the
+ * server sends it and what it makes of the answer.
+ */
+
 let binderCards: Record<string, unknown>[] = [];
+const calls: { fn: string; args: Record<string, unknown> }[] = [];
+let answer: unknown = null;
 
 function chain(result: () => unknown) {
   const self: Record<string, unknown> = {};
-  let updateWith: { quantity: number } | null = null;
-  for (const name of ["select", "order", "in", "limit"]) self[name] = () => self;
-  self.eq = (column: string, value: string) => {
-    if (updateWith && column === "id") updated.push({ ...updateWith, id: value });
-    return self;
-  };
-  self.update = (values: { quantity: number }) => {
-    updateWith = values;
-    return self;
-  };
-  self.insert = async (rows: unknown[]) => {
-    inserted.push(...rows);
-    return { error: null };
-  };
+  for (const name of ["select", "order", "in", "limit", "eq", "is", "update"])
+    self[name] = () => self;
   self.maybeSingle = async () => result();
   self.then = (resolve: (value: unknown) => unknown) => resolve(result());
   return self;
@@ -101,6 +97,10 @@ vi.mock("@/lib/supabase/admin", () => ({
       table === "binders"
         ? chain(() => ({ data: { id: "binder-1", for_trade: false }, error: null }))
         : chain(() => ({ data: binderCards, error: null })),
+    rpc: async (fn: string, args: Record<string, unknown>) => {
+      calls.push({ fn, args });
+      return { data: answer, error: null };
+    },
   }),
 }));
 
@@ -108,72 +108,122 @@ const binder = await import("@/lib/binder/binder");
 
 const CARD_A = "00000000-0000-4000-8000-00000000000a";
 const CARD_B = "00000000-0000-4000-8000-00000000000b";
-const CARD_C = "00000000-0000-4000-8000-00000000000c";
 
 beforeEach(() => {
-  inserted.length = 0;
-  updated.length = 0;
   binderCards = [];
+  calls.length = 0;
+  answer = {
+    ok: true,
+    added: 0,
+    merged: 0,
+    unchanged: 0,
+    displaced: 0,
+    skipped: 0,
+    occupied: 0,
+  };
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("placing scanned pages", () => {
-  it("puts each card in the exact pocket it sat in", async () => {
+  it("sends every card for its exact pocket in one call, each pocket once", async () => {
+    answer = {
+      ok: true,
+      added: 2,
+      merged: 0,
+      unchanged: 0,
+      displaced: 0,
+      skipped: 0,
+      occupied: 0,
+      first_pocket: 27,
+    };
     const result = await binder.placeBinderPages("p1", "Zach", "binder-1", [
       { pocket: 31, cardId: CARD_B, printingId: null },
       { pocket: 27, cardId: CARD_A, printingId: null },
+      { pocket: 31, cardId: CARD_A, printingId: null },
     ]);
-    expect(result).toMatchObject({ ok: true, added: 2, occupied: 0, firstPocket: 27 });
-    expect(inserted).toEqual([
-      expect.objectContaining({ card_id: CARD_A, position: 27, quantity: 1 }),
-      expect.objectContaining({ card_id: CARD_B, position: 31, quantity: 1 }),
-    ]);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].fn).toBe("binder_place_scanned");
+    expect(calls[0].args).toMatchObject({
+      p_binder: "binder-1",
+      p_cards: [
+        { pocket: 27, card_id: CARD_A, printing_id: null },
+        { pocket: 31, card_id: CARD_B, printing_id: null },
+      ],
+      p_mode: "skip",
+      p_key: null,
+    });
+    expect(result).toMatchObject({ ok: true, added: 2, firstPocket: 27 });
   });
 
-  it("never writes over a card already in a pocket", async () => {
-    binderCards = [
-      {
-        id: "row-c",
-        card_id: CARD_C,
-        printing_id: null,
-        quantity: 1,
-        position: 27,
-        created_at: "2026-10-01T00:00:00Z",
-      },
-    ];
-    const result = await binder.placeBinderPages("p1", "Zach", "binder-1", [
-      { pocket: 27, cardId: CARD_A, printingId: null },
-      { pocket: 28, cardId: CARD_B, printingId: null },
-    ]);
-    expect(result).toMatchObject({ ok: true, added: 1, occupied: 1 });
-    expect(inserted).toEqual([
-      expect.objectContaining({ card_id: CARD_B, position: 28 }),
-    ]);
-  });
-
-  it("counts a second copy up in the first pocket, never a second pocket", async () => {
-    binderCards = [
-      {
-        id: "row-c",
-        card_id: CARD_C,
-        printing_id: null,
-        quantity: 2,
-        position: 5,
-        created_at: "2026-10-01T00:00:00Z",
-      },
-    ];
-    const result = await binder.placeBinderPages("p1", "Zach", "binder-1", [
+  it("gives two copies of one card a pocket each", async () => {
+    await binder.placeBinderPages("p1", "Zach", "binder-1", [
       { pocket: 9, cardId: CARD_A, printingId: null },
       { pocket: 10, cardId: CARD_A, printingId: null },
-      { pocket: 11, cardId: CARD_C, printingId: null },
     ]);
-    expect(result).toMatchObject({ ok: true, added: 1, merged: 2 });
-    expect(inserted).toEqual([
-      expect.objectContaining({ card_id: CARD_A, position: 9, quantity: 2 }),
+    expect(calls[0].args.p_cards).toEqual([
+      { pocket: 9, card_id: CARD_A, printing_id: null },
+      { pocket: 10, card_id: CARD_A, printing_id: null },
     ]);
-    expect(updated).toEqual([{ quantity: 3, id: "row-c" }]);
+  });
+
+  it("asks before writing over a full pocket, and says which", async () => {
+    answer = { ok: false, reason: "occupied", pockets: [27] };
+    const result = await binder.placeBinderPages(
+      "p1",
+      "Zach",
+      "binder-1",
+      [{ pocket: 27, cardId: CARD_A, printingId: null }],
+      { mode: "ask", key: "batch:abc:ask" },
+    );
+    expect(calls[0].args).toMatchObject({ p_mode: "ask", p_key: "batch:abc:ask" });
+    expect(result).toEqual({ ok: false, reason: "occupied", pockets: [27] });
+  });
+
+  it("says what moved aside and what was already there", async () => {
+    answer = {
+      ok: true,
+      added: 1,
+      merged: 0,
+      unchanged: 2,
+      displaced: 1,
+      skipped: 0,
+      occupied: 0,
+    };
+    const result = await binder.placeBinderPages(
+      "p1",
+      "Zach",
+      "binder-1",
+      [{ pocket: 27, cardId: CARD_A, printingId: null }],
+      { mode: "replace" },
+    );
+    expect(result).toMatchObject({ ok: true, added: 1, displaced: 1, unchanged: 2 });
+    expect(
+      pagesPlacedLine({
+        added: 1,
+        merged: 0,
+        occupied: 0,
+        skipped: 0,
+        displaced: 1,
+        unchanged: 2,
+      }),
+    ).toBe(
+      "Placed 1 card. 2 were already in their pockets. The card that was in its pocket moved to the back of the binder.",
+    );
+  });
+
+  it("is one transaction that never merges copies and replays a retry", () => {
+    const sql = read("supabase/migrations/20261120090000_scanner_v2.sql");
+    const fn = sql.slice(
+      sql.indexOf("create or replace function public.binder_place_scanned("),
+    );
+    expect(fn).toContain("for update;");
+    expect(fn).toContain("from public.binder_scan_placements");
+    expect(fn).toContain("'replayed', true");
+    expect(fn).toContain("v_unchanged := v_unchanged + 1;");
+    expect(fn).not.toMatch(/set quantity = least\(99, quantity \+ 1\)/);
+    expect(fn).toContain("'reason', 'occupied'");
   });
 });
 
@@ -290,7 +340,7 @@ describe("the doors", () => {
   it("sends a long queue from the app a few pages at a time, and adds the counts up", () => {
     const api = read("mobile/src/api.ts");
     const place = api.slice(api.indexOf("export async function placePageQueue("));
-    expect(place).toContain("for (const part of placementParts(placements)) {");
+    expect(place).toContain("const parts = placementParts(placements);");
     expect(place).toContain("pagesPlacedLine(totals)");
     expect(read("src/app/api/v1/binders/[binderId]/cards/route.ts")).toContain(
       "occupied: result.occupied",

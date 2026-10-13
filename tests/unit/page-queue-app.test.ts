@@ -48,6 +48,10 @@ vi.mock("../../mobile/node_modules/@react-native-async-storage/async-storage", (
 const read = (path: string) =>
   readFileSync(resolve(import.meta.dirname, "../..", path), "utf8");
 const flat = (text: string) => text.replace(/\s+/g, " ");
+const between = (text: string, from: string, to: string) => {
+  const start = text.indexOf(from);
+  return start < 0 ? "" : text.slice(start, text.indexOf(to, start + from.length));
+};
 const code = (text: string) =>
   text.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 
@@ -149,13 +153,16 @@ describe("the shooting step sends, and never waits for a read", () => {
     expect(shooting).not.toContain("READING_PAGE");
   });
 
-  it("sends the whole page beside its nine pockets, cut to the guide", () => {
-    expect(src.scanner).toContain("cutJpeg(photo.uri, region, pageResize(region))");
-    expect(pageResize({ width: 3000, height: 4200 })).toEqual({ height: 1568 });
-    expect(pageResize({ width: 4200, height: 3000 })).toEqual({ width: 1568 });
+  it("sends the whole page as ONE full-resolution photo, no pockets cut", () => {
+    expect(src.scanner).toContain("[{ resize: pageResize(photo, longEdge) }],");
+    expect(pageResize({ width: 3000, height: 4200 })).toEqual({ height: 2800 });
+    expect(pageResize({ width: 4200, height: 3000 })).toEqual({ width: 2800 });
     expect(pageResize({ width: 900, height: 1260 })).toEqual({ height: 1260 });
-    /* Under the same ceiling as a pocket. */
-    expect(src.scanner).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
+    /* Under the page's own ceiling, twice a card's. */
+    expect(src.scanner).toContain(
+      "if (out.base64 && pageFits(out.base64)) return out.base64;",
+    );
+    expect(src.scanner).not.toContain("POCKETS_PER_PAGE");
   });
 
   it("makes the queue's id once, and sends every page under it", () => {
@@ -196,7 +203,7 @@ describe("the shooting step sends, and never waits for a read", () => {
     expect(shooting).toContain(
       '{!retake && anySent && typeof leftNow === "number" ? (',
     );
-    const queue = shooting.slice(shooting.indexOf("const queuePage = async"));
+    const queue = shooting.slice(shooting.indexOf("const queuePage = ("));
     expect(queue.slice(0, 400)).toContain("if (!retake && leftNow === 0) {");
     expect(queue.slice(0, 400)).toContain('line: SCAN_REFUSALS["daily-pages"]');
   });
@@ -283,10 +290,12 @@ describe("the check", () => {
 
   it("marks a guess the reader was not sure of, and shows its note", () => {
     const tile = src.pages.slice(src.pages.indexOf("function PocketTile("));
+    expect(tile).toContain("const status = pocketStatus(pocket);");
     expect(tile).toContain(
-      'const unsure = pocket.state === "found" && pocket.sure === false && !looked;',
+      'const unsure = pocket.state === "found" && status === "ambiguous";',
     );
     expect(tile).toContain("{unsure ? (");
+    expect(tile).toContain("${unsure ? NOT_SURE : word}");
     /* The viewer says it, with the note (tests/unit/card-scan-app.test.ts). */
     expect(read("mobile/src/card-viewer.tsx")).toContain("{NOT_SURE}");
     expect(checking).toContain(
@@ -298,6 +307,33 @@ describe("the check", () => {
     expect(src.api).toMatch(
       /state: "found";[\s\S]*?sure\?: boolean;[\s\S]*?note\?: string;/,
     );
+  });
+
+  it("offers Line up the page, and Retake, on a page the scanner could not find the pockets on", () => {
+    const lining = between(
+      checking,
+      'page.status === "failed" && page.error === "needs-alignment" ? (',
+      ') : page.status === "failed" ? (',
+    );
+    expect(lining).toContain("{PAGE_NEEDS_LINING_UP}");
+    expect(lining).toContain("label={LINE_UP_PAGE}");
+    expect(lining).toContain("onPress={() => setAligning(page.scanId)}");
+    expect(lining.indexOf("label={LINE_UP_PAGE}")).toBeLessThan(
+      lining.indexOf("label={RETAKE}"),
+    );
+    /* From where the server last put the page; read again, then reading here. */
+    expect(checking).toContain("start={lining.vision.corners ?? lining.vision.page}");
+    expect(checking).toContain("await realignPage(scanId, corners);");
+    expect(checking).toContain(
+      'page.scanId === scanId ? { ...page, status: "queued", error: null } : page,',
+    );
+    expect(src.api).toContain('{ action: "realign", scanId, corners }');
+  });
+
+  it("says a blurry page is blurry, over its grid", () => {
+    expect(checking).toContain("{page.vision?.blurry ? (");
+    expect(checking).toContain("{BLURRY_PAGE}");
+    expect(src.api).toContain("vision?: VisionView | null;");
   });
 
   it("offers Retake on a failed page, into the same queue under the same number", () => {
@@ -321,10 +357,10 @@ describe("the check", () => {
     expect(checking).toContain("page: page.page,");
     expect(checking).toContain("const placements = pagePlacements(choices);");
     expect(checking).toContain(
-      "const result = await placePageQueue(batchId, placements);",
+      "const result = await placePageQueue(batchId, placements, mode, resume);",
     );
     expect(checking).toContain("disabled={chosenPages === 0 || !settled}");
-    expect(checking).toContain("if (alive.current) onPlaced(result.message);");
+    expect(checking).toContain("onPlaced(result.message);");
     /* The binder shows the sentence and reads itself again. */
     const placed = src.binder.slice(src.binder.indexOf("onPlaced={(message) => {"));
     expect(placed.slice(0, 300)).toContain("setNotice(message);");
@@ -343,6 +379,41 @@ describe("the check", () => {
   });
 });
 
+describe("placing over a card already in the binder", () => {
+  it("asks first, then Move them and place resends with replace, Cancel says what went in", () => {
+    expect(app.MOVE_AND_PLACE).toBe(site.MOVE_AND_PLACE);
+    expect(app.CANCEL_PLACING).toBe(site.CANCEL_PLACING);
+    for (const names of [["B2"], ["Page 3 B2", "Page 4 C1"], ["A1", "A2", "A3"]]) {
+      expect(app.pocketsTakenLine(names)).toBe(site.pocketsTakenLine(names));
+    }
+    for (const pocket of [0, 8, 22, 899]) {
+      expect(app.binderPocketName(pocket)).toBe(site.binderPocketName(pocket));
+    }
+    const counts = {
+      added: 3,
+      merged: 0,
+      occupied: 0,
+      skipped: 0,
+      displaced: 2,
+      unchanged: 1,
+    };
+    expect(app.pagesPlacedLine(counts)).toBe(site.pagesPlacedLine(counts));
+    const place = checking.slice(checking.indexOf("const place = async"));
+    expect(place).toContain(
+      'const place = async (mode: PlaceMode = "ask", resume?: PlaceResume) => {',
+    );
+    expect(place).toContain("Alert.alert(");
+    expect(place).toContain("result.message,");
+    expect(place).toContain(
+      '{ text: CANCEL_PLACING, style: "cancel", onPress: cancel },',
+    );
+    expect(flat(place)).toContain(
+      'text: MOVE_AND_PLACE, onPress: () => void place("replace", result.resume),',
+    );
+    expect(place).toContain("setError(pagesPlacedLine(result.resume.totals));");
+  });
+});
+
 describe("placing a long queue", () => {
   it("goes in parts of at most 27, last only on the final part", () => {
     expect(PLACE_PER_PART).toBe(27);
@@ -354,8 +425,11 @@ describe("placing a long queue", () => {
     expect(placementParts([1, 2])).toEqual([{ placements: [1, 2], last: true }]);
     expect(placementParts(Array.from({ length: 27 }, () => 0))).toHaveLength(1);
     expect(placementParts([])).toEqual([]);
-    expect(src.api).toContain("for (const part of placementParts(placements)) {");
-    expect(src.api).toContain("return { message: pagesPlacedLine(totals) };");
+    expect(src.api).toContain("const parts = placementParts(placements);");
+    expect(src.api).toContain(
+      "for (let at = resume?.part ?? 0; at < parts.length; at += 1) {",
+    );
+    expect(src.api).toContain("return { ok: true, message: pagesPlacedLine(totals) };");
   });
 });
 
@@ -402,13 +476,31 @@ interface AppApi {
     batchId: string;
     pageNumber: number;
     page: string;
-    pockets: (string | null)[];
   }) => Promise<unknown>;
   getPageQueue: (batchId: string) => Promise<unknown>;
   placePageQueue: (
     batchId: string,
     placements: { pocket: number; cardId: string; printingId: string | null }[],
-  ) => Promise<{ message: string }>;
+    mode?: "skip" | "ask" | "replace",
+    resume?: unknown,
+  ) => Promise<
+    | { ok: true; message: string }
+    | {
+        ok: false;
+        reason: "occupied";
+        message: string;
+        pockets: number[];
+        resume: { part: number; totals: Record<string, number> };
+      }
+  >;
+  realignPage: (
+    scanId: string,
+    corners: { x: number; y: number }[],
+  ) => Promise<unknown>;
+  rescanPagePocket: (
+    scanId: string,
+    slot: number,
+  ) => Promise<{ ok: true; pocket: unknown } | { ok: false; reason: string }>;
 }
 const API_PATH = "../../mobile/src/api";
 const loadApi = () => import(/* @vite-ignore */ API_PATH) as Promise<AppApi>;
@@ -484,10 +576,97 @@ describe.skipIf(!appInstalled)(
         places.map((one) => (one.payload?.placements as unknown[]).length),
       ).toEqual([27, 13]);
       expect(places.map((one) => one.payload?.last)).toEqual([false, true]);
+      /* Asks before it moves anything. */
+      expect(places.map((one) => one.payload?.mode)).toEqual(["ask", "ask"]);
       expect(places.every((one) => one.url === "/api/v1/scans/pages")).toBe(true);
       expect(result.message).toBe(
         site.pagesPlacedLine({ added: 40, merged: 2, occupied: 0, skipped: 0 }),
       );
+    });
+
+    it("stops at the part that found a pocket full, and carries on from it with replace", async () => {
+      answer = (one) => {
+        const part = one.payload?.placements as { pocket: number }[];
+        if (one.payload?.mode === "ask" && part[0].pocket >= 27) {
+          return reply(
+            { error: "occupied", pockets: [30], message: "Page 4 D4 question" },
+            409,
+          );
+        }
+        return reply({
+          message: "ignored",
+          counts: {
+            added: part.length,
+            merged: 0,
+            occupied: 0,
+            displaced: one.payload?.mode === "replace" ? 1 : 0,
+            unchanged: 0,
+            skipped: 0,
+          },
+        });
+      };
+      const api = await loadApi();
+      const placements = Array.from({ length: 40 }, (_, pocket) => ({
+        pocket,
+        cardId: "00000000-0000-4000-8000-00000000000c",
+        printingId: null,
+      }));
+      const asked = await api.placePageQueue(BATCH, placements);
+      expect(asked.ok).toBe(false);
+      if (asked.ok) return;
+      expect(asked.message).toBe("Page 4 D4 question");
+      expect(asked.pockets).toEqual([30]);
+      /* The first part is in already. */
+      expect(asked.resume.part).toBe(1);
+      expect(asked.resume.totals.added).toBe(27);
+
+      sent = [];
+      const done = await api.placePageQueue(BATCH, placements, "replace", asked.resume);
+      expect(sent.map((one) => [one.payload?.mode, one.payload?.last])).toEqual([
+        ["replace", true],
+      ]);
+      expect(done).toEqual({
+        ok: true,
+        message: site.pagesPlacedLine({
+          added: 40,
+          merged: 0,
+          occupied: 0,
+          displaced: 1,
+          unchanged: 0,
+          skipped: 0,
+        }),
+      });
+    });
+
+    it("lines a page up and reads one pocket again, on the queue's own route", async () => {
+      answer = (one) =>
+        one.payload?.action === "rescan-pocket"
+          ? one.payload.slot === 4
+            ? reply({ ok: true, pocket: { slot: 4, state: "empty" } })
+            : reply({ ok: false, reason: "limit" }, 429)
+          : reply({ ok: true });
+      const api = await loadApi();
+      const corners = [
+        { x: 0.1, y: 0.1 },
+        { x: 0.9, y: 0.1 },
+        { x: 0.9, y: 0.9 },
+        { x: 0.1, y: 0.9 },
+      ];
+      await api.realignPage("00000000-0000-4000-8000-0000000000s1", corners);
+      expect(sent[0].payload).toEqual({
+        action: "realign",
+        scanId: "00000000-0000-4000-8000-0000000000s1",
+        corners,
+      });
+      await expect(api.rescanPagePocket("s", 4)).resolves.toEqual({
+        ok: true,
+        pocket: { slot: 4, state: "empty" },
+      });
+      await expect(api.rescanPagePocket("s", 5)).resolves.toEqual({
+        ok: false,
+        reason: "limit",
+      });
+      expect(sent.every((one) => one.url === "/api/v1/scans/pages")).toBe(true);
     });
 
     it("hears a refused send as a reason, not an error", async () => {
@@ -502,7 +681,6 @@ describe.skipIf(!appInstalled)(
           batchId: BATCH,
           pageNumber: 3,
           page: "UEFHRQ",
-          pockets: Array.from({ length: 9 }, () => null),
         }),
       ).resolves.toEqual({ ok: false, reason: "daily-pages" });
     });

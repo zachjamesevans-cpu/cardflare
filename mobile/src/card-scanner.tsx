@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
+import * as ImagePicker from "expo-image-picker";
 import {
   useEffect,
   useRef,
@@ -28,11 +29,16 @@ import {
 } from "./api";
 import { CardViewer, type ViewerPocket } from "./card-viewer";
 import {
+  PAGE_LONG_EDGE,
+  PAGE_PIECES_LONG_EDGE,
+  PAGE_PIECES_QUALITY,
+  PAGE_QUALITY,
   canTakeAnother,
   newBatchId,
   nextToSend,
+  pageFits,
+  pageQualities,
   pageResize,
-  pocketInPhoto,
   sendRefusalLine,
   stillSending,
   type PageStatus,
@@ -41,11 +47,11 @@ import { ProMark } from "./pro-mark";
 import { ProWords } from "./pro-words";
 import {
   BINDER_PAGES,
+  CHOOSE_PHOTO,
   DONE_SCANNING,
   FILL_THE_FRAME,
   GET_PRO,
   PAGES_ARE_PRO,
-  POCKETS_PER_PAGE,
   QUEUE_FULL,
   READING_CARD,
   SCAN_AGAIN,
@@ -87,13 +93,16 @@ import { AsyncButton, Body, Button, Loading, SheetClose, Tap } from "./ui";
  *
  * a. "Scan a card.", "Scan a whole binder page with PRO", the hint, the
  *    free scans left today; the camera with one card-shaped outline (a
- *    nine-pocket page is a card's shape too) and "Take photo".
- * b. Every photo is read as one card first: the outline's part, shrunk
- *    to the website's size. The photo itself is kept until the answer.
+ *    nine-pocket page is a card's shape too), "Take photo", and "Choose
+ *    a photo" for one already in the library.
+ * b. Every photo is read as one card first: the outline's part (the
+ *    whole of a chosen one), shrunk to the website's size. The photo
+ *    itself is kept until the answer.
  * c. A card: the card viewer (src/card-viewer.tsx). "That's it" puts it
  *    in the add menu's tray and the camera is back for the next one.
- * d. A whole page, for a player who scans pages: the kept photo is cut
- *    into the page and its nine pockets and sent to be read in the
+ * d. A whole page, for a player who scans pages: the kept photo goes up
+ *    whole, as ONE full-resolution photo (the server finds the page and
+ *    straightens its nine pockets itself), to be read in the
  *    background, under one queue for this whole session, on the page a
  *    small "Page 4" chip says (the first empty one to begin with). "Page
  *    4 added" when it has gone, and the camera stays.
@@ -104,7 +113,7 @@ import { AsyncButton, Body, Button, Loading, SheetClose, Tap } from "./ui";
  * f. "Done" (or the X) closes it, once the pages on their way have gone.
  *
  * A failed page shot again from the check opens this too (`retake`):
- * the photo is that page already, so it is cut and sent at once, under
+ * the photo is that page already, so it is sent at once, under
  * its queue and its number, and the scanner closes when it has gone.
  *
  * The camera is asked for here and nowhere else: this only opens on a
@@ -123,10 +132,8 @@ interface ShotPage {
   id: string;
   /** The binder page it fills, fixed when it is shot. */
   number: number;
-  /** The whole page, base64, until it has gone; null if it could not be made small enough. */
-  photo: string | null;
-  /** Each pocket, base64, until it has gone; null for one that could not be cut. */
-  cells: (string | null)[];
+  /** The photo as taken or chosen, until it has gone: encoded when its turn comes. */
+  source: Photo | null;
   status: PageStatus;
 }
 
@@ -138,17 +145,29 @@ const TOAST_MS = 4000;
 type Photo = { uri: string; width: number; height: number };
 type Size = { width: number; height: number };
 
+type Crop = { originX: number; originY: number; width: number; height: number };
+
 /**
- * The outline's part of the photo, its long side at SCAN_LONG_EDGE, as
+ * The part of the photo a card is read from: the outline's, through the
+ * preview's fit, for one the camera took; the whole of one chosen from
+ * the library, which had no outline.
+ */
+function cardCrop(photo: Photo, view: Size | null): Crop {
+  return view
+    ? frameInPhoto(guideFrame(view.width, view.height), view, photo)
+    : { originX: 0, originY: 0, width: photo.width, height: photo.height };
+}
+
+/**
+ * The card's part of the photo, its long side at SCAN_LONG_EDGE, as
  * base64 JPEG and as a file for "Your photo". Quality walks down only if
  * a photo would still be over the server's ceiling, which at this size
  * it should never be.
  */
 async function shrinkPhoto(
   photo: Photo,
-  view: Size,
+  crop: Crop,
 ): Promise<{ base64: string; uri: string } | null> {
-  const crop = frameInPhoto(guideFrame(view.width, view.height), view, photo);
   let quality = 0.6;
   while (quality >= 0.3) {
     const out = await manipulateAsync(
@@ -166,70 +185,50 @@ async function shrinkPhoto(
 }
 
 /**
- * One cut of the photo as JPEG, at the single scan's quality, walking
- * down only past the ceiling. A pocket goes at SCAN_LONG_EDGE, the whole
- * page at PAGE_LONG_EDGE.
+ * The whole page as ONE JPEG, nothing cut: its long side at `longEdge`,
+ * never enlarged, at `start` quality, stepping down only while it is
+ * over the server's page ceiling. The server finds the page and its
+ * pockets in it.
  */
-async function cutJpeg(
-  uri: string,
-  crop: { originX: number; originY: number; width: number; height: number },
-  resize: { width: number } | { height: number },
+async function pageJpeg(
+  photo: Photo,
+  longEdge: number,
+  start: number,
 ): Promise<string | null> {
-  let quality = 0.6;
-  while (quality >= 0.3) {
-    const out = await manipulateAsync(uri, [{ crop }, { resize }], {
-      compress: quality,
-      format: SaveFormat.JPEG,
-      base64: true,
-    });
-    if (out.base64 && (out.base64.length * 3) / 4 <= SCAN_MAX_BYTES) return out.base64;
-    quality -= 0.15;
+  for (const quality of pageQualities(start)) {
+    const out = await manipulateAsync(
+      photo.uri,
+      [{ resize: pageResize(photo, longEdge) }],
+      { compress: quality, format: SaveFormat.JPEG, base64: true },
+    );
+    if (out.base64 && pageFits(out.base64)) return out.base64;
   }
   return null;
 }
 
-/** A pocket, shrunk to a card's size. */
-const cutPocket = (
-  uri: string,
-  crop: { originX: number; originY: number; width: number; height: number },
-) => cutJpeg(uri, crop, scanResize(crop));
-
-/**
- * The outline's part of the kept photo, exactly (a page has no margin
- * of its own): the whole page from it, and its nine pockets, each the
- * website's pocketCrop of that part, shrunk to SCAN_LONG_EDGE.
- */
-async function cutPage(
-  photo: Photo,
-  view: Size,
-): Promise<Pick<ShotPage, "photo" | "cells">> {
-  const region = frameInPhoto(guideFrame(view.width, view.height), view, photo, 0);
-  const [whole, ...cells] = await Promise.all([
-    cutJpeg(photo.uri, region, pageResize(region)),
-    ...Array.from({ length: POCKETS_PER_PAGE }, (_, slot) =>
-      cutPocket(photo.uri, pocketInPhoto(slot, region)),
-    ),
-  ]);
-  return { photo: whole, cells };
-}
-
 /**
  * One page to the server, to be read there: sent, or the reason in
- * words. A page too big to send is turned down here, as the server would.
+ * words. At full resolution in one body; smaller in pieces, made only
+ * if the pieces are the way. A page too big to send is turned down
+ * here, as the server would.
  */
 async function sendPage(
   binderId: string,
   batchId: string,
   page: ShotPage,
 ): Promise<{ status: PageStatus; failure: string | null; left?: number | null }> {
-  if (!page.photo) return { status: "refused", failure: SCAN_REFUSALS["too-big"] };
+  const source = page.source;
+  const photo = source ? await pageJpeg(source, PAGE_LONG_EDGE, PAGE_QUALITY) : null;
+  if (!source || !photo) {
+    return { status: "refused", failure: SCAN_REFUSALS["too-big"] };
+  }
   try {
     const result = await sendScanPage({
       binderId,
       batchId,
       pageNumber: page.number,
-      page: page.photo,
-      pockets: page.cells,
+      page: photo,
+      smaller: () => pageJpeg(source, PAGE_PIECES_LONG_EDGE, PAGE_PIECES_QUALITY),
     });
     if (result.ok) return { status: "sent", failure: null, left: result.left };
     return {
@@ -301,9 +300,9 @@ function Scanner({
   const [step, setStep] = useState<Step>({ kind: "camera" });
   const [progress, setProgress] = useState(0);
   const [slow, setSlow] = useState(false);
-  /* The shutter is open, or a page is being cut: the camera stays on
-     screen until the photo is taken, because taking it from a camera
-     already unmounted fails. */
+  /* The shutter is open, or the library is: the camera stays on screen
+     until the photo is taken, because taking it from a camera already
+     unmounted fails. */
   const [capturing, setCapturing] = useState(false);
 
   /* Whole pages: one queue for this whole session, the page the next
@@ -370,12 +369,10 @@ function Scanner({
       if (after !== undefined) setLeft(after);
       if (result.status === "sent") {
         setToast({ line: pageAddedLine(page.number), alert: false });
-        /* The photos are dropped once sent: the server keeps its own. */
+        /* The photo is dropped once sent: the server keeps its own. */
         setQueue((current) =>
           current.map((each) =>
-            each.id === page.id
-              ? { ...each, status: "sent", photo: null, cells: [] }
-              : each,
+            each.id === page.id ? { ...each, status: "sent", source: null } : each,
           ),
         );
         return;
@@ -416,8 +413,11 @@ function Scanner({
   const leftNow =
     left === undefined || left === null ? left : Math.max(0, left - pending);
 
-  /** The kept photo, as a page: cut, and queued to be sent. */
-  const queuePage = async (photo: Photo, size: Size) => {
+  /**
+   * The kept photo, as a page: queued to be sent whole, at full
+   * resolution, when its turn comes. Nothing is cut on the phone.
+   */
+  const queuePage = (photo: Photo) => {
     const number = startNow.current;
     if (!retake && leftNow === 0) {
       setStep({ kind: "refused", line: SCAN_REFUSALS["daily-pages"] });
@@ -428,45 +428,97 @@ function Scanner({
       return;
     }
     setStep({ kind: "camera" });
-    setCapturing(true);
-    try {
-      const cut = await cutPage(photo, size);
-      if (!alive.current) return;
-      shots += 1;
-      setQueue((current) => [
-        ...current,
-        { id: `page-${shots}`, number, ...cut, status: "waiting" },
-      ]);
-      if (!retake) setStart(Math.min(BINDER_PAGES, number + 1));
-      setChipOpen(false);
-    } finally {
-      if (alive.current) setCapturing(false);
-    }
+    shots += 1;
+    setQueue((current) => [
+      ...current,
+      { id: `page-${shots}`, number, source: photo, status: "waiting" },
+    ]);
+    if (!retake) setStart(Math.min(BINDER_PAGES, number + 1));
+    setChipOpen(false);
   };
 
-  const shoot = async () => {
-    if (!camera.current || !view || step.kind !== "camera" || capturing || finishing) {
-      return;
-    }
+  /** Whether a photo may be taken or chosen now; the door to Pro if the free scans are gone. */
+  const mayScan = (): boolean => {
+    if (step.kind !== "camera" || capturing || finishing) return false;
     setToast(null);
     /* The day's free scans are gone: the door to Pro, nothing sent. */
     if (!retake && freeScansGone(rights)) {
       setStep({ kind: "pro", why: "daily-singles" });
-      return;
+      return false;
     }
+    return true;
+  };
+
+  /* The camera's photo: the outline's part is read. */
+  const shoot = async () => {
+    if (!camera.current || !view || !mayScan()) return;
     setProgress(0);
     setCapturing(true);
+    let photo: Photo;
     try {
-      /* The full photo, kept until the answer comes: a page is cut from it. */
-      const photo = await camera.current.takePictureAsync({ quality: 1 });
-      if (!alive.current) return;
-      setCapturing(false);
+      /* The full photo, kept until the answer comes: a page goes up whole. */
+      photo = await camera.current.takePictureAsync({ quality: 1 });
+    } catch (caught) {
+      failed(caught);
+      return;
+    }
+    if (!alive.current) return;
+    setCapturing(false);
+    await readPhoto(photo, cardCrop(photo, view));
+  };
+
+  /*
+   * "Choose a photo": one already in the library, read the same way, all
+   * of it (it had no outline). The system's picker, with no cropper and
+   * no permission asked: it hands over only the photo chosen.
+   */
+  const choose = async () => {
+    if (!mayScan()) return;
+    setProgress(0);
+    setCapturing(true);
+    let photo: Photo | null = null;
+    try {
+      const chosen = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        quality: 1,
+        exif: false,
+        preferredAssetRepresentationMode:
+          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Current,
+      });
+      const asset = chosen.canceled ? null : chosen.assets[0];
+      if (asset) photo = { uri: asset.uri, width: asset.width, height: asset.height };
+    } catch (caught) {
+      failed(caught);
+      return;
+    }
+    if (!alive.current) return;
+    setCapturing(false);
+    if (photo) await readPhoto(photo, cardCrop(photo, null));
+  };
+
+  /* A scan that broke on the way, in the website's words: the cause goes
+     to the log, the player hears the scanner is down. */
+  const failed = (caught: unknown) => {
+    console.warn("[cardflare] card scan failed", describeError(caught));
+    if (!alive.current) return;
+    setCapturing(false);
+    setStep({
+      kind: "refused",
+      line: SCAN_REFUSALS[
+        caught instanceof ApiError && caught.status === 429 ? "limit" : "unavailable"
+      ],
+    });
+  };
+
+  /** A photo, taken or chosen: read as one card first, a page if it is one. */
+  const readPhoto = async (photo: Photo, crop: Crop) => {
+    try {
       if (retake) {
-        await queuePage(photo, view);
+        queuePage(photo);
         return;
       }
       setStep({ kind: "reading" });
-      const shrunk = await shrinkPhoto(photo, view);
+      const shrunk = await shrinkPhoto(photo, crop);
       if (!shrunk) {
         if (alive.current) setStep({ kind: "refused", line: SCAN_REFUSALS["too-big"] });
         return;
@@ -513,7 +565,7 @@ function Scanner({
         return;
       }
       if (next.kind === "send-page") {
-        await queuePage(photo, view);
+        queuePage(photo);
         return;
       }
       if (next.kind === "pro") {
@@ -529,17 +581,7 @@ function Scanner({
         line: SCAN_REFUSALS[next.kind === "refused" ? next.reason : "unavailable"],
       });
     } catch (caught) {
-      /* The website's words for a scan that broke on the way: the cause
-         goes to the log, the player hears the scanner is down. */
-      console.warn("[cardflare] card scan failed", describeError(caught));
-      if (!alive.current) return;
-      setCapturing(false);
-      setStep({
-        kind: "refused",
-        line: SCAN_REFUSALS[
-          caught instanceof ApiError && caught.status === 429 ? "limit" : "unavailable"
-        ],
-      });
+      failed(caught);
     }
   };
 
@@ -660,6 +702,13 @@ function Scanner({
             />
           </View>
         </CameraAllowed>
+        {/* Outside the camera's gate: a photo already taken needs no camera. */}
+        <Button
+          label={CHOOSE_PHOTO}
+          variant="secondary"
+          disabled={capturing || finishing}
+          onPress={() => void choose()}
+        />
 
         {/* Where the next page goes, once a page has been shot; a tap
             to move it. */}

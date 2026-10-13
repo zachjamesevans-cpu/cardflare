@@ -1933,6 +1933,80 @@ export type PlayerCollectionInsert = Omit<PlayerCollectionRow, "id" | "created_a
   created_at?: string;
 };
 
+/** The page scanner's one row of settings. See scanner_settings. */
+export type ScannerSettingsRow = {
+  id: number;
+  mode: "anthropic" | "openai" | "hybrid";
+  auto_accept: number;
+  review_floor: number;
+  page_cap_cents: number;
+  /** USD per million tokens, {model: [input, output, cached]}. */
+  prices: Record<string, number[]>;
+  updated_at: string;
+  updated_by: string | null;
+};
+export type ScannerSettingsInsert = Partial<ScannerSettingsRow>;
+
+/** What a model read off one card picture, by the picture's hash. */
+export type ScanRecognitionRow = {
+  hash: string;
+  provider: string;
+  model: string;
+  prompt_version: number;
+  read: unknown;
+  created_at: string;
+};
+export type ScanRecognitionInsert = Omit<ScanRecognitionRow, "created_at"> & {
+  created_at?: string;
+};
+
+/** One scan's calls, tokens, cost and outcome. See scan_runs. */
+export type ScanRunRow = {
+  id: number;
+  created_at: string;
+  player_id: string | null;
+  page_scan_id: string | null;
+  kind: "page" | "card" | "pocket" | "benchmark";
+  mode: string;
+  calls: unknown;
+  cards: number;
+  retries: number;
+  cents: number;
+  ms: number;
+  matched: number;
+  review: number;
+  unrecognized: number;
+  empty: number;
+  corrections: number | null;
+  detect_method: string | null;
+};
+export type ScanRunInsert = Omit<ScanRunRow, "id" | "created_at" | "corrections"> & {
+  corrections?: number | null;
+};
+
+/** An admin's labelled scanner test photo and each mode's result. */
+export type ScanBenchmarkRow = {
+  id: string;
+  created_at: string;
+  created_by: string | null;
+  label: string;
+  runs: unknown;
+  truth: unknown;
+};
+export type ScanBenchmarkInsert = Partial<
+  Omit<ScanBenchmarkRow, "id" | "created_at">
+> & {
+  id?: string;
+};
+
+/** A scanned-page placement already made, by key. */
+export type BinderScanPlacementRow = {
+  key: string;
+  binder_id: string;
+  result: unknown;
+  created_at: string;
+};
+
 /** One binder page waiting to be read or checked. See page_scans. */
 export type PageScanRow = {
   id: string;
@@ -1950,6 +2024,8 @@ export type PageScanRow = {
   finished_at: string | null;
   notified_at: string | null;
   closed_at: string | null;
+  /** Where the page and its pockets were found (page-vision.ts). */
+  vision: unknown;
 };
 
 type PageScanDefaults =
@@ -1962,7 +2038,8 @@ type PageScanDefaults =
   | "started_at"
   | "finished_at"
   | "notified_at"
-  | "closed_at";
+  | "closed_at"
+  | "vision";
 
 export type PageScanInsert = Omit<PageScanRow, PageScanDefaults> &
   Partial<Pick<PageScanRow, PageScanDefaults>>;
@@ -2213,6 +2290,11 @@ export type Database = {
       notifications: Table<NotificationRow, NotificationInsert>;
       page_scans: Table<PageScanRow, PageScanInsert>;
       card_scans: Table<CardScanRow, CardScanInsert>;
+      scanner_settings: Table<ScannerSettingsRow, ScannerSettingsInsert>;
+      scan_recognitions: Table<ScanRecognitionRow, ScanRecognitionInsert>;
+      scan_runs: Table<ScanRunRow, ScanRunInsert>;
+      scan_benchmarks: Table<ScanBenchmarkRow, ScanBenchmarkInsert>;
+      binder_scan_placements: Table<BinderScanPlacementRow, BinderScanPlacementRow>;
       subscriptions: Table<SubscriptionRow, SubscriptionInsert>;
       player_devices: Table<PlayerDeviceRow, PlayerDeviceInsert>;
       push_tickets: Table<PushTicketRow, PushTicketInsert>;
@@ -2296,6 +2378,16 @@ export type Database = {
       binder_place_card: {
         Args: { p_binder: string; p_entry: string; p_pocket: number };
         Returns: undefined;
+      };
+      /* A scanned page into a binder, in one transaction. */
+      binder_place_scanned: {
+        Args: {
+          p_binder: string;
+          p_cards: { pocket: number; card_id: string; printing_id: string | null }[];
+          p_mode: "skip" | "ask" | "replace";
+          p_key: string | null;
+        };
+        Returns: unknown;
       };
       binder_save_order: {
         Args: { p_binder: string; p_ids: string[] };

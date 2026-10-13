@@ -3,12 +3,18 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  PAGE_LONG_EDGE,
+  PAGE_MAX_BYTES,
+  PAGE_PIECES_LONG_EDGE,
+  PAGE_PIECES_QUALITY,
+  PAGE_QUALITY,
   canTakeAnother,
   nextToSend,
+  pageFits,
   pagePlacements,
+  pageQualities,
+  pageResize,
   pagesWithCards,
-  pocketBox,
-  pocketInPhoto,
 } from "../../mobile/src/page-scan";
 import * as app from "../../mobile/src/scan-copy";
 import { CARD_ASPECT, guideFrame, scanResize } from "../../mobile/src/scan-frame";
@@ -20,7 +26,8 @@ import * as site from "@/lib/cards/scan-rules";
  * actual binder, with the exact same location the cards were in in
  * their binder", and the single scan kept "fast and quick". The app's
  * page scanner is the website's: the same words, the same steps, the
- * same cuts, and a faster upload with the old pieces as its fallback.
+ * same photo (one, whole, at full resolution: the server finds the
+ * pockets), and a faster upload with the old pieces as its fallback.
  * Pages read in the background, and their check from the binder, are
  * pinned in page-queue-app.test.ts.
  *
@@ -116,7 +123,7 @@ describe("the words and the rules", () => {
       [src.pages, "label={RETAKE}"],
       [src.pages, "PAGE_FAILED"],
       [src.pages, "READING_PAGE"],
-      [src.pages, "{POCKET_EMPTY}"],
+      [src.pages, ": `${name}: ${unread ? POCKET_UNREAD : POCKET_EMPTY}`;"],
       [src.pages, "POCKET_UNREAD"],
       [src.viewer, "{OTHER_MATCHES}"],
       [src.viewer, "label={FIND_THE_CARD}"],
@@ -150,12 +157,12 @@ describe("pages from the one scanner", () => {
     expect(src.sheet).not.toContain("<PageScanner");
     expect(src.pages).not.toContain("export function PageScanner(");
     expect(src.scanner).toContain('if (next.kind === "send-page") {');
-    expect(src.scanner).toContain("await queuePage(photo, view);");
+    expect(src.scanner).toContain("queuePage(photo);");
   });
 
   it("puts nothing in the tray from pages, and ends with the pages sent, not placed", () => {
     const queue = src.scanner.slice(
-      src.scanner.indexOf("const queuePage = async"),
+      src.scanner.indexOf("const queuePage = ("),
       src.scanner.indexOf("const shoot = async"),
     );
     expect(queue).not.toContain("onAdd");
@@ -193,42 +200,67 @@ describe("the photo of a page", () => {
     expect(src.scanner.match(/styles\.frame,/g)).toHaveLength(1);
   });
 
-  it("is cut to the outline, then into pockets with the website's pocketCrop", () => {
-    const region = { originX: 120, originY: 300, width: 1500, height: 2100 };
-    for (let slot = 0; slot < 9; slot += 1) {
-      const cut = site.pocketCrop(slot, region.width, region.height);
-      expect(pocketBox(slot, region)).toEqual({
-        originX: cut.x,
-        originY: cut.y,
-        width: cut.width,
-        height: cut.height,
-      });
-      expect(pocketInPhoto(slot, region)).toEqual({
-        originX: region.originX + cut.x,
-        originY: region.originY + cut.y,
-        width: cut.width,
-        height: cut.height,
-      });
-    }
-    /* The outline exactly: each pocket carries its own margin. */
+  it("goes up as ONE photo, whole: nothing is cut into pockets on the phone", () => {
+    expect(src.scanner).not.toContain("cutPage");
+    expect(src.scanner).not.toContain("cutPocket");
+    expect(src.scanner).not.toContain("pocketInPhoto");
+    expect(src.scanner).not.toContain("pockets: page.cells");
+    expect(src.api).not.toContain("pockets: input.pockets");
+    /* Kept as taken (or chosen), encoded when its turn to be sent comes. */
     expect(src.scanner).toContain(
-      "const region = frameInPhoto(guideFrame(view.width, view.height), view, photo, 0);",
+      '{ id: `page-${shots}`, number, source: photo, status: "waiting" },',
     );
-    expect(src.scanner).toContain("cutPocket(photo.uri, pocketInPhoto(slot, region))");
+    /* The check shows the server's straightened crops of each pocket. */
+    expect(src.pages).toContain("photo: page.photos.pockets[pocket.slot] ?? null,");
   });
 
-  it("sends each pocket shrunk to SCAN_LONG_EDGE, never enlarged, as JPEG at 0.6", () => {
-    expect(src.scanner).toContain("cutJpeg(uri, crop, scanResize(crop))");
-    expect(src.scanner).toContain("[{ crop }, { resize }]");
+  it("is 2800 on its long side at 0.85 the quick way, 2000 at 0.8 in pieces, under 3,000,000 bytes", () => {
+    expect(PAGE_LONG_EDGE).toBe(2800);
+    expect(PAGE_QUALITY).toBe(0.85);
+    expect(PAGE_PIECES_LONG_EDGE).toBe(2000);
+    expect(PAGE_PIECES_QUALITY).toBe(0.8);
+    expect(PAGE_MAX_BYTES).toBe(3_000_000);
+    expect(pageResize({ width: 3024, height: 4032 })).toEqual({ height: 2800 });
+    expect(pageResize({ width: 4032, height: 3024 })).toEqual({ width: 2800 });
+    expect(pageResize({ width: 3024, height: 4032 }, 2000)).toEqual({ height: 2000 });
+    /* Never enlarged. */
+    expect(pageResize({ width: 900, height: 1260 })).toEqual({ height: 1260 });
+    /* Quality steps down only past the ceiling. */
+    expect(pageQualities(0.85)).toEqual([0.85, 0.75, 0.65, 0.55, 0.45]);
+    expect(pageQualities(0.8)).toEqual([0.8, 0.7, 0.6, 0.5]);
+    expect(pageFits("A".repeat(4_000_000))).toBe(true);
+    expect(pageFits("A".repeat(4_000_004))).toBe(false);
+    expect(src.scanner).toContain(
+      "const photo = source ? await pageJpeg(source, PAGE_LONG_EDGE, PAGE_QUALITY) : null;",
+    );
+    expect(src.scanner).toContain(
+      "smaller: () => pageJpeg(source, PAGE_PIECES_LONG_EDGE, PAGE_PIECES_QUALITY),",
+    );
+    expect(src.scanner).toContain("for (const quality of pageQualities(start)) {");
+    expect(src.scanner).toContain("[{ resize: pageResize(photo, longEdge) }],");
+    expect(src.scanner).toContain(
+      "if (out.base64 && pageFits(out.base64)) return out.base64;",
+    );
+    /* A single card is unchanged: the outline's part at SCAN_LONG_EDGE. */
+    expect(src.scanner).toContain("[{ crop }, { resize: scanResize(crop) }]");
     expect(src.scanner).toContain("let quality = 0.6;");
-    expect(src.scanner).toContain("format: SaveFormat.JPEG,");
-    expect(src.scanner).toContain("(out.base64.length * 3) / 4 <= SCAN_MAX_BYTES");
-    expect(scanResize({ width: 700, height: 980 })).toEqual({ height: 980 });
     expect(scanResize({ width: 1500, height: 2100 })).toEqual({
       height: site.SCAN_LONG_EDGE,
     });
-    /* The check shows the server's photos of each pocket. */
-    expect(src.pages).toContain("photo: page.photos.pockets[pocket.slot] ?? null,");
+  });
+
+  it("can be one already in the library: Choose a photo, read whole, the same way", () => {
+    expect(app.CHOOSE_PHOTO).toBe(site.CHOOSE_PHOTO);
+    expect(src.scanner).toContain("label={CHOOSE_PHOTO}");
+    expect(src.scanner).toContain("await ImagePicker.launchImageLibraryAsync({");
+    expect(src.scanner).toContain(
+      "if (photo) await readPhoto(photo, cardCrop(photo, null));",
+    );
+    expect(src.scanner).toContain("await readPhoto(photo, cardCrop(photo, view));");
+    /* Outside the camera's gate, so a refused camera still has a way in. */
+    expect(src.scanner.indexOf("label={CHOOSE_PHOTO}")).toBeGreaterThan(
+      src.scanner.indexOf("</CameraAllowed>"),
+    );
   });
 });
 
@@ -328,9 +360,9 @@ describe("checking and placing", () => {
     const place = src.api.slice(
       src.api.indexOf("export async function placePageQueue("),
     );
-    expect(flat(place.slice(0, 1200))).toContain('"POST", PAGES_PATH,');
-    expect(flat(place.slice(0, 1200))).toContain(
-      '{ action: "place", batchId, placements: part.placements, last: part.last },',
+    expect(flat(place.slice(0, 2000))).toContain('"POST", PAGES_PATH,');
+    expect(flat(place.slice(0, 2000))).toContain(
+      '{ action: "place", batchId, placements: part.placements, last: part.last, mode, },',
     );
     expect(src.api).toContain('const PAGES_PATH = "/api/v1/scans/pages";');
     expect(src.api).not.toContain("placeBinderPages");
@@ -339,7 +371,12 @@ describe("checking and placing", () => {
 
 /* ---- The upload, run for real against a stubbed fetch -------------- */
 
-type Sent = { path: string; action: string; inBody: boolean };
+type Sent = {
+  path: string;
+  action: string;
+  inBody: boolean;
+  payload: Record<string, unknown>;
+};
 
 /*
  * The app's api module, loaded by a path TypeScript does not follow: a
@@ -355,7 +392,7 @@ interface AppApi {
     batchId: string;
     pageNumber: number;
     page: string;
-    pockets: (string | null)[];
+    smaller?: () => Promise<string | null>;
   }) => Promise<unknown>;
   uploadAvatar: (
     base64: string,
@@ -389,11 +426,12 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
         const header = headers["x-cf-payload"];
         const payload = JSON.parse(
           header ? decodeURIComponent(header) : String(init.body ?? "{}"),
-        ) as { action: string };
+        ) as { action: string } & Record<string, unknown>;
         const one = {
           path: new URL(url).pathname,
           action: payload.action,
           inBody: init.body !== undefined,
+          payload,
         };
         sent.push(one);
         const reply = answer(one);
@@ -420,12 +458,12 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
 
   const BINDER = "00000000-0000-4000-8000-0000000000b1";
   const BATCH = "00000000-0000-4000-8000-0000000000b2";
-  const pageOf = (pockets: (string | null)[]) => ({
+  const pageOf = (smaller?: () => Promise<string | null>) => ({
     binderId: BINDER,
     batchId: BATCH,
     pageNumber: 4,
     page: "UEFHRQ",
-    pockets,
+    ...(smaller ? { smaller } : {}),
   });
 
   it("probes once a session, then sends a card whole in its body", async () => {
@@ -445,19 +483,30 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
     expect(sent.every((one) => one.path === "/api/v1/cards/scan")).toBe(true);
   });
 
-  it("sends a page whole: the page and nine pockets in one body, to be read later", async () => {
+  it("sends a page whole: ONE photo in one body, no pockets, to be read later", async () => {
     answer = (one) =>
       one.action === "send-direct"
         ? ok({ ok: true, scanId: "s", left: 19 })
         : ok({ ok: true });
     const api = await loadApi();
+    let made = 0;
     await expect(
-      api.sendScanPage(pageOf(Array.from({ length: 9 }, () => "QUJD"))),
+      api.sendScanPage(
+        pageOf(async () => {
+          made += 1;
+          return "U01BTEw";
+        }),
+      ),
     ).resolves.toEqual({ ok: true, scanId: "s", left: 19 });
     expect(sent.map((one) => `${one.path} ${one.action}`)).toEqual([
       "/api/v1/cards/scan probe",
       "/api/v1/scans/pages send-direct",
     ]);
+    const direct = sent[1].payload;
+    expect(direct.page).toBe("UEFHRQ");
+    expect(direct).not.toHaveProperty("pockets");
+    /* The smaller page is made only for the pieces. */
+    expect(made).toBe(0);
   });
 
   it("goes in pieces when the probe does not arrive, all session", async () => {
@@ -485,18 +534,12 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
     answer = (one) =>
       one.action === "probe" ? ok({ ok: true }) : one.inBody ? "network" : pieces(one);
     const api = await loadApi();
-    await api.sendScanPage(
-      pageOf(["QUJD", null, "QUJD", null, null, null, null, null, null]),
-    );
+    await api.sendScanPage(pageOf(async () => "U01BTEw"));
     await api.scanCardPhoto("QUJD");
     expect(sent.map((one) => one.action)).toEqual([
       "probe",
       "send-direct",
-      /* The page, then a pocket at a time: each its own upload and pieces. */
-      "begin",
-      "chunk",
-      "begin",
-      "chunk",
+      /* The smaller page, in pieces: one upload, no pockets. */
       "begin",
       "chunk",
       "send",
@@ -505,7 +548,15 @@ describe.skipIf(!appInstalled)("the faster upload (needs mobile/node_modules)", 
       "chunk",
       "read",
     ]);
-    expect(sent.find((one) => one.action === "send")?.path).toBe("/api/v1/scans/pages");
+    const send = sent.find((one) => one.action === "send");
+    expect(send?.path).toBe("/api/v1/scans/pages");
+    expect(send?.payload).not.toHaveProperty("pockets");
+    expect(send?.payload.page).toEqual({
+      uploadId: "00000000-0000-4000-8000-000000000000",
+      count: 1,
+    });
+    /* The pieces carry the smaller page, not the full one. */
+    expect(sent.find((one) => one.action === "chunk")?.payload.data).toBe("U01BTEw");
   });
 
   it("takes an HTTP error as the answer and never sends it again in pieces", async () => {
