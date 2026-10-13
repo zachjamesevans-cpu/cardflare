@@ -177,7 +177,8 @@ function binderLine(
       : `Cards ${ownerName} will trade.`;
   }
   /* Shown on the profile but not up for trade: a binder to look at. */
-  if (isPublic) return yours ? "On your profile. Not up for trade." : `${ownerName}'s binder.`;
+  if (isPublic)
+    return yours ? "On your profile. Not up for trade." : `${ownerName}'s binder.`;
   /* A visitor sees a private binder only when its owner brought it to
      a night and showed it to that night's attendees. */
   return yours ? "Private. Only you can open it." : nightSharedLine(ownerName);

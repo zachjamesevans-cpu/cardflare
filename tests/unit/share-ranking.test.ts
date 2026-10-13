@@ -70,7 +70,11 @@ describe("who the share sheet offers first", () => {
   });
 
   it("leaves out closed conversations, and keeps a face for non-follows", () => {
-    const ranked = rankShareTargets([thread("gone", 0, true), thread("stranger", 1)], [], NOW);
+    const ranked = rankShareTargets(
+      [thread("gone", 0, true), thread("stranger", 1)],
+      [],
+      NOW,
+    );
     expect(ranked.map((p) => p.playerId)).toEqual(["stranger"]);
     expect(ranked[0].displayName).toBe("stranger");
   });

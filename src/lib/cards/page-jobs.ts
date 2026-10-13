@@ -1,22 +1,41 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import { afterResponse } from "@/lib/after-response";
 import {
   binderOwner,
   placeBinderPages,
   type BinderPlacement,
+  type PlaceMode,
 } from "@/lib/binder/binder";
-import { readCards, type ReaderPhoto } from "@/lib/cards/page-reader";
-import { photoType, scannerAccess, type PocketOutcome } from "@/lib/cards/scan";
+import { cornersMakeAPage, slotName, type Quad } from "@/lib/cards/page-geometry";
+import {
+  emptyRun,
+  readCrops,
+  recordRun,
+  type ReaderPhoto,
+  type ReadOutcome,
+} from "@/lib/cards/page-reader";
+import { readPagePhoto, type DetectMethod } from "@/lib/cards/page-vision";
+import {
+  photoType,
+  scannerAccess,
+  withoutKeys,
+  type PocketOutcome,
+} from "@/lib/cards/scan";
 import {
   MAX_SCAN_PAGES,
   PAGES_PER_DAY,
+  pocketAt,
   POCKETS_PER_PAGE,
   SCAN_MAX_BYTES,
   type ScanRefusal,
 } from "@/lib/cards/scan-rules";
+import { scannerSettings } from "@/lib/cards/scan-settings";
 import { notifyPagesReady } from "@/lib/notifications/notify";
 import { listPlayerGames } from "@/lib/players/games";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { PageScanRow } from "@/lib/supabase/types";
 
@@ -24,11 +43,18 @@ import type { PageScanRow } from "@/lib/supabase/types";
  * Binder pages read in the background, and the notice when they are.
  *
  * The founder (2026-10-09): "maybe it scans it, and then they'll get a
- * notification once it's ready." A page is sent (the whole photo and its
- * nine pockets), stored privately, and read by the careful reader after
- * the response has gone, so the player can close the app. When every page
- * of the queue is done, one notice. The player checks the pages, places
- * them, and the photos go.
+ * notification once it's ready." A page is sent (one full-resolution photo
+ * of it), stored privately, and read after the response has gone, so the
+ * player can close the app: the page and its nine pockets are found in the
+ * photo and straightened (page-vision.ts), each pocket's card is cut out
+ * and kept, and the reader (page-reader.ts) names them. When every page of
+ * the queue is done, one notice. The player checks the pages, places them,
+ * and the photos go.
+ *
+ * A photo the detector is unsure of is not guessed at: the page comes
+ * back as "needs-alignment", the player drags its four corners into place
+ * (realignPage), and it is read again from those. One pocket can be read
+ * again on its own, more carefully (rescanPocket).
  *
  * Each page is read in its own run after the request that sent it. A run
  * that dies part way (a deploy, a timeout) leaves its row "reading" with
@@ -38,8 +64,8 @@ import type { PageScanRow } from "@/lib/supabase/types";
  */
 
 const BUCKET = "scans";
-/** A page photo may be larger than a pocket: it is the whole page. */
-const PAGE_MAX_BYTES = SCAN_MAX_BYTES * 2;
+/** A page photo may be larger than a pocket: it is the whole page, at full resolution. */
+export const PAGE_MAX_BYTES = SCAN_MAX_BYTES * 2;
 /** A run past this is presumed dead and may be started again. */
 const STALE_MS = 6 * 60 * 1000;
 /** A queued page not started within this has lost its run. */
@@ -48,6 +74,8 @@ const MAX_ATTEMPTS = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Rows and photos older than this are swept. */
 const KEEP_MS = 7 * DAY_MS;
+/** Saved reads and placement receipts: long enough to matter, short enough to stay small. */
+const KEEP_READS_MS = 30 * DAY_MS;
 
 type Who = { playerId: string; userId: string };
 
@@ -87,7 +115,11 @@ export async function sendPage(
     batchId: string;
     pageNumber: number;
     page: Uint8Array;
-    pockets: (Uint8Array | null)[];
+    /**
+     * Pockets cut on the phone, from builds before the server found them
+     * itself. Checked, and not kept: the server's own cuts are straighter.
+     */
+    pockets?: (Uint8Array | null)[];
   },
 ): Promise<
   | { ok: true; scanId: string; left: number | null }
@@ -102,14 +134,14 @@ export async function sendPage(
     !Number.isInteger(input.pageNumber) ||
     input.pageNumber < 1 ||
     input.pageNumber > 100 ||
-    input.pockets.length !== POCKETS_PER_PAGE
+    (input.pockets !== undefined && input.pockets.length !== POCKETS_PER_PAGE)
   ) {
     return { ok: false, reason: "no-card" };
   }
   if (input.page.length === 0 || input.page.length > PAGE_MAX_BYTES) {
     return { ok: false, reason: "too-big" };
   }
-  if (input.pockets.some((cell) => cell !== null && cell.length > SCAN_MAX_BYTES)) {
+  if (input.pockets?.some((cell) => cell !== null && cell.length > SCAN_MAX_BYTES)) {
     return { ok: false, reason: "too-big" };
   }
   const pageType = photoType(input.page);
@@ -139,33 +171,16 @@ export async function sendPage(
   if (left !== null && left <= 0 && !retake)
     return { ok: false, reason: "daily-pages" };
 
-  /* The photos, privately. A pocket the client sent nothing for is empty. */
+  /* The photo, privately. The pockets are cut from it when it is read. */
   const photos: { page: string; pockets: (string | null)[] } = {
     page: pathFor(who, input.batchId, input.pageNumber, "page.jpg"),
-    pockets: [],
+    pockets: Array.from({ length: POCKETS_PER_PAGE }, () => null),
   };
-  const uploads: Promise<{ error: unknown }>[] = [
-    admin.storage
-      .from(BUCKET)
-      .upload(photos.page, input.page, { contentType: pageType, upsert: true }),
-  ];
-  input.pockets.forEach((cell, slot) => {
-    const type = cell ? photoType(cell) : null;
-    if (!cell || !type) {
-      photos.pockets.push(null);
-      return;
-    }
-    const path = pathFor(who, input.batchId, input.pageNumber, `pocket-${slot}.jpg`);
-    photos.pockets.push(path);
-    uploads.push(
-      admin.storage
-        .from(BUCKET)
-        .upload(path, cell, { contentType: type, upsert: true }),
-    );
-  });
-  const stored = await Promise.all(uploads);
-  if (stored.some((result) => result.error)) {
-    console.error("Could not store a scanned page", stored.find((r) => r.error)?.error);
+  const stored = await admin.storage
+    .from(BUCKET)
+    .upload(photos.page, input.page, { contentType: pageType, upsert: true });
+  if (stored.error) {
+    console.error("Could not store a scanned page", stored.error);
     return { ok: false, reason: "unavailable" };
   }
 
@@ -182,6 +197,7 @@ export async function sendPage(
         attempts: 0,
         result: null,
         error: null,
+        vision: null,
       },
       { onConflict: "batch_id,page_number" },
     )
@@ -251,35 +267,296 @@ async function photoAt(path: string | null): Promise<ReaderPhoto | null> {
   return mediaType ? { bytes, mediaType } : null;
 }
 
-/** Reads one page with the careful reader and keeps what it found. */
+/** Where the page and its pockets were found, as kept on the row and sent to the check. */
+export interface VisionView {
+  method: DetectMethod;
+  /** 0 to 1: how surely the grid was found. */
+  confidence: number;
+  needsAlignment: boolean;
+  /** The page in the photo, as shares of its width and height. */
+  page: Quad;
+  /** The photo is soft overall: a steadier retake would read better. */
+  blurry: boolean;
+  width: number;
+  height: number;
+  pockets: {
+    slot: number;
+    /** A1 to C3. */
+    position: string;
+    quad: Quad;
+    cardSeen: boolean;
+    looksEmpty: boolean;
+    glare: boolean;
+  }[];
+  /** The player's own corners, once they have lined the page up. */
+  corners: Quad | null;
+}
+
+const isQuad = (value: unknown): value is Quad =>
+  Array.isArray(value) &&
+  value.length === 4 &&
+  value.every(
+    (p) =>
+      p &&
+      typeof p === "object" &&
+      Number.isFinite((p as { x: unknown }).x) &&
+      Number.isFinite((p as { y: unknown }).y),
+  );
+
+/** The row's vision, if it has one in the shape we write. */
+function visionOf(value: unknown): VisionView | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Partial<VisionView>;
+  if (!Array.isArray(v.pockets) || !isQuad(v.page)) return null;
+  return { ...(v as VisionView), corners: isQuad(v.corners) ? v.corners : null };
+}
+
+/**
+ * One look at a page photo: the pockets found and cut (from `corners` when
+ * given), each cut kept for the check, where they were found kept on the
+ * row, and, unless the page needs lining up, the cards read and the run
+ * logged.
+ */
+async function lookAt(
+  row: PageScanRow,
+  bytes: Uint8Array,
+  corners: Quad | null,
+  games: readonly string[],
+  settings: Awaited<ReturnType<typeof scannerSettings>>,
+): Promise<{ vision: VisionView; outcome: ReadOutcome }> {
+  const admin = getSupabaseAdmin();
+  const vision = await readPagePhoto(bytes, corners ?? undefined);
+  const view: VisionView = {
+    method: vision.method,
+    confidence: vision.confidence,
+    needsAlignment: vision.needsAlignment,
+    page: vision.page,
+    blurry: vision.blurry,
+    width: vision.width,
+    height: vision.height,
+    pockets: vision.pockets.map((pocket) => ({
+      slot: pocket.slot,
+      position: slotName(pocket.slot),
+      quad: pocket.quad,
+      cardSeen: pocket.cardSeen,
+      looksEmpty: pocket.looksEmpty,
+      glare: pocket.glare,
+    })),
+    corners,
+  };
+
+  /* Each pocket's straightened card, kept for the check and for a
+     pocket read again later. */
+  const base = row.photos.page.replace(/page\.jpg$/, "");
+  const pocketPaths = await Promise.all(
+    vision.pockets.map(async (pocket) => {
+      const path = `${base}pocket-${pocket.slot}.jpg`;
+      const { error } = await admin.storage
+        .from(BUCKET)
+        .upload(path, pocket.jpeg, { contentType: "image/jpeg", upsert: true });
+      return error ? null : path;
+    }),
+  );
+  await admin
+    .from("page_scans")
+    .update({ vision: view, photos: { page: row.photos.page, pockets: pocketPaths } })
+    .eq("id", row.id);
+
+  if (vision.needsAlignment) {
+    return {
+      vision: view,
+      outcome: { ok: false, reason: "unavailable", run: emptyRun(settings.mode) },
+    };
+  }
+  const outcome = await readCrops(
+    vision.pockets.map((pocket) => ({
+      slot: pocket.slot,
+      bytes: pocket.jpeg,
+      mediaType: "image/jpeg" as const,
+      looksEmpty: pocket.looksEmpty,
+      cardSeen: pocket.cardSeen,
+      glare: pocket.glare,
+    })),
+    { games, settings },
+  );
+  await recordRun(outcome.run, {
+    playerId: row.player_id,
+    pageScanId: row.id,
+    kind: "page",
+    detectMethod: vision.method,
+  });
+  return { vision: view, outcome };
+}
+
+/** Reads one page: finds the pockets, cuts and keeps them, names the cards. */
 export async function readPage(id: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     const row = await claim(id);
     if (!row) return;
 
-    const [page, pockets, games] = await Promise.all([
+    const [page, games, settings] = await Promise.all([
       photoAt(row.photos.page),
-      Promise.all(row.photos.pockets.map((path) => photoAt(path))),
       listPlayerGames(row.player_id),
+      scannerSettings(),
     ]);
     if (!page) {
       await finish(row, { status: "failed", error: "unavailable", result: null });
       return;
     }
 
-    const outcome = await readCards({ mode: "page", page, pockets, games });
-    if (!outcome.ok) {
-      await finish(row, { status: "failed", error: outcome.reason, result: null });
+    let corners = visionOf(row.vision)?.corners ?? null;
+    let looked = await lookAt(row, page.bytes, corners, games, settings);
+    if (looked.vision.needsAlignment) {
+      await finish(row, { status: "failed", error: "needs-alignment", result: null });
       return;
     }
-    const result: PocketOutcome[] = outcome.pockets;
-    await finish(row, { status: "ready", error: null, result });
+    /*
+     * Most cards came back upside down: the page was photographed turned
+     * round, which card outlines alone cannot tell, and read as it was it
+     * would put A1's card in C3. The same page, from its far corner, is
+     * cut and read again (a turned photo only; the player's own corners
+     * already say which way up it is).
+     */
+    if (looked.outcome.run.upsideDown && !corners) {
+      const p = looked.vision.page;
+      corners = [p[2], p[3], p[0], p[1]];
+      looked = await lookAt(row, page.bytes, corners, games, settings);
+    }
+    const { outcome } = looked;
+    if (!outcome.ok) {
+      await finish(row, {
+        status: "failed",
+        error: outcome.reason === "timeout" ? "timeout" : "unavailable",
+        result: null,
+      });
+      return;
+    }
+    await finish(row, { status: "ready", error: null, result: outcome.pockets });
   } catch (error) {
     console.error(
       "Could not read a scanned page",
       error instanceof Error ? error.name : error,
+      error instanceof Error ? withoutKeys(error.message).slice(0, 200) : "",
     );
+  }
+}
+
+/**
+ * The player's own four corners of a page the detector was unsure of,
+ * and the page read again from them. Corners are shares of the photo's
+ * width and height, A1's corner first, then clockwise.
+ */
+export async function realignPage(
+  who: Who,
+  scanId: string,
+  corners: Quad,
+): Promise<{ ok: true } | { ok: false; reason: "not-found" | "busy" | "bad-corners" }> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "not-found" };
+  if (!isQuad(corners) || !cornersMakeAPage(corners)) {
+    return { ok: false, reason: "bad-corners" };
+  }
+  const ordered: Quad = [corners[0], corners[1], corners[2], corners[3]];
+
+  const admin = getSupabaseAdmin();
+  const { data: row } = await admin
+    .from("page_scans")
+    .select("*")
+    .eq("id", scanId)
+    .eq("player_id", who.playerId)
+    .is("closed_at", null)
+    .maybeSingle();
+  if (!row) return { ok: false, reason: "not-found" };
+  if (row.status === "queued" || row.status === "reading")
+    return { ok: false, reason: "busy" };
+
+  const before = visionOf(row.vision);
+  const { error } = await admin
+    .from("page_scans")
+    .update({
+      status: "queued",
+      attempts: 0,
+      result: null,
+      error: null,
+      vision: before ? { ...before, corners: ordered } : { corners: ordered },
+    })
+    .eq("id", row.id)
+    .eq("status", row.status);
+  if (error) return { ok: false, reason: "busy" };
+  afterResponse(() => readPage(row.id));
+  return { ok: true };
+}
+
+/* One pocket read again at a time per page, so two answers cannot overwrite each other. */
+const rescanning = new Set<string>();
+
+/**
+ * One pocket read again on its own: the reader asked to take more care,
+ * the cache not used. The page's other pockets are left as they were.
+ */
+export async function rescanPocket(
+  who: Who,
+  scanId: string,
+  slot: number,
+): Promise<
+  | { ok: true; pocket: PocketOutcome }
+  | { ok: false; reason: "not-found" | "busy" | "limit" | "unavailable" | "timeout" }
+> {
+  if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
+  if (!Number.isInteger(slot) || slot < 0 || slot >= POCKETS_PER_PAGE) {
+    return { ok: false, reason: "not-found" };
+  }
+  const admin = getSupabaseAdmin();
+  const { data: row } = await admin
+    .from("page_scans")
+    .select("*")
+    .eq("id", scanId)
+    .eq("player_id", who.playerId)
+    .is("closed_at", null)
+    .maybeSingle();
+  if (!row || row.status !== "ready" || !Array.isArray(row.result)) {
+    return { ok: false, reason: "not-found" };
+  }
+  const path = row.photos.pockets[slot];
+  if (!path) return { ok: false, reason: "not-found" };
+  if (rescanning.has(scanId)) return { ok: false, reason: "busy" };
+  /* Thirty in ten minutes is a player going round a page twice; past it,
+     something is tapping for them. */
+  if (!checkRateLimit(`pocket-rescan:${who.playerId}`, 30, 10 * 60 * 1000).allowed) {
+    return { ok: false, reason: "limit" };
+  }
+
+  rescanning.add(scanId);
+  try {
+    const [photo, games] = await Promise.all([
+      photoAt(path),
+      listPlayerGames(who.playerId),
+    ]);
+    if (!photo) return { ok: false, reason: "not-found" };
+    const seen = visionOf(row.vision)?.pockets.find((p) => p.slot === slot);
+    const outcome = await readCrops(
+      [{ slot, ...photo, cardSeen: true, glare: seen?.glare ?? false }],
+      { games, careful: true },
+    );
+    await recordRun(outcome.run, {
+      playerId: who.playerId,
+      pageScanId: row.id,
+      kind: "pocket",
+    });
+    if (!outcome.ok) {
+      return {
+        ok: false,
+        reason: outcome.reason === "timeout" ? "timeout" : "unavailable",
+      };
+    }
+    const pocket = outcome.pockets[0];
+    const result = (row.result as PocketOutcome[]).map((each) =>
+      each.slot === slot ? pocket : each,
+    );
+    await admin.from("page_scans").update({ result }).eq("id", row.id);
+    return { ok: true, pocket };
+  } finally {
+    rescanning.delete(scanId);
   }
 }
 
@@ -342,9 +619,11 @@ export interface QueuedPage {
   scanId: string;
   page: number;
   status: PageScanRow["status"];
-  /** "timeout" or "unavailable" on a failed page. */
+  /** "timeout", "unavailable" or "needs-alignment" on a failed page. */
   error: string | null;
   pockets: PocketOutcome[] | null;
+  /** Where the page and its pockets were found, once it has been looked at. */
+  vision: VisionView | null;
   /** Short-lived links to the player's own photos. */
   photos: { page: string | null; pockets: (string | null)[] };
 }
@@ -401,6 +680,7 @@ export async function queueView(
       status: row.status,
       error: row.error,
       pockets: row.status === "ready" ? (row.result as PocketOutcome[]) : null,
+      vision: visionOf(row.vision),
       photos: {
         page: urlOf.get(row.photos.page) ?? null,
         pockets: row.photos.pockets.map((path) =>
@@ -468,19 +748,75 @@ export async function placeQueue(
   batchId: string,
   placements: BinderPlacement[],
   last = true,
+  mode: PlaceMode = "skip",
 ): Promise<
   Awaited<ReturnType<typeof placeBinderPages>> | { ok: false; reason: "not-found" }
 > {
   const view = await queueView(who, batchId);
   if (!view) return { ok: false, reason: "not-found" };
+  /* The same cards placed twice (a retry after a lost answer) carry the
+     same key, so the second does nothing; different cards, a new key. */
+  const key = `${batchId}:${createHash("sha256")
+    .update(
+      JSON.stringify(
+        [...placements]
+          .sort((a, b) => a.pocket - b.pocket)
+          .map((p) => [p.pocket, p.cardId, p.printingId]),
+      ),
+    )
+    .digest("hex")
+    .slice(0, 32)}:${mode}`;
   const result = await placeBinderPages(
     who.playerId,
     displayName,
     view.binderId,
     placements,
+    { mode, key },
   );
+  if (result.ok) await recordCorrections(view, placements);
   if (result.ok && last) await close(who, batchId);
   return result;
+}
+
+/**
+ * How many pockets the player changed before placing, per page, for the
+ * accuracy numbers: a card placed that is not the reader's first pick (or
+ * its printing), a card placed where the reader saw none, and a card the
+ * reader named that was left out. Only the pages this placement touches.
+ */
+async function recordCorrections(
+  view: { pages: QueuedPage[] },
+  placements: BinderPlacement[],
+): Promise<void> {
+  const byPocket = new Map(placements.map((p) => [p.pocket, p]));
+  const admin = getSupabaseAdmin();
+  for (const page of view.pages) {
+    if (!page.pockets) continue;
+    const pockets = Array.from({ length: POCKETS_PER_PAGE }, (_, slot) =>
+      pocketAt(page.page, slot),
+    );
+    if (!pockets.some((pocket) => byPocket.has(pocket))) continue;
+    let corrections = 0;
+    for (const outcome of page.pockets) {
+      const placed = byPocket.get(pocketAt(page.page, outcome.slot));
+      const top = outcome.state === "found" ? outcome.matches[0] : null;
+      if (!top) {
+        if (placed) corrections += 1;
+      } else if (!placed) {
+        corrections += 1;
+      } else if (
+        placed.cardId !== top.card.id ||
+        (top.printingId !== null && (placed.printingId ?? null) !== top.printingId)
+      ) {
+        corrections += 1;
+      }
+    }
+    await admin
+      .from("scan_runs")
+      .update({ corrections })
+      .eq("page_scan_id", page.scanId)
+      .eq("kind", "page");
+  }
 }
 
 /** Throws a queue away: nothing placed, the photos removed. */
@@ -527,6 +863,10 @@ export async function sweepPageScans(): Promise<{ failed: number; removed: numbe
       .remove(paths.slice(at, at + 100))
       .catch(() => {});
   }
+  /* Saved reads and placement receipts: a month. */
+  const readsCutoff = new Date(Date.now() - KEEP_READS_MS).toISOString();
+  await admin.from("scan_recognitions").delete().lt("created_at", readsCutoff);
+  await admin.from("binder_scan_placements").delete().lt("created_at", readsCutoff);
   /* Free single scans only count for a day; two is plenty of history. */
   await admin
     .from("card_scans")

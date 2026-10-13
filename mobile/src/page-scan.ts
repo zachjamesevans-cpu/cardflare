@@ -4,15 +4,19 @@ import {
   POCKETS_PER_PAGE,
   QUEUE_FULL,
   SCAN_REFUSALS,
+  POCKET_NAMES,
+  STATUS_EMPTY,
+  STATUS_MATCHED,
+  STATUS_REVIEW,
+  STATUS_UNRECOGNIZED,
   pocketAt,
-  pocketCrop,
   type ScanRefusal,
 } from "./scan-copy";
 
 /**
- * Whole binder pages, as arithmetic: where each pocket is in the photo,
- * which page is sent next, which pockets the check walks through, and
- * what goes to the binder at the end. Kept apart from the screens
+ * Whole binder pages, as arithmetic: how big the page's photo goes up,
+ * which page is sent next, what each pocket's status is, which pockets
+ * the check walks through, and what goes to the binder at the end. Kept apart from the screens
  * (src/card-scanner.tsx, src/page-scanner.tsx) and from ./api, so
  * tests/unit/page-scan-app.test.ts can run it in node.
  *
@@ -20,41 +24,6 @@ import {
  * a queue and it auto fills in an actual binder, with the exact same
  * location the cards were in in their binder."
  */
-
-/**
- * One pocket of the page's photo (already cut to the guide), for the
- * image manipulator: the website's pocketCrop on the photo's own pixels.
- */
-export function pocketBox(
-  slot: number,
-  page: { width: number; height: number },
-): { originX: number; originY: number; width: number; height: number } {
-  const cut = pocketCrop(slot, page.width, page.height);
-  return {
-    originX: cut.x,
-    originY: cut.y,
-    width: Math.max(1, cut.width),
-    height: Math.max(1, cut.height),
-  };
-}
-
-/**
- * The same pocket in the whole photo's pixels: the page's region (the
- * guide, cut through the preview's fit) first, then the pocket inside
- * it, so each pocket is one crop of the original photo and the page is
- * never encoded twice.
- */
-export function pocketInPhoto(
-  slot: number,
-  region: { originX: number; originY: number; width: number; height: number },
-): { originX: number; originY: number; width: number; height: number } {
-  const box = pocketBox(slot, region);
-  return {
-    ...box,
-    originX: region.originX + box.originX,
-    originY: region.originY + box.originY,
-  };
-}
 
 /** Where a page just shot is: waiting its turn, on its way, sent, or refused. */
 export type PageStatus = "waiting" | "sending" | "sent" | "refused";
@@ -94,20 +63,43 @@ export function isSendRefusal(code: string): code is PageSendRefusal {
 }
 
 /*
- * The whole page goes up beside its pockets, for the careful reader to
- * see the page as the player shot it: larger than a pocket, so a
- * further-away photo still has its text, and under SCAN_MAX_BYTES.
+ * A page goes up as ONE photo, the whole of it at full resolution: the
+ * server finds the page and its nine pockets in it, straightens each card
+ * and keeps those crops, so nothing is cut on the phone. The quick way
+ * (one body) sends it at PAGE_LONG_EDGE; the pieces, where a body cannot
+ * get through, send a smaller one, as a page at full size would be
+ * hundreds of requests. Quality steps down only past the server's
+ * ceiling, PAGE_MAX_BYTES.
  */
-export const PAGE_LONG_EDGE = 1568;
+export const PAGE_LONG_EDGE = 2800;
+export const PAGE_QUALITY = 0.85;
+export const PAGE_PIECES_LONG_EDGE = 2000;
+export const PAGE_PIECES_QUALITY = 0.8;
+/** The server's page ceiling: twice a single card's. */
+export const PAGE_MAX_BYTES = 3_000_000;
 
-/** The whole page's resize: its long side at PAGE_LONG_EDGE, never enlarged. */
-export function pageResize(crop: {
-  width: number;
-  height: number;
-}): { width: number } | { height: number } {
-  return crop.height >= crop.width
-    ? { height: Math.min(crop.height, PAGE_LONG_EDGE) }
-    : { width: Math.min(crop.width, PAGE_LONG_EDGE) };
+/** The page's resize: its long side at `longEdge`, never enlarged. */
+export function pageResize(
+  photo: { width: number; height: number },
+  longEdge = PAGE_LONG_EDGE,
+): { width: number } | { height: number } {
+  return photo.height >= photo.width
+    ? { height: Math.min(photo.height, longEdge) }
+    : { width: Math.min(photo.width, longEdge) };
+}
+
+/** The qualities a page is tried at, from `start` down by 0.1, never under 0.45. */
+export function pageQualities(start: number): number[] {
+  const steps: number[] = [];
+  for (let at = 0; start - at * 0.1 >= 0.45 - 1e-9; at += 1) {
+    steps.push(Math.round((start - at * 0.1) * 100) / 100);
+  }
+  return steps;
+}
+
+/** Whether a base64 page is under the server's ceiling. */
+export function pageFits(base64: string): boolean {
+  return (base64.length * 3) / 4 <= PAGE_MAX_BYTES;
 }
 
 /**
@@ -199,17 +191,66 @@ export function pagesWithCards(pages: readonly (readonly PocketChoice[])[]): num
   return pages.filter((choices) => choices.some((choice) => choice !== null)).length;
 }
 
+/** A pocket's status: matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+export type PocketStatus = "matched" | "ambiguous" | "unrecognized" | "empty";
+
 /**
- * A pocket "Check 2 unsure" walks through: a guess the reader was not
- * sure of, or one it could not read, until the player has looked at it
+ * A pocket's status as the server gave it, or, for a page read before the
+ * second scanner (no status), as its state says: empty is empty, a sure
+ * guess matched, an unsure one ambiguous, an unread pocket unrecognized.
+ */
+export function pocketStatus(pocket: {
+  state: string;
+  sure?: boolean;
+  status?: PocketStatus;
+}): PocketStatus {
+  if (pocket.status) return pocket.status;
+  if (pocket.state === "empty") return "empty";
+  if (pocket.state === "found") return pocket.sure === false ? "ambiguous" : "matched";
+  return "unrecognized";
+}
+
+/** The word under a status's colour. */
+export function statusWord(status: PocketStatus): string {
+  if (status === "matched") return STATUS_MATCHED;
+  if (status === "ambiguous") return STATUS_REVIEW;
+  if (status === "unrecognized") return STATUS_UNRECOGNIZED;
+  return STATUS_EMPTY;
+}
+
+/** The theme token a status is drawn in: the screens look it up in ./theme. */
+export const STATUS_TOKEN = {
+  matched: "success",
+  ambiguous: "warning",
+  unrecognized: "danger",
+  empty: "textMuted",
+} as const satisfies Record<PocketStatus, string>;
+
+/** A pocket's name on its page, A1 to C3: the server's, else its slot's. */
+export function pocketName(pocket: { slot: number; position?: string }): string {
+  return pocket.position ?? POCKET_NAMES[pocket.slot] ?? "";
+}
+
+/**
+ * A pocket "Check 2 unsure" walks through, as the website's `doubtful`:
+ * one to check, one the reader could not identify, or a card whose
+ * printing is the player's to choose, until the player has looked at it
  * in the viewer (confirmed it, chose another, or left it empty).
  */
 export function needsLook(
-  pocket: { state: string; sure?: boolean },
+  pocket: {
+    state: string;
+    sure?: boolean;
+    status?: PocketStatus;
+    printingUncertain?: boolean;
+  },
   looked: boolean,
 ): boolean {
   if (looked) return false;
+  const status = pocketStatus(pocket);
   return (
-    pocket.state === "unread" || (pocket.state === "found" && pocket.sure === false)
+    status === "ambiguous" ||
+    status === "unrecognized" ||
+    (pocket.state === "found" && pocket.printingUncertain === true)
   );
 }

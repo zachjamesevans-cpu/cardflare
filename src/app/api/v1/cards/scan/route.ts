@@ -40,6 +40,9 @@ const CHUNK_MAX_CHARS = 8000;
    pieces before it reached the scanner's ceiling. */
 const APP_PIECE_CHARS = 6000;
 const CHUNK_MAX_COUNT = Math.ceil((SCAN_MAX_BYTES * 4) / 3 / APP_PIECE_CHARS);
+/* A whole page photo goes up the same way, at twice the ceiling: its
+   pieces are numbered this high (/api/v1/scans/pages stitches them). */
+const PAGE_CHUNK_MAX_COUNT = Math.ceil((SCAN_MAX_BYTES * 2 * 4) / 3 / APP_PIECE_CHARS);
 /** A whole photo as base64 text, at the scanner's ceiling. */
 const PHOTO_MAX_CHARS = Math.ceil((SCAN_MAX_BYTES * 4) / 3) + 4;
 
@@ -63,7 +66,7 @@ const schema = z.discriminatedUnion("action", [
       .number()
       .int()
       .min(0)
-      .max(CHUNK_MAX_COUNT - 1),
+      .max(PAGE_CHUNK_MAX_COUNT - 1),
     data: base64.min(1).max(CHUNK_MAX_CHARS),
   }),
   z.object({ action: z.literal("read"), uploadId, count: upload.shape.count }),

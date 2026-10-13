@@ -24,7 +24,13 @@ import type { DisplayPayload } from "@/lib/event-hub/display-payload";
  * needs from a screen that has to survive an evening.
  */
 
-/** How often the display asks for control changes. Not the clock's rate. */
+/**
+ * How often the display asks for control changes until the server says
+ * otherwise. Not the clock's rate. Each answer carries `pollMs`: every 3
+ * seconds with a timer on the screen, every 30 without, every 5 minutes
+ * after the store's hours (idle-rules.ts). An idle screen left on all
+ * day used to ask 1,200 times an hour; now it asks about 120.
+ */
 const POLL_MS = 3_000;
 
 /** How often the wall re-renders. Twice a second keeps seconds crisp. */
@@ -65,6 +71,9 @@ export function useDisplayClock(
   /* Server time minus this device's time, re-measured at every poll. */
   const offset = useRef(0);
 
+  /* How long to wait before the next ask, as the last answer said. */
+  const delay = useRef(initial.pollMs || POLL_MS);
+
   useEffect(() => {
     offset.current = initial.serverNow - Date.now();
   }, [initial.serverNow]);
@@ -99,6 +108,7 @@ export function useDisplayClock(
         if (!live) return;
 
         offset.current = fresh.serverNow - Date.now();
+        delay.current = fresh.pollMs || POLL_MS;
         setPayload(fresh);
         setConnected(true);
       } catch {
@@ -109,7 +119,16 @@ export function useDisplayClock(
       }
     };
 
-    const pollTimer = setInterval(poll, POLL_MS);
+    /* A chain of timeouts rather than one interval, so each wait is the
+       one the last answer asked for. */
+    let pollTimer: ReturnType<typeof setTimeout> | undefined;
+    const next = () => {
+      pollTimer = setTimeout(async () => {
+        await poll();
+        if (live) next();
+      }, delay.current);
+    };
+    next();
     const onVisible = () => {
       if (document.visibilityState === "visible") void poll();
     };
@@ -118,7 +137,7 @@ export function useDisplayClock(
     return () => {
       live = false;
       controller.abort();
-      clearInterval(pollTimer);
+      clearTimeout(pollTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [token]);

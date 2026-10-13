@@ -10,19 +10,27 @@ import {
   placeQueue,
   queuesFor,
   queueView,
+  realignPage,
+  rescanPocket,
   sendPage,
   type PageSendRefusal,
   type QueuedPage,
 } from "@/lib/cards/page-jobs";
-import { POCKETS_PER_PAGE, pagesPlacedLine } from "@/lib/cards/scan-rules";
+import type { PocketOutcome } from "@/lib/cards/scan";
+import {
+  binderPocketName,
+  pagesPlacedLine,
+  pocketsTakenLine,
+  POCKETS_PER_PAGE,
+} from "@/lib/cards/scan-rules";
 import { playerForUser } from "@/lib/players/accounts";
 import { z } from "zod";
 
 /**
  * The website's doors to pages read in the background. The browser
- * sends a page (the whole photo, "page", and its pockets, "pocket0" to
- * "pocket8") and can be left; the check opens the queue later, from
- * the binder or from the notice.
+ * sends a page (the whole photo, "page", at full resolution; the server
+ * finds and cuts the pockets) and can be left; the check opens the queue
+ * later, from the binder or from the notice.
  */
 
 async function who(): Promise<{
@@ -67,12 +75,17 @@ export async function sendPageAction(
   const page = form.get("page");
   if (!parsed.success || !(page instanceof Blob))
     return { ok: false, reason: "no-card" };
-  const pockets = await Promise.all(
-    Array.from({ length: POCKETS_PER_PAGE }, async (_, slot) => {
-      const cell = form.get(`pocket${slot}`);
-      return cell instanceof Blob ? new Uint8Array(await cell.arrayBuffer()) : null;
-    }),
-  );
+  /* Pockets cut in the browser, from a tab open since before the
+     server cut its own: checked, and not kept. */
+  const cut = form.has("pocket0");
+  const pockets = cut
+    ? await Promise.all(
+        Array.from({ length: POCKETS_PER_PAGE }, async (_, slot) => {
+          const cell = form.get(`pocket${slot}`);
+          return cell instanceof Blob ? new Uint8Array(await cell.arrayBuffer()) : null;
+        }),
+      )
+    : undefined;
   return sendPage(me, {
     ...parsed.data,
     page: new Uint8Array(await page.arrayBuffer()),
@@ -101,17 +114,43 @@ export async function queuesForAction(binderId: string): Promise<{
   return { queues, left };
 }
 
+const placeMode = z.enum(["skip", "ask", "replace"]);
+
+/**
+ * Places a checked queue. With mode "ask" (what the check sends first) a
+ * pocket that already holds a different card places nothing and comes
+ * back as `occupied`, so the player can say whether to move those cards
+ * aside; "replace" is their yes.
+ */
 export async function placeQueueAction(
   batchId: string,
   input: unknown,
-): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+  mode: unknown = "skip",
+): Promise<
+  { ok: true; message: string } | { ok: false; message: string; occupied?: number[] }
+> {
   const me = await who();
   if (!me) return { ok: false, message: "Sign in to keep a binder." };
   const parsed = binderPagesSchema.safeParse(input);
   if (!z.guid().safeParse(batchId).success || !parsed.success) {
     return { ok: false, message: "Those pages could not be read." };
   }
-  const result = await placeQueue(me, me.name, batchId, parsed.data.placements);
+  const how = placeMode.safeParse(mode);
+  const result = await placeQueue(
+    me,
+    me.name,
+    batchId,
+    parsed.data.placements,
+    true,
+    how.success ? how.data : "skip",
+  );
+  if (!result.ok && result.reason === "occupied") {
+    return {
+      ok: false,
+      message: pocketsTakenLine(result.pockets.map(binderPocketName)),
+      occupied: result.pockets,
+    };
+  }
   if (!result.ok) {
     return {
       ok: false,
@@ -124,6 +163,36 @@ export async function placeQueueAction(
   revalidatePath("/profile");
   revalidatePath("/profile/binders/[binderId]", "page");
   return { ok: true, message: pagesPlacedLine(result) };
+}
+
+/** The player's own four corners of a page, and the page read again from them. */
+export async function realignPageAction(
+  scanId: string,
+  corners: unknown,
+): Promise<{ ok: boolean }> {
+  const me = await who();
+  const parsed = z
+    .array(z.object({ x: z.number().finite(), y: z.number().finite() }))
+    .length(4)
+    .safeParse(corners);
+  if (!me || !z.guid().safeParse(scanId).success || !parsed.success)
+    return { ok: false };
+  const [a, b, c, d] = parsed.data;
+  return { ok: (await realignPage(me, scanId, [a, b, c, d])).ok };
+}
+
+/** One pocket read again, more carefully. */
+export async function rescanPocketAction(
+  scanId: string,
+  slot: number,
+): Promise<
+  | { ok: true; pocket: PocketOutcome }
+  | { ok: false; reason: "not-found" | "busy" | "limit" | "unavailable" | "timeout" }
+> {
+  const me = await who();
+  if (!me || !z.guid().safeParse(scanId).success)
+    return { ok: false, reason: "not-found" };
+  return rescanPocket(me, scanId, slot);
 }
 
 export async function discardQueueAction(batchId: string): Promise<{ ok: boolean }> {

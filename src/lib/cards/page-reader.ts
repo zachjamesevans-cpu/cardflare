@@ -1,10 +1,13 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import Anthropic from "@anthropic-ai/sdk";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { z } from "zod";
 
 import { isRenderableImageUrl } from "@/lib/cards/images";
+import { slotName } from "@/lib/cards/page-geometry";
 import {
   findScanned,
   scannerKey,
@@ -14,6 +17,25 @@ import {
   type ScanMatch,
 } from "@/lib/cards/scan";
 import {
+  evidenceFor,
+  isAltPrinting,
+  narrowPrintings,
+  scoreEvidence,
+  verdict,
+  type Evidence,
+  type Verdict,
+} from "@/lib/cards/scan-confidence";
+import {
+  callCents,
+  gameWord,
+  PROMPT_VERSION,
+  RECOGNIZERS,
+  type CardRead,
+  type CropInput,
+  type Provider,
+  type ProviderCall,
+} from "@/lib/cards/scan-providers";
+import {
   photoType,
   scanScore,
   SCAN_GAMES,
@@ -21,148 +43,103 @@ import {
   type ScanRead,
   type ScanTraits,
 } from "@/lib/cards/scan-rules";
+import {
+  ANTHROPIC_SCAN_MODEL,
+  OPENAI_SCAN_MODEL,
+  providerKeys,
+  scannerSettings,
+  type ScanMode,
+  type ScannerSettings,
+} from "@/lib/cards/scan-settings";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
- * The page reader: one look, then the catalogue, then a cheap tiebreak.
+ * The scanner's reader: straightened card pictures in, a verdict per
+ * pocket out.
  *
- * The founder (2026-10-09), after three pages cost $2.79: "surely there's
- * a better way to do this from an API standpoint." The reader before
- * this was an agent loop that searched, looked at catalogue art and
- * searched again, re-sending every photo on every round: up to forty
- * rounds a page on the strongest model. Now:
+ * The founder (2026-10-13): "accuracy first, then speed, then cost", and
+ * "Do not allow the AI model to invent card IDs." So no model ever picks
+ * a card. In order:
  *
- * 1. One call to the reader model with the page and its pockets. It says
- *    what each card is the way a collector would (name, number when it
- *    can read one, the frame's colours, power, cost, type, whether it is
- *    an alternate art), in a fixed shape, and nothing else.
- * 2. Our catalogue finds each card from that, narrowed by the traits
- *    (findScanned). No model is involved, and most pockets end here.
- * 3. Pockets the catalogue cannot settle (the same name and traits on a
- *    few cards, or a regular and an alternate art) go together into one
- *    call to the cheapest model, which compares each pocket with up to
- *    four pictures and picks one, or none.
- * 4. A card it recognised but nothing matched gets the catalogue's
- *    closest cards by traits, for "Might be one of these".
+ * 1. The cache. A picture read before (the same bytes, the same model and
+ *    prompt) is not paid for twice.
+ * 2. One batched call to the primary reader (by the scanner settings:
+ *    Anthropic, OpenAI, or Anthropic first in hybrid), every card picture
+ *    in the one request, each labelled with its pocket. A pocket the
+ *    page's photo shows as empty is not sent.
+ * 3. The catalogue. Each read is looked up (findScanned): name, number,
+ *    the traits it saw. Its printings are narrowed by the set code, the
+ *    rarity, and whether it is an alternate art. No model involved.
+ * 4. Hybrid only: the pockets the evidence left unsure go, together, to
+ *    OpenAI's reader at full resolution, and the better-supported read of
+ *    the two is kept. Both naming the same card is a small bonus, never
+ *    proof.
+ * 5. One cheap picture comparison for every pocket still open between a
+ *    few cards, or between a card's printings: the photo against the
+ *    catalogue's own pictures.
+ * 6. A verdict per pocket from the evidence (scan-confidence.ts): matched,
+ *    ambiguous, unrecognized or empty. The player checks the unsure ones
+ *    before anything is placed.
  *
- * The model never chooses a card id: it describes, and the catalogue and
- * the pictures decide. The player checks every pocket before anything is
- * placed. Each read logs what it cost, and the tiebreak is skipped once
- * a page has spent PAGE_CAP_CENTS.
+ * Every call's tokens, time and cost are kept in the run summary, the
+ * page stops asking once it has spent the configured cap, and nothing
+ * logged carries a key or a picture.
  */
-
-const DEFAULT_MODEL = "claude-sonnet-5-5";
-const TIEBREAK_MODEL = "claude-haiku-5-5";
-
-/** The reader's model, a Vercel setting so it can change without a release. */
-export function readerModel(): string {
-  return process.env.SCAN_AGENT_MODEL?.trim() || DEFAULT_MODEL;
-}
-
-/**
- * Dollars per million tokens: input, output, cache read. An unknown
- * model is costed as the dearest Opus, so the log never under-reports.
- */
-const PRICES: Record<string, [number, number, number]> = {
-  "claude-haiku-5-5": [0.1, 0.5, 0.01],
-  "claude-sonnet-5-5": [2, 10, 0.2],
-  "claude-sonnet-5": [2, 10, 0.2],
-  "claude-opus-5-5": [4, 20, 0.2],
-  "claude-opus-5": [5, 25, 0.5],
-  "claude-fable-5-1": [10, 50, 0.25],
-};
-const DEAREST: [number, number, number] = [10, 50, 1];
-
-/** What a call cost, in cents. */
-export function costCents(
-  model: string,
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_read_input_tokens?: number | null;
-    cache_creation_input_tokens?: number | null;
-  },
-): number {
-  const [input, output, cacheRead] = PRICES[model] ?? DEAREST;
-  const dollars =
-    (usage.input_tokens * input +
-      (usage.cache_creation_input_tokens ?? 0) * input * 1.25 +
-      (usage.cache_read_input_tokens ?? 0) * cacheRead +
-      usage.output_tokens * output) /
-    1_000_000;
-  return dollars * 100;
-}
-
-/** Past this, a page skips the tiebreak and leaves the choice to the player. */
-export const PAGE_CAP_CENTS = 15;
-
-/** The most pictures one tiebreak compares a pocket with. */
-const TIEBREAK_OPTIONS = 4;
-const LETTERS = ["A", "B", "C", "D"] as const;
 
 export type ReaderPhoto = {
   bytes: Uint8Array;
   mediaType: "image/jpeg" | "image/png" | "image/webp";
 };
 
-export type ReaderOutcome =
-  | { ok: true; pockets: PocketOutcome[]; cents: number }
-  | { ok: false; reason: "unavailable" | "timeout" };
-
-const pocketSchema = z.object({
-  slot: z.number().int(),
-  /* Plain text, normalised below: the API takes an enum only as a hint,
-     and one odd word ("One Piece") must not sink a whole page. */
-  state: z.string(),
-  game: z.string(),
-  name: z.string(),
-  englishName: z.string(),
-  number: z.string(),
-  setCode: z.string(),
-  colors: z.array(z.string()),
-  power: z.number().int().nullable(),
-  cost: z.number().int().nullable(),
-  cardType: z.string(),
-  altArt: z.boolean(),
-  sure: z.boolean(),
-  note: z.string(),
-});
-const readingSchema = z.object({ pockets: z.array(pocketSchema) });
-type Raw = z.infer<typeof pocketSchema>;
-type Seen = Omit<Raw, "state" | "game"> & {
-  state: "empty" | "card";
-  game: ScanGame | "other";
-  /** The reader's own word for the game, kept for the log. */
-  said: string;
-};
-
-/**
- * The words a reader might use for each game, found anywhere in what it
- * wrote: "One Piece Card Game", "Pokémon TCG", "Disney Lorcana". The
- * founder's first page on this reader came back with every pocket unread
- * because a long name like those fell through to "other" and was never
- * looked up.
- */
-const GAME_WORDS: [string, ScanGame][] = [
-  ["onepiece", "one-piece"],
-  ["optcg", "one-piece"],
-  ["riftbound", "riftbound"],
-  ["lorcana", "lorcana"],
-  ["magic", "mtg"],
-  ["mtg", "mtg"],
-  ["pokemon", "pokemon"],
-  ["pokmon", "pokemon"],
-  ["ptcg", "pokemon"],
-  ["fleshandblood", "flesh-and-blood"],
-  ["fab", "flesh-and-blood"],
-];
-
-/** A reader's word for a game, as one of ours, or "other". */
-export function gameOf(word: string): ScanGame | "other" {
-  const exact = word.trim().toLowerCase();
-  if ((SCAN_GAMES as readonly string[]).includes(exact)) return exact as ScanGame;
-  const key = exact.replace(/[^a-z]/g, "");
-  return GAME_WORDS.find(([words]) => key.includes(words))?.[1] ?? "other";
+/** One pocket's picture, and what the page's photo already showed of it. */
+export interface ScanCrop extends CropInput {
+  /** The photo shows an empty pocket here: not sent to any reader. */
+  looksEmpty?: boolean;
+  /** A card outline was found here. */
+  cardSeen?: boolean;
+  /** Glare over part of the card. */
+  glare?: boolean;
 }
+
+export interface ReadOptions {
+  /** The player's games, for a card whose game the reader did not name. */
+  games: readonly string[];
+  /** Read once by the caller for a page of many reads; looked up when not given. */
+  settings?: ScannerSettings;
+  /** Overrides the settings' mode: the admin's benchmark runs all three. */
+  mode?: ScanMode;
+  /** A single pocket read again: more effort, and the cache is not used. */
+  careful?: boolean;
+  /** False for the admin's benchmark: every mode pays for its own reads, as it would live. */
+  cache?: boolean;
+}
+
+export interface RunSummary {
+  mode: ScanMode;
+  calls: ProviderCall[];
+  /** Calls made again after a failure: a provider down, the other tried. */
+  retries: number;
+  cents: number;
+  ms: number;
+  /** Pictures sent to a reader, and pictures answered from the cache. */
+  cards: number;
+  cached: number;
+  /** Slots hybrid mode sent to the second reader. */
+  escalated: number[];
+  /** Most cards read upside down: the page was photographed turned round. */
+  upsideDown: boolean;
+  matched: number;
+  review: number;
+  unrecognized: number;
+  empty: number;
+}
+
+export type ReadOutcome =
+  | { ok: true; pockets: PocketOutcome[]; run: RunSummary }
+  | { ok: false; reason: "unavailable" | "timeout" | "no-key"; run: RunSummary };
+
+/** The words a reader might use for a game, as one of ours. */
+export const gameOf = gameWord;
 
 /**
  * The games to look a pocket up in: the one the reader named, or, when
@@ -180,113 +157,253 @@ export function gamesToTry(
   return own.length > 0 ? own : [...SCAN_GAMES];
 }
 
-const tidy = (raw: Raw): Seen => ({
-  ...raw,
-  state: raw.state.trim().toLowerCase() === "empty" ? "empty" : "card",
-  game: gameOf(raw.game),
-  said: raw.game,
-});
+const hashOf = (bytes: Uint8Array) => createHash("sha256").update(bytes).digest("hex");
 
-const tiebreakSchema = z.object({
-  picks: z.array(z.object({ pocket: z.number().int(), choice: z.string() })),
-});
+const modelOf = (provider: Provider) =>
+  provider === "anthropic" ? ANTHROPIC_SCAN_MODEL : OPENAI_SCAN_MODEL;
 
-const READ_PROMPT = [
-  "You identify trading cards in photos for cardflare, a trading app. Our catalogue finds each card from what you say, so describe each one precisely.",
-  "Recognise every card the way an expert collector would, from everything visible: the artwork, the character, the frame and its colours, the set's style, rarity marks, and any text you can read. Use your own knowledge of the games freely: most cards can be named from the artwork alone, even at an angle or under glare.",
-  "For each card give: game, exactly one of one-piece, riftbound, lorcana, mtg (Magic: The Gathering), pokemon, flesh-and-blood, or other for a game not listed; name as printed; englishName (the English name, the same as name when it is printed in English); number and setCode exactly as printed, only if you can read them or are certain of them, otherwise empty; colors, the card's colours as lower-case words (red, green, blue, purple, black, yellow, white), empty if unclear; power and cost as the numbers printed, or null; cardType in lower case (leader, character, event, stage, creature, instant, pokemon, trainer, and so on), empty if unclear; altArt true for an alternate, parallel or special art; sure false whenever you are not confident; note, a few words on how you decided, or what got in the way.",
-  "Ignore sleeves, glare, reflections and anything laid over the photo, such as an on-screen button.",
-].join("\n");
+/* ---- 1 and 2: the cache, then one call ------------------------------ */
 
-function pageTask(slots: number[]): string {
-  return [
-    "The first photo is a whole binder page with nine pockets in a 3x3 grid: slots 0, 1, 2 are the top row from left to right, 3, 4, 5 the middle row, 6, 7, 8 the bottom row.",
-    slots.length > 0
-      ? `The photos after it are close-ups of slots ${slots.join(", ")}, cut automatically on that grid, so one may be off-centre or show parts of the cards beside it. When a close-up and the whole page disagree, trust the whole page and the card's place in the grid.`
-      : "There are no close-ups: read every slot from the whole page.",
-    "Answer all nine slots, 0 to 8: state empty for an empty pocket, card for a card.",
-  ].join("\n");
+/**
+ * The reads for these pictures from one provider: from the cache where
+ * the same picture was read before, the rest in one call. A failed call
+ * keeps whatever the cache had.
+ */
+async function readWith(
+  provider: Provider,
+  crops: readonly ScanCrop[],
+  options: ReadOptions & { settings: ScannerSettings },
+  run: RunSummary,
+): Promise<{
+  reads: Map<number, CardRead>;
+  failed: "unavailable" | "timeout" | "no-key" | null;
+}> {
+  const reads = new Map<number, CardRead>();
+  if (crops.length === 0) return { reads, failed: null };
+  const model = modelOf(provider);
+  const hashes = new Map(crops.map((crop) => [crop.slot, hashOf(crop.bytes)]));
+  const useCache =
+    !options.careful && options.cache !== false && isSupabaseConfigured();
+
+  if (useCache) {
+    const { data, error } = await getSupabaseAdmin()
+      .from("scan_recognitions")
+      .select("hash, read")
+      .in("hash", [...new Set(hashes.values())])
+      .eq("provider", provider)
+      .eq("model", model)
+      .eq("prompt_version", PROMPT_VERSION);
+    /* Missing before the migration runs: no cache, quietly. */
+    if (!error) {
+      const byHash = new Map(
+        (data ?? []).map((row) => [row.hash, row.read as CardRead]),
+      );
+      for (const crop of crops) {
+        const hit = byHash.get(hashes.get(crop.slot) ?? "");
+        if (hit && typeof hit === "object")
+          reads.set(crop.slot, { ...hit, slot: crop.slot });
+      }
+      run.cached += reads.size;
+    }
+  }
+
+  const missing = crops.filter((crop) => !reads.has(crop.slot));
+  if (missing.length === 0) return { reads, failed: null };
+  const answer = await RECOGNIZERS[provider](missing, {
+    games: options.games,
+    careful: options.careful,
+    prices: options.settings.prices,
+  });
+  if (answer.call) {
+    run.calls.push(answer.call);
+    run.cents += answer.call.cents;
+  }
+  if (!answer.ok) return { reads, failed: answer.reason };
+  run.cards += missing.length;
+
+  const fresh: {
+    hash: string;
+    provider: string;
+    model: string;
+    prompt_version: number;
+    read: CardRead;
+  }[] = [];
+  for (const crop of missing) {
+    const read = answer.reads.get(crop.slot);
+    if (!read) continue;
+    reads.set(crop.slot, read);
+    fresh.push({
+      hash: hashes.get(crop.slot) as string,
+      provider,
+      model,
+      prompt_version: PROMPT_VERSION,
+      read,
+    });
+  }
+  if (isSupabaseConfigured() && fresh.length > 0) {
+    const { error } = await getSupabaseAdmin()
+      .from("scan_recognitions")
+      .upsert(fresh, { onConflict: "hash,provider,model,prompt_version" });
+    if (error) console.error("Could not keep the scanner's reads", error.code);
+  }
+  return { reads, failed: null };
 }
 
-const CARD_TASK =
-  "The photo is one trading card. Answer one entry, slot 0, state card (or empty if there is no card).";
+/* ---- 3: the catalogue ---------------------------------------------- */
 
-function imageBlock(photo: ReaderPhoto): Anthropic.ImageBlockParam {
+const traitsOf = (read: CardRead): ScanTraits => ({
+  colors: read.colors,
+  power: read.power,
+  cost: read.cost,
+  cardType: read.cardType,
+});
+
+const scanReadOf = (read: CardRead): ScanRead => ({
+  found: true,
+  game: read.game,
+  name: read.name,
+  englishName: read.englishName || read.name,
+  number: read.number,
+  setCode: read.setCode,
+});
+
+/** A read looked up in the catalogue, in the reader's game or the player's. */
+async function lookUp(
+  read: CardRead,
+  games: readonly string[],
+): Promise<{ read: CardRead; matches: ScanMatch[] }> {
+  const tried = gamesToTry(read.game, games);
+  for (const game of tried) {
+    const named = { ...read, game };
+    const matches = await findScanned(scanReadOf(named), 8, traitsOf(named));
+    if (matches.length > 0) return { read: named, matches };
+  }
+  /* Nothing in any game: kept as the one game when there was only one,
+     so "Might be one of these" can still look there. */
+  return { read: tried.length === 1 ? { ...read, game: tried[0] } : read, matches: [] };
+}
+
+/** One reader's read of a pocket, weighed against the catalogue. */
+interface Assessed {
+  provider: Provider;
+  read: CardRead;
+  matches: ScanMatch[];
+  /** Printings the top card can still be, by set code, rarity and art. */
+  printings: string[];
+  /** The same without the alternate-art word: what a picture chooses between. */
+  printingChoices: string[];
+  /** The top card is not settled by its number: the pictures should choose. */
+  cardOpen: boolean;
+  art: Evidence["art"];
+  agreed: boolean;
+}
+
+function assess(
+  provider: Provider,
+  read: CardRead,
+  matches: ScanMatch[],
+): Assessed | null {
+  if (matches.length === 0) return null;
+  const top = matches[0].card;
+  const numbered = matches.filter(
+    (m) => scanScore(read, m.card.canonicalCardNumber) >= 4,
+  );
+  const printingRead = {
+    setCode: read.setCode,
+    rarity: read.rarity,
+    altArt: read.altArt,
+  };
   return {
-    type: "image",
-    source: {
-      type: "base64",
-      media_type: photo.mediaType,
-      data: Buffer.from(photo.bytes).toString("base64"),
-    },
+    provider,
+    read,
+    matches,
+    printings: narrowPrintings(top.printings, printingRead).map((p) => p.id),
+    printingChoices: narrowPrintings(top.printings, printingRead, { art: false }).map(
+      (p) => p.id,
+    ),
+    /* More than one card, and the number does not single one out. */
+    cardOpen: matches.length > 1 && numbered.length !== 1,
+    art: "not-asked",
+    agreed: false,
   };
 }
 
-function client(timeout: number): Anthropic {
-  return new Anthropic({ apiKey: scannerKey(), timeout, maxRetries: 1 });
-}
-
-function logFailure(stage: string, error: unknown): "unavailable" | "timeout" {
-  if (error instanceof Anthropic.APIError) {
-    console.error(
-      `Page reader ${stage} failed`,
-      error.status,
-      error.name,
-      withoutKeys(error.message),
-    );
-    return "unavailable";
-  }
-  const name = error instanceof Error ? error.name : "Error";
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(`Page reader ${stage} failed`, name, withoutKeys(message));
-  return name === "TimeoutError" || name === "AbortError" ? "timeout" : "unavailable";
-}
-
-/** Step 1: the one look. */
-async function look(input: {
-  mode: "page" | "card";
-  page: ReaderPhoto | null;
-  pockets: (ReaderPhoto | null)[];
-  games: readonly string[];
-  model: string;
-}): Promise<
-  | { ok: true; seen: Seen[]; cents: number }
-  | { ok: false; reason: "unavailable" | "timeout" }
-> {
-  const slots = input.pockets.flatMap((photo, slot) => (photo ? [slot] : []));
-  const content: Anthropic.ContentBlockParam[] = [];
-  if (input.page) content.push(imageBlock(input.page));
-  for (const photo of input.pockets) if (photo) content.push(imageBlock(photo));
-  const known =
-    input.games.length > 0 ? `The player collects: ${input.games.join(", ")}.\n` : "";
-  content.push({
-    type: "text",
-    text: `${READ_PROMPT}\n${known}${input.mode === "page" ? pageTask(slots) : CARD_TASK}`,
+function evidenceOf(a: Assessed): Evidence {
+  return evidenceFor(a.read, a.matches[0].card, {
+    only: a.matches.length === 1 || !a.cardOpen,
+    art: a.art,
+    agreed: a.agreed,
   });
+}
 
-  try {
-    const response = await client(150_000).messages.parse({
-      model: input.model,
-      /* Room for its thinking and nine described cards; the ceiling on
-         what one look can cost. */
-      max_tokens: 6000,
-      output_config: { effort: "medium", format: zodOutputFormat(readingSchema) },
-      messages: [{ role: "user", content }],
-    });
-    const cents = costCents(input.model, response.usage);
-    if (response.stop_reason === "refusal") {
-      console.info("Page reader cost", { model: input.model, cents, how: "refused" });
-      return { ok: false, reason: "unavailable" };
-    }
-    const parsed = readingSchema.safeParse(response.parsed_output);
-    if (!parsed.success) {
-      console.error("Page reader look came back unreadable", response.stop_reason);
-      return { ok: false, reason: "unavailable" };
-    }
-    return { ok: true, seen: parsed.data.pockets.map(tidy), cents };
-  } catch (error) {
-    return { ok: false, reason: logFailure("look", error) };
+const scoreOf = (a: Assessed | null) => (a ? scoreEvidence(evidenceOf(a)).score : -1);
+
+/* ---- 5: the pictures ------------------------------------------------ */
+
+/** The most pictures one comparison sets against a pocket. */
+const TIEBREAK_OPTIONS = 4;
+const LETTERS = ["A", "B", "C", "D"] as const;
+
+/** One choice a picture comparison can make: a card, and the printing whose art it shows. */
+type Option = { cardId: string; printingId: string | null; imageUrl: string | null };
+
+/**
+ * What a pocket could still be: several cards the number could not tell
+ * apart, or one card's printings the set code and rarity could not.
+ * Empty when there is nothing for the pictures to decide.
+ */
+export function tiebreakOptions(
+  a: Pick<Assessed, "matches" | "cardOpen" | "printings" | "printingChoices" | "read">,
+): {
+  kind: "card" | "printing";
+  options: Option[];
+} {
+  const { matches } = a;
+  if (matches.length === 0) return { kind: "card", options: [] };
+  const artOf = (match: ScanMatch, printingId: string | null) =>
+    match.card.printings.find((p) => p.id === printingId && p.imageUrl)?.imageUrl ??
+    match.card.printings.find((p) => p.imageUrl)?.imageUrl ??
+    null;
+  if (a.cardOpen) {
+    return {
+      kind: "card",
+      options: matches.slice(0, TIEBREAK_OPTIONS).map((match) => {
+        const own = narrowPrintings(match.card.printings, {
+          setCode: a.read.setCode,
+          rarity: a.read.rarity,
+          altArt: a.read.altArt,
+        });
+        const printingId = own.length === 1 ? own[0].id : null;
+        return {
+          cardId: match.card.id,
+          printingId,
+          imageUrl: artOf(match, own[0]?.id ?? null),
+        };
+      }),
+    };
   }
+  if (a.printingChoices.length > 1) {
+    const top = matches[0];
+    /* The printings the art word points at first, so they are never cut. */
+    const ordered = [
+      ...a.printingChoices.filter((id) => a.printings.includes(id)),
+      ...a.printingChoices.filter((id) => !a.printings.includes(id)),
+    ];
+    const drawn = ordered
+      .map((id) => top.card.printings.find((p) => p.id === id))
+      .filter((p): p is NonNullable<typeof p> => Boolean(p?.imageUrl));
+    if (drawn.length > 1) {
+      return {
+        kind: "printing",
+        options: drawn.slice(0, TIEBREAK_OPTIONS).map((p) => ({
+          cardId: top.card.id,
+          printingId: p.id,
+          imageUrl: p.imageUrl,
+        })),
+      };
+    }
+  }
+  return { kind: "card", options: [] };
 }
 
 /** A catalogue picture, from an allowed host, typed by its bytes. */
@@ -304,53 +421,34 @@ async function picture(url: string | null): Promise<ReaderPhoto | null> {
   }
 }
 
-/** One choice a tiebreak can make: a card, and the printing whose art it shows. */
-type Option = { cardId: string; printingId: string | null; imageUrl: string | null };
+const tiebreakSchema = z.object({
+  picks: z.array(z.object({ pocket: z.number().int(), choice: z.string() })),
+});
 
-/**
- * What a pocket could still be: several cards the catalogue could not
- * tell apart, or one card whose printings differ in art when the reader
- * saw an alternate art. Empty when there is nothing to decide.
- */
-export function tiebreakOptions(
-  matches: ScanMatch[],
-  seen: Pick<Seen, "altArt" | "number" | "setCode">,
-): Option[] {
-  if (matches.length === 0) return [];
-  const art = (match: ScanMatch, printingId: string | null) =>
-    match.card.printings.find((p) => p.id === printingId)?.imageUrl ??
-    match.card.printings.find((p) => p.imageUrl)?.imageUrl ??
-    null;
-  const decided = scanScore(seen, matches[0].card.canonicalCardNumber) >= 2;
-  if (matches.length > 1 && !decided) {
-    return matches.slice(0, TIEBREAK_OPTIONS).map((match) => ({
-      cardId: match.card.id,
-      printingId: match.printingId,
-      imageUrl: art(match, match.printingId),
-    }));
-  }
-  const top = matches[0];
-  const drawn = top.card.printings.filter((p) => p.imageUrl);
-  if (seen.altArt && !top.printingId && drawn.length > 1) {
-    return drawn.slice(0, TIEBREAK_OPTIONS).map((p) => ({
-      cardId: top.card.id,
-      printingId: p.id,
-      imageUrl: p.imageUrl,
-    }));
-  }
-  return [];
+function imageBlock(photo: ReaderPhoto): Anthropic.ImageBlockParam {
+  return {
+    type: "image",
+    source: {
+      type: "base64",
+      media_type: photo.mediaType,
+      data: Buffer.from(photo.bytes).toString("base64"),
+    },
+  };
 }
 
 /**
- * Step 3: every unsettled pocket in one call to the cheapest model. The
- * answer per pocket is a letter or "none"; a letter it was not offered
- * counts as none.
+ * Every open pocket in one call to the cheapest model. The answer per
+ * pocket is a letter or "none"; a letter it was not offered counts as
+ * none, and a pocket with fewer than two usable pictures is not asked.
  */
 async function tiebreak(
   asks: { slot: number; photo: ReaderPhoto; options: Option[] }[],
-): Promise<{ picks: Map<number, Option>; cents: number }> {
+  settings: ScannerSettings,
+  run: RunSummary,
+): Promise<{ asked: Set<number>; picks: Map<number, Option> }> {
   const picks = new Map<number, Option>();
-  if (asks.length === 0) return { picks, cents: 0 };
+  const asked = new Set<number>();
+  if (asks.length === 0 || !scannerKey()) return { asked, picks };
 
   const content: Anthropic.ContentBlockParam[] = [
     {
@@ -379,18 +477,42 @@ async function tiebreak(
       );
     });
   }
-  if (offered.size === 0) return { picks, cents: 0 };
+  if (offered.size === 0) return { asked, picks };
+  for (const slot of offered.keys()) asked.add(slot);
 
+  const started = Date.now();
   try {
-    const response = await client(60_000).messages.parse({
-      model: TIEBREAK_MODEL,
+    const response = await new Anthropic({
+      apiKey: scannerKey(),
+      timeout: 60_000,
+      maxRetries: 1,
+    }).messages.parse({
+      model: ANTHROPIC_SCAN_MODEL,
       max_tokens: 2000,
       output_config: { effort: "low", format: zodOutputFormat(tiebreakSchema) },
       messages: [{ role: "user", content }],
     });
-    const cents = costCents(TIEBREAK_MODEL, response.usage);
+    const usage = {
+      input:
+        response.usage.input_tokens +
+        (response.usage.cache_read_input_tokens ?? 0) +
+        (response.usage.cache_creation_input_tokens ?? 0),
+      output: response.usage.output_tokens,
+      cached: response.usage.cache_read_input_tokens ?? 0,
+    };
+    const cents = callCents(settings.prices, ANTHROPIC_SCAN_MODEL, usage);
+    run.calls.push({
+      provider: "anthropic",
+      model: ANTHROPIC_SCAN_MODEL,
+      ...usage,
+      cents,
+      ms: Date.now() - started,
+      cards: offered.size,
+      ok: response.stop_reason !== "refusal",
+    });
+    run.cents += cents;
     const parsed = tiebreakSchema.safeParse(response.parsed_output);
-    if (response.stop_reason === "refusal" || !parsed.success) return { picks, cents };
+    if (response.stop_reason === "refusal" || !parsed.success) return { asked, picks };
     for (const { pocket, choice } of parsed.data.picks) {
       const options = offered.get(pocket);
       const index = LETTERS.indexOf(
@@ -399,139 +521,391 @@ async function tiebreak(
       if (options && index >= 0 && index < options.length)
         picks.set(pocket, options[index]);
     }
-    return { picks, cents };
+    return { asked, picks };
   } catch (error) {
-    logFailure("tiebreak", error);
-    return { picks, cents: 0 };
+    const name = error instanceof Error ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Scanner picture comparison failed", name, withoutKeys(message));
+    return { asked: new Set(), picks };
   }
 }
 
-const traitsOf = (seen: Seen): ScanTraits => ({
-  colors: seen.colors,
-  power: seen.power,
-  cost: seen.cost,
-  cardType: seen.cardType,
-});
+/* ---- The whole read ------------------------------------------------- */
 
-const readOf = (seen: Seen): ScanRead => ({
-  found: true,
-  game: seen.game,
-  name: seen.name,
-  englishName: seen.englishName || seen.name,
-  number: seen.number,
-  setCode: seen.setCode,
+/** A run that made no calls. */
+export const emptyRun = (mode: ScanMode): RunSummary => ({
+  mode,
+  calls: [],
+  retries: 0,
+  cents: 0,
+  ms: 0,
+  cards: 0,
+  cached: 0,
+  escalated: [],
+  upsideDown: false,
+  matched: 0,
+  review: 0,
+  unrecognized: 0,
+  empty: 0,
 });
 
 /**
- * Reads a page (nine pockets) or one card. `pockets` holds a close-up per
- * slot, or null; in card mode it is the one photo and `page` is null.
+ * Reads a page's pockets (or one card, as slot 0). Each crop is one
+ * straightened card picture from page-vision.ts, or the one photo of a
+ * single scan.
  */
-export async function readCards(input: {
-  mode: "page" | "card";
-  page: ReaderPhoto | null;
-  pockets: (ReaderPhoto | null)[];
-  games: readonly string[];
-}): Promise<ReaderOutcome> {
-  const model = readerModel();
-  const count = input.mode === "page" ? 9 : 1;
-  const looked = await look({ ...input, model });
-  if (!looked.ok) return looked;
-  let cents = looked.cents;
+export async function readCrops(
+  crops: readonly ScanCrop[],
+  options: ReadOptions,
+): Promise<ReadOutcome> {
+  const started = Date.now();
+  const settings = options.settings ?? (await scannerSettings());
+  const mode = options.mode ?? settings.mode;
+  const run = emptyRun(mode);
+  const withSettings = { ...options, settings };
+  const keys = providerKeys();
+  const thresholds = {
+    autoAccept: settings.autoAccept,
+    reviewFloor: settings.reviewFloor,
+  };
 
-  const bySlot = new Map<number, Seen>();
-  for (const seen of looked.seen) {
-    if (
-      Number.isInteger(seen.slot) &&
-      seen.slot >= 0 &&
-      seen.slot < count &&
-      !bySlot.has(seen.slot)
-    ) {
-      bySlot.set(seen.slot, seen);
+  /* The primary reader by the mode, the other when its key is missing. */
+  let primary: Provider = mode === "openai" ? "openai" : "anthropic";
+  const otherOf = (p: Provider): Provider =>
+    p === "anthropic" ? "openai" : "anthropic";
+  if (!keys[primary] && keys[otherOf(primary)]) primary = otherOf(primary);
+  const finish = (outcome: ReadOutcome): ReadOutcome => {
+    outcome.run.ms = Date.now() - started;
+    outcome.run.cents = Math.round(outcome.run.cents * 10_000) / 10_000;
+    logRun(outcome);
+    return outcome;
+  };
+  if (!keys[primary]) return finish({ ok: false, reason: "no-key", run });
+
+  const bySlot = new Map(crops.map((crop) => [crop.slot, crop]));
+  const toRead = crops.filter((crop) => !crop.looksEmpty);
+
+  let first = await readWith(primary, toRead, withSettings, run);
+  /* The primary down altogether: the other reader, once, when it has a key. */
+  if (first.failed && first.reads.size === 0 && keys[otherOf(primary)]) {
+    run.retries += 1;
+    primary = otherOf(primary);
+    first = await readWith(primary, toRead, withSettings, run);
+  }
+  if (first.failed && first.reads.size === 0 && toRead.length > 0) {
+    return finish({ ok: false, reason: first.failed, run });
+  }
+
+  /* A page turned round reads with most of its cards upside down. */
+  const cardsRead = [...first.reads.values()].filter((read) => read.state === "card");
+  run.upsideDown =
+    cardsRead.length >= 2 &&
+    cardsRead.filter((read) => read.upsideDown).length > cardsRead.length / 2;
+
+  /* 3: the catalogue, every pocket at once. */
+  const looked = new Map(
+    await Promise.all(
+      [...first.reads].map(async ([slot, read]) => {
+        if (read.state === "empty")
+          return [slot, { read, matches: [] as ScanMatch[] }] as const;
+        return [slot, await lookUp(read, options.games)] as const;
+      }),
+    ),
+  );
+  const best = new Map<number, Assessed | null>();
+  for (const [slot, { read, matches }] of looked) {
+    if (read.state === "card") best.set(slot, assess(primary, read, matches));
+  }
+
+  /* 4: hybrid sends the unsure pockets, together, to the second reader. */
+  const second: Provider = otherOf(primary);
+  if (
+    mode === "hybrid" &&
+    primary === "anthropic" &&
+    keys[second] &&
+    run.cents < settings.pageCapCents
+  ) {
+    const unsure = toRead.filter((crop) => {
+      const read = first.reads.get(crop.slot);
+      /* An empty pocket the photo saw a card in, or a pocket never answered. */
+      if (!read) return true;
+      if (read.state === "empty") return Boolean(crop.cardSeen);
+      return scoreOf(best.get(crop.slot) ?? null) < settings.autoAccept;
+    });
+    if (unsure.length > 0) {
+      run.escalated = unsure.map((crop) => crop.slot);
+      const again = await readWith(second, unsure, withSettings, run);
+      await Promise.all(
+        [...again.reads].map(async ([slot, read]) => {
+          if (read.state === "empty") {
+            if (!first.reads.has(slot)) looked.set(slot, { read, matches: [] });
+            return;
+          }
+          const found = await lookUp(read, options.games);
+          const theirs = assess(second, found.read, found.matches);
+          const ours = best.get(slot) ?? null;
+          if (!first.reads.has(slot) || first.reads.get(slot)?.state === "empty") {
+            looked.set(slot, found);
+          }
+          const agreed = Boolean(
+            ours && theirs && ours.matches[0].card.id === theirs.matches[0].card.id,
+          );
+          const kept = scoreOf(theirs) > scoreOf(ours) ? theirs : ours;
+          if (kept) kept.agreed = agreed;
+          best.set(slot, kept);
+        }),
+      );
     }
   }
 
-  /* Step 2: the catalogue, every pocket at once. */
-  const found = await Promise.all(
-    Array.from({ length: count }, async (_, slot) => {
-      const seen = bySlot.get(slot);
-      if (!seen || seen.state === "empty")
-        return { slot, seen, matches: [] as ScanMatch[] };
-      const games = gamesToTry(seen.game, input.games);
-      for (const game of games) {
-        const named = { ...seen, game };
-        const matches = await findScanned(readOf(named), 6, traitsOf(named));
-        if (matches.length > 0) return { slot, seen: named, matches };
+  /* 5: one picture comparison for every pocket still open. */
+  const asks: {
+    slot: number;
+    photo: ReaderPhoto;
+    options: Option[];
+    kind: "card" | "printing";
+  }[] = [];
+  for (const [slot, a] of best) {
+    const crop = bySlot.get(slot);
+    if (!a || !crop) continue;
+    const { kind, options: choices } = tiebreakOptions(a);
+    if (choices.length > 1) asks.push({ slot, photo: crop, options: choices, kind });
+  }
+  const compared =
+    asks.length > 0 && run.cents < settings.pageCapCents
+      ? await tiebreak(asks, settings, run)
+      : { asked: new Set<number>(), picks: new Map<number, Option>() };
+  const pinned = new Map<number, string | null>();
+  /* Pockets whose picture pick an alternate art was not backed up. */
+  const artInDoubt = new Set<number>();
+  /**
+   * An alternate art is only taken from the pictures when the reader
+   * independently said "alternate art" and was sure of the card, and a
+   * regular printing only when the reader did not say alternate. The
+   * founder (2026-10-13): "Our confidence thresholds don't automatically
+   * accept questionable alternate-art identifications." Anything less is
+   * left for the player to choose.
+   */
+  const pin = (slot: number, a: Assessed, printingId: string) => {
+    const printing = a.matches[0].card.printings.find((p) => p.id === printingId);
+    const alt = printing ? isAltPrinting(printing) : false;
+    if (alt !== a.read.altArt || (alt && !a.read.sure)) {
+      artInDoubt.add(slot);
+      return;
+    }
+    pinned.set(slot, printingId);
+  };
+  for (const ask of asks) {
+    const a = best.get(ask.slot);
+    if (!a || !compared.asked.has(ask.slot)) continue;
+    const pick = compared.picks.get(ask.slot);
+    if (ask.kind === "card") {
+      if (!pick) {
+        a.art = "rejected";
+        continue;
       }
-      /* Nothing in any game: kept as the one game when there was only one,
-         so "Might be one of these" can still look there. */
+      const chosen = a.matches.find((m) => m.card.id === pick.cardId);
+      if (!chosen) continue;
+      a.matches = [chosen, ...a.matches.filter((m) => m !== chosen)];
+      a.cardOpen = false;
+      a.art = "chosen";
+      const printingRead = {
+        setCode: a.read.setCode,
+        rarity: a.read.rarity,
+        altArt: a.read.altArt,
+      };
+      a.printings = narrowPrintings(chosen.card.printings, printingRead).map(
+        (p) => p.id,
+      );
+      a.printingChoices = narrowPrintings(chosen.card.printings, printingRead, {
+        art: false,
+      }).map((p) => p.id);
+      if (pick.printingId) pin(ask.slot, a, pick.printingId);
+    } else if (pick?.printingId) {
+      a.art = "chosen";
+      pin(ask.slot, a, pick.printingId);
+    }
+  }
+
+  /* 6: a verdict per pocket. */
+  const pockets = await Promise.all(
+    crops.map(async (crop): Promise<PocketOutcome> => {
+      const slot = crop.slot;
+      const position = slotName(slot);
+      const glare = Boolean(crop.glare);
+      const seen = looked.get(slot);
+      const empty: PocketOutcome = {
+        slot,
+        state: "empty",
+        position,
+        status: "empty",
+        confidence: 1,
+        reasons: [],
+        glare,
+      };
+      if (crop.looksEmpty) return empty;
+      if (!seen) {
+        const v = verdict({ kind: "none", readerSaw: false }, thresholds);
+        return { slot, state: "unread", read: null, position, ...v, glare };
+      }
+      if (seen.read.state === "empty") {
+        /* The reader saw nothing where the photo saw a card's outline. */
+        if (crop.cardSeen) {
+          const v = verdict({ kind: "none", readerSaw: false }, thresholds);
+          return { slot, state: "unread", read: null, position, ...v, glare };
+        }
+        return empty;
+      }
+      const a = best.get(slot) ?? null;
+      const read = a?.read ?? seen.read;
+      const note = read.note;
+      if (!a) {
+        const game = read.game;
+        const suggestions =
+          game === "other" ? [] : await suggestByTraits(game, traitsOf(read));
+        const v = verdict({ kind: "none", readerSaw: true }, thresholds);
+        return {
+          slot,
+          state: "unread",
+          read: scanReadOf(read),
+          note,
+          ...(suggestions.length > 0 ? { suggestions } : {}),
+          position,
+          ...v,
+          glare,
+        };
+      }
+
+      const printingId =
+        pinned.get(slot) ??
+        (a.printings.length === 1 && a.printingChoices.length <= 1
+          ? a.printings[0]
+          : null);
+      const printingOpen =
+        printingId === null && a.matches[0].card.printings.length > 1;
+      const v: Verdict = verdict(
+        { kind: "candidate", evidence: evidenceOf(a), printingOpen },
+        thresholds,
+      );
+      if (artInDoubt.has(slot)) v.reasons.push("alternate art not confirmed");
+      if (glare) v.reasons.push("glare over the card");
+      const matches: ScanMatch[] = [
+        {
+          card: a.matches[0].card,
+          printingId:
+            printingId ??
+            (a.matches[0].card.printings.length === 1
+              ? a.matches[0].card.printings[0].id
+              : null),
+        },
+        ...a.matches.slice(1),
+      ];
+      if (v.status === "unrecognized") {
+        /* A weak guess only: offered as "Might be one of these". */
+        return {
+          slot,
+          state: "unread",
+          read: scanReadOf(read),
+          note,
+          suggestions: matches.slice(0, 4),
+          position,
+          ...v,
+          glare,
+        };
+      }
       return {
         slot,
-        seen: games.length === 1 ? { ...seen, game: games[0] } : seen,
-        matches: [] as ScanMatch[],
+        state: "found",
+        read: scanReadOf(read),
+        matches,
+        sure: v.status === "matched",
+        note,
+        position,
+        status: v.status,
+        confidence: v.confidence,
+        reasons: v.reasons,
+        printingUncertain: printingOpen,
+        glare,
       };
     }),
   );
 
-  /* Step 3: one cheap call for every pocket the catalogue left open. */
-  const asks = found.flatMap(({ slot, seen, matches }) => {
-    const photo =
-      input.pockets[slot] ?? (input.mode === "card" ? input.pockets[0] : null);
-    if (!seen || !photo) return [];
-    const options = tiebreakOptions(matches, seen);
-    return options.length > 1 ? [{ slot, photo, options }] : [];
-  });
-  const settled =
-    cents < PAGE_CAP_CENTS
-      ? await tiebreak(asks)
-      : { picks: new Map<number, Option>(), cents: 0 };
-  cents += settled.cents;
+  for (const pocket of pockets) {
+    if (pocket.status === "matched") run.matched += 1;
+    else if (pocket.status === "ambiguous") run.review += 1;
+    else if (pocket.status === "unrecognized") run.unrecognized += 1;
+    else run.empty += 1;
+  }
+  return finish({ ok: true, pockets: pockets.map(stripVerdict), run });
+}
 
-  /* Step 4: the pockets, and suggestions where nothing matched. */
-  const pockets = await Promise.all(
-    found.map(async ({ slot, seen, matches }): Promise<PocketOutcome> => {
-      if (!seen) return { slot, state: "unread", read: null, note: "" };
-      if (seen.state === "empty") return { slot, state: "empty" };
-      const read = readOf(seen);
-      if (seen.game === "other")
-        return { slot, state: "unread", read, note: seen.note };
-      if (matches.length === 0) {
-        const suggestions = await suggestByTraits(seen.game, traitsOf(seen));
-        return {
-          slot,
-          state: "unread",
-          read,
-          note: seen.note,
-          ...(suggestions.length > 0 ? { suggestions } : {}),
-        };
-      }
-      const pick = settled.picks.get(slot);
-      const asked = asks.some((ask) => ask.slot === slot);
-      let ordered = matches;
-      if (pick) {
-        const chosen = matches.find((match) => match.card.id === pick.cardId);
-        if (chosen) {
-          ordered = [
-            { card: chosen.card, printingId: pick.printingId ?? chosen.printingId },
-            ...matches.filter((match) => match !== chosen),
-          ];
-        }
-      }
-      /* Sure only when the reader was, and nothing was left open: either
-         the catalogue settled it, or the pictures did. */
-      const sure = seen.sure && (!asked || Boolean(pick));
-      return { slot, state: "found", read, matches: ordered, sure, note: seen.note };
-    }),
-  );
+/** The verdict's needsReview is the status's to say: not sent to clients. */
+function stripVerdict(
+  pocket: PocketOutcome & { needsReview?: boolean },
+): PocketOutcome {
+  const rest = { ...pocket };
+  delete rest.needsReview;
+  return rest;
+}
 
-  console.info("Page reader cost", {
-    model,
-    mode: input.mode,
-    cents: Math.round(cents * 100) / 100,
-    tiebreaks: asks.length,
-    /* What came of it, so a page that placed nothing says why in the log. */
-    found: pockets.filter((pocket) => pocket.state === "found").length,
-    unread: pockets.filter((pocket) => pocket.state === "unread").length,
-    games: [...new Set(looked.seen.map((seen) => `${seen.said} -> ${seen.game}`))],
+/** The run in the server log: calls, tokens, cents, counts. No pictures, no keys. */
+function logRun(outcome: ReadOutcome): void {
+  const { run } = outcome;
+  console.info("Scanner run", {
+    mode: run.mode,
+    ok: outcome.ok,
+    cents: run.cents,
+    ms: run.ms,
+    calls: run.calls.map((c) => ({
+      provider: c.provider,
+      model: c.model,
+      input: c.input,
+      output: c.output,
+      cached: c.cached,
+      cents: Math.round(c.cents * 10_000) / 10_000,
+      ms: c.ms,
+      cards: c.cards,
+      ok: c.ok,
+    })),
+    cards: run.cards,
+    cached: run.cached,
+    escalated: run.escalated.length,
+    matched: run.matched,
+    review: run.review,
+    unrecognized: run.unrecognized,
+    empty: run.empty,
   });
-  return { ok: true, pockets, cents };
+}
+
+/** A run kept for the cost and accuracy numbers on /admin/scanner. */
+export async function recordRun(
+  run: RunSummary,
+  context: {
+    playerId: string | null;
+    pageScanId?: string | null;
+    kind: "page" | "card" | "pocket" | "benchmark";
+    detectMethod?: string | null;
+  },
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  const { error } = await getSupabaseAdmin()
+    .from("scan_runs")
+    .insert({
+      player_id: context.playerId,
+      page_scan_id: context.pageScanId ?? null,
+      kind: context.kind,
+      mode: run.mode,
+      calls: run.calls,
+      cards: run.cards,
+      retries: run.retries,
+      cents: run.cents,
+      ms: run.ms,
+      matched: run.matched,
+      review: run.review,
+      unrecognized: run.unrecognized,
+      empty: run.empty,
+      detect_method: context.detectMethod ?? null,
+    });
+  /* Missing before the migration runs: the numbers are a nicety, the scan is not. */
+  if (error) console.error("Could not record a scanner run", error.code);
 }

@@ -351,6 +351,10 @@ export function pagesPlacedLine(result: {
   merged: number;
   occupied: number;
   skipped: number;
+  /** Cards that were in those pockets, moved to the back of the binder. */
+  displaced?: number;
+  /** Cards already in their very pocket, from a page placed before. */
+  unchanged?: number;
 }): string {
   const parts: string[] = [];
   if (result.added > 0) {
@@ -368,6 +372,20 @@ export function pagesPlacedLine(result: {
       result.occupied === 1
         ? "1 pocket was already full, so that card was left out."
         : `${result.occupied} pockets were already full, so those cards were left out.`,
+    );
+  }
+  if ((result.unchanged ?? 0) > 0) {
+    parts.push(
+      result.unchanged === 1
+        ? "1 was already in its pocket."
+        : `${result.unchanged} were already in their pockets.`,
+    );
+  }
+  if ((result.displaced ?? 0) > 0) {
+    parts.push(
+      result.displaced === 1
+        ? "The card that was in its pocket moved to the back of the binder."
+        : `The ${result.displaced} cards that were in those pockets moved to the back of the binder.`,
     );
   }
   if (result.skipped > 0) {
@@ -460,4 +478,66 @@ export function pageAddedLine(page: number): string {
 /** The check's shortcut through the doubtful pockets: "Check 2 unsure". */
 export function checkUnsureLabel(count: number): string {
   return `Check ${count} unsure`;
+}
+
+/* ---- The second scanner: statuses, a pocket again, lining up ------- */
+
+/*
+ * The founder (2026-10-13): each pocket is matched (green), needs review
+ * (yellow), empty (grey) or unable to identify (red), a pocket can be
+ * read again on its own, a page the scanner is unsure of is lined up by
+ * hand, and nothing in the binder is overwritten without a yes.
+ */
+
+/** The pockets as the founder names them, top row first. */
+export const POCKET_NAMES = [
+  "A1",
+  "A2",
+  "A3",
+  "B1",
+  "B2",
+  "B3",
+  "C1",
+  "C2",
+  "C3",
+] as const;
+
+/** A pocket's status in words, under its colour. */
+export const STATUS_MATCHED = "Matched";
+export const STATUS_REVIEW = "Check this one";
+export const STATUS_EMPTY = "Empty";
+export const STATUS_UNRECOGNIZED = "Can't identify";
+
+export const RESCAN_POCKET = "Rescan this pocket";
+export const RESCANNING_POCKET = "Reading it again...";
+export const RESCAN_FAILED = "Couldn't read it again. Try in a moment.";
+export const CHOOSE_PRINTING = "Which printing is it?";
+export const GLARE_ON_CARD = "Glare on this card.";
+export const BLURRY_PAGE = "This photo looks blurry. A steadier one will read better.";
+export const CHOOSE_PHOTO = "Choose a photo";
+
+export const LINE_UP_PAGE = "Line up the page";
+export const LINE_UP_HINT =
+  "Drag the four corners onto the corners of the binder page.";
+export const PAGE_NEEDS_LINING_UP = "We couldn't find the pockets. Line the page up.";
+export const TURN_PAGE = "Turn";
+export const READ_PAGE_AGAIN = "Read it again";
+
+export const MOVE_AND_PLACE = "Move them and place";
+export const CANCEL_PLACING = "Cancel";
+
+/** Pockets that already hold other cards: "B2 and C1 already have different cards in this binder." */
+export function pocketsTakenLine(pockets: readonly string[]): string {
+  const names =
+    pockets.length <= 1
+      ? (pockets[0] ?? "")
+      : `${pockets.slice(0, -1).join(", ")} and ${pockets[pockets.length - 1]}`;
+  return pockets.length === 1
+    ? `${names} already has a different card in this binder. Put the scanned card in and move that one to the back of the binder?`
+    : `${names} already have different cards in this binder. Put the scanned cards in and move those to the back of the binder?`;
+}
+
+/** A binder pocket (0 to 899) as page and pocket: "Page 3 B2". */
+export function binderPocketName(pocket: number): string {
+  return `Page ${Math.floor(pocket / 9) + 1} ${POCKET_NAMES[pocket % 9]}`;
 }

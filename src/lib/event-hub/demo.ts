@@ -12,6 +12,10 @@ import {
   type HubTimer,
   type TimerPatch,
 } from "./timer";
+import { ACTIVE_POLL_MS, IDLE_PANELS } from "./idle-rules";
+
+/** The demo store keeps Austin time, like the demo world's store. */
+export const DEMO_TIME_ZONE = "America/Chicago";
 
 /**
  * A sample night, for the store page.
@@ -347,6 +351,13 @@ export function demoPayload(
     joinUrl,
     timers,
     flares: demoFlares(),
+    /* A night with no tournament on it shows the idle screen, as a
+       store's own screen would. */
+    idleMode: true,
+    idlePanels: [...IDLE_PANELS],
+    timeZone: DEMO_TIME_ZONE,
+    storeOpen: true,
+    pollMs: ACTIVE_POLL_MS,
     serverNow: now,
   };
 }

@@ -3,6 +3,7 @@
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { checkIdlePanels } from "./idle-rules";
 
 import { getViewer } from "@/lib/auth/session";
 import type { FormNotice } from "@/lib/forms/notice";
@@ -163,6 +164,18 @@ export async function updateDisplayAction(formData: FormData): Promise<void> {
       : {}),
     ...(formData.has("soundEnabled")
       ? { soundEnabled: formData.getAll("soundEnabled").includes("on") }
+      : {}),
+    ...(formData.has("idleMode")
+      ? { idleMode: formData.getAll("idleMode").includes("on") }
+      : {}),
+    /* The idle panels arrive as one form: a hidden "idlePanels" marks it,
+       and only the ticked names are kept, ours and in our order. */
+    ...(formData.has("idlePanels")
+      ? {
+          idlePanels: checkIdlePanels(
+            formData.getAll("idlePanels").map((value) => String(value)),
+          ),
+        }
       : {}),
   });
 

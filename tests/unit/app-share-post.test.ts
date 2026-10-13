@@ -64,8 +64,12 @@ describe("the post line inside a message", () => {
   });
 
   it("reads as the words, or Sent a post, on the Messages list", () => {
-    expect(previewWithoutPostLink(`look at this ${postLink(POST)}`)).toBe("look at this");
-    expect(previewWithoutPostLink("cardflare://post/4f9b1c2e-8a3d")).toBe("Sent a post");
+    expect(previewWithoutPostLink(`look at this ${postLink(POST)}`)).toBe(
+      "look at this",
+    );
+    expect(previewWithoutPostLink("cardflare://post/4f9b1c2e-8a3d")).toBe(
+      "Sent a post",
+    );
     expect(previewWithoutPostLink("hey")).toBe("hey");
   });
 });

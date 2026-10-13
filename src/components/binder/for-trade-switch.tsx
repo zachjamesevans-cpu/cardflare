@@ -37,7 +37,9 @@ export function PublicSwitch({
   return (
     <label className="flex cursor-pointer items-center justify-between gap-3 rounded-[var(--radius-control)] border border-border bg-elevated p-3">
       <span className="flex min-w-0 flex-col">
-        <span className="text-sm font-semibold text-text-primary">Show on your profile</span>
+        <span className="text-sm font-semibold text-text-primary">
+          Show on your profile
+        </span>
         <span className="text-xs text-text-muted">
           {forTrade
             ? "Always shown while it is up for trade."

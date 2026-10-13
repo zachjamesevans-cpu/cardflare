@@ -257,6 +257,8 @@ export default async function ManageScreenPage({
             showFlares={display.showFlares}
             showQr={display.showQr}
             soundEnabled={display.soundEnabled}
+            idleMode={display.idleMode}
+            idlePanels={display.idlePanels}
           />
         </Card>
       </section>

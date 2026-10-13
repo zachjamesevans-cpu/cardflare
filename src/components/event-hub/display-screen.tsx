@@ -6,12 +6,14 @@ import { Maximize, Minimize, WifiOff } from "lucide-react";
 import { Logo } from "@/components/brand/logo";
 import { intermissionFor } from "@/lib/event-hub/auto-mode";
 import type { DisplayPayload } from "@/lib/event-hub/display-payload";
+import type { IdleInfo } from "@/lib/event-hub/idle-rules";
 import { GAME_PROFILES } from "@/lib/event-hub/game-profiles";
 import { displayPlan } from "@/lib/event-hub/layout";
 import { rotationWindow } from "@/lib/event-hub/rotation";
 import { remainingMs, timerPhase, type HubTimer } from "@/lib/event-hub/timer";
 import { FeaturedFlare } from "./featured-flare";
 import { FlareBoard } from "./flare-board";
+import { IdleScreen } from "./idle-screen";
 import { IntermissionBody } from "./intermission-screen";
 import { TimerPanel } from "./timer-panel";
 import { useDisplayClock } from "./display-clock";
@@ -41,8 +43,11 @@ export function DisplayScreen({
   initial,
   token,
   qrSvg,
+  idleSample,
 }: {
   initial: DisplayPayload;
+  /** The idle panels for a preview, which has no token to ask with. */
+  idleSample?: IdleInfo;
   /** Null for the store page's preview: a sample night, no polling. */
   token: string | null;
   /**
@@ -204,6 +209,38 @@ export function DisplayScreen({
     );
   }
 
+  /*
+   * No tournament on the screen: the idle screen, unless the store
+   * turned it off (then the empty state below, as it always was). The
+   * founder: "if they're not showing a tournament timer or anything -
+   * maybe it'll show some valuable cardflare info".
+   */
+  if (timers.length === 0 && payload.idleMode) {
+    return (
+      <>
+        <IdleScreen
+          payload={payload}
+          now={at}
+          token={token}
+          sample={idleSample}
+          header={
+            <Header
+              storeName={payload.storeName}
+              nightTitle={payload.nightTitle}
+              connected={connected}
+            />
+          }
+          join={
+            payload.showQr && qrSvg && payload.joinCode ? (
+              <JoinPanel code={payload.joinCode} qrSvg={qrSvg} corner large />
+            ) : null
+          }
+        />
+        <FullscreenControl />
+      </>
+    );
+  }
+
   return (
     <main
       id="main"
@@ -332,9 +369,12 @@ function JoinPanel({
   code,
   qrSvg,
   corner = false,
+  large = false,
 }: {
   code: string;
   qrSvg: string;
+  /** The idle screen's square: the way in is half of what it is for. */
+  large?: boolean;
   /**
    * Frameless, for sitting inside another panel's dead space. No card
    * of its own: the code fades up out of the panel with a soft halo,
@@ -381,7 +421,7 @@ function JoinPanel({
   if (corner) {
     return (
       <aside
-        style={PLATE_VARS}
+        style={large ? LARGE_PLATE_VARS : PLATE_VARS}
         className="motion-safe:animate-[cf-join-in_1.2s_var(--ease-out-soft)_0.4s_both]"
       >
         {column}
@@ -403,6 +443,11 @@ function JoinPanel({
 const PLATE_VARS = {
   ["--qr" as string]: "clamp(3.5rem, 9vh, 8rem)",
   ["--plate-pad" as string]: "clamp(0.2rem, 0.4vw, 0.5rem)",
+};
+/** The idle screen's square, big enough to scan from across the shop. */
+const LARGE_PLATE_VARS = {
+  ["--qr" as string]: "clamp(7rem, 30vh, 24rem)",
+  ["--plate-pad" as string]: "clamp(0.35rem, 0.6vw, 0.8rem)",
 };
 const PLATE_WIDTH = "calc(var(--qr) + 2 * var(--plate-pad))";
 

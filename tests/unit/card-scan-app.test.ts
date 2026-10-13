@@ -198,8 +198,15 @@ describe("the photo", () => {
     expect(src.scanner).toContain("[{ crop }, { resize: scanResize(crop) }]");
     expect(src.scanner).toContain("format: SaveFormat.JPEG, base64: true");
     expect(src.scanner).toContain("let quality = 0.6;");
-    const shoot = src.scanner.slice(src.scanner.indexOf("const shoot = async"));
-    const shrunk = shoot.indexOf("await shrinkPhoto(photo, view)");
+    const shoot = src.scanner.slice(src.scanner.indexOf("const readPhoto = async"));
+    const shrunk = shoot.indexOf("await shrinkPhoto(photo, crop)");
+    /* The outline's part of a camera photo; all of a chosen one. */
+    expect(src.scanner).toContain(
+      "? frameInPhoto(guideFrame(view.width, view.height), view, photo)",
+    );
+    expect(src.scanner).toContain(
+      ": { originX: 0, originY: 0, width: photo.width, height: photo.height };",
+    );
     const sent = shoot.indexOf("await scanCardPhoto(shrunk.base64");
     expect(shrunk).toBeGreaterThan(-1);
     expect(sent).toBeGreaterThan(shrunk);

@@ -35,6 +35,8 @@ vi.mock("@/lib/cards/page-job-actions", () => ({
   queueViewAction: vi.fn(),
   placeQueueAction: vi.fn(),
   discardQueueAction: vi.fn(),
+  realignPageAction: vi.fn(),
+  rescanPocketAction: vi.fn(),
 }));
 vi.mock("@/lib/cards/actions", () => ({ searchCardsAction: vi.fn() }));
 
@@ -139,10 +141,10 @@ describe("the scanner is one flow, a single read first", () => {
     expect(scanner).toMatch(
       /if \(reason === "is-page"\) \{\s*if \(rights\.pages === "on" && photo\) await sendAsPage\(photo\);\s*else setStep\(\{ kind: "pro", why: PAGES_ARE_PRO \}\);/,
     );
-    /* Cut from the kept photo at full size, the page scanner's own helpers. */
-    expect(scanner).toContain("photos = await cutPage(file);");
+    /* Made ready from the kept photo at full size, the page scanner's own helpers. */
+    expect(scanner).toContain("photo = await preparePage(file);");
     expect(scanner).toContain(
-      'import { cutPage, sendPage, sendRefusalLine } from "@/components/cards/page-scan";',
+      'import { preparePage, sendPage, sendRefusalLine } from "@/components/cards/page-scan";',
     );
   });
 
@@ -197,8 +199,8 @@ describe("the scanner is one flow, a single read first", () => {
     expect(scanner).toContain(
       "const timer = window.setTimeout(() => setToast(null), TOAST_MS);",
     );
-    /* Back to the camera as soon as the page is cut, before it is sent. */
-    const cut = at(scanner, "const cut = photos;");
+    /* Back to the camera as soon as the page is ready, before it is sent. */
+    const cut = at(scanner, "const ready = photo;");
     const camera = scanner.indexOf('setStep({ kind: "camera" });', cut);
     const chain = at(scanner, "chain.current = chain.current.then(");
     expect(camera).toBeGreaterThan(cut);
@@ -393,7 +395,10 @@ describe("the PRO mark", () => {
       ["src/app/pro/page.tsx", /<ProMark \/> goes on top of it/],
       ["src/app/pro/page.tsx", /then cardflare <ProMark \/>\./],
       ["src/app/pro/page.tsx", /\{SITE\.name\} <ProMark \/>/],
-      ["src/app/profile/settings/settings-content.tsx", /<ProMark \/> through the App Store/],
+      [
+        "src/app/profile/settings/settings-content.tsx",
+        /<ProMark \/> through the App Store/,
+      ],
     ];
     for (const [path, pattern] of spots) {
       expect(read(path), path).toMatch(pattern);

@@ -6,6 +6,13 @@ import { SubmitButton } from "@/components/ui/submit-button";
 import { Checkbox, Select, TextInput } from "@/components/ui/controls";
 import { rotateDisplayTokenAction, updateDisplayAction } from "@/lib/event-hub/actions";
 import { ConfirmButton } from "./confirm-button";
+import {
+  IDLE_MODE_HINT,
+  IDLE_MODE_LABEL,
+  IDLE_PANEL_LABELS,
+  IDLE_PANELS,
+  type IdlePanel,
+} from "@/lib/event-hub/idle-rules";
 import type { LayoutChoice } from "@/lib/event-hub/layout";
 import { ANNOUNCEMENT_MAX, NIGHT_TITLE_MAX } from "@/lib/event-hub/schema";
 
@@ -28,6 +35,8 @@ export function DisplaySettings({
   showFlares,
   showQr,
   soundEnabled,
+  idleMode,
+  idlePanels,
 }: {
   displayId: string;
   name: string;
@@ -37,6 +46,8 @@ export function DisplaySettings({
   showFlares: boolean;
   showQr: boolean;
   soundEnabled: boolean;
+  idleMode: boolean;
+  idlePanels: readonly IdlePanel[];
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -162,6 +173,47 @@ export function DisplaySettings({
         </fieldset>
 
         <SubmitButton label="Save screen settings" pendingLabel="Saving…" size="sm" />
+      </form>
+
+      {/*
+       * The idle screen: what the TV shows with no timer on it. Its own
+       * form, like the others, because it is set once and left. The
+       * founder: "if they're not showing a tournament timer or anything -
+       * maybe it'll show some valuable cardflare info".
+       */}
+      <form action={updateDisplayAction} className="flex flex-col gap-3">
+        <input type="hidden" name="displayId" value={displayId} />
+        <fieldset className="flex flex-col gap-3">
+          <legend className="text-sm font-medium text-text-secondary">
+            {IDLE_MODE_LABEL}
+          </legend>
+          <p className="text-xs text-text-muted">{IDLE_MODE_HINT}</p>
+
+          <input type="hidden" name="idleMode" value="off" />
+          <Checkbox
+            id="idleMode"
+            name="idleMode"
+            value="on"
+            defaultChecked={idleMode}
+            label="Show the idle screen when no timer is on"
+          />
+
+          {/* The panels arrive as one list: the hidden marker says this
+              form carries it, so ticking every box off is honoured. */}
+          <input type="hidden" name="idlePanels" value="" />
+          {IDLE_PANELS.map((panel) => (
+            <Checkbox
+              key={panel}
+              id={`idlePanels-${panel}`}
+              name="idlePanels"
+              value={panel}
+              defaultChecked={idlePanels.includes(panel)}
+              label={IDLE_PANEL_LABELS[panel]}
+            />
+          ))}
+        </fieldset>
+
+        <SubmitButton label="Save idle screen" pendingLabel="Saving…" size="sm" />
       </form>
 
       <form action={rotateDisplayTokenAction} className="flex flex-col gap-2">

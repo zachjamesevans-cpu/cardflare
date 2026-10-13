@@ -135,7 +135,9 @@ export function BinderSettings({
       <ForTradeSwitch
         on={forTrade}
         disabled={pending}
-        onChange={(on) => save(on ? { forTrade: true, isPublic: true } : { forTrade: false })}
+        onChange={(on) =>
+          save(on ? { forTrade: true, isPublic: true } : { forTrade: false })
+        }
       />
 
       <div className="flex flex-col gap-2">

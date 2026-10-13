@@ -8,6 +8,7 @@ import {
   Megaphone,
   Package,
   Radio,
+  ScanLine,
   Store as StoreIcon,
   Tent,
   UserRound,
@@ -28,6 +29,7 @@ import { CatalogueImportForm } from "@/components/admin/catalogue-import-form";
 import { SyncCatalogForm } from "@/components/admin/sync-catalog-form";
 import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
+import { pagesScannedLately } from "@/lib/cards/scan-bench";
 import { catalogBySet, failuresForRun } from "@/lib/cards/health";
 import {
   DON_EXCLUSION,
@@ -168,13 +170,14 @@ export default async function AdminPage() {
     0,
   );
 
-  /* One batch, not a chain: these four used to run one after another,
-     which multiplied any slowness by four. */
-  const [playerCount, catalogue, imported, notices] = await Promise.all([
+  /* One batch, not a chain: these used to run one after another,
+     which multiplied any slowness by the count. */
+  const [playerCount, catalogue, imported, notices, scannedPages] = await Promise.all([
     within("countPlayers", 0, countPlayers()),
     within("catalogForConsole", [], catalogForConsole()),
     within("listImportedSets", [], listImportedSets()),
     within("listAnnouncements", [], listAnnouncements()),
+    within("pagesScannedLately", 0, pagesScannedLately()),
   ]);
 
   /* The catalogue at a glance: what is on sale, and what is waiting. */
@@ -297,6 +300,13 @@ export default async function AdminPage() {
             label="Import a set"
             value={importedSets}
             detail="Sets no provider carries yet"
+          />
+          <AreaLink
+            href="/admin/scanner"
+            icon={ScanLine}
+            label="Scanner"
+            value={scannedPages}
+            detail="pages scanned in the last 30 days · mode, costs, bench"
           />
           <AreaLink
             href="/admin/announcements"

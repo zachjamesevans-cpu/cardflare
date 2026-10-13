@@ -126,7 +126,9 @@ describe("your own Flares reach your own feed", () => {
     expect(repo).toContain('yours: key.split("::")[0] === viewerId');
     /* A post by somebody near you whom you do not follow is "around":
        Nearby's, not yours and not people you follow. */
-    expect(repo).toContain('return item.yours ? "yours" : item.around ? "around" : "people"');
+    expect(repo).toContain(
+      'return item.yours ? "yours" : item.around ? "around" : "people"',
+    );
     expect(repo).toContain('if (item.around) return "Near you";');
     expect(repo).toContain(
       'return item.yours ? "Your Flare" : "Because you follow them"',

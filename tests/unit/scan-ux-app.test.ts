@@ -160,17 +160,28 @@ describe("one scanner", () => {
   });
 
   it("reads every photo as one card first, from the kept full photo", () => {
-    const shoot = between(src.scanner, "const shoot = async", "const again =");
-    const photo = shoot.indexOf("await camera.current.takePictureAsync(");
-    const single = shoot.indexOf("await scanCardPhoto(shrunk.base64");
-    const decide = shoot.indexOf("const next = afterSingleScan(answer, rights);");
-    const page = shoot.indexOf("await queuePage(photo, view);", decide);
-    expect(photo).toBeGreaterThan(-1);
-    expect(single).toBeGreaterThan(photo);
+    const shoot = between(src.scanner, "const shoot = async", "const failed =");
+    expect(shoot).toContain("await camera.current.takePictureAsync(");
+    expect(shoot).toContain("await readPhoto(photo, cardCrop(photo, view));");
+    /* A chosen photo goes the same way. */
+    expect(shoot).toContain(
+      "if (photo) await readPhoto(photo, cardCrop(photo, null));",
+    );
+    const read = between(
+      src.scanner,
+      "const readPhoto = async",
+      "/* The answer, full screen",
+    );
+    const single = read.indexOf("await scanCardPhoto(shrunk.base64");
+    const decide = read.indexOf("const next = afterSingleScan(answer, rights);");
+    const page = read.indexOf("queuePage(photo);", decide);
+    expect(single).toBeGreaterThan(-1);
     expect(decide).toBeGreaterThan(single);
     expect(page).toBeGreaterThan(decide);
-    /* The page is cut from the photo the camera took, not the small one. */
-    expect(src.scanner).toContain("const cut = await cutPage(photo, size);");
+    /* The page is the photo taken or chosen, whole, not the small one. */
+    expect(src.scanner).toContain(
+      '{ id: `page-${shots}`, number, source: photo, status: "waiting" },',
+    );
   });
 
   it("sends a page for Pro, opens the door to Pro for anyone else, and for the day's free scans", () => {
@@ -202,10 +213,16 @@ describe("one scanner", () => {
     ).toBe(true);
     expect(freeScansGone(rights({ singlesLeft: 3, pages: "pro-door" }))).toBe(false);
     expect(freeScansGone(rights({}))).toBe(false);
-    const shoot = between(src.scanner, "const shoot = async", "const again =");
+    const shoot = between(src.scanner, "const mayScan = ", "const failed =");
     const gone = shoot.indexOf("if (!retake && freeScansGone(rights)) {");
     expect(gone).toBeGreaterThan(-1);
     expect(gone).toBeLessThan(shoot.indexOf("takePictureAsync("));
+    /* Both ways in ask first. */
+    expect(shoot).toContain("if (!camera.current || !view || !mayScan()) return;");
+    expect(shoot).toContain("if (!mayScan()) return;");
+    expect(shoot.indexOf("if (!mayScan()) return;")).toBeLessThan(
+      shoot.indexOf("launchImageLibraryAsync("),
+    );
   });
 
   it("counts the free scans down as the server does, and asks the server for its count", () => {
@@ -337,7 +354,11 @@ describe("the card viewer", () => {
   it("swipes across every pocket of every page, with Page N and nine dots", () => {
     expect(src.viewer).toContain("horizontal");
     expect(src.viewer).toContain("pagingEnabled");
-    expect(src.viewer).toContain("{`Page ${pocket.page}`}");
+    /* "Page 4 B2": the page and the pocket's name, A1 to C3. */
+    expect(src.viewer).toContain(
+      "? binderPocketName(pocketAt(pocket.page, pocket.slot))",
+    );
+    expect(src.viewer).toContain(": `Page ${pocket.page}`}");
     expect(src.viewer).toContain("<Dots slot={pocket.slot} />");
     expect(src.viewer).toContain("length: POCKETS_PER_PAGE");
     /* That's it moves on, and closes after the last. */
@@ -356,13 +377,17 @@ describe("the check", () => {
     expect(src.pages).not.toContain("openSlot");
   });
 
-  it("shows our match's art, a ? for unread, and the unsure mark", () => {
+  it("shows our match's art, a ? for unread, and the status in colour and in a word", () => {
     const tile = src.pages.slice(src.pages.indexOf("function PocketTile("));
     expect(tile).toContain(
       "const art = pick ? (pickArt(pick) ?? pocket.photo) : null;",
     );
     expect(tile).toContain("<Text style={styles.unknown}>?</Text>");
-    expect(tile).toContain('<Ionicons name="help-circle"');
+    expect(tile).toContain("const tone = colors[STATUS_TOKEN[status]];");
+    expect(tile).toContain("[styles.statusDot, { backgroundColor: tone }]");
+    expect(tile).toContain("[styles.statusWord, { color: tone }]");
+    expect(tile).toContain("{word}");
+    expect(tile).toContain("<Text style={styles.name}>{name}</Text>");
   });
 
   it("walks only the unsure and unread pockets with Check N unsure, until looked at", () => {

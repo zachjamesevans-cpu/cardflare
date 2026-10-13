@@ -128,8 +128,12 @@ describe("the strip: six tabs for the owner, four for anyone else, Flares first"
     );
     expect(web.tabs).toMatch(/const THEIRS: ProfileTab\[\] = \["flares", "hunts"\];/);
     expect(web.tabs).toContain("return yours ? OWN : THEIRS;");
-    expect(app.tabs).toContain('export const OWN_TABS: ProfileTab[] = ["flares", "hunts", "trades"];');
-    expect(app.tabs).toContain('export const THEIR_TABS: ProfileTab[] = ["flares", "hunts"];');
+    expect(app.tabs).toContain(
+      'export const OWN_TABS: ProfileTab[] = ["flares", "hunts", "trades"];',
+    );
+    expect(app.tabs).toContain(
+      'export const THEIR_TABS: ProfileTab[] = ["flares", "hunts"];',
+    );
     /* The app's screens hand the strip the panes they own; the two
        lists say which. */
     expect(app.ownProfile).toMatch(/OWN_TABS|"trades"/);

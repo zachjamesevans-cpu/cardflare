@@ -12,8 +12,14 @@ import type { BinderCoverId } from "./binder-covers";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
+import type { Quad } from "./page-geometry";
 import { isSendRefusal, placementParts, type PageSendRefusal } from "./page-scan";
-import { pagesPlacedLine, type ScanRefusal } from "./scan-copy";
+import {
+  binderPocketName,
+  pagesPlacedLine,
+  pocketsTakenLine,
+  type ScanRefusal,
+} from "./scan-copy";
 import { NO_SCAN_RIGHTS, type ScanRights } from "./scan-flow";
 import type { ScanCard } from "./scan-hit";
 
@@ -422,6 +428,11 @@ export class ApiError extends Error {
      * written for the person, and a screen shows it as it came.
      */
     public detail: string | null = null,
+    /**
+     * The refusal's whole body, for the few that carry more than words: a
+     * place that found pockets already full names them.
+     */
+    public body: Record<string, unknown> | null = null,
   ) {
     super(code);
   }
@@ -630,6 +641,7 @@ async function call<T>(
       response.status,
       detail.error ?? detail.reason ?? `http-${response.status}`,
       typeof detail.message === "string" ? detail.message : null,
+      detail && typeof detail === "object" ? (detail as Record<string, unknown>) : null,
     );
   }
 
@@ -2827,7 +2839,22 @@ export const getScanRights = () =>
 
 /** One pocket of a scanned page: nothing there, a card and its guesses, or unread. */
 export type PocketOutcome =
-  | { slot: number; state: "empty" }
+  | {
+      slot: number;
+      state: "empty";
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
+    }
   | {
       slot: number;
       state: "found";
@@ -2837,6 +2864,18 @@ export type PocketOutcome =
       sure?: boolean;
       /** How it decided, in a few words, for the check. */
       note?: string;
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
     }
   | {
       slot: number;
@@ -2848,6 +2887,18 @@ export type PocketOutcome =
        * reader saw (name, colour, power), for "Might be one of these".
        */
       suggestions?: ScanMatch[];
+      /** The pocket as the founder names it: A1 to C3. */
+      position?: string;
+      /** matched (green), ambiguous (yellow), unrecognized (red), empty (grey). */
+      status?: "matched" | "ambiguous" | "unrecognized" | "empty";
+      /** The evidence score, 0 to 1: for gating, never shown as a percentage. */
+      confidence?: number;
+      /** Why, in words: "collector number matches", "artwork matches". */
+      reasons?: string[];
+      /** The card is known but its printing (alternate art...) is the player's choice. */
+      printingUncertain?: boolean;
+      /** Glare over part of the card in the photo. */
+      glare?: boolean;
     };
 
 const SCAN_PATH = "/api/v1/cards/scan";
@@ -2907,8 +2958,9 @@ export async function scanCardPhoto(
 /*
  * The founder (2026-10-09): "the full binder page scans should be fully
  * agentic... Maybe it scans it, and then they'll get a notification once
- * it's ready." A page is SENT (the whole photo and its nine pockets) and
- * read on the server after the answer; the player closes the menu, the
+ * it's ready." A page is SENT (one full-resolution photo of it: the
+ * server finds and straightens the nine pockets itself) and read on the
+ * server after the answer; the player closes the menu, the
  * binder says when the pages are ready, and a notice does too. The
  * website's src/lib/cards/page-jobs.ts, through /api/v1/scans/pages.
  */
@@ -2923,16 +2975,60 @@ export interface PageQueue {
   ready: boolean;
 }
 
+export type { Quad } from "./page-geometry";
+
+/**
+ * Where the server found the page and its pockets in the page's photo:
+ * the website's VisionView. Every point is a share (0 to 1) of the
+ * photo's width and height.
+ */
+export interface VisionView {
+  /** How the grid was found: the cards' outlines, the page's, the frame's, or the player's corners. */
+  method: "cards" | "page" | "frame" | "manual";
+  /** 0 to 1: how surely the grid was found. Never shown as a number. */
+  confidence: number;
+  needsAlignment: boolean;
+  /** The page in the photo: top left, top right, bottom right, bottom left. */
+  page: Quad;
+  /** The photo is soft overall: a steadier retake would read better. */
+  blurry: boolean;
+  width: number;
+  height: number;
+  pockets: {
+    slot: number;
+    /** A1 to C3. */
+    position: string;
+    quad: Quad;
+    cardSeen: boolean;
+    looksEmpty: boolean;
+    glare: boolean;
+  }[];
+  /** The player's own corners, A1's first, once they have lined the page up. */
+  corners: Quad | null;
+}
+
 /** One page of a queue as the check draws it: the website's QueuedPage. */
 export interface QueuedPage {
   scanId: string;
   /** The binder page it fills, 1-based. */
   page: number;
   status: "queued" | "reading" | "ready" | "failed";
-  /** "timeout" or "unavailable" on a failed page. */
+  /**
+   * "timeout", "unavailable" or "needs-alignment" on a failed page: the
+   * last is the scanner unsure where the pockets are, which it never
+   * guesses, so the player lines the page up.
+   */
   error: string | null;
   pockets: PocketOutcome[] | null;
-  /** Short-lived links to the player's own photos. */
+  /**
+   * Where the page and its pockets were found, once it has been looked
+   * at. Absent from a server before the second scanner.
+   */
+  vision?: VisionView | null;
+  /**
+   * Short-lived links to the player's own photos: the page as shot, and
+   * each pocket's card as the server straightened it.
+   */
   photos: { page: string | null; pockets: (string | null)[] };
 }
 
@@ -2972,18 +3068,20 @@ export type PageSent =
 /**
  * One page into its queue, to be read on the server: the answer comes
  * at once and says only that it arrived. In one body where the network
- * allows it ("send-direct"), else each photo in pieces through the
- * scanner's own upload and then "send" naming them. A refusal is an
- * answer, `{ ok: false, reason }`, whichever road it came by.
+ * allows it ("send-direct"), else the photo in pieces through the
+ * scanner's own upload and then "send" naming it. The pieces carry a
+ * smaller photo (`smaller`, made only if it is needed): a page at full
+ * size would be hundreds of requests. A refusal is an answer,
+ * `{ ok: false, reason }`, whichever road it came by.
  */
 export async function sendScanPage(input: {
   binderId: string;
   batchId: string;
   pageNumber: number;
-  /** The whole page, base64 JPEG. */
+  /** The whole page, base64 JPEG, at full resolution. */
   page: string;
-  /** The nine pockets, base64 JPEG, null for one that could not be cut. */
-  pockets: (string | null)[];
+  /** The page for the pieces, base64 JPEG; null if it could not be made. The page itself without it. */
+  smaller?: () => Promise<string | null>;
 }): Promise<PageSent> {
   const where = {
     binderId: input.binderId,
@@ -2995,31 +3093,18 @@ export async function sendScanPage(input: {
       action: "send-direct",
       ...where,
       page: input.page,
-      pockets: input.pockets,
     });
     if (whole.sent) return whole.answer;
 
-    const upload = async (photo: string) => {
-      const uploadId = await beginScanUpload();
-      if (!uploadId) return null;
-      return { uploadId, count: await sendPieces(SCAN_PATH, uploadId, photo) };
-    };
-    const page = await upload(input.page);
-    if (!page) return { ok: false, reason: "not-allowed" };
-    const pockets: ({ uploadId: string; count: number } | null)[] = [];
-    for (const cell of input.pockets) {
-      if (!cell) {
-        pockets.push(null);
-        continue;
-      }
-      const sent = await upload(cell);
-      if (!sent) return { ok: false, reason: "not-allowed" };
-      pockets.push(sent);
-    }
+    const photo = input.smaller ? await input.smaller() : input.page;
+    if (!photo) return { ok: false, reason: "too-big" };
+    const uploadId = await beginScanUpload();
+    if (!uploadId) return { ok: false, reason: "not-allowed" };
+    const page = { uploadId, count: await sendPieces(SCAN_PATH, uploadId, photo) };
     return await call<PageSent>(
       "POST",
       PAGES_PATH,
-      { action: "send", ...where, page, pockets },
+      { action: "send", ...where, page },
       false,
       60_000,
     );
@@ -3033,30 +3118,150 @@ export async function sendScanPage(input: {
 }
 
 /**
- * A checked queue into its binder, each card in its exact pocket: a
- * second copy counting up, a pocket already full left alone. Sent three
+ * What placing does with a pocket that already holds a different card:
+ * "ask" places nothing and says which (a 409), "replace" is the player's
+ * yes (that card moves to the back of the binder), "skip" leaves it out.
+ */
+export type PlaceMode = "skip" | "ask" | "replace";
+
+/** What a queue's placing did, added up over its parts. */
+export interface PlaceTotals {
+  added: number;
+  merged: number;
+  occupied: number;
+  displaced: number;
+  /** Cards already in that very pocket, from a page placed before. */
+  unchanged: number;
+  skipped: number;
+}
+
+/** Where a placing stopped to ask: the part that asked, and what the parts before it did. */
+export interface PlaceResume {
+  part: number;
+  totals: PlaceTotals;
+}
+
+export type QueuePlaced =
+  | { ok: true; message: string }
+  | {
+      ok: false;
+      reason: "occupied";
+      /** The server's question, in words: "B2 and C1 already have...". */
+      message: string;
+      /** The binder pockets (0 to 899) already holding different cards. */
+      pockets: number[];
+      /** To carry on from, with "replace", on a yes. */
+      resume: PlaceResume;
+    };
+
+/** Whether any part before the one that asked put a card in the binder. */
+export function placedAny(totals: PlaceTotals): boolean {
+  return totals.added + totals.merged + totals.displaced > 0;
+}
+
+/**
+ * A checked queue into its binder, each card in its exact pocket, a
+ * copy of its own (a server that still merges says so in counts.merged;
+ * a card already in that very pocket is counts.unchanged). Sent three
  * pages at a time, in order, `last` on the final part only (the server
  * closes the queue on that one): the payload rides in a header, and ten
  * pages of placements in one would be close to the size a server
- * accepts for all of its headers together. The counts are added up so
- * the line says what the whole queue did.
+ * accepts for all of its headers together.
+ * The counts are added up so the line says what the whole queue did.
+ *
+ * Sent with "ask": a part whose pockets already hold different cards
+ * comes back 409 and places nothing, and this stops there and says so,
+ * with where to carry on from. The parts before it are already placed
+ * (a part sent twice is placed once: the server keeps a receipt). On the
+ * player's yes the screen calls this again with "replace" and `resume`,
+ * which sends that part and the rest.
  */
 export async function placePageQueue(
   batchId: string,
   placements: BinderPlacement[],
-): Promise<{ message: string }> {
-  const totals = { added: 0, merged: 0, occupied: 0, skipped: 0 };
-  for (const part of placementParts(placements)) {
-    const answer = await call<{ message: string; counts?: typeof totals }>(
-      "POST",
-      PAGES_PATH,
-      { action: "place", batchId, placements: part.placements, last: part.last },
-    );
-    for (const key of Object.keys(totals) as (keyof typeof totals)[]) {
+  mode: PlaceMode = "ask",
+  resume?: PlaceResume,
+): Promise<QueuePlaced> {
+  const totals: PlaceTotals = resume
+    ? { ...resume.totals }
+    : { added: 0, merged: 0, occupied: 0, displaced: 0, unchanged: 0, skipped: 0 };
+  const parts = placementParts(placements);
+  for (let at = resume?.part ?? 0; at < parts.length; at += 1) {
+    const part = parts[at];
+    let answer: { message: string; counts?: Partial<PlaceTotals> };
+    try {
+      answer = await call<{ message: string; counts?: Partial<PlaceTotals> }>(
+        "POST",
+        PAGES_PATH,
+        {
+          action: "place",
+          batchId,
+          placements: part.placements,
+          last: part.last,
+          mode,
+        },
+      );
+    } catch (caught) {
+      if (
+        caught instanceof ApiError &&
+        caught.status === 409 &&
+        caught.code === "occupied"
+      ) {
+        const pockets = Array.isArray(caught.body?.pockets)
+          ? (caught.body.pockets as unknown[]).filter(
+              (pocket): pocket is number => typeof pocket === "number",
+            )
+          : [];
+        return {
+          ok: false,
+          reason: "occupied",
+          message: caught.detail ?? pocketsTakenLine(pockets.map(binderPocketName)),
+          pockets,
+          resume: { part: at, totals: { ...totals } },
+        };
+      }
+      throw caught;
+    }
+    for (const key of Object.keys(totals) as (keyof PlaceTotals)[]) {
       totals[key] += answer.counts?.[key] ?? 0;
     }
   }
-  return { message: pagesPlacedLine(totals) };
+  return { ok: true, message: pagesPlacedLine(totals) };
+}
+
+/**
+ * A page read again from the player's own four corners, A1's first and
+ * then clockwise, each a share of the page photo: 200 and the page is
+ * queued to be read again (the check polls it as before); 400 bad
+ * corners, 409 busy reading, 404 gone. The corners are checked on the
+ * phone first, with the website's rule (./page-geometry).
+ */
+export const realignPage = (scanId: string, corners: Quad) =>
+  call<{ ok: true }>("POST", PAGES_PATH, { action: "realign", scanId, corners });
+
+/**
+ * One pocket of a read page read again on its own, more carefully: the
+ * new pocket, or why not (404 gone, 409 already being read, 429 too many,
+ * 503 the reader is down). A careful read of one card, so a minute.
+ */
+export async function rescanPagePocket(
+  scanId: string,
+  slot: number,
+): Promise<{ ok: true; pocket: PocketOutcome } | { ok: false; reason: string }> {
+  try {
+    return await call<{ ok: true; pocket: PocketOutcome }>(
+      "POST",
+      PAGES_PATH,
+      { action: "rescan-pocket", scanId, slot },
+      false,
+      60_000,
+    );
+  } catch (caught) {
+    if (caught instanceof ApiError && caught.status > 0) {
+      return { ok: false, reason: caught.code };
+    }
+    throw caught;
+  }
 }
 
 /** A queue thrown away: nothing placed, and its photos gone from the server. */
@@ -4002,7 +4207,10 @@ export const getFeed = (coords?: { latitude: number; longitude: number } | null)
     : "";
 
   /* `radius`: the Nearby tab's reach in miles; absent from an older server. */
-  return call<{ items: FeedEntry[]; radius?: number | null }>("GET", `/api/v1/feed${query}`);
+  return call<{ items: FeedEntry[]; radius?: number | null }>(
+    "GET",
+    `/api/v1/feed${query}`,
+  );
 };
 
 /** A player found by name search: enough for a row and a door. */
