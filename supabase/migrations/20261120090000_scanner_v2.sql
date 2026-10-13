@@ -227,7 +227,7 @@ begin
        select 1 from public.binder_cards c
         where c.binder_id = p_binder
           and c.position = (e ->> 'pocket')::integer
-          -- The same card already there is not a conflict: it counts up.
+          -- The same card already there is not a conflict: it stays as it is.
           and not (c.card_id = (e ->> 'card_id')::uuid
                    and coalesce(c.printing_id, '00000000-0000-0000-0000-000000000000'::uuid)
                      = coalesce((e ->> 'printing_id')::uuid, '00000000-0000-0000-0000-000000000000'::uuid))
