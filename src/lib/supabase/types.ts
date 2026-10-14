@@ -2016,7 +2016,8 @@ export type PageScanRow = {
   page_number: number;
   status: "queued" | "reading" | "ready" | "failed";
   attempts: number;
-  photos: { page: string; pockets: (string | null)[] };
+  /** framed: the app cut the photo at its on-screen guide (builds before scanner v2). */
+  photos: { page: string; pockets: (string | null)[]; framed?: boolean };
   result: unknown;
   error: string | null;
   created_at: string;

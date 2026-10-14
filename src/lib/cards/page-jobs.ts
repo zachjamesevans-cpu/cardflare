@@ -172,9 +172,11 @@ export async function sendPage(
     return { ok: false, reason: "daily-pages" };
 
   /* The photo, privately. The pockets are cut from it when it is read. */
-  const photos: { page: string; pockets: (string | null)[] } = {
+  const photos: { page: string; pockets: (string | null)[]; framed?: boolean } = {
     page: pathFor(who, input.batchId, input.pageNumber, "page.jpg"),
     pockets: Array.from({ length: POCKETS_PER_PAGE }, () => null),
+    /* Builds that cut pockets on the phone cut the page at their guide too. */
+    ...(input.pockets ? { framed: true } : {}),
   };
   const stored = await admin.storage
     .from(BUCKET)
@@ -290,6 +292,8 @@ export interface VisionView {
   }[];
   /** The player's own corners, once they have lined the page up. */
   corners: Quad | null;
+  /** The pockets came from the app's guide, not the cards: every one is checked. */
+  guided?: boolean;
 }
 
 const isQuad = (value: unknown): value is Quad =>
@@ -325,7 +329,9 @@ async function lookAt(
   settings: Awaited<ReturnType<typeof scannerSettings>>,
 ): Promise<{ vision: VisionView; outcome: ReadOutcome }> {
   const admin = getSupabaseAdmin();
-  const vision = await readPagePhoto(bytes, corners ?? undefined);
+  const vision = await readPagePhoto(bytes, corners ?? undefined, {
+    framed: Boolean(row.photos.framed),
+  });
   const view: VisionView = {
     method: vision.method,
     confidence: vision.confidence,
@@ -343,6 +349,7 @@ async function lookAt(
       glare: pocket.glare,
     })),
     corners,
+    guided: vision.guided,
   };
 
   /* Each pocket's straightened card, kept for the check and for a
@@ -359,7 +366,7 @@ async function lookAt(
   );
   await admin
     .from("page_scans")
-    .update({ vision: view, photos: { page: row.photos.page, pockets: pocketPaths } })
+    .update({ vision: view, photos: { ...row.photos, pockets: pocketPaths } })
     .eq("id", row.id);
 
   if (vision.needsAlignment) {
@@ -368,7 +375,7 @@ async function lookAt(
       outcome: { ok: false, reason: "unavailable", run: emptyRun(settings.mode) },
     };
   }
-  const outcome = await readCrops(
+  const read = await readCrops(
     vision.pockets.map((pocket) => ({
       slot: pocket.slot,
       bytes: pocket.jpeg,
@@ -379,6 +386,12 @@ async function lookAt(
     })),
     { games, settings },
   );
+  /* Pockets placed by the guide: the card may be known, where it sat is
+     the guide's guess, so none goes in unchecked. */
+  const outcome: ReadOutcome =
+    read.ok && vision.guided
+      ? { ...read, pockets: read.pockets.map(checkedByHand) }
+      : read;
   await recordRun(outcome.run, {
     playerId: row.player_id,
     pageScanId: row.id,
@@ -386,6 +399,17 @@ async function lookAt(
     detectMethod: vision.method,
   });
   return { vision: view, outcome };
+}
+
+/** A pocket that must be checked: a match held back as a question. */
+function checkedByHand(pocket: PocketOutcome): PocketOutcome {
+  if (pocket.state !== "found" || pocket.status !== "matched") return pocket;
+  return {
+    ...pocket,
+    status: "ambiguous",
+    sure: false,
+    reasons: [...(pocket.reasons ?? []), "pocket found from the guide, not the cards"],
+  };
 }
 
 /** Reads one page: finds the pockets, cuts and keeps them, names the cards. */

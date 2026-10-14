@@ -204,6 +204,62 @@ describe("photos of a page", { timeout: 60_000 }, () => {
   });
 });
 
+describe("photos the installed app cut at its guide", { timeout: 60_000 }, () => {
+  /* The page cut exactly at its edges, or a little inside them, as a page
+     that fills the app's outline is. */
+  async function cutAtGuide(inset: number, empty: number[] = []) {
+    const sharp = (await import("sharp")).default;
+    const photo = await photographed({ empty });
+    const dx = Math.round(PAGE_W * inset);
+    const dy = Math.round(PAGE_H * inset);
+    return new Uint8Array(
+      await sharp(photo)
+        .extract({
+          left: 120 + dx,
+          top: 120 + dy,
+          width: PAGE_W - 2 * dx,
+          height: PAGE_H - 2 * dy,
+        })
+        .resize({ height: 1568 })
+        .jpeg({ quality: 70 })
+        .toBuffer(),
+    );
+  }
+
+  it("finds cards the photo's edge cuts through", async () => {
+    const vision = await readPagePhoto(await cutAtGuide(0.04, [1, 5]), undefined, {
+      framed: true,
+    });
+    expect(vision.method).toBe("cards");
+    expect(vision.needsAlignment).toBe(false);
+    expect(vision.guided).toBe(false);
+    expect(vision.pockets.filter((p) => p.looksEmpty).map((p) => p.slot)).toEqual([
+      1, 5,
+    ]);
+    const shows = await Promise.all(
+      vision.pockets.map(async (p) => nearestSlot(await middleColour(p.jpeg))),
+    );
+    for (const slot of [0, 2, 3, 4, 6, 7, 8]) expect(shows[slot]).toBe(slot);
+  });
+
+  it("falls back to the guide, every pocket to be checked, rather than sending the page back", async () => {
+    const photo = await cutAtGuide(0.1);
+    const guided = await readPagePhoto(photo, undefined, { framed: true });
+    expect(guided).toMatchObject({
+      method: "frame",
+      needsAlignment: false,
+      guided: true,
+    });
+    /* The same photo from a build that can line a page up: it asks. */
+    expect((await readPagePhoto(photo)).needsAlignment).toBe(true);
+    const jobs = read("src/lib/cards/page-jobs.ts");
+    expect(jobs).toContain("...(input.pockets ? { framed: true } : {}),");
+    expect(jobs).toMatch(
+      /read\.ok && vision\.guided\s*\?\s*\{ \.\.\.read, pockets: read\.pockets\.map\(checkedByHand\) \}/,
+    );
+  });
+});
+
 describe("where it runs", () => {
   it("is loaded by the server only, from node_modules, and traced into the routes that read pages", () => {
     const config = read("next.config.ts");
