@@ -109,12 +109,20 @@ export interface PageVision {
   width: number;
   height: number;
   pockets: PocketCrop[];
+  /**
+   * The pockets come from the app's guide, not from the cards (a photo cut
+   * at the guide whose cards did not settle the grid): cut wider, and each
+   * is for the player to check.
+   */
+  guided: boolean;
 }
 
 /** The long side the detector works at. Crops come from the full photo. */
 const DETECT_EDGE = 1000;
 /** A crop's border beyond the card, as a share of the card's width. */
 const CROP_MARGIN = 0.04;
+/** Wider when the pockets come from the guide: a card a little off it stays whole. */
+const GUIDED_MARGIN = 0.12;
 /** The widest a card crop is cut. Wider than any model needs, and no wider. */
 const CROP_MAX_WIDTH = 900;
 
@@ -175,13 +183,34 @@ function matFrom(cv: Cv, rgba: Buffer, width: number, height: number): OpenCv.Ma
 function findCards(cv: Cv, small: OpenCv.Mat): (FoundCard & { sideways: boolean })[] {
   const grey = new cv.Mat();
   const blurred = new cv.Mat();
+  const padded = new cv.Mat();
   const edges = new cv.Mat();
   const contours = new cv.MatVector();
   const hierarchy = new cv.Mat();
+  /*
+   * A black border round the photo first, so a card the photo's edge cuts
+   * through still has a closed outline. Builds of the app before this
+   * scanner cut the photo exactly at the on-screen guide, and a page that
+   * fills the guide has its outer cards cut by it: without the border,
+   * those cards had no outline at all and the page was sent back as
+   * unreadable.
+   */
+  const pad = Math.round(Math.max(small.rows, small.cols) * 0.03);
+  const back = (p: Point): Point => ({ x: p.x - pad, y: p.y - pad });
   try {
     cv.cvtColor(small, grey, cv.COLOR_RGBA2GRAY);
     cv.GaussianBlur(grey, blurred, new cv.Size(5, 5), 0);
-    cv.Canny(blurred, edges, 40, 120);
+    cv.copyMakeBorder(
+      blurred,
+      padded,
+      pad,
+      pad,
+      pad,
+      pad,
+      cv.BORDER_CONSTANT,
+      new cv.Scalar(0, 0, 0, 0),
+    );
+    cv.Canny(padded, edges, 40, 120);
     const kernel = cv.Mat.ones(3, 3, cv.CV_8U);
     cv.dilate(edges, edges, kernel);
     kernel.delete();
@@ -233,8 +262,8 @@ function findCards(cv: Cv, small: OpenCv.Mat): (FoundCard & { sideways: boolean 
       if (tilt > 90) tilt -= 180;
       if (tilt <= -90) tilt += 180;
       found.push({
-        center: rect.center,
-        corners: four ?? corners,
+        center: back(rect.center),
+        corners: (four ?? corners).map(back),
         short,
         long,
         tilt,
@@ -266,6 +295,7 @@ function findCards(cv: Cv, small: OpenCv.Mat): (FoundCard & { sideways: boolean 
   } finally {
     grey.delete();
     blurred.delete();
+    padded.delete();
     edges.delete();
     contours.delete();
     hierarchy.delete();
@@ -446,6 +476,14 @@ async function jpeg(cv: Cv, mat: OpenCv.Mat): Promise<Uint8Array> {
 export async function readPagePhoto(
   bytes: Uint8Array,
   corners?: Quad,
+  /**
+   * The photo was already cut at the app's on-screen guide (builds before
+   * this scanner): its edges are where the player put the page's edges.
+   * Those builds have no screen for lining a page up, so when the cards
+   * do not settle the grid, the guide does, as the scanner before this
+   * one always assumed, rather than the page coming back unreadable.
+   */
+  options: { framed?: boolean } = {},
 ): Promise<PageVision> {
   const { cv } = await opencv();
   const { data, width, height } = await decode(bytes);
@@ -465,6 +503,7 @@ export async function readPagePhoto(
     let method: DetectMethod;
     let homography: Homography | null = null;
     let gaps: GridGaps = DEFAULT_GAPS;
+    let guided = false;
     let confidence: number;
     const seen = new Set<number>();
     /* Card outlines found, centres in the full photo's pixels. */
@@ -550,14 +589,33 @@ export async function readPagePhoto(
           confidence = 0.3;
         }
       }
+      if (options.framed && !sideways && confidence < ALIGN_BELOW) {
+        if (fit && fit.ambiguous && gridConfidence(fit) >= ALIGN_BELOW) {
+          /* The cards fit more than one way; the guide says which is centred. */
+          confidence = gridConfidence(fit);
+        } else {
+          method = "frame";
+          gaps = DEFAULT_GAPS;
+          homography = fitHomography(idealPage(gaps), [
+            { x: 0, y: 0 },
+            { x: width, y: 0 },
+            { x: width, y: height },
+            { x: 0, y: height },
+          ]);
+          centres = cards.map((card) => toFull(card.center));
+          confidence = ALIGN_BELOW;
+          guided = true;
+        }
+      }
     }
     if (!homography) throw new Error("No page map");
 
     const blurry = sharpness(cv, small) < 40;
     const share = (q: Quad): Quad =>
       q.map((p) => ({ x: p.x / width, y: p.y / height })) as Quad;
+    const margin = guided ? GUIDED_MARGIN : CROP_MARGIN;
     const pocketQuads = Array.from({ length: 9 }, (_, slot) =>
-      mapQuad(homography as Homography, idealCard(slot, gaps, CROP_MARGIN)),
+      mapQuad(homography as Homography, idealCard(slot, gaps, margin)),
     );
     /* Crop size from the pocket's own size in the photo, never upscaled. */
     const pocketWidth = Math.min(
@@ -569,7 +627,7 @@ export async function readPagePhoto(
       ),
     );
     const w = Math.max(240, pocketWidth);
-    const h = Math.round(w * ((CARD_RATIO + 2 * CROP_MARGIN) / (1 + 2 * CROP_MARGIN)));
+    const h = Math.round(w * ((CARD_RATIO + 2 * margin) / (1 + 2 * margin)));
 
     /*
      * Which pockets hold a found outline: the outline's centre inside the
@@ -608,6 +666,7 @@ export async function readPagePhoto(
       width,
       height,
       pockets,
+      guided,
     };
   } finally {
     full.delete();
