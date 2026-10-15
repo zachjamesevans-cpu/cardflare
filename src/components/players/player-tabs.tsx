@@ -119,7 +119,10 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                    themselves." The name stays for a screen reader. */
                 className={cn(
                   "flex h-12 items-center justify-center transition-colors active:scale-95",
-                  active ? "text-accent" : "text-text-muted hover:text-text-secondary",
+                  /* White, not grey, when not chosen: the founder, "can
+                     you make their outlines white instead of gray? easier
+                     to see". The app's dock is the same. */
+                  active ? "text-accent" : "text-text-primary hover:text-accent",
                 )}
               >
                 <span className="relative flex items-center justify-center">

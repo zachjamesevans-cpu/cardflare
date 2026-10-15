@@ -516,7 +516,9 @@ function Tabs() {
           elevation: 0,
         },
         tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
+        /* White, not grey: the founder, "can you make their outlines white
+           instead of gray? easier to see". The chosen tab stays green. */
+        tabBarInactiveTintColor: colors.textPrimary,
         tabBarIcon: ({ color, focused }) => {
           const pair = TAB_ICONS[route.name as keyof TabParams] ?? {
             idle: "add" as const,
