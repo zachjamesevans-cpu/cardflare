@@ -24,7 +24,7 @@ import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, playersLine, type GameSlug } from "../games";
 import { registerForPush } from "../push";
-import { LAUNCH_WORDMARK_WIDTH } from "../launch-view";
+import { LAUNCH_BACKGROUND, LAUNCH_WORDMARK_WIDTH } from "../launch-view";
 import { Intro } from "../intro";
 import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE } from "../intro-copy";
 import { NearbyLocationAsk } from "../nearby-location-ask";
@@ -144,7 +144,9 @@ export function WelcomeScreen({
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+    /* The launch screen's green-grey under every step, so the first run
+       is one surface from the launch screen to the intro. */
+    <View style={{ flex: 1, backgroundColor: LAUNCH_BACKGROUND }}>
       {step === "splash" && (
         <Splash
           onCreate={() => setStep("account")}
@@ -211,6 +213,11 @@ function Splash({
   return (
     <View
       /*
+       * The founder's dark green-grey now (2026-10-15): "make the
+       * background our trademark dark green/gray" - the launch screen's
+       * colour, so the hand-over from it does not change. It was pure
+       * black before, per the note below.
+       *
        * Pure black behind the lockup, and nothing else.
        *
        * There was a scatter of cards here — generated art, drawn by
@@ -222,7 +229,7 @@ function Splash({
        */
       style={{
         flex: 1,
-        backgroundColor: colors.canvas,
+        backgroundColor: LAUNCH_BACKGROUND,
         alignItems: "center",
         justifyContent: "center",
         padding: spacing(6),
