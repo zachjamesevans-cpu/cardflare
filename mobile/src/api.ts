@@ -9,6 +9,7 @@ import type { ArtFile } from "./cosmetic-film";
 import { demoReady, demoOn } from "./demo/demo-mode";
 import { demoAnswer, demoSaw } from "./demo/demo-server";
 import type { BinderCoverId } from "./binder-covers";
+import type { WantedSort } from "./nearby-shared";
 import { binderOfferFailure } from "./binder-offer-copy";
 import { offerFailureMessage } from "./offer-copy";
 import type { PushGroup, PushPrefs } from "./push-copy";
@@ -2309,15 +2310,60 @@ export interface NearbyMatch {
   miles: number;
   milesLabel: string;
   threadId: string | null;
+  /** When they asked; absent from an older server. */
+  when?: string;
+  /** Why they want it, in their words; absent from an older server. */
+  note?: string | null;
 }
 
-/** "I have this": opens the conversation on the ask with a first message. */
-export const openMatchThread = (ask: NearbyAsk, body: string) =>
+/** The Feed's "Wanted near you": the top cards, a few faces each. */
+export interface WantedSummary {
+  totalPeople: number;
+  totalCards: number;
+  groups: {
+    card: NearbyMatch["card"];
+    count: number;
+    nearestLabel: string;
+    faces: NearbyMatch["wanter"][];
+  }[];
+}
+
+/** One card of yours on "Wanted near you", and everybody near you who wants it. */
+export interface WantedGroup {
+  card: NearbyMatch["card"];
+  haveEntryId: string;
+  people: NearbyMatch[];
+  nearestLabel: string;
+}
+
+export interface WantedPage {
+  groups: WantedGroup[];
+  totalPeople: number;
+  totalCards: number;
+  nextOffset: number | null;
+}
+
+/** A page of "Wanted near you", read live. */
+export const getWantedNearYou = (sort: WantedSort, offset = 0) =>
+  call<WantedPage>(
+    "GET",
+    `/api/v1/nearby/wanted?sort=${sort}&offset=${offset}`,
+  );
+
+/**
+ * A reply from "Wanted near you": the holder's draft, sent now, on an
+ * ask that is still up. A 409 carries the words to show.
+ */
+export const answerNearby = (ask: NearbyAsk, body: string) =>
   call<{ ok: boolean; threadId?: string; message?: string }>(
     "POST",
-    "/api/v1/local/threads",
-    ask.kind === "want" ? { wantId: ask.id, body } : { flareId: ask.id, body },
+    "/api/v1/nearby/answer",
+    { kind: ask.kind, id: ask.id, body },
   );
+
+/** "Not trading this anymore": takes one card off Trade locally. */
+export const setLocalTrade = (entryId: string, localTrade: boolean) =>
+  call<{ ok: boolean }>("PUT", "/api/v1/haves", { entryId, localTrade });
 
 export interface PackSeries {
   id: string;
@@ -3313,6 +3359,8 @@ export interface FeedCard {
   remaining?: number;
   /** The hunt request this card answers, when the post is in a hunt. */
   huntRequestId?: string | null;
+  /** Why this card, in the poster's words (card-note.ts). */
+  cardNote?: string | null;
 }
 
 export type CardState = "open" | "offered" | "found";
@@ -3349,6 +3397,8 @@ export interface PostCard {
   quantity?: number;
   remaining?: number;
   huntRequestId?: string | null;
+  /** Why this card, in the poster's words. */
+  cardNote?: string | null;
 }
 
 /** The whole post, for its own screen. Mirrors the server's PostDetail. */
@@ -3468,7 +3518,13 @@ export const publishFlare = (input: {
   code?: string;
   intent: "want" | "showcase";
   caption?: string | null;
-  items: { cardId: string; printingId?: string | null; quantity: number }[];
+  items: {
+    cardId: string;
+    printingId?: string | null;
+    quantity: number;
+    /** Why this card (card-note.ts). */
+    cardNote?: string | null;
+  }[];
   hunt?: { id: string } | { name: string } | null;
   acceptsTrade?: boolean;
   acceptsCash?: boolean;
@@ -3723,6 +3779,14 @@ export const setFeedView = (view: string) =>
     action: "set-feed-view",
     view,
   });
+
+/** The note on one card of your own post: set, changed, or cleared with null. */
+export const setCardNote = (postId: string, flareId: string, note: string | null) =>
+  call<{ ok: true; note: string | null }>(
+    "POST",
+    `/api/v1/posts/${encodeURIComponent(postId)}`,
+    { action: "set-card-note", flareId, note },
+  );
 
 export const likePost = (postId: string, liked: boolean) =>
   call<{ ok: true }>("POST", `/api/v1/posts/${encodeURIComponent(postId)}`, {
@@ -4003,7 +4067,12 @@ export type FeedItem =
    * the holder's Feed carries it; the wanter hears nothing until the
    * holder answers.
    */
-  | { kind: "nearbyMatch"; matches: NearbyMatch[] }
+  | {
+      kind: "nearbyMatch";
+      matches: NearbyMatch[];
+      /** Absent from a server older than "Wanted near you". */
+      summary?: WantedSummary;
+    }
   /**
    * A store you follow, saying something: the founder's "OP-12
    * prerelease Saturday, 20 seats". Drawn as the post a Flare is, with

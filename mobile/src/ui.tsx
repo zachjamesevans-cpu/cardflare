@@ -40,6 +40,12 @@ import { OfferReviewSheet } from "./offer-review-sheet";
 import { RemoteImage } from "./remote-image";
 
 import { youHaveLabel } from "./held-label";
+import {
+  CARD_NOTE_LABEL,
+  CARD_NOTE_MAX,
+  CARD_NOTE_PLACEHOLDER,
+  CARD_NOTE_SUGGESTIONS,
+} from "./card-note";
 import { colors, radius, spacing } from "./theme";
 
 /** The handful of primitives every screen shares, in the site's skin. */
@@ -250,6 +256,13 @@ export interface ZoomCard {
    * on your own post and on a card that already traded.
    */
   have?: ZoomHave | null;
+  /**
+   * The card's Flare, when it is the viewer's own: the note under the
+   * card can be added, changed or cleared from the viewer ("Add a note"
+   * / "Edit note"). `save` resolves to the note as stored. Null on
+   * anybody else's card.
+   */
+  noteEdit?: { save: (note: string | null) => Promise<string | null> } | null;
   /**
    * FOUND or OFFERED, so the open card says what its thumbnail said.
    * The founder: "when viewing a card in full view, it should still
@@ -1530,7 +1543,16 @@ export function CardImage({
                     ) : null}
                     {/* The tile has no room for the note; the zoom is where
                       it gets read. */}
-                    {note ? <Text style={styles.zoomNote}>{note}</Text> : null}
+                    {shown?.noteEdit ? (
+                      <ZoomNoteEditor
+                        key={`note-${at}`}
+                        note={note ?? null}
+                        cardName={shown.name}
+                        save={shown.noteEdit.save}
+                      />
+                    ) : note ? (
+                      <Text style={styles.zoomNote}>{`\u201C${note}\u201D`}</Text>
+                    ) : null}
                     {/* Keyed on the shelf position so a half-typed note
                       does not ride along to the next card. */}
                     {offer ? (
@@ -1991,6 +2013,135 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+
+/**
+ * The note on one card: the common reasons as one-tap chips, and a line
+ * to type in, so most people say something without typing. Used by the
+ * composer's card editor and by "Edit note" under an open card. The
+ * website's CardNoteField is the same
+ * (src/components/flares/card-note-field.tsx).
+ */
+export function CardNoteField({
+  value,
+  onChange,
+  cardName,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  cardName: string;
+}) {
+  return (
+    <View style={{ gap: spacing(1.5) }}>
+      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{CARD_NOTE_LABEL}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
+        {CARD_NOTE_SUGGESTIONS.map((suggestion) => {
+          const on = value.trim() === suggestion;
+          return (
+            <Tap
+              key={suggestion}
+              accessibilityLabel={suggestion}
+              accessibilityState={{ selected: on }}
+              onPress={() => onChange(on ? "" : suggestion)}
+              style={{
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: on ? colors.accent : colors.border,
+                backgroundColor: on ? colors.accentTint : "transparent",
+                paddingHorizontal: spacing(2.5),
+                paddingVertical: spacing(1),
+              }}
+            >
+              <Text
+                style={{
+                  color: on ? colors.accent : colors.textSecondary,
+                  fontSize: 12,
+                  fontWeight: "600",
+                }}
+              >
+                {suggestion}
+              </Text>
+            </Tap>
+          );
+        })}
+      </View>
+      <Input
+        value={value}
+        onChangeText={onChange}
+        maxLength={CARD_NOTE_MAX}
+        placeholder={CARD_NOTE_PLACEHOLDER}
+        accessibilityLabel={`Note on ${cardName}`}
+      />
+    </View>
+  );
+}
+
+/**
+ * The note under your own card, with the way to change it: the reason
+ * other people read when they open it, and on Wanted near you.
+ */
+function ZoomNoteEditor({
+  note,
+  cardName,
+  save,
+}: {
+  note: string | null;
+  cardName: string;
+  save: (note: string | null) => Promise<string | null>;
+}) {
+  const [saved, setSaved] = useState(note);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note ?? "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!editing) {
+    return (
+      <View style={{ alignItems: "center", gap: spacing(1) }}>
+        {saved ? <Text style={styles.zoomNote}>{`\u201C${saved}\u201D`}</Text> : null}
+        <Tap
+          accessibilityLabel={saved ? "Edit note" : "Add a note"}
+          onPress={() => {
+            setText(saved ?? "");
+            setEditing(true);
+          }}
+        >
+          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+            {saved ? "Edit note" : "Add a note"}
+          </Text>
+        </Tap>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ alignSelf: "stretch", gap: spacing(2) }}>
+      <CardNoteField value={text} onChange={setText} cardName={cardName} />
+      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+        <View style={{ flex: 1 }}>
+          <Button
+            label="Save"
+            busy={busy}
+            onPress={() => {
+              setBusy(true);
+              setError(null);
+              save(text.trim() || null)
+                .then((stored) => {
+                  setSaved(stored);
+                  setEditing(false);
+                })
+                .catch(() => setError("Could not save that. Try again in a moment."))
+                .finally(() => setBusy(false));
+            }}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Button label="Cancel" variant="secondary" onPress={() => setEditing(false)} />
+        </View>
+      </View>
+      <ErrorLine message={error} />
+    </View>
+  );
+}
 
 /**
  * The card at full size in the viewer, saying what its thumbnail says:

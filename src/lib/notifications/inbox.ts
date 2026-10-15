@@ -1,5 +1,6 @@
 import "server-only";
 
+import { pruneStaleNearbyNotices } from "@/lib/nearby/live";
 import { avatarWearFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
@@ -68,6 +69,8 @@ export function actorNotBlockedFilter(hidden: Iterable<string>): string | null {
 
 export async function listInbox(playerId: string): Promise<InboxItem[]> {
   if (!isSupabaseConfigured()) return [];
+  /* A match whose Flare came down is not news any more (nearby/live.ts). */
+  await pruneStaleNearbyNotices(playerId);
 
   const notBlocked = actorNotBlockedFilter(await blockedSet(playerId));
   let query = getSupabaseAdmin()
@@ -148,6 +151,7 @@ async function actorsFor(ids: (string | null)[]): Promise<Map<string, InboxActor
 /** How many are still unread — the number the tab bar wears. */
 export async function unreadCount(playerId: string): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
+  await pruneStaleNearbyNotices(playerId);
 
   /* The same notices the list shows, so the badge can clear. */
   const notBlocked = actorNotBlockedFilter(await blockedSet(playerId));

@@ -1,3 +1,4 @@
+import { CardNoteField } from "../card-note-field";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -445,6 +446,7 @@ export function FlareComposer({
           cardId: item.cardId,
           printingId: item.printingId,
           quantity: item.quantity,
+          cardNote: item.cardNote?.trim() || null,
         })),
         hunt:
           draft.intent !== "want" || !draft.hunt
@@ -676,6 +678,8 @@ export function FlareComposer({
                               ? {
                                   ...item,
                                   quantity: Math.min(99, item.quantity + next.quantity),
+                                  /* Folding keeps a note: the twin's, or this one's. */
+                                  cardNote: item.cardNote || next.cardNote,
                                 }
                               : item,
                           ),
@@ -1034,6 +1038,14 @@ function CardEditor({
         />
       </View>
 
+      {/* Why this card: shown under it when it is opened, and on Wanted
+          near you, where it is how a holder picks who to message. */}
+      <CardNoteField
+        value={item.cardNote ?? ""}
+        onChange={(cardNote) => onChange({ ...item, cardNote })}
+        cardName={item.name}
+      />
+
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
         {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
         <SmallAction label="Remove" onPress={onRemove} danger />
@@ -1320,6 +1332,7 @@ export function FlareComposerPreview({
         : null,
       quantity: entry.quantity,
       remaining: entry.quantity,
+      cardNote: entry.cardNote?.trim() || null,
     })),
     total: draft.items.length,
     youCanAnswer: 0,

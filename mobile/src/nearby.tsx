@@ -2,19 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { Switch, Text, View } from "react-native";
 
-import {
-  getNearbySettings,
-  openMatchThread,
-  setNearbyMatching,
-  type NearbyMatch,
-  type NearbySettings,
-} from "./api";
-import { HeldRing } from "./held-ring";
+import { getNearbySettings, setNearbyMatching, type NearbySettings } from "./api";
 import { NearbyLocationAsk } from "./nearby-location-ask";
-import { haveThisMessage, messageOpener } from "./nearby-shared";
-import { PlayerAvatar } from "./player-avatar";
 import { colors, spacing } from "./theme";
-import { Button, CardImage, Card, ErrorLine } from "./ui";
+import { Card, ErrorLine } from "./ui";
 
 /**
  * Nearby matching inside the Flare composer: the website's NearbyCard,
@@ -91,124 +82,5 @@ export function NearbyCard() {
 
       <ErrorLine message={error} />
     </Card>
-  );
-}
-
-/**
- * One nearby match on the Feed: who, which card, how far, two buttons.
- * "I have this" opens the conversation with the first message already
- * sent; "Message" opens it empty. Both land on the thread.
- */
-export function MatchRow({
-  match,
-  onOpen,
-}: {
-  match: NearbyMatch;
-  /** Navigates to the thread once it exists. */
-  onOpen: (threadId: string) => void;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const open = async (message: boolean) => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await openMatchThread(
-        match.ask,
-        message ? messageOpener() : haveThisMessage(null),
-      );
-      if (!result.ok || !result.threadId) {
-        setError(result.message ?? "Could not start the conversation.");
-        return;
-      }
-      onOpen(result.threadId);
-    } catch {
-      setError("Could not start the conversation.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <View style={{ gap: spacing(2.5) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2.5) }}>
-        {/* Every nearby match is a card you hold: the ring, as the
-            website's tile draws it. */}
-        <View>
-          <CardImage
-            imageUrl={match.card.imageUrl}
-            width={44}
-            name={match.card.cardName}
-            cardNumber={match.card.cardNumber}
-            youHave={{ kind: match.card.match, count: 0 }}
-          />
-          <HeldRing match={match.card.match} />
-        </View>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "flex-start",
-            gap: spacing(2),
-          }}
-        >
-          <PlayerAvatar
-            displayName={match.wanter.displayName}
-            seed={match.wanter.playerId}
-            avatarUrl={match.wanter.avatarUrl}
-            frame={match.wanter.frame}
-            ring={match.wanter.ring}
-            aura={match.wanter.aura}
-            ringArt={match.wanter.ringArt}
-            auraArt={match.wanter.auraArt}
-            size={28}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 14, lineHeight: 19 }}>
-              <Text style={{ fontWeight: "700" }}>{match.wanter.displayName}</Text>
-              {" is looking for your "}
-              <Text style={{ fontWeight: "700" }}>{match.card.cardName}</Text>
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-              <Ionicons name="location-outline" size={12} color={colors.textMuted} />
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                {match.milesLabel}
-                {match.card.match === "other-printing"
-                  ? " · You have another printing"
-                  : ""}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {match.threadId ? (
-        <View style={{ alignSelf: "flex-start" }}>
-          <Button
-            label="Open the conversation"
-            variant="secondary"
-            onPress={() => onOpen(match.threadId ?? "")}
-          />
-        </View>
-      ) : (
-        <View style={{ flexDirection: "row", gap: spacing(2) }}>
-          <View style={{ flex: 1 }}>
-            <Button label="I have this" busy={busy} onPress={() => void open(false)} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Button
-              label={`Message ${match.wanter.displayName.split(" ")[0]}`}
-              variant="secondary"
-              disabled={busy}
-              onPress={() => void open(true)}
-            />
-          </View>
-        </View>
-      )}
-
-      <ErrorLine message={error} />
-    </View>
   );
 }

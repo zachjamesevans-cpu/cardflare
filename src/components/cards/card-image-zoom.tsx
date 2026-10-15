@@ -28,6 +28,8 @@ import {
   type OfferOutcome,
 } from "@/components/flares/offer-review";
 import { Button, buttonStyles } from "@/components/ui/button";
+import { CardNoteField } from "@/components/flares/card-note-field";
+import { setCardNoteAction } from "@/lib/feed/post-actions";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
@@ -97,6 +99,12 @@ export interface ZoomCard {
    * on one that is not up for trade.
    */
   ask?: ZoomAsk | null;
+  /**
+   * The card's Flare, when it is the viewer's own: the note under the
+   * card can be added, changed or cleared from here ("Add a note" /
+   * "Edit note"). Null on anybody else's card.
+   */
+  noteEdit?: { flareId: string } | null;
   /**
    * FOUND or OFFERED, so the open card says what its thumbnail said.
    * The founder: "when viewing a card in full view, it should still
@@ -870,6 +878,7 @@ export function CardImageZoom({
   const offer = shown ? (shown.offer ?? null) : ownOffer;
   const have = shown ? (shown.have ?? null) : ownHave;
   const ask = shown ? (shown.ask ?? null) : ownAsk;
+  const noteEdit = shown ? (shown.noteEdit ?? null) : null;
   const cardState = shown ? (shown.state ?? "open") : "open";
   /* Found: black and white; offered: dimmed - the thumbnail's own rule. */
   const stateArt =
@@ -1540,7 +1549,18 @@ export function CardImageZoom({
           {terms && <p className="text-sm font-medium text-accent">{terms}</p>}
           {/* The note travels with the card: the carousel tile has no
               room for it, so the zoom is where it gets read. */}
-          {note && <p className="text-sm text-text-secondary italic">{note}</p>}
+          {noteEdit ? (
+            <ZoomNoteEditor
+              key={`note-${at}`}
+              flareId={noteEdit.flareId}
+              note={note}
+              cardName={exactName}
+            />
+          ) : (
+            note && (
+              <p className="text-sm text-text-secondary italic">&ldquo;{note}&rdquo;</p>
+            )
+          )}
 
           {/* Last, under the picture, where the thumb is. The room's form
               is keyed on the shelf position so a half-typed note does not
@@ -1572,5 +1592,88 @@ export function CardImageZoom({
         />
       )}
     </>
+  );
+}
+
+/**
+ * The note under your own card, with the way to change it: the reason
+ * other people read when they open it, and on Wanted near you. Saved
+ * on its own; the Feed underneath is refreshed so the mark follows.
+ */
+function ZoomNoteEditor({
+  flareId,
+  note,
+  cardName,
+}: {
+  flareId: string;
+  note: string | null;
+  cardName: string;
+}) {
+  const router = useRouter();
+  const [saved, setSaved] = useState(note);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(note ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  /* A plain await, then the refresh as its own step: the zoom never
+     wraps a server call in a transition (round13-parity). */
+  const saveNote = async () => {
+    setPending(true);
+    setError(null);
+    const result = await setCardNoteAction(flareId, text.trim() || null);
+    setPending(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    setSaved(result.note);
+    setEditing(false);
+    router.refresh();
+  };
+
+  if (!editing) {
+    return (
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        {saved && (
+          <p className="text-sm text-text-secondary italic">&ldquo;{saved}&rdquo;</p>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setText(saved ?? "");
+            setEditing(true);
+          }}
+          className="cursor-pointer text-sm font-semibold text-accent"
+        >
+          {saved ? "Edit note" : "Add a note"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <CardNoteField value={text} onChange={setText} cardName={cardName} />
+      <div className="flex gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={() => void saveNote()}
+        >
+          {pending ? "Saving…" : "Save"}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditing(false)}
+        >
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="text-sm text-danger">{error}</p>}
+    </div>
   );
 }

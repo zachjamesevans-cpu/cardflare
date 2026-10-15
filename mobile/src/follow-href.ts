@@ -5,6 +5,7 @@ import type { StackParams } from "../App";
 import { rememberRoom } from "./api";
 import { API_BASE } from "./config";
 import { LOCAL_ENABLED } from "./local-enabled";
+import { WANTED_PATH } from "./nearby-shared";
 import { openRoom } from "./open-room";
 import { isSettingsSection } from "./settings-sections";
 
@@ -86,6 +87,12 @@ export async function followHref(
       navigation.navigate("FlarePost", { postId });
       return;
     }
+  }
+  /* A nearby match's notice: everybody who wants your cards, by card.
+     An app from before this screen opens the website's page instead. */
+  if (href === WANTED_PATH || href.startsWith(`${WANTED_PATH}?`)) {
+    navigation.navigate("WantedNearYou");
+    return;
   }
   if (href === "/feed" || href.startsWith("/feed?")) {
     navigation.navigate("Tabs", { screen: "Feed" });

@@ -138,12 +138,13 @@ function marksForTrade(id: string) {
   });
 }
 
-function wants(id: string) {
+function wants(id: string, note: string | null = null) {
   world.player_wants.push({
     id: `want-${id}`,
     player_id: id,
     card_id: CARD,
     printing_id: null,
+    note,
   });
 }
 
@@ -278,6 +279,47 @@ describe("somebody hunting a card, near somebody who has it", () => {
       Math.round(matches[1].miles),
     ]);
     for (const match of matches) expect(Number.isInteger(match.miles)).toBe(true);
+  });
+});
+
+describe("ten people who want the same card", () => {
+  it("each say why, so the holder can choose who to message", async () => {
+    player("holder", "10001");
+    marksForTrade("holder");
+    player("pc", "10011");
+    wants("pc", "For my PC");
+    player("deck", "10011");
+    wants("deck", "Building a Shanks deck");
+    player("quiet", "10011");
+    wants("quiet");
+
+    const matches = await nearbyMatchesForHolder("holder");
+    expect(
+      Object.fromEntries(matches.map((match) => [match.wanter.playerId, match.note])),
+    ).toEqual({ pc: "For my PC", deck: "Building a Shanks deck", quiet: null });
+  });
+
+  it("takes a Flare's note on the card when the ask is a Flare", async () => {
+    player("holder", "10001");
+    marksForTrade("holder");
+    player("poster", "10011");
+    world.flares.push({
+      id: "flare-poster",
+      player_id: "poster",
+      card_id: CARD,
+      printing_id: null,
+      quantity: 1,
+      found_quantity: 0,
+      event_id: null,
+      status: "open",
+      intent: "want",
+      created_at: "2026-10-12T00:00:00Z",
+      card_note: "Need it this week",
+    });
+
+    const [match] = await nearbyMatchesForHolder("holder");
+    expect(match.ask).toEqual({ kind: "flare", id: "flare-poster" });
+    expect(match.note).toBe("Need it this week");
   });
 });
 

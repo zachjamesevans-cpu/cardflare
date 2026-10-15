@@ -67,6 +67,8 @@ export interface PostCard {
   remaining: number;
   /** The hunt request this card answers, when the post is in a hunt. */
   huntRequestId: string | null;
+  /** Why this card, in the poster's words (flares.card_note). */
+  cardNote: string | null;
 }
 
 export interface PostDetail extends PostSocial {
@@ -132,6 +134,7 @@ interface PostContext {
     quantity: number;
     foundQuantity: number;
     huntRequestId: string | null;
+    cardNote: string | null;
   }[];
   /** Set when the id names a store's post; see storePostContext. */
   store: StorePostHeader | null;
@@ -197,7 +200,7 @@ async function postContext(postId: string): Promise<PostContext | null> {
   const { data, error } = await admin
     .from("flares")
     .select(
-      "id, card_id, status, event_id, player_session_id, player_id, deck_label, printing_id, quantity, found_quantity, hunt_request_id, note, intent",
+      "id, card_id, status, event_id, player_session_id, player_id, deck_label, printing_id, quantity, found_quantity, hunt_request_id, note, card_note, intent",
     )
     .eq("posted_batch", postId)
     .order("created_at")
@@ -253,6 +256,7 @@ async function postContext(postId: string): Promise<PostContext | null> {
       quantity: row.quantity,
       foundQuantity: row.found_quantity ?? 0,
       huntRequestId: row.hunt_request_id ?? null,
+      cardNote: row.card_note ?? null,
     })),
   };
 }
@@ -712,6 +716,7 @@ export async function postDetail(
       quantity: flare.quantity,
       remaining: remaining.get(flare.id) ?? 0,
       huntRequestId: flare.huntRequestId,
+      cardNote: flare.cardNote,
     });
   }
   /* Cards you hold first, the order the found ones are then moved

@@ -18,10 +18,9 @@ import { GoingButton } from "@/components/nights/going-button";
 import { PlanVisitButton } from "@/components/nights/plan-visit-sheet";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { VerifiedMark } from "@/components/stores/verified-mark";
-import { LOCAL_ENABLED } from "@/lib/local/enabled";
 import { FeedPerson, PersonLink } from "@/components/feed/feed-person";
 import { WantedMessageButton } from "@/components/feed/wanted-message-button";
-import { MatchRow } from "@/components/nearby/match-card";
+import { WantedSummaryCard } from "@/components/nearby/wanted-summary";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import type { FeedItem } from "@/lib/feed/repository";
@@ -301,46 +300,9 @@ export function Item({
   }
 
   if (item.kind === "nearbyMatch") {
-    /* The "I have this" door is Local's, and Local is off: see
-       src/lib/local/enabled.ts. The kind stays known so a server that
-       still sends it is not mistaken for one this build cannot read. */
-    if (!LOCAL_ENABLED) return null;
-
-    return (
-      <Card className="flex flex-col gap-3 border-accent/40 bg-gradient-to-b from-accent/5 to-transparent p-4">
-        <div className="flex flex-col gap-0.5">
-          <p className="text-[11px] font-bold tracking-[0.16em] text-accent uppercase">
-            You can answer a Flare
-          </p>
-          <p className="text-xs text-text-muted">
-            Only you see this. They hear from you when you answer.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {item.matches.slice(0, 5).map((match) => (
-            <MatchRow
-              key={`${match.ask.kind}-${match.ask.id}`}
-              match={match}
-              tile={
-                <FeedTile
-                  imageUrl={match.card.imageUrl}
-                  name={match.card.cardName}
-                  cardNumber={match.card.cardNumber}
-                  match={match.card.match}
-                />
-              }
-            />
-          ))}
-        </div>
-
-        {item.matches.length > 5 && (
-          <p className="text-xs text-text-muted">
-            +{item.matches.length - 5} more nearby
-          </p>
-        )}
-      </Card>
-    );
+    /* Shown whatever Local's switch says, as the app always has: a
+       reply opens in Messages, which stays on with Local off. */
+    return <WantedSummaryCard summary={item.summary} />;
   }
 
   if (item.kind === "wanted") {

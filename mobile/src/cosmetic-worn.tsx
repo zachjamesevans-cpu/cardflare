@@ -9,7 +9,7 @@ import {
   withTiming,
 } from "react-native-reanimated";
 
-import { auraClearance, auraLayer, ringLayer } from "./avatar-geometry";
+import { auraClearance, auraLayer, ringGlow, ringLayer } from "./avatar-geometry";
 import {
   AURA_ART,
   RING_ART,
@@ -204,10 +204,11 @@ function makeKit(S: Skia) {
 
     const { box, offset, radius, strokeWidth } = ringLayer(size);
 
-    /* Room for the glow to fall off in. A canvas cut to the band alone
-       clips the blur into a hard edge, which reads as a second, uglier
-       ring. */
-    const pad = art.glow ? Math.ceil(art.glow.radius) : 1;
+    /* Room for the glow to fall off in. A canvas cut short clips the
+       blur into a hard edge - a second, uglier ring, or a faint square
+       behind the face. ringGlow has the arithmetic. */
+    const glow = art.glow ? ringGlow(art.glow.radius) : null;
+    const pad = glow ? glow.reach : 1;
     const canvas = box + pad * 2;
     const centre = canvas / 2;
 
@@ -236,7 +237,7 @@ function makeKit(S: Skia) {
               strokeWidth={strokeWidth}
               color={art.glow.color}
             >
-              <BlurMask blur={art.glow.radius} style="solid" />
+              <BlurMask blur={glow?.sigma ?? 0} style="solid" />
             </Circle>
           ) : null}
           <Group origin={vec(centre, centre)} transform={spin}>

@@ -1,6 +1,6 @@
 import { ScrollView, Text, View } from "react-native";
 
-import type { FeedCard } from "./api";
+import { setCardNote, type FeedCard } from "./api";
 import { availableLabel, GONE_LABEL, printingLabel } from "./flare-copy";
 import { seeAllLabel, wantsLine } from "./offer-copy";
 import { HELD_RING_WIDTH, HeldRing } from "./held-ring";
@@ -80,6 +80,18 @@ export function shelfFor(cards: FeedCard[], post: PostRef | undefined): ZoomCard
     have: haveWithCap(card, post),
     /* FOUND in the full view too, band and all. */
     state: card.state ?? "open",
+    /* The poster's reason, read when the card is opened; on your own
+       post, the way to add or change it. */
+    note: card.cardNote ?? null,
+    noteEdit:
+      post?.yours && card.flareId
+        ? {
+            save: (note: string | null) =>
+              setCardNote(post.postId, card.flareId as string, note).then(
+                (result) => result.note,
+              ),
+          }
+        : null,
   }));
 }
 

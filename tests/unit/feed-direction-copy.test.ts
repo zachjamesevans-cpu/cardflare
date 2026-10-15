@@ -163,12 +163,14 @@ describe("the Feed page", () => {
     );
   });
 
-  it("keeps the nearby I-have-this row behind Local's switch", () => {
+  it("shows Wanted near you whatever Local's switch says, as the app does", () => {
+    /* A reply opens in Messages, which stays on with Local off; the old
+       gate hid the card on the website while the app showed it. */
     const block = items.slice(items.indexOf('item.kind === "nearbyMatch"'));
-    expect(block.slice(0, block.indexOf("<MatchRow"))).toContain(
-      "if (!LOCAL_ENABLED) return null;",
+    expect(block.slice(0, 400)).toContain(
+      "<WantedSummaryCard summary={item.summary} />",
     );
-    expect(items).toContain('import { LOCAL_ENABLED } from "@/lib/local/enabled"');
+    expect(block.slice(0, 400)).not.toContain("LOCAL_ENABLED");
   });
 
   it("offers a guest the account first, and a way in second", () => {

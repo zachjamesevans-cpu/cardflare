@@ -1,3 +1,5 @@
+import { CARD_NOTE_MAX } from "@/lib/flares/card-note";
+import { setCardNote } from "@/lib/flares/card-note-server";
 import { z } from "zod";
 
 import { restoreFlares, withdrawFlares } from "@/lib/flares/withdraw";
@@ -53,6 +55,15 @@ const actionSchema = z.discriminatedUnion("action", [
       .string()
       .max(POST_COMMENT_MAX * 2)
       .optional(),
+  }),
+  /* Your own post: the note on one of its cards, set or cleared. */
+  z.object({
+    action: z.literal("set-card-note"),
+    flareId: z.guid(),
+    note: z
+      .string()
+      .max(CARD_NOTE_MAX * 2)
+      .nullable(),
   }),
   /* "I have these": several cards, each with how many, in one offer. */
   z.object({
@@ -110,6 +121,19 @@ export async function POST(
     return done
       ? Response.json({ ok: true })
       : Response.json({ error: "unavailable" }, { status: 503 });
+  }
+
+  if (body.action === "set-card-note") {
+    const limited = tooMany(`card-note:${player.playerId}`, 60, 60 * MINUTE);
+    if (limited) return limited;
+
+    const result = await setCardNote(player.playerId, body.flareId, body.note);
+    return result.ok
+      ? Response.json({ ok: true, note: result.note })
+      : Response.json(
+          { error: result.reason },
+          { status: result.reason === "not-yours" ? 403 : 503 },
+        );
   }
 
   if (body.action === "take-down") {

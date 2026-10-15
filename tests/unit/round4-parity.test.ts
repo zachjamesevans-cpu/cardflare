@@ -81,11 +81,12 @@ describe("Wanted from you ends in Message, not Go", () => {
     expect(web.feedItems).toContain("<WantedMessageButton");
     expect(web.feedItems).toContain("They already asked. Tell them you have it.");
     expect(web.feedItems).not.toContain("Bring it and it");
-    expect(web.wantedButton).toContain("`I have ${cardName}.`");
+    /* A message icon that opens a new conversation, the first line
+       written, as on "Wanted near you" (wanted-near-you.test.ts). */
     expect(web.wantedButton).toContain(
-      "openThreadAction(flareId, `I have ${cardName}.`)",
+      'newMessageHref({ kind: "flare", id: flareId })',
     );
-    expect(web.wantedButton).toMatch(/\n\s+Message\n/);
+    expect(web.wantedButton).toContain("<MessageCircle");
     /* Accounts only: the Guest chip has nothing to say on this row. */
     const wantedRow = web.feedItems.slice(
       web.feedItems.indexOf('item.kind === "wanted"'),
@@ -98,21 +99,24 @@ describe("Wanted from you ends in Message, not Go", () => {
   it("in the app", () => {
     expect(app.home).toContain("They already asked. Tell them you have it.");
     expect(app.home).not.toContain("Bring it and it");
-    expect(app.home).toContain("`I have ${");
-    expect(app.home).toContain("openLocalThread(");
+    /* "I have <card>. Are you looking to trade for it?", written into
+       a new conversation (screens/new-message.tsx). */
+    expect(app.home).toContain("draft: answerDraft(entry.card.cardName)");
     const wantedItem = app.home.slice(
       app.home.indexOf('item.kind === "wanted"'),
       app.home.indexOf('item.kind === "upcoming"'),
     );
     expect(wantedItem).toContain("<WantedRow");
     expect(wantedItem).not.toContain("GuestChip");
-    /* Each row's button is Message. (This once matched the Feed posts'
-       onMessage props, which sat in the same stretch of the file.) */
+    /* Each row ends in the message icon, which opens a new
+       conversation: the same as "Wanted near you". */
     const wantedRow = app.home.slice(
       app.home.indexOf("function WantedRow("),
       app.home.indexOf("export function HomeScreen("),
     );
-    expect(wantedRow).toMatch(/\n\s+Message\n/);
+    expect(wantedRow).toContain("<MessageIcon");
+    expect(wantedRow).toContain("onCompose()");
+    expect(app.home).toContain('navigation.navigate("NewMessage"');
   });
 });
 

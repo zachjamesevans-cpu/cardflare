@@ -1,3 +1,5 @@
+import { RING_ART } from "./cosmetic-art-data";
+
 /**
  * Where a worn cosmetic is drawn, relative to the picture it is worn on.
  *
@@ -118,6 +120,43 @@ export function filmLayer(size: number): Layer {
   const box = size * FILM_SCALE;
 
   return { box, offset: (box - size) / 2 };
+}
+
+/**
+ * A ring's glow, the website's `filter: drop-shadow(0 0 Rpx ...)`.
+ *
+ * CSS's blur radius is twice the Gaussian's sigma, and Skia's BlurMask
+ * takes the sigma, so the glow is drawn at R/2; the fall-off is gone by
+ * about three sigmas, R * 1.5, and that is the room it needs. It was
+ * drawn at R with only R of room: twice as wide as the website's, and
+ * cut off square at the canvas's edge - a faint box behind every gold
+ * and water ring, seen on "Wanted near you".
+ */
+export function ringGlow(radius: number): { sigma: number; reach: number } {
+  return { sigma: radius / 2, reach: Math.ceil(radius * 1.5) };
+}
+
+/** The widest glow any catalogue ring wears. */
+const WIDEST_RING_GLOW = Math.max(
+  0,
+  ...Object.values(RING_ART).map((art) => art.glow?.radius ?? 0),
+);
+
+/**
+ * How far past its own edge a worn avatar can draw: the widest of the
+ * ring with its glow, the aura and a dropped-in film. A scrolling list
+ * clips at its bounds, so a list of avatars needs at least this much
+ * room on every side or the rings are cut off - the founder, of "Wanted
+ * near you": "the profile pics on here are kinda cut off."
+ */
+export function avatarOverhang(size: number): number {
+  return Math.ceil(
+    Math.max(
+      RING_INSET + ringGlow(WIDEST_RING_GLOW).reach,
+      auraLayer(size).offset,
+      filmLayer(size).offset,
+    ),
+  );
 }
 
 /**

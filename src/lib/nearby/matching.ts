@@ -11,7 +11,13 @@ import { DEFAULT_LOCAL_RADIUS, isLocalRadius } from "@/lib/local/shared";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { CosmeticArtFile } from "@/lib/players/art-files";
 
-import { milesLabel, roundedMiles } from "./shared";
+import {
+  distinctPeople,
+  groupByCard,
+  milesLabel,
+  roundedMiles,
+  type WantedSort,
+} from "./shared";
 import { wornFrame } from "@/lib/players/worn-frame";
 
 /**
@@ -77,6 +83,33 @@ export interface NearbyMatch {
   milesLabel: string;
   /** The thread already open between these two about this want, if any. */
   threadId: string | null;
+  /** When the wanter asked, for "Newest". */
+  when: string;
+  /**
+   * Why they want it, in their words: the Flare's card note, or the
+   * saved want's note. What makes ten people wanting one card ten
+   * different conversations - the founder: "how do you choose who to
+   * message? it should have their note under it."
+   */
+  note: string | null;
+}
+
+/**
+ * Reads an `.in()` list in slices. One request with a thousand ids is a
+ * URL long enough for a proxy to refuse, and a big city's worth of
+ * wanters or a big binder's worth of cards gets there.
+ */
+async function inSlices<T>(
+  ids: string[],
+  read: (slice: string[]) => PromiseLike<{ data: T[] | null }>,
+  size = 150,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let at = 0; at < ids.length; at += size) {
+    const { data } = await read(ids.slice(at, at + size));
+    out.push(...(data ?? []));
+  }
+  return out;
 }
 
 interface Anchor {
@@ -148,24 +181,34 @@ export async function nearbyMatchesForHolder(
   const held = heldByCard(cards);
   const cardIds = [...held.keys()];
 
-  const [{ data: wants }, { data: area }] = await Promise.all([
-    admin
-      .from("player_wants")
-      .select("id, player_id, card_id, printing_id")
-      .in("card_id", cardIds)
-      .neq("player_id", holderId)
-      .order("created_at", { ascending: false })
-      .limit(500),
-    admin
-      .from("flares")
-      .select("id, player_id, card_id, printing_id, quantity, found_quantity")
-      .in("card_id", cardIds)
-      .is("event_id", null)
-      .eq("status", "open")
-      .eq("intent", "want")
-      .neq("player_id", holderId)
-      .order("created_at", { ascending: false })
-      .limit(500),
+  /* Every ask for these cards, read in slices of cards. The cap is per
+     slice and generous: it used to be 500 nationwide, taken before any
+     distance was measured, so a busy card's nearby askers could be
+     crowded out by far-away ones. */
+  const [wants, area] = await Promise.all([
+    inSlices(cardIds, (slice) =>
+      admin
+        .from("player_wants")
+        .select("id, player_id, card_id, printing_id, created_at, note")
+        .in("card_id", slice)
+        .neq("player_id", holderId)
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ),
+    inSlices(cardIds, (slice) =>
+      admin
+        .from("flares")
+        .select(
+          "id, player_id, card_id, printing_id, quantity, found_quantity, created_at, card_note",
+        )
+        .in("card_id", slice)
+        .is("event_id", null)
+        .eq("status", "open")
+        .eq("intent", "want")
+        .neq("player_id", holderId)
+        .order("created_at", { ascending: false })
+        .limit(5000),
+    ),
   ]);
 
   /* One ask per person per card: the saved want wins when both exist,
@@ -176,12 +219,14 @@ export async function nearbyMatchesForHolder(
     player_id: string;
     card_id: string;
     printing_id: string | null;
+    created_at: string;
+    note: string | null;
   }[] = [];
-  for (const row of wants ?? []) {
+  for (const row of wants) {
     seen.add(`${row.player_id}:${row.card_id}`);
-    rows.push({ ask: { kind: "want", id: row.id }, ...row });
+    rows.push({ ask: { kind: "want", id: row.id }, ...row, note: row.note ?? null });
   }
-  for (const row of area ?? []) {
+  for (const row of area) {
     if (!row.player_id || seen.has(`${row.player_id}:${row.card_id}`)) continue;
     /* Found already: nobody needs telling they could have it. */
     if ((row.found_quantity ?? 0) >= row.quantity) continue;
@@ -191,6 +236,8 @@ export async function nearbyMatchesForHolder(
       player_id: row.player_id,
       card_id: row.card_id,
       printing_id: row.printing_id,
+      created_at: row.created_at,
+      note: row.card_note ?? null,
     });
   }
   if (rows.length === 0) return [];
@@ -207,15 +254,17 @@ export async function nearbyMatchesForHolder(
   );
   if (wanterIds.length === 0) return [];
 
-  const { data: wanters } = await admin
-    .from("players")
-    .select(
-      "id, display_name, postal_code, nearby_matching, avatar_url, avatar_animated, tier, equipped_avatar_frame",
-    )
-    .in("id", wanterIds)
-    .eq("nearby_matching", true);
+  const wanters = await inSlices(wanterIds, (slice) =>
+    admin
+      .from("players")
+      .select(
+        "id, display_name, postal_code, nearby_matching, avatar_url, avatar_animated, tier, equipped_avatar_frame",
+      )
+      .in("id", slice)
+      .eq("nearby_matching", true),
+  );
 
-  const near = (wanters ?? []).flatMap((row) => {
+  const near = wanters.flatMap((row) => {
     const point = pointForPostalCode(row.postal_code);
     if (!point) return [];
     const miles = milesApart(holder.point, point);
@@ -235,38 +284,56 @@ export async function nearbyMatchesForHolder(
   const flareIds = usable.flatMap((row) =>
     row.ask.kind === "flare" ? [row.ask.id] : [],
   );
-  const [{ data: cardRows }, { data: printings }, { data: threads }, wear] =
-    await Promise.all([
+  /* A thread is looked up by either side of the ask; both lists sliced. */
+  const NONE = "00000000-0000-0000-0000-000000000000";
+  const [cardRows, printings, wantThreads, flareThreads, wearMaps] = await Promise.all([
+    inSlices(usableCardIds, (slice) =>
       admin
         .from("cards")
         .select("id, exact_name, canonical_card_number")
-        .in("id", usableCardIds),
+        .in("id", slice),
+    ),
+    inSlices(usableCardIds, (slice) =>
       admin
         .from("card_printings")
         .select("id, card_id, image_url")
-        .in("card_id", usableCardIds)
+        .in("card_id", slice)
         .not("image_url", "is", null),
+    ),
+    inSlices(wantIds.length ? wantIds : [NONE], (slice) =>
       admin
         .from("flare_threads")
         .select("id, want_id, flare_id")
         .eq("responder_player_id", holderId)
-        .or(
-          `want_id.in.(${[...wantIds, "00000000-0000-0000-0000-000000000000"].join(",")}),flare_id.in.(${[...flareIds, "00000000-0000-0000-0000-000000000000"].join(",")})`,
-        ),
-      avatarWearFor([...nearById.keys()]),
-    ]);
+        .in("want_id", slice),
+    ),
+    inSlices(flareIds.length ? flareIds : [NONE], (slice) =>
+      admin
+        .from("flare_threads")
+        .select("id, want_id, flare_id")
+        .eq("responder_player_id", holderId)
+        .in("flare_id", slice),
+    ),
+    Promise.all(
+      Array.from({ length: Math.ceil(nearById.size / 150) }, (_, page) =>
+        avatarWearFor([...nearById.keys()].slice(page * 150, page * 150 + 150)),
+      ),
+    ),
+  ]);
+  const wear = new Map(wearMaps.flatMap((map) => [...map.entries()]));
+  const threads = [...wantThreads, ...flareThreads];
 
-  const cardById = new Map((cardRows ?? []).map((row) => [row.id, row]));
+  const cardById = new Map(cardRows.map((row) => [row.id, row]));
   const artByCard = new Map<string, string>();
   const artByPrinting = new Map<string, string>();
-  for (const row of printings ?? []) {
+  for (const row of printings) {
     if (row.image_url) {
       artByPrinting.set(row.id, row.image_url);
       if (!artByCard.has(row.card_id)) artByCard.set(row.card_id, row.image_url);
     }
   }
   const threadByAsk = new Map<string, string>();
-  for (const row of threads ?? []) {
+  for (const row of threads) {
     if (row.want_id) threadByAsk.set(`want:${row.want_id}`, row.id);
     if (row.flare_id) threadByAsk.set(`flare:${row.flare_id}`, row.id);
   }
@@ -306,12 +373,93 @@ export async function nearbyMatchesForHolder(
       miles: roundedMiles(wanter.miles),
       milesLabel: milesLabel(wanter.miles),
       threadId: threadByAsk.get(`${want.ask.kind}:${want.ask.id}`) ?? null,
+      when: want.created_at,
+      note: want.note,
     });
   }
 
-  /* Nearest first; the same wanter's cards stay together by luck of
-     the sort, which is fine for a list this short. */
-  return matches.sort((a, b) => a.miles - b.miles).slice(0, 50);
+  /* Nearest first. Every one of them: there is no cap here any more,
+     because "Wanted near you" groups them by card and pages the cards,
+     and a cap is how the hundred-and-first person went unreachable. */
+  return matches.sort((a, b) => a.miles - b.miles);
+}
+
+/** One card of yours and everybody near you who wants it. */
+export interface WantedGroup {
+  card: NearbyMatch["card"];
+  haveEntryId: string;
+  people: NearbyMatch[];
+  nearestLabel: string;
+}
+
+/** The Feed's card: the top few cards, with a few faces each. */
+export interface WantedSummary {
+  totalPeople: number;
+  totalCards: number;
+  groups: {
+    card: NearbyMatch["card"];
+    count: number;
+    nearestLabel: string;
+    faces: NearbyMatch["wanter"][];
+  }[];
+}
+
+function asGroup(group: { people: NearbyMatch[]; nearest: number }): WantedGroup {
+  const first = group.people[0];
+  return {
+    card: first.card,
+    haveEntryId: first.haveEntryId,
+    people: group.people,
+    nearestLabel: milesLabel(group.nearest),
+  };
+}
+
+/** What the Feed shows: the three most wanted cards, three faces each. */
+export function wantedSummaryOf(matches: NearbyMatch[]): WantedSummary {
+  const groups = groupByCard(matches, "most");
+  return {
+    totalPeople: distinctPeople(matches),
+    totalCards: groups.length,
+    groups: groups.slice(0, 3).map((group) => ({
+      card: group.people[0].card,
+      count: group.people.length,
+      nearestLabel: milesLabel(group.nearest),
+      faces: group.people.slice(0, 3).map((person) => person.wanter),
+    })),
+  };
+}
+
+/** How many cards one page of "Wanted near you" carries. */
+export const WANTED_PAGE = 12;
+
+/**
+ * The "Wanted near you" screen: a page of cards, each with everybody
+ * near the holder who wants it. Computed at read time, so a Flare taken
+ * down or a want removed is simply not there on the next read - the
+ * founder: "it needs to be 'live'."
+ */
+export async function wantedNearYou(
+  holderId: string,
+  sort: WantedSort,
+  offset = 0,
+  /** Cards per page; the website asks for several pages at once. */
+  limit = WANTED_PAGE,
+): Promise<{
+  groups: WantedGroup[];
+  totalPeople: number;
+  totalCards: number;
+  nextOffset: number | null;
+}> {
+  const matches = await nearbyMatchesForHolder(holderId);
+  const groups = groupByCard(matches, sort);
+  const page = groups.slice(offset, offset + limit).map(asGroup);
+  const next = offset + limit;
+  return {
+    groups: page,
+    totalPeople: distinctPeople(matches),
+    totalCards: groups.length,
+    nextOffset: next < groups.length ? next : null,
+  };
 }
 
 /** Tells the holder about every match on their list that has not been told yet. */

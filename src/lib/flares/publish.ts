@@ -1,3 +1,4 @@
+import { tidyCardNote } from "./card-note";
 import "server-only";
 
 import { randomUUID } from "node:crypto";
@@ -40,6 +41,8 @@ export interface PublishItem {
   cardId: string;
   printingId: string | null;
   quantity: number;
+  /** Why this card, in the poster's words (card-note.ts). Optional. */
+  cardNote?: string | null;
 }
 
 export interface PublishInput {
@@ -223,7 +226,8 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
     const postedIds = items
       .filter((_, index) => outcomes[index] === "posted")
       .map((item) => item.cardId);
-    if (postedIds.length > 0 && (requestIds.length > 0 || caption)) {
+    const anyCardNote = items.some((item) => tidyCardNote(item.cardNote));
+    if (postedIds.length > 0 && (requestIds.length > 0 || caption || anyCardNote)) {
       const { data } = await admin
         .from("flares")
         .select("id, card_id, printing_id")
@@ -241,7 +245,8 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
           if (outcomes[index] !== "posted") return null;
           const requestId = requestIds[index] ?? null;
           const note = index === 0 ? caption : null;
-          if (!requestId && !note) return null;
+          const cardNote = tidyCardNote(item.cardNote);
+          if (!requestId && !note && !cardNote) return null;
           const row = rows.find(
             (candidate) =>
               candidate.card_id === item.cardId &&
@@ -250,7 +255,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
           if (!row) return null;
           return admin
             .from("flares")
-            .update({ hunt_request_id: requestId, note })
+            .update({ hunt_request_id: requestId, note, card_note: cardNote })
             .eq("id", row.id);
         }),
       );
@@ -266,6 +271,7 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
         /* The caption rides the first card too, for readers that still
            take a post's words off its first flare. */
         note: index === 0 ? caption : null,
+        cardNote: tidyCardNote(item.cardNote),
         intent: input.intent,
         acceptsTrade: accepts.acceptsTrade,
         acceptsCash: accepts.acceptsCash,
@@ -313,7 +319,10 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
           cardId: item.cardId,
           printingId: item.printingId,
           quantity: item.quantity,
-          note: null,
+          /* The card's note becomes the saved want's, so it follows to
+             the next store and onto Wanted near you. No note leaves the
+             want's own alone: posting used to wipe it to null. */
+          ...(tidyCardNote(item.cardNote) ? { note: tidyCardNote(item.cardNote) } : {}),
           deckLabel: huntName,
         }),
       ),
