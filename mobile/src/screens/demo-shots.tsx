@@ -120,6 +120,11 @@ export const SHOTS: Shot[] = [
     tip: "A new player's whole first run: welcome, account, games, where, the intro, then the + pointed at. Type anything; nothing is created.",
     go: (nav) => nav.navigate("SignUpPreview"),
   },
+  {
+    title: "17. The intro",
+    tip: "Just the three cards and their scenes, in your account's games. Next walks them; Look around first ends on the spotlit +.",
+    go: (nav) => nav.navigate("Intro"),
+  },
 ];
 
 export function DemoShotsScreen() {
