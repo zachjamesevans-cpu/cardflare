@@ -56,8 +56,8 @@ export const SHOTS: Shot[] = [
     go: (nav) => nav.navigate("Hunt", { huntId: huntId("maya-crew") }),
   },
   {
-    title: "6. Adding to a hunt",
-    tip: "Pick cards, choose one of your hunts and post. It lands at the top of the Feed.",
+    title: "6. Posting a Flare",
+    tip: "Just the cards you are looking for. To add to a hunt, open the hunt and tap +.",
     go: (nav) => nav.navigate("Tabs", { screen: "Flare" }),
   },
   {

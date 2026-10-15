@@ -95,10 +95,13 @@ export function HubScreen() {
    */
   const route = useRoute<RouteProp<TabParams, "Flare">>();
   const hunt = route.params?.hunt;
-  const [openInto, setOpenInto] = useState<string | undefined>(undefined);
+  /* With a count, so a second "+" on the same hunt opens into it again. */
+  const [openInto, setOpenInto] = useState<{ id: string; n: number } | undefined>(
+    undefined,
+  );
   useEffect(() => {
     if (hunt === undefined) return;
-    setOpenInto(hunt);
+    setOpenInto((last) => ({ id: hunt, n: (last?.n ?? 0) + 1 }));
     navigation.setParams({ hunt: undefined } as never);
   }, [hunt, navigation]);
   /* "Post a Flare for it" on a card page: the card, read once and
@@ -317,7 +320,8 @@ export function HubScreen() {
     <FlareComposer
       target={target}
       resolveTarget={resolveTarget}
-      initialHuntId={openInto}
+      initialHuntId={openInto?.id}
+      huntSignal={openInto?.n}
       initialCard={openWith}
       resetSignal={resetSignal}
       onPosted={(rows) => {

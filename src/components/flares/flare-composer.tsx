@@ -2,10 +2,9 @@
 
 import { Sheet } from "@/components/ui/sheet";
 import {
-  HuntSheet,
+  AddingToHunt,
   PickerRow,
   PrintingSheet,
-  huntRowValue,
 } from "@/components/flares/composer-sheets";
 import { CardNoteField } from "@/components/flares/card-note-field";
 import {
@@ -16,15 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import {
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Crosshair,
-  Plus,
-  Star,
-  Trash2,
-} from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, Star, Trash2 } from "lucide-react";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -164,8 +155,6 @@ function ComposerBody({
   });
   const [step, setStep] = useState<Step>("compose");
   const [editing, setEditing] = useState<string | null>(null);
-  /* The hunt sheet, open or not (composer-sheets.tsx). */
-  const [choosingHunt, setChoosingHunt] = useState(false);
   /** The line key being dragged, while a tile is in the air. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -215,36 +204,18 @@ function ComposerBody({
     if (editing === key) setEditing(null);
   };
 
+  /* Only ever the hunt the composer was opened from (AddingToHunt). */
   const choice = draft.hunt;
   const huntName =
-    draft.intent !== "want"
-      ? null
-      : choice.kind === "existing"
-        ? (hunts.find((hunt) => hunt.id === choice.id)?.name ?? null)
-        : choice.kind === "new"
-          ? choice.name.trim() || null
-          : null;
-  /* A new hunt with no name: Preview and Post wait for one, rather than
-     posting without the hunt the player thought they had started. */
-  const huntUnnamed =
-    draft.intent === "want" && choice.kind === "new" && !choice.name.trim();
+    choice.kind === "existing"
+      ? (hunts.find((hunt) => hunt.id === choice.id)?.name ?? null)
+      : null;
 
   const post = () => {
     if (pending || draft.cards.length === 0) return;
-    if (huntUnnamed) {
-      setError("Name your hunt.");
-      return;
-    }
     setError(null);
     start(async () => {
-      const hunt =
-        draft.intent === "want"
-          ? draft.hunt.kind === "existing"
-            ? { id: draft.hunt.id }
-            : draft.hunt.kind === "new" && draft.hunt.name.trim()
-              ? { name: draft.hunt.name.trim() }
-              : null
-          : null;
+      const hunt = draft.hunt.kind === "existing" ? { id: draft.hunt.id } : null;
       const result = await publishPostAction({
         intent: draft.intent,
         caption: draft.caption.trim() || null,
@@ -382,25 +353,13 @@ function ComposerBody({
         </p>
       </div>
 
-      {/* THE HUNT, with what the post is for, not at the foot of the
-          form. The founder: "the 'add to a hunt' thing at bottom is very
-          weirdly placed." Wants only. */}
-      {draft.intent === "want" && (
-        <>
-          <PickerRow
-            label="Hunt"
-            icon={Crosshair}
-            value={huntRowValue(draft.hunt, hunts)}
-            onClick={() => setChoosingHunt(true)}
-          />
-          <HuntSheet
-            open={choosingHunt}
-            hunts={hunts}
-            value={draft.hunt}
-            onChange={(hunt) => patch({ hunt })}
-            onClose={() => setChoosingHunt(false)}
-          />
-        </>
+      {/* No hunt picker: a hunt is built from its own screen, whose "+"
+          opens this with the hunt set (AddingToHunt says why). */}
+      {draft.hunt.kind === "existing" && (
+        <AddingToHunt
+          name={huntName}
+          onLeave={() => patch({ hunt: { kind: "none" } })}
+        />
       )}
 
       {/* The cards, in order, with the cover first. */}
@@ -603,10 +562,10 @@ function ComposerBody({
             setError(null);
             setStep("preview");
           }}
-          disabled={draft.cards.length === 0 || huntUnnamed}
+          disabled={draft.cards.length === 0}
           className="flex-1"
         >
-          {huntUnnamed ? "Name your hunt" : "Preview"}
+          Preview
         </Button>
         {!isEmptyDraft(draft) && (
           <Button

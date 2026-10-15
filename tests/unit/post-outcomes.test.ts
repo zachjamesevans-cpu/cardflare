@@ -74,16 +74,17 @@ describe("saying what a post did", () => {
   });
 });
 
-describe("a new hunt needs a name", () => {
-  it("holds Preview on both platforms until it has one", async () => {
+describe("a hunt is never started from the composer", () => {
+  /* It is named on the Hunts screen and opened from its "+", so the
+     composer has no unnamed new hunt to hold Preview for. */
+  it("has nothing to name on either platform", async () => {
     for (const file of [
       "mobile/src/screens/flare-composer.tsx",
       "src/components/flares/flare-composer.tsx",
     ]) {
       const source = await readFile(file, "utf8");
-      expect(source).toContain("huntUnnamed");
-      expect(source).toContain('"Name your hunt"');
-      expect(source).toMatch(/disabled=\{[^}]*huntUnnamed/);
+      expect(source).not.toContain("huntUnnamed");
+      expect(source).not.toContain('"Name your hunt"');
     }
   });
 

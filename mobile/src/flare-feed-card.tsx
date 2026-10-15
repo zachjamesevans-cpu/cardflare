@@ -86,8 +86,8 @@ export function statusLabel(item: {
   /** How many cards: `total` on a Feed post, the cards themselves on the post screen. */
   total?: number;
   cards?: unknown[];
-  /** The hunt the post went up in: "is hunting", and the hunt's name after it. */
-  hunt?: { id: string; name: string } | null;
+  /** The hunt the post went up in: what it did to it, and the name after. */
+  hunt?: { id: string; name: string; started?: boolean } | null;
 }): string {
   const offering = item.direction === "showcase";
   if (item.completed) {
@@ -97,10 +97,15 @@ export function statusLabel(item: {
       : "found them all";
   }
   if (offering) return "is offering";
-  /* The founder: "soupie posted 17 cards to her ace hunt. but it just
-     says 'is looking for' with a little tiny ace 'view hunt' button
-     below". A post in a hunt says so, and names it (see FlareStatus). */
-  return item.hunt ? "is hunting" : "is looking for";
+  /* A post in a hunt says what it did to the hunt, and names it after
+     the words (see FlareStatus). The founder, on taking the hunt picker
+     out of the composer: "in the feed it'll say 'so and so updated
+     their hunt' or 'so and so added a new hunt'." The hunt's first post
+     started it; every later one added to it. */
+  if (!item.hunt) return "is looking for";
+  if (item.hunt.started) return "started a hunt:";
+  const count = item.total ?? item.cards?.length ?? 1;
+  return `added ${count} ${count === 1 ? "card" : "cards"} to`;
 }
 
 /**

@@ -56,6 +56,8 @@ interface PostSpec {
   by: DemoPersonKey;
   direction: "want" | "showcase";
   hunt?: string;
+  /** A later post in its hunt: "added 4 cards to", not "started a hunt". */
+  huntAdded?: boolean;
   note?: string;
   cards: CardSpec[];
   likes: number;
@@ -149,6 +151,7 @@ const POSTS: PostSpec[] = [
     by: "priya",
     direction: "want",
     hunt: "Red Hair Pirates",
+    huntAdded: true,
     cards: [
       { card: "shanks14", held: "exact" },
       { card: "shanksSt" },
@@ -359,7 +362,9 @@ function feedItem(id: string, state: PostState): FeedEntry {
     acceptsCash: spec.direction === "showcase",
     note: spec.note ?? null,
     offers: spec.offers ?? 0,
-    hunt: spec.hunt ? { id: huntId(spec.key), name: spec.hunt } : null,
+    hunt: spec.hunt
+      ? { id: huntId(spec.key), name: spec.hunt, started: !spec.huntAdded }
+      : null,
     remainingCopies: remaining,
     completed: Boolean(spec.completed),
     cards: state.cards,
@@ -584,7 +589,7 @@ export function demoPublish(
   me: { playerId: string; displayName: string; avatarUrl: string | null },
   cards: FeedCard[],
   direction: "want" | "showcase",
-  hunt: { id: string; name: string } | null,
+  hunt: { id: string; name: string; started?: boolean } | null,
   note: string | null,
 ): string {
   const id = `demo-post-mine-${Date.now()}`;
