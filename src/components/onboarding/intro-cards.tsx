@@ -13,6 +13,7 @@ import {
   type IntroGame,
 } from "@/lib/onboarding/intro";
 import { IntroScene } from "@/components/onboarding/intro-scenes";
+import { noteProfileTour } from "@/components/onboarding/profile-tour";
 import { cn } from "@/lib/cn";
 
 /**
@@ -63,6 +64,7 @@ export function IntroCards({
         {!last && (
           <Link
             href={LOOK_HREF}
+            onClick={noteProfileTour}
             className="text-sm font-semibold text-text-muted hover:text-text-primary"
           >
             {INTRO_SKIP}
@@ -131,7 +133,11 @@ export function IntroCards({
           "disorienting". */}
       <div className="flex w-full flex-col gap-2">
         {last ? (
-          <Link href="/flare" className={cn(buttonStyles("primary"), "w-full")}>
+          <Link
+            href="/flare"
+            onClick={noteProfileTour}
+            className={cn(buttonStyles("primary"), "w-full")}
+          >
             {INTRO_POST}
           </Link>
         ) : (
@@ -143,6 +149,7 @@ export function IntroCards({
           {last && (
             <Link
               href={LOOK_HREF}
+              onClick={noteProfileTour}
               className="font-semibold text-accent hover:underline"
             >
               {INTRO_LOOK}

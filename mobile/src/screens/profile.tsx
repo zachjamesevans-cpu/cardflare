@@ -57,6 +57,7 @@ import { ProfileFlares, stillWanted } from "../profile-flares";
 import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { ProfileTour, useTourTarget } from "../profile-tour";
 import { HuntsPanel } from "../hunts-panel";
 import {
   OWN_TABS,
@@ -181,6 +182,10 @@ export function ProfileScreen() {
 
   /* The wand's two doors - your look, and the Embers shop - when open. */
   const [wandMenu, setWandMenu] = useState<ActionItem[] | null>(null);
+  /* The profile tour's stops on this screen (profile-tour.tsx). */
+  const tourBinders = useTourTarget("binders");
+  const tourShare = useTourTarget("share");
+  const tourWand = useTourTarget("wand");
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -934,9 +939,14 @@ export function ProfileScreen() {
             flexDirection: "row",
           }}
         >
-          <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+          {/* Share and the wand are the profile tour's second and third
+              stops (profile-tour.tsx). */}
+          <View ref={tourShare} collapsable={false}>
+            <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
+          </View>
           {/* The wand: your look, and the Embers shop that pays for it.
               The shop was a tab of its own until the strip went to three. */}
+          <View ref={tourWand} collapsable={false}>
           <HeaderButton
             icon="color-wand"
             label="Customize and Embers shop"
@@ -957,6 +967,7 @@ export function ProfileScreen() {
               ])
             }
           />
+          </View>
           <ActionSheet items={wandMenu} onClose={() => setWandMenu(null)} />
           <HeaderButton
             icon="settings-outline"
@@ -1025,18 +1036,22 @@ export function ProfileScreen() {
         {/* Your binders as a row of circles in your order, the ones up
             for trade with the lime ring, and a dashed "+" at the end
             that starts a new one. Tap one and it opens. */}
-        <BinderHighlights
-          binders={profile.binders ?? []}
-          yours
-          onOpen={(binderId) => navigation.navigate("Binder", { binderId })}
-          onNew={() => setCreatingBinder(true)}
-        />
+        <View ref={tourBinders} collapsable={false}>
+          <BinderHighlights
+            binders={profile.binders ?? []}
+            yours
+            onOpen={(binderId) => navigation.navigate("Binder", { binderId })}
+            onNew={() => setCreatingBinder(true)}
+          />
+        </View>
 
         {/* The strip and the panes under it: Flares, Hunts, Binders,
             Showcase, Trades, Embers. Everything that used to stack down
             this screen, then sat behind a row of doors, slides in place
             now; the header and the circles above stay put. */}
         <ProfileTabs panes={panes} onChange={onTab} />
+        {/* A new player's first visit: four stops, once. */}
+        <ProfileTour />
       </View>
 
       {message && (

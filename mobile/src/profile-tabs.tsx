@@ -8,6 +8,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { useTourTarget } from "./profile-tour";
 import Animated, {
   runOnJS,
   useAnimatedScrollHandler,
@@ -123,6 +124,8 @@ export function ProfileTabs({
    */
   const window = useWindowDimensions();
   const root = useRef<View>(null);
+  /* The profile tour's last stop points at the strip (profile-tour.tsx). */
+  const strip = useTourTarget("tabs");
   const [top, setTop] = useState(0);
   const fill = top > 0 ? Math.max(0, Math.round(window.height - top)) : 0;
   const [active, setActive] = useState(() =>
@@ -238,6 +241,8 @@ export function ProfileTabs({
       {/* The strip: evenly spaced icon tabs, a hairline under the row,
           and the one underline that slides to the tab in front. */}
       <View
+        ref={strip}
+        collapsable={false}
         accessibilityRole="tablist"
         style={{
           flexDirection: "row",

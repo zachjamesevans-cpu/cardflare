@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { REPLAY_LABEL } from "@/lib/onboarding/intro";
+import { REPLAY_LABEL, REPLAY_TOUR_LABEL } from "@/lib/onboarding/intro";
 import { SyncCollectionForm } from "@/components/players/sync-collection-form";
 import { BackLink } from "@/components/ui/back-link";
 import { Button, buttonStyles } from "@/components/ui/button";
@@ -402,6 +402,7 @@ export async function SettingsContent({
         {[
           /* The new player's thirty seconds again (welcome/intro). */
           { href: "/welcome/intro", label: REPLAY_LABEL },
+          { href: "/profile?tour=profile", label: REPLAY_TOUR_LABEL },
           { href: "/contact", label: "Contact us" },
           { href: "/terms", label: "Terms of use" },
           { href: "/privacy", label: "Privacy policy" },

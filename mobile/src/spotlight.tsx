@@ -129,35 +129,32 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
   };
   const close = () => setHole(null);
 
+
   return (
     <Modal transparent animationType="fade" onRequestClose={close}>
-      {/* The dim, in four pieces around the ring, so the + shows through. */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close">
-        <View style={[styles.dim, { left: 0, right: 0, top: 0, height: ring.top }]} />
-        <View
-          style={[
-            styles.dim,
-            { left: 0, right: 0, top: ring.top + ring.size, bottom: 0 },
-          ]}
-        />
-        <View
-          style={[
-            styles.dim,
-            { left: 0, width: ring.left, top: ring.top, height: ring.size },
-          ]}
-        />
-        <View
-          style={[
-            styles.dim,
-            {
-              left: ring.left + ring.size,
-              right: 0,
-              top: ring.top,
-              height: ring.size,
-            },
-          ]}
-        />
-      </Pressable>
+      {/* Any tap closes it. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+
+      {/*
+       * THE DIM, WITH A ROUND HOLE. It was four rectangles around the
+       * ring, which left a square of undimmed page around a round ring -
+       * the founder: "see how there's a square around the icon ... just
+       * make it a circle ... it's like clipping over your circle." Now one
+       * Skia shape: the window, less the ring's circle (even-odd fill),
+       * so the page shows through that circle and nowhere else. A border
+       * as thick as the screen was tried first; iOS drew none of it.
+       */}
+      <HoleDim
+        width={window.width}
+        height={window.height}
+        hole={{
+          x: ring.left,
+          y: ring.top,
+          width: ring.size,
+          height: ring.size,
+          radius: ring.size / 2,
+        }}
+      />
 
       {/* The ring, and a tap on it opens the composer. */}
       <Pressable
@@ -200,13 +197,59 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+/**
+ * The scrim with a circle cut out of it. Skia is loaded here, when a
+ * spotlight shows, never at launch: the launch path loads no Skia
+ * (welcome.tsx says why), and the cosmetics load it the same lazy way.
+ */
+/** A hole in the dim: a rounded rectangle, a circle when the radius is
+    half its size. */
+export interface DimHole {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+}
+
+/**
+ * The scrim with a hole cut out of it: the window less the hole, filled
+ * even-odd. Shared by this spotlight and the profile tour
+ * (profile-tour.tsx). Skia is loaded here, when one shows, never at
+ * launch: the launch path loads no Skia (welcome.tsx says why), and the
+ * cosmetics load it the same lazy way.
+ */
+export function HoleDim({
+  width,
+  height,
+  hole,
+}: {
+  width: number;
+  height: number;
+  hole: DimHole;
+}) {
+  const { Canvas, Path } =
+    require("@shopify/react-native-skia") as typeof import("@shopify/react-native-skia");
+  const { x, y, width: w, height: h } = hole;
+  const r = Math.min(hole.radius, w / 2, h / 2);
+  const shape =
+    `M0 0 H${width} V${height} H0 Z ` +
+    `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
+    `V${y + h - r} A${r} ${r} 0 0 1 ${x + w - r} ${y + h} ` +
+    `H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r} ` +
+    `V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
+  return (
+    /* The wrapper lets taps through to what is under the dim: a Skia
+       canvas takes them itself, whatever its own pointerEvents say. */
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Canvas style={StyleSheet.absoluteFill}>
+        <Path path={shape} fillType="evenOdd" color={colors.scrim} />
+      </Canvas>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  dim: {
-    position: "absolute",
-    get backgroundColor() {
-      return colors.scrim;
-    },
-  },
   ring: {
     position: "absolute",
     borderWidth: 2,

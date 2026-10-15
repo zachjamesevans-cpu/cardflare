@@ -8,6 +8,7 @@ import { DEMO_CARDS } from "../demo/demo-cards";
 import { PEOPLE } from "../demo/demo-people";
 import { answerDraft } from "../nearby-shared";
 import { huntId, postId } from "../demo/demo-world";
+import { queueProfileTour } from "../profile-tour";
 import { colors, gutter, spacing } from "../theme";
 import { Body, Button, Card, Muted, Tap, Title } from "../ui";
 
@@ -124,6 +125,14 @@ export const SHOTS: Shot[] = [
     title: "17. The intro",
     tip: "Just the three cards and their scenes, in your account's games. Next walks them; Look around first ends on the spotlit +.",
     go: (nav) => nav.navigate("Intro"),
+  },
+  {
+    title: "18. The profile tour",
+    tip: "Four stops on your Profile: binders, Share, the wand, the tabs. Next or a tap moves on.",
+    go: (nav) => {
+      void queueProfileTour();
+      nav.navigate("Tabs", { screen: "Profile" });
+    },
   },
 ];
 
