@@ -7,6 +7,7 @@ import { getViewer } from "@/lib/auth/session";
 import { introGame } from "@/lib/onboarding/intro";
 import { playerForUser } from "@/lib/players/accounts";
 import { listPlayerGames } from "@/lib/players/games";
+import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { SITE } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -30,6 +31,17 @@ export default async function WelcomeIntroPage() {
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
   const game = introGame(playerId ? await listPlayerGames(playerId) : []);
+  /* Their handle, for the share scene's link title; none for a guest. */
+  const handle =
+    playerId && isSupabaseConfigured()
+      ? ((
+          await getSupabaseAdmin()
+            .from("players")
+            .select("handle")
+            .eq("id", playerId)
+            .maybeSingle()
+        ).data?.handle ?? null)
+      : null;
 
   return (
     <main
@@ -39,7 +51,7 @@ export default async function WelcomeIntroPage() {
       <Link href="/" aria-label={`${SITE.name} home`}>
         <Logo size={40} priority />
       </Link>
-      <IntroCards game={game} />
+      <IntroCards game={game} handle={handle} />
     </main>
   );
 }

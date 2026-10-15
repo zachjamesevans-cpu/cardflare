@@ -5,7 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import { existsSync } from "node:fs";
 
-import { INTRO_ART, INTRO_CARDS, introGame } from "../../src/lib/onboarding/intro";
+import {
+  INTRO_ART,
+  INTRO_CARDS,
+  INTRO_SHARE_LINK,
+  introGame,
+  introShareTitle,
+} from "../../src/lib/onboarding/intro";
 
 /**
  * A new player's first run. The founder (2026-10-15): "id like a quick
@@ -24,19 +30,21 @@ describe("the intro's words", () => {
     expect(read("mobile/src/intro-copy.ts")).toBe(read("src/lib/onboarding/intro.ts"));
   });
 
-  /* Four since the founder asked for the social card: "maybe a forth
-     slide ... that showcases someone commenting on a flare post". */
-  it("are four cards and under fifty words", () => {
+  /* Five: "if you had to summarize cardflare into the 4-5 most eye
+     catching slides and features what would you do? ... id love to
+     highlight the binder feature". */
+  it("are five cards and about fifty-five words", () => {
     expect(INTRO_CARDS.map((card) => card.key)).toEqual([
       "post",
-      "social",
       "nearby",
+      "binders",
+      "share",
       "trade",
     ]);
     const words = INTRO_CARDS.flatMap((card) =>
       `${card.title} ${card.body}`.split(/\s+/),
     );
-    expect(words.length).toBeLessThanOrEqual(50);
+    expect(words.length).toBeLessThanOrEqual(70);
   });
 });
 
@@ -44,8 +52,8 @@ describe("the app's sign-up", () => {
   const welcome = read("mobile/src/screens/welcome.tsx");
 
   it("goes account, games, where, intro", () => {
-    expect(welcome).toContain(
-      '<AccountStep preview={preview} onDone={() => setStep("games")} />',
+    expect(welcome).toMatch(
+      /<AccountStep\s+preview=\{preview\}\s+onDone=\{\(chosen\) => \{\s*setHandle\(chosen\);\s*setStep\("games"\);/,
     );
     expect(welcome).toMatch(
       /<GamesStep\s+preview=\{preview\}\s+onDone=\{\(picked\) => \{\s*setPlayed\(picked\);\s*setStep\("where"\);/,
@@ -54,7 +62,7 @@ describe("the app's sign-up", () => {
       '<WhereStep preview={preview} onDone={() => setStep("intro")} />',
     );
     expect(welcome).toMatch(
-      /<Intro\s+game=\{introGame\(played\)\}\s+onPost=\{\(\) => done\("post"\)\}\s+onLook=\{\(\) => done\("look"\)\}/,
+      /<Intro\s+game=\{introGame\(played\)\}\s+handle=\{handle\}\s+onPost=\{\(\) => done\("post"\)\}\s+onLook=\{\(\) => done\("look"\)\}/,
     );
   });
 
@@ -65,7 +73,7 @@ describe("the app's sign-up", () => {
 
   it("creates and saves nothing in the preview", () => {
     expect(welcome).toMatch(
-      /if \(preview\) \{\s*onDone\(\);\s*return;\s*\}\s*const result = await signUp/,
+      /if \(preview\) \{\s*onDone\(handle\.trim\(\)\);\s*return;\s*\}\s*const result = await signUp/,
     );
     expect(welcome).toMatch(
       /if \(preview\) \{\s*onDone\(\[\.\.\.picked\]\);\s*return;\s*\}\s*\/\*\s*\* A failed save/,
@@ -120,7 +128,7 @@ describe("the website's sign-up", () => {
     expect(where).toContain('href="/welcome/intro"');
     expect(where).toContain("<PostalAsk");
     expect(read("src/app/welcome/intro/page.tsx")).toContain(
-      "<IntroCards game={game} />",
+      "<IntroCards game={game} handle={handle} />",
     );
   });
 });
@@ -158,10 +166,16 @@ describe("the intro's cards", () => {
     const nearby = INTRO_CARDS.find((card) => card.key === "nearby");
     expect(nearby?.title).toBe("Find it nearby");
     expect(nearby?.body).toBe(
-      "Players near you find it in their binders and offer it to you.",
+      "Players near you check their binders and offer it to you.",
     );
-    const social = INTRO_CARDS.find((card) => card.key === "social");
-    expect(social?.title).toBe("Your followers chime in");
+    /* The founder's own line for the share card. */
+    const share = INTRO_CARDS.find((card) => card.key === "share");
+    expect(share?.body).toBe(
+      "Want someone to see your trade binder? Send them a link.",
+    );
+    expect(INTRO_CARDS.find((card) => card.key === "binders")?.title).toBe(
+      "Your binders, your way",
+    );
   });
 
   it("swipe both ways, one at a time, on both platforms", () => {
@@ -183,10 +197,10 @@ describe("the intro's cards", () => {
 describe("the intro's scenes", () => {
   it("are on both platforms, in place of the icons", () => {
     expect(read("mobile/src/intro.tsx")).toContain(
-      "<IntroScene card={card.key} game={game} />",
+      "<IntroScene card={card.key} game={game} handle={handle} />",
     );
     expect(read("src/components/onboarding/intro-cards.tsx")).toContain(
-      "<IntroScene card={card.key} game={game} />",
+      "<IntroScene card={card.key} game={game} handle={handle} />",
     );
   });
 
@@ -194,10 +208,10 @@ describe("the intro's scenes", () => {
     const app = read("mobile/src/intro-scenes.tsx");
     expect(app).toContain("<FlareStatus />");
     expect(app).toContain('<StateBand state="found" />');
-    /* The social card shows comments on both platforms. */
-    expect(app).toContain("INTRO_COMMENTS.map(");
+    /* The binders are the one binder cover, on both platforms. */
+    expect(app).toContain("<BinderCover");
     expect(read("src/components/onboarding/intro-scenes.tsx")).toContain(
-      "INTRO_COMMENTS.map(",
+      "<BinderCover",
     );
     expect(read("src/components/onboarding/intro-scenes.tsx")).toContain(
       "<FlareStatus />",
@@ -221,5 +235,15 @@ describe("the intro's scenes", () => {
     expect(introGame(["riftbound", "pokemon"])).toBe("pokemon");
     expect(introGame(["riftbound"])).toBe("one-piece");
     expect(introGame([])).toBe("one-piece");
+  });
+});
+
+describe("the share card's link", () => {
+  it("is a real link's shape, not the handle", () => {
+    /* app/b/[binderId] takes an eight-letter share code. */
+    expect(INTRO_SHARE_LINK).toMatch(/^cardflare\.gg\/b\/[a-z0-9]{8}$/);
+    expect(introShareTitle("samtrades")).toBe("@samtrades · Trades");
+    expect(introShareTitle("@samtrades")).toBe("@samtrades · Trades");
+    expect(introShareTitle(null)).toBe("@yourname · Trades");
   });
 });

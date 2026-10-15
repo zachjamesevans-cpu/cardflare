@@ -25,7 +25,14 @@ import { cn } from "@/lib/cn";
 
 const LOOK_HREF = "/feed?tour=post";
 
-export function IntroCards({ game }: { game: IntroGame }) {
+export function IntroCards({
+  game,
+  handle = null,
+}: {
+  game: IntroGame;
+  /** Theirs, so the shared binder link reads as theirs. */
+  handle?: string | null;
+}) {
   const strip = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   /* Pages whose scene has drawn: each mounts as it slides past halfway,
@@ -89,7 +96,7 @@ export function IntroCards({ game }: { game: IntroGame }) {
           >
             {/* A fixed height, so the words do not jump when it draws. */}
             <div className="flex h-[300px] items-center">
-              {at < drawn && <IntroScene card={card.key} game={game} />}
+              {at < drawn && <IntroScene card={card.key} game={game} handle={handle} />}
             </div>
             <div className="flex flex-col gap-2">
               <h1 className="text-3xl font-extrabold tracking-tight text-text-primary">

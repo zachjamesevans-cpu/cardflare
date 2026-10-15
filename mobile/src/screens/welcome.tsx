@@ -141,6 +141,8 @@ export function WelcomeScreen({
   const [step, setStep] = useState<Step>(initialStep);
   /* The games picked a step before the intro, for its scenes' art. */
   const [played, setPlayed] = useState<string[]>([]);
+  /* The handle just chosen, for the intro's shared binder link. */
+  const [handle, setHandle] = useState<string | null>(null);
 
   const done = (end?: WelcomeEnd) => {
     if (!preview) void markWelcomeSeen();
@@ -165,7 +167,13 @@ export function WelcomeScreen({
             initialStep === "account" && onCancel ? onCancel : () => setStep("splash")
           }
         >
-          <AccountStep preview={preview} onDone={() => setStep("games")} />
+          <AccountStep
+            preview={preview}
+            onDone={(chosen) => {
+              setHandle(chosen);
+              setStep("games");
+            }}
+          />
         </StepShell>
       )}
       {step === "games" && (
@@ -187,6 +195,7 @@ export function WelcomeScreen({
       {step === "intro" && (
         <Intro
           game={introGame(played)}
+          handle={handle}
           onPost={() => done("post")}
           onLook={() => done("look")}
         />
@@ -481,7 +490,13 @@ function HandleAvailabilityLine({
   return null;
 }
 
-function AccountStep({ onDone, preview }: { onDone: () => void; preview: boolean }) {
+function AccountStep({
+  onDone,
+  preview,
+}: {
+  onDone: (handle: string) => void;
+  preview: boolean;
+}) {
   const [email, setEmail] = useState("");
   /* The address twice, as on the website: a typo here is an account
      whose password reset goes to somebody else, or nowhere. */
@@ -592,7 +607,7 @@ function AccountStep({ onDone, preview }: { onDone: () => void; preview: boolean
             return;
           }
           if (preview) {
-            onDone();
+            onDone(handle.trim());
             return;
           }
 
@@ -601,7 +616,7 @@ function AccountStep({ onDone, preview }: { onDone: () => void; preview: boolean
             setError(result.message);
             return;
           }
-          onDone();
+          onDone(handle.trim());
         }}
       />
     </Card>
