@@ -11,6 +11,7 @@ import {
   INTRO_SKIP,
   type IntroCard,
 } from "./intro-copy";
+import { LAUNCH_BACKGROUND } from "./launch-view";
 import { colors, spacing } from "./theme";
 import { Button, Tap } from "./ui";
 
@@ -50,7 +51,8 @@ export function Intro({
     <View
       style={{
         flex: 1,
-        backgroundColor: colors.canvas,
+        /* The first run's surface, as welcome.tsx draws it. */
+        backgroundColor: LAUNCH_BACKGROUND,
         paddingTop: insets.top + spacing(3),
         paddingBottom: insets.bottom + spacing(4),
         paddingHorizontal: spacing(6),

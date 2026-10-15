@@ -43,11 +43,13 @@ describe("pull to refresh on the Feed", () => {
 });
 
 describe("the logo", () => {
-  it("is the CF mark wherever the app draws it, not the flame card", () => {
+  it("is the soft logo wherever the app draws it, not the flame card", () => {
     /* welcome.tsx keeps the flame card only on the "lime" side of its
-       BRAND switch, which is how the old look goes back in one line. */
+       BRAND switch, which is how the old look goes back in one line. Its
+       soft side is the full wordmark: the founder, "make the cf logo the
+       cardflare logo full". */
     expect(read("mobile/src/screens/welcome.tsx")).toMatch(
-      /BRAND === "soft" \? \([\s\S]*?source=\{CF_MARK\}/,
+      /BRAND === "soft" \? \([\s\S]*?source=\{WORDMARK_SOFT\}/,
     );
     for (const file of ["mobile/src/screens/home.tsx", "mobile/src/pack-shop.tsx"]) {
       const source = read(file);

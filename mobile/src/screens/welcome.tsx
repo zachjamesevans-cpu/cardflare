@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
 import { useEffect, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   checkHandle,
@@ -22,8 +24,9 @@ import { HeaderButton } from "../header";
 import { API_BASE } from "../config";
 import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
-import { TCG_GAMES, playersLine, type GameSlug } from "../games";
+import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
+import { LAUNCH_BACKGROUND, LAUNCH_WORDMARK_WIDTH } from "../launch-view";
 import { Intro } from "../intro";
 import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE } from "../intro-copy";
 import { NearbyLocationAsk } from "../nearby-location-ask";
@@ -64,9 +67,10 @@ const SEEN_KEY = "cf-welcome-seen";
    future master with different proportions stays correctly shaped. */
 const WORDMARK = require("../../assets/wordmark.png");
 const WORDMARK_SOURCE = Image.resolveAssetSource(WORDMARK);
-/* The CF mark, the logo while BRAND is "soft". */
-const CF_MARK = require("../../assets/cf-mark.png");
-const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
+/* The full wordmark in the soft green, the logo while BRAND is "soft":
+   the art the launch screen and the Feed's header draw. */
+const WORDMARK_SOFT = require("../../assets/wordmark-soft.png");
+const WORDMARK_SOFT_SOURCE = Image.resolveAssetSource(WORDMARK_SOFT);
 
 export async function hasSeenWelcome(): Promise<boolean> {
   try {
@@ -106,10 +110,10 @@ type Step = "splash" | "account" | "games" | "where" | "intro" | "signin";
 /**
  * How a welcome ended: "post" from the intro's last button (open the
  * composer), "look" from its quieter one or Skip (the Feed, with the +
- * pointed at), or nothing - signed in, or browsing as a guest, where no
- * intro was shown.
+ * pointed at), "scan" from the splash's guest door (the scanner, no
+ * account), or nothing - signed in, where no intro is shown.
  */
-export type WelcomeEnd = "post" | "look" | undefined;
+export type WelcomeEnd = "post" | "look" | "scan" | undefined;
 
 export function WelcomeScreen({
   onDone,
@@ -142,12 +146,14 @@ export function WelcomeScreen({
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+    /* The launch screen's green-grey under every step, so the first run
+       is one surface from the launch screen to the intro. */
+    <View style={{ flex: 1, backgroundColor: LAUNCH_BACKGROUND }}>
       {step === "splash" && (
         <Splash
           onCreate={() => setStep("account")}
           onSignIn={() => setStep("signin")}
-          onSkip={() => done()}
+          onScan={() => done("scan")}
         />
       )}
       {step === "account" && (
@@ -196,146 +202,135 @@ export function WelcomeScreen({
   );
 }
 
-/** The pitch: the mark, still, on pure black. */
+/**
+ * The pitch, cut to what it has to say. The founder: "this splash screen
+ * is a bit too much imo. lots of random text", then "build it go" on the
+ * plan: the wordmark and one line, Create account, a small way to sign
+ * in, and the guest door said as what it is for.
+ *
+ * Gone, and where each now lives: "Meet nearby" (the intro's second
+ * card), the games line (the games step, a screen later), and "Built
+ * for collectors, not marketplaces". "I already have an account" is a
+ * link under the one button rather than a second button.
+ *
+ * "At a store? Scan the code" replaced "Browse without an account". The
+ * guest door is for a player at a store joining a room without signing
+ * up - PRODUCT.md's front door - and "browse" read like a skip that led
+ * to a Feed a guest can do little with. It ends the welcome straight on
+ * the scanner (welcome end "scan").
+ *
+ * On the launch screen's green-grey, the founder's "trademark dark
+ * green/gray", so the hand-over from the launch screen does not change.
+ * The mark does not move: the launch path loads no Skia and no
+ * Reanimated, and the founder cut both the glow and the pulse.
+ */
 function Splash({
   onCreate,
   onSignIn,
-  onSkip,
+  onScan,
 }: {
   onCreate: () => void;
   onSignIn: () => void;
-  onSkip: () => void;
+  onScan: () => void;
 }) {
+  const insets = useSafeAreaInsets();
+
   return (
     <View
-      /*
-       * Pure black behind the lockup, and nothing else.
-       *
-       * There was a scatter of cards here — generated art, drawn by
-       * scripts/generate-welcome-art.mjs, with a vignette baked in. The
-       * founder cut it: "make the splash sign up screen for app just
-       * have a pure black background." colors.canvas IS #000000, so the
-       * first screen of a fresh install is the mark, the wordmark, the
-       * three lines and the buttons, on nothing.
-       */
       style={{
         flex: 1,
-        backgroundColor: colors.canvas,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: spacing(6),
-        gap: spacing(3),
+        backgroundColor: LAUNCH_BACKGROUND,
+        paddingHorizontal: spacing(6),
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom + spacing(6),
       }}
     >
-      {/*
-       * Nothing behind the mark, and nothing happening to it.
-       *
-       * There was a lime circle here, faded and slowly breathing, and the
-       * founder cut it: "please take off that super ugly green glow behind
-       * the cardflare logo on signup screen." The breathing then moved
-       * onto the mark itself - a 4% scale loop - and the founder cut that
-       * too: "the logo is pulsing on the splash screen make it static."
-       * So the first screen of the app holds still. The website's <Logo>
-       * is a plain image and always was; this is the app catching up to
-       * it rather than drifting from it.
-       */}
-      {BRAND === "soft" ? (
-        /* The founder's CF mark, flat and alone: the logo "for now", in
-           place of the flame card and the glowing wordmark. See BRAND in
-           theme.ts. */
-        <Image
-          source={CF_MARK}
-          style={{
-            height: 72,
-            width: 72 * (CF_MARK_SOURCE.width / CF_MARK_SOURCE.height),
-            resizeMode: "contain",
-          }}
-          accessibilityLabel="cardflare"
-        />
-      ) : (
-        <>
+      {/* The name and one line, a little above the middle. */}
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing(4),
+        }}
+      >
+        {BRAND === "soft" ? (
+          /* The full wordmark at the launch screen's width
+             (launch-view.tsx): the founder, "make the cf logo the
+             cardflare logo full". */
           <Image
-            source={require("../../assets/cardflare-mark.png")}
-            style={{ height: 140, width: 140, resizeMode: "contain" }}
-          />
-
-          {/* The name is the founder's wordmark art, never a font — BRAND.md:
-              "Just put this everywhere." Height set, width follows the file's
-              own ratio, same as the header. */}
-          <Image
-            source={WORDMARK}
+            source={WORDMARK_SOFT}
             style={{
-              height: 44,
-              width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
+              width: LAUNCH_WORDMARK_WIDTH,
+              height:
+                LAUNCH_WORDMARK_WIDTH *
+                (WORDMARK_SOFT_SOURCE.height / WORDMARK_SOFT_SOURCE.width),
               resizeMode: "contain",
             }}
             accessibilityLabel="cardflare"
           />
-        </>
-      )}
-      {/* Smaller, and sitting closer to the mark it belongs to. Three
-          short lines under a wordmark do not need to be nearly the size
-          of the wordmark, and the shared gap held them apart as though
-          they were a separate thought. Centred, like everything here. */}
-      <Text
-        style={{
-          color: colors.textPrimary,
-          fontSize: 17,
-          fontWeight: "500",
-          textAlign: "center",
-          lineHeight: 24,
-          marginTop: -spacing(1.5),
-        }}
-      >
-        Find your cards.{"\n"}Meet nearby.{"\n"}Trade in person.
-      </Text>
-      {/* Which cards. "Find your cards" alone read as anything from
-          baseball to a deck of 52; the games say it at a glance. */}
-      <Text
-        style={{
-          color: colors.textSecondary,
-          fontSize: 14,
-          textAlign: "center",
-          lineHeight: 20,
-        }}
-      >
-        {playersLine()}.
-      </Text>
+        ) : (
+          <>
+            <Image
+              source={require("../../assets/cardflare-mark.png")}
+              style={{ height: 140, width: 140, resizeMode: "contain" }}
+            />
+            {/* The name is the founder's wordmark art, never a font. */}
+            <Image
+              source={WORDMARK}
+              style={{
+                height: 44,
+                width: 44 * (WORDMARK_SOURCE.width / WORDMARK_SOURCE.height),
+                resizeMode: "contain",
+              }}
+              accessibilityLabel="cardflare"
+            />
+          </>
+        )}
+        <Text
+          style={{
+            color: colors.textPrimary,
+            fontSize: 17,
+            fontWeight: "500",
+            textAlign: "center",
+          }}
+        >
+          Find your cards. Trade in person.
+        </Text>
+      </View>
 
-      <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(4) }}>
+      {/* The actions, low, where a thumb already is. */}
+      <View style={{ gap: spacing(3) }}>
         <Button label="Create account" onPress={onCreate} />
-        <Button
-          label="I already have an account"
-          variant="secondary"
-          onPress={onSignIn}
-        />
-        {/* The guest door, said as an action rather than a shrug — the
-            founder's mock. Guests scanning into a room without an
-            account is still the product's front door (PRODUCT.md). */}
-        <Tap onPress={onSkip} hitSlop={8}>
+        <Text style={{ color: colors.textSecondary, fontSize: 15, textAlign: "center" }}>
+          Have an account?{" "}
           <Text
-            style={{
-              color: colors.accent,
-              fontWeight: "600",
-              textAlign: "center",
-              paddingVertical: spacing(2),
-            }}
+            style={{ color: colors.accent, fontWeight: "700" }}
+            accessibilityRole="button"
+            onPress={onSignIn}
+            suppressHighlighting
           >
-            Browse without an account{"  "}›
+            Sign in
+          </Text>
+        </Text>
+        <Tap
+          onPress={onScan}
+          hitSlop={8}
+          accessibilityLabel="At a store? Scan the code"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing(1.5),
+            paddingVertical: spacing(2),
+          }}
+        >
+          <Ionicons name="qr-code-outline" size={16} color={colors.textMuted} />
+          <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: "600" }}>
+            At a store? Scan the code
           </Text>
         </Tap>
       </View>
-
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 13,
-          textAlign: "center",
-          marginTop: spacing(5),
-        }}
-      >
-        Built for collectors, not marketplaces.
-      </Text>
     </View>
   );
 }
