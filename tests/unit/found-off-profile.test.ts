@@ -36,9 +36,16 @@ describe("found cards come off a profile", () => {
 
   it("filters the profile's wants through it", () => {
     const profile = read("src/lib/players/profile.ts");
-    expect(profile).toContain("doneWantKeys(playerId)");
-    expect(profile).toContain("!done.has(wantKey(row.cardId, row.printingId))");
+    expect(profile).toContain("openWants(playerId)");
     expect(profile).toContain("[...open, ...offerings]");
+    /* One list for the profile and for a room's auto-post. */
+    const wants = read("src/lib/players/wants.ts");
+    const open = wants.slice(wants.indexOf("export async function openWants("));
+    expect(open.slice(0, 300)).toContain("doneWantKeys(playerId)");
+    expect(open.slice(0, 300)).toContain(
+      "!done.has(wantKey(row.cardId, row.printingId))",
+    );
+    expect(read("src/lib/events/auto-post.ts")).toContain("openWants(playerId)");
   });
 
   it("carries a hunt's tick to the request's open Flares", () => {

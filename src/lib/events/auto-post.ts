@@ -3,7 +3,7 @@ import "server-only";
 import { addFlareBatch } from "@/lib/lists/repository";
 import { afterResponse } from "@/lib/after-response";
 import { notifyRoomFlare } from "@/lib/notifications/notify";
-import { listOfferings, listWants } from "@/lib/players/wants";
+import { openWants } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -17,8 +17,10 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * the room was asking a question the player answered when they posted.
  *
  * So every way into a room ends here: the website's join, the app's
- * join, and signing in while already in one as a guest. Wants and
- * offerings both go up, because the board draws both. `addFlare`
+ * join, and signing in while already in one as a guest. Wants only:
+ * the founder took offering out of CardFlare (2026-10-15), "just
+ * having a binder is more than enough for trades", and said yes to
+ * rooms no longer posting the old offerings either. `addFlare`
  * upserts on the board's own key, so re-scanning the code posts
  * nothing twice, and a card taken off the board tonight stays off: the
  * next join is a fresh upsert of what is still on the list, which is
@@ -88,56 +90,41 @@ export async function postFlaresOnJoin(
   try {
     if (!(await autoPostFor(playerId))) return NOTHING;
 
-    const [wants, offerings] = await Promise.all([
-      listWants(playerId),
-      listOfferings(playerId),
-    ]);
-    if (wants.length === 0 && offerings.length === 0) return NOTHING;
+    /* The wants still open - never one already found, ticked off in a
+       hunt or on a Flare (openWants). It read every saved want, and a
+       found card's want is kept, so joining a room put found cards back
+       on its board. The founder, after Mox Valley: "it auto posted all
+       my flares and then some." */
+    const wants = await openWants(playerId);
+    if (wants.length === 0) return NOTHING;
 
-    const toInputs = (rows: typeof wants) =>
-      rows.map((row) => ({
-        cardId: row.cardId,
-        printingId: row.printingId,
-        quantity: row.quantity,
-        note: row.note,
-        deckLabel: row.deckLabel,
-      }));
+    const inputs = wants.map((row) => ({
+      cardId: row.cardId,
+      printingId: row.printingId,
+      quantity: row.quantity,
+      note: row.note,
+      deckLabel: row.deckLabel,
+    }));
 
-    /* Wants first: they are what the room is for. Offerings follow as
-       their own batch under the showcase intent, the board's other
-       direction. */
-    const posted = [];
-    if (wants.length > 0) {
-      const batch = await addFlareBatch(roomId, session.id, toInputs(wants), "want");
-      posted.push(...batch.posted);
-      if (batch.posted.length > 0) {
-        const posted = batch.posted;
-        afterResponse(() =>
-          notifyRoomFlare(
-            roomId,
-            session.id,
-            session.display_name ?? "A player",
-            posted,
-            "want",
-          ),
-        );
-      }
-    }
-    if (offerings.length > 0) {
-      const batch = await addFlareBatch(
-        roomId,
-        session.id,
-        toInputs(offerings),
-        "showcase",
+    const batch = await addFlareBatch(roomId, session.id, inputs, "want");
+    const posted = batch.posted;
+    if (posted.length > 0) {
+      afterResponse(() =>
+        notifyRoomFlare(
+          roomId,
+          session.id,
+          session.display_name ?? "A player",
+          posted,
+          "want",
+        ),
       );
-      posted.push(...batch.posted);
     }
 
     /* What did not fit, said rather than swallowed: the founder's
        complaint about the old cap was that it went quiet. */
     return {
       posted: posted.length,
-      skipped: Math.max(0, wants.length + offerings.length - posted.length),
+      skipped: Math.max(0, wants.length - posted.length),
     };
   } catch (error) {
     console.error("Could not post the player's Flares on join", error);

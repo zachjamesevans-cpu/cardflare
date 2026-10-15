@@ -6,6 +6,8 @@ import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repo
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { splitFound } from "./found-split";
 import { avatarWearFor } from "./equips";
+import { sessionsForPlayers } from "./accounts";
+import { clearWant } from "./wants";
 import { avatarPathFor, avatarSrc } from "./profile-image";
 import { wornFrame } from "@/lib/players/worn-frame";
 import { tierAllows } from "@/lib/tiers";
@@ -676,6 +678,11 @@ export async function setRequestFound(
  * The card's open Flares come down with it, since a Flare for a card
  * nobody is hunting any more is a false signal on every board. Owner
  * only, decided by the hunt the request belongs to.
+ *
+ * The saved want goes too, unless the card is still asked for somewhere
+ * else, or the next room joined posts it again: the founder, after Mox
+ * Valley, "reposting them even though i deleted / found the cards
+ * already and removed them."
  */
 export async function removeHuntRequest(
   playerId: string,
@@ -686,7 +693,7 @@ export async function removeHuntRequest(
 
   const { data: request } = await admin
     .from("hunt_requests")
-    .select("id, hunt_id")
+    .select("id, hunt_id, card_id, printing_id")
     .eq("id", requestId)
     .is("removed_at", null)
     .maybeSingle();
@@ -715,9 +722,62 @@ export async function removeHuntRequest(
     .eq("hunt_request_id", requestId)
     .eq("status", "open");
   if (flareError) console.error("Could not take the card's Flares down", flareError);
+  else await forgetWantIfDone(playerId, request.card_id, request.printing_id);
 
   await admin.from("hunts").update({ updated_at: now }).eq("id", hunt.id);
   return { ok: true };
+}
+
+/**
+ * Clears the saved want for a card taken off a hunt, when no other open
+ * want Flare and no other hunt of the player's still asks for it.
+ */
+async function forgetWantIfDone(
+  playerId: string,
+  cardId: string,
+  printingId: string | null,
+): Promise<void> {
+  const admin = getSupabaseAdmin();
+  const sessions = [...(await sessionsForPlayers([playerId])).keys()];
+  const owned =
+    sessions.length > 0
+      ? `player_id.eq.${playerId},player_session_id.in.(${sessions
+          .map((id) => `"${id}"`)
+          .join(",")})`
+      : `player_id.eq.${playerId}`;
+  const { data: hunts } = await admin
+    .from("hunts")
+    .select("id")
+    .eq("player_id", playerId);
+  const huntIds = (hunts ?? []).map((row) => row.id);
+
+  let flares = admin
+    .from("flares")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "open")
+    .eq("intent", "want")
+    .eq("card_id", cardId)
+    .or(owned);
+  flares = printingId
+    ? flares.eq("printing_id", printingId)
+    : flares.is("printing_id", null);
+  let requests = admin
+    .from("hunt_requests")
+    .select("id", { count: "exact", head: true })
+    .in("hunt_id", huntIds)
+    .eq("card_id", cardId)
+    .is("removed_at", null);
+  requests = printingId
+    ? requests.eq("printing_id", printingId)
+    : requests.is("printing_id", null);
+
+  const [stillFlared, stillHunted] = await Promise.all([flares, requests]);
+  /* Unsure what is still up: keep the want. One left behind is the old
+     behaviour; one cleared wrongly loses a card. */
+  if (stillFlared.error || stillHunted.error) return;
+  if ((stillFlared.count ?? 0) > 0 || (stillHunted.count ?? 0) > 0) return;
+
+  await clearWant(playerId, cardId, printingId);
 }
 
 /**

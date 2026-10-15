@@ -16,19 +16,24 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
 describe("every way into a room posts the player's Flares", () => {
-  it("has one module that does it, wants and offerings, never throwing", () => {
+  it("has one module that does it, open wants only, never throwing", () => {
     const auto = read("src/lib/events/auto-post.ts");
     expect(auto).toContain("export async function postFlaresOnJoin(");
-    expect(auto).toContain("listWants(playerId)");
-    expect(auto).toContain("listOfferings(playerId)");
-    expect(auto).toContain('"want"');
-    expect(auto).toContain('"showcase"');
+    /* Still-open wants only: never a card already found (openWants).
+       The founder, after Mox Valley: "it auto posted all my flares and
+       then some ... even though i deleted / found the cards already." */
+    expect(auto).toContain("openWants(playerId)");
+    expect(auto).not.toContain("listWants(playerId)");
+    /* No offerings: the founder took offering out (2026-10-15), "just
+       having a binder is more than enough for trades", and said yes to
+       rooms no longer posting the old ones. */
+    expect(auto).not.toContain("listOfferings");
+    expect(auto).not.toContain('"showcase"');
+    expect(auto).toContain('addFlareBatch(roomId, session.id, inputs, "want")');
     expect(auto).toContain("if (!(await autoPostFor(playerId))) return NOTHING;");
     expect(auto).toMatch(/catch \(error\) \{[\s\S]*return NOTHING;/);
     /* What did not fit is counted, never swallowed. */
-    expect(auto).toContain(
-      "skipped: Math.max(0, wants.length + offerings.length - posted.length)",
-    );
+    expect(auto).toContain("skipped: Math.max(0, wants.length - posted.length)");
   });
 
   it("runs on the website's join, the app's join, and a guest signing in mid-night", () => {

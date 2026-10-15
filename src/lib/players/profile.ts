@@ -24,7 +24,7 @@ import {
   type MatchKind,
 } from "@/lib/matching/schema";
 import { sessionsForPlayers } from "./accounts";
-import { doneWantKeys, listOfferings, listWants, wantKey } from "./wants";
+import { listOfferings, openWants } from "./wants";
 import { tierAllows } from "@/lib/tiers";
 import { wornFrame } from "./worn-frame";
 import type { CosmeticArtFile } from "./art-files";
@@ -194,7 +194,6 @@ async function loadProfile(
     binders,
     wants,
     offerings,
-    done,
     viewerHeld,
   ] = await Promise.all([
     huntsFor(playerId, viewerId),
@@ -209,9 +208,10 @@ async function loadProfile(
     listShowcase(playerId),
     organizerStoresFor(playerId),
     listBinders(playerId, viewerId),
-    listWants(playerId),
+    /* Still looking for, found ones out: the same list a room is
+       handed on join (openWants), so the two cannot disagree. */
+    openWants(playerId),
     listOfferings(playerId),
-    doneWantKeys(playerId),
     heldByViewer(viewerId, playerId),
   ]);
 
@@ -227,10 +227,7 @@ async function loadProfile(
    * then what they are offering. Only the wants move, and only past each
    * other: an offer is not a card anybody holds for them.
    */
-  const open = heldFirst(
-    wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId))),
-    (row) => matchOf(row) !== null,
-  );
+  const open = heldFirst(wants, (row) => matchOf(row) !== null);
 
   const flares: ProfileFlare[] = [...open, ...offerings].map((row) => ({
     id: row.id,
