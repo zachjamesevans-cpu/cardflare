@@ -130,6 +130,10 @@ export const colors = {
   success: "#6ee7a8",
   warning: "#fbc85a",
   danger: "#ff8f8f",
+  /* The fill behind a swiped row's Delete: the iOS system red, because
+     the gesture is iOS's own and the founder asked for "that delete red
+     thing thats built into ios". White text on it. */
+  destructive: "#ff3b30",
   /* Cosmetics — the colours Embers buy, same block as the web tokens. */
   ember: "#ff8a3d",
   emberDeep: "#c2410c",
