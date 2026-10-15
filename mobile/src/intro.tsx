@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -30,7 +30,7 @@ import { Button, Tap } from "./ui";
  * second.
  *
  * Each card shows a scene of the app (intro-scenes.tsx), in the art of
- * the game the player picked a step before.
+ * the game the player picked a step before. The cards swipe both ways.
  */
 
 export function Intro({
@@ -43,10 +43,24 @@ export function Intro({
   /** Whose art the scenes draw: introGame() of the games they play. */
   game?: IntroGame;
 }) {
-  const [index, setIndex] = useState(0);
   const insets = useSafeAreaInsets();
-  const card = INTRO_CARDS[index];
+  const { width } = useWindowDimensions();
+  const pager = useRef<ScrollView>(null);
+  const [index, setIndex] = useState(0);
+  /*
+   * How many pages have had their scene drawn. A scene mounts as its
+   * page slides past halfway into view, so its animation plays as it
+   * arrives - by swipe or by Next - and stays drawn after.
+   */
+  const [drawn, setDrawn] = useState(1);
   const last = index === INTRO_CARDS.length - 1;
+
+  const follow = (x: number) => {
+    const at = Math.max(0, Math.min(INTRO_CARDS.length - 1, Math.round(x / width)));
+    setIndex(at);
+    setDrawn((count) => Math.max(count, at + 1));
+  };
+  const go = (to: number) => pager.current?.scrollTo({ x: to * width, animated: true });
 
   return (
     <View
@@ -56,10 +70,9 @@ export function Intro({
         backgroundColor: LAUNCH_BACKGROUND,
         paddingTop: insets.top + spacing(3),
         paddingBottom: insets.bottom + spacing(4),
-        paddingHorizontal: spacing(6),
       }}
     >
-      <View style={{ alignItems: "flex-end", minHeight: 32 }}>
+      <View style={{ alignItems: "flex-end", minHeight: 32, paddingHorizontal: spacing(6) }}>
         {last ? null : (
           <Tap onPress={onLook} hitSlop={10} accessibilityLabel={INTRO_SKIP}>
             <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>
@@ -69,80 +82,121 @@ export function Intro({
         )}
       </View>
 
-      <View
-        key={card.key}
-        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: spacing(5) }}
+      {/*
+       * THE CARDS, SWIPED. The founder: "people should be able to swipe
+       * between these screens on this page. like go back and forth."
+       * One page per card, the screen's width each; Next scrolls the
+       * same pager, so a tap and a swipe land in the same place.
+       */}
+      <ScrollView
+        ref={pager}
+        horizontal
+        pagingEnabled
+        /* One card per swipe however hard it is flung: a long drag in
+           testing carried from the first card straight to the third. */
+        disableIntervalMomentum
+        showsHorizontalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={(event) => follow(event.nativeEvent.contentOffset.x)}
+        style={{ flex: 1 }}
       >
-        <IntroScene card={card.key} game={game} />
-        <View style={{ alignItems: "center", gap: spacing(2) }}>
-          <Text
-            style={{
-              color: colors.textPrimary,
-              fontSize: 28,
-              fontWeight: "800",
-              textAlign: "center",
-            }}
-          >
-            {card.title}
-          </Text>
-          <Text
-            style={{
-              color: colors.textSecondary,
-              fontSize: 18,
-              lineHeight: 25,
-              textAlign: "center",
-            }}
-          >
-            {card.body}
-          </Text>
-        </View>
-      </View>
-
-      {/* Where you are, three dots. */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "center",
-          gap: spacing(2),
-          marginBottom: spacing(5),
-        }}
-        accessibilityLabel={`${index + 1} of ${INTRO_CARDS.length}`}
-      >
-        {INTRO_CARDS.map((entry, at) => (
+        {INTRO_CARDS.map((card, at) => (
           <View
-            key={entry.key}
+            key={card.key}
             style={{
-              width: at === index ? 22 : 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: at === index ? colors.accent : colors.borderStrong,
+              width,
+              paddingHorizontal: spacing(6),
+              alignItems: "center",
+              justifyContent: "center",
+              gap: spacing(5),
             }}
-          />
+          >
+            {/* A fixed height, so the words do not jump when it draws. */}
+            <View style={{ height: SCENE_HEIGHT, justifyContent: "center" }}>
+              {at < drawn ? <IntroScene card={card.key} game={game} /> : null}
+            </View>
+            <View style={{ alignItems: "center", gap: spacing(2) }}>
+              <Text
+                style={{
+                  color: colors.textPrimary,
+                  fontSize: 28,
+                  fontWeight: "800",
+                  textAlign: "center",
+                }}
+              >
+                {card.title}
+              </Text>
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  fontSize: 18,
+                  lineHeight: 25,
+                  textAlign: "center",
+                }}
+              >
+                {card.body}
+              </Text>
+            </View>
+          </View>
         ))}
-      </View>
+      </ScrollView>
 
-      {last ? (
-        <View style={{ gap: spacing(2) }}>
-          <Button label={INTRO_POST} onPress={onPost} />
-          <Tap onPress={onLook} hitSlop={8}>
-            <Text
-              style={{
-                color: colors.accent,
-                fontWeight: "600",
-                textAlign: "center",
-                paddingVertical: spacing(2),
-              }}
+      <View style={{ paddingHorizontal: spacing(6) }}>
+        {/* Where you are, three dots; each one goes there. */}
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: spacing(2),
+            marginBottom: spacing(5),
+          }}
+          accessibilityLabel={`${index + 1} of ${INTRO_CARDS.length}`}
+        >
+          {INTRO_CARDS.map((entry, at) => (
+            <Tap
+              key={entry.key}
+              onPress={() => go(at)}
+              hitSlop={8}
+              accessibilityLabel={`${entry.title}, ${at + 1} of ${INTRO_CARDS.length}`}
             >
-              {INTRO_LOOK}
-            </Text>
-          </Tap>
+              <View
+                style={{
+                  width: at === index ? 22 : 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: at === index ? colors.accent : colors.borderStrong,
+                }}
+              />
+            </Tap>
+          ))}
         </View>
-      ) : (
-        <Button label={INTRO_NEXT} onPress={() => setIndex(index + 1)} />
-      )}
+
+        {last ? (
+          <View style={{ gap: spacing(2) }}>
+            <Button label={INTRO_POST} onPress={onPost} />
+            <Tap onPress={onLook} hitSlop={8}>
+              <Text
+                style={{
+                  color: colors.accent,
+                  fontWeight: "600",
+                  textAlign: "center",
+                  paddingVertical: spacing(2),
+                }}
+              >
+                {INTRO_LOOK}
+              </Text>
+            </Tap>
+          </View>
+        ) : (
+          <Button label={INTRO_NEXT} onPress={() => go(index + 1)} />
+        )}
+      </View>
     </View>
   );
 }
+
+/** Room for the tallest scene (intro-scenes.tsx), the trade. */
+const SCENE_HEIGHT = 300;
 
 /**
  * The intro again, from Settings -> Help: in the art of the games the
