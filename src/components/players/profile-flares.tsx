@@ -112,13 +112,15 @@ export function ProfileFlares({
         </div>
       ) : (
         /*
-         * A grid the way a social profile draws one: three across,
-         * edge to edge, a hairline between tiles, nothing under them.
-         * The founder: "more of a grid like instagram instead of these
-         * random blurry cards." Only an offer wears a chip at the foot,
-         * so the tile is the picture and nothing else.
+         * A grid the way a social profile draws one: edge to edge, a
+         * hairline between tiles, nothing under them. The founder: "more
+         * of a grid like instagram instead of these random blurry
+         * cards." Four across, not three: a card is tall, so four reads
+         * like a binder page and shows twice as many at a glance - the
+         * founder, shown both, "okay yeah commit it". Only an offer
+         * wears a chip at the foot, so the tile is the picture.
          */
-        <ul className="grid grid-cols-3 gap-0.5">
+        <ul className="grid grid-cols-4 gap-0.5">
           {flares.map((flare, index) => {
             const want = flare.direction === "want";
             return (
@@ -135,10 +137,10 @@ export function ProfileFlares({
                   position={index}
                   enabled={imagesEnabled}
                   thumbClassName="w-full"
-                  /* A third of the column, not the 56px every shelf asks
-                     for: at 56px the optimiser's picture is stretched
-                     to twice its size and reads as a blur. */
-                  thumbSizes="(max-width: 672px) 33vw, 220px"
+                  /* A quarter of the column, not the 56px every shelf
+                     asks for: at 56px the optimiser's picture is
+                     stretched to twice its size and reads as a blur. */
+                  thumbSizes="(max-width: 672px) 25vw, 168px"
                 />
                 {flare.match && (
                   /* A want in your binder: the green ring a card you

@@ -29,9 +29,12 @@ import { Button, CardImage, type ZoomCard } from "./ui";
  */
 
 /** The space between tiles, and how many sit across. */
-/* A hairline between tiles, the way a social grid draws them. */
+/* A hairline between tiles, the way a social grid draws them. Four
+   across, the website's grid-cols-4: a card is tall, so four reads like
+   a binder page - the founder, shown three and four, "okay yeah commit
+   it". */
 const GAP = 2;
-const ACROSS = 3;
+const ACROSS = 4;
 
 /**
  * The Flares a profile shows: the cards still being looked for. The
