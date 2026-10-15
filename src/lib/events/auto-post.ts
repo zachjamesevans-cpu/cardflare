@@ -3,7 +3,7 @@ import "server-only";
 import { addFlareBatch } from "@/lib/lists/repository";
 import { afterResponse } from "@/lib/after-response";
 import { notifyRoomFlare } from "@/lib/notifications/notify";
-import { listOfferings, listWants } from "@/lib/players/wants";
+import { listOfferings, openWants } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -88,8 +88,12 @@ export async function postFlaresOnJoin(
   try {
     if (!(await autoPostFor(playerId))) return NOTHING;
 
+    /* What the profile shows: the wants still open - never one already
+       found, ticked off in a hunt or on a Flare (openWants) - and the
+       open offerings. It read every saved want, and a found card's want
+       is kept, so joining a room put found cards back on its board. */
     const [wants, offerings] = await Promise.all([
-      listWants(playerId),
+      openWants(playerId),
       listOfferings(playerId),
     ]);
     if (wants.length === 0 && offerings.length === 0) return NOTHING;

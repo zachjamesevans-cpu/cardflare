@@ -253,6 +253,28 @@ export async function listWants(playerId: string): Promise<SavedWant[]> {
   return describeRows(data ?? []);
 }
 
+/**
+ * What the player is STILL looking for: the saved wants, less the ones
+ * found - ticked off in a hunt or on a Flare (`doneWantKeys`). The list
+ * the profile shows, and the list a room is handed when the player
+ * joins it.
+ *
+ * A found card's saved want is not deleted (only a confirmed room trade
+ * clears one), so `listWants` alone still holds every card ever found.
+ * The room's auto-post read it alone and put found cards back on the
+ * board as asks - the founder (2026-10-15), after joining Mox Valley:
+ * "it auto posted all my flares and then some ... it's clear that the
+ * app is saving old flares somewhere and reposting them even though i
+ * deleted / found the cards already."
+ */
+export async function openWants(playerId: string): Promise<SavedWant[]> {
+  const [wants, done] = await Promise.all([
+    listWants(playerId),
+    doneWantKeys(playerId),
+  ]);
+  return wants.filter((row) => !done.has(wantKey(row.cardId, row.printingId)));
+}
+
 /** What a row on the list is before its card has a name and a picture. */
 interface ListRow {
   id: string;

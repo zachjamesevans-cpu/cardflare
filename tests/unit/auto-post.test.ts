@@ -19,7 +19,11 @@ describe("every way into a room posts the player's Flares", () => {
   it("has one module that does it, wants and offerings, never throwing", () => {
     const auto = read("src/lib/events/auto-post.ts");
     expect(auto).toContain("export async function postFlaresOnJoin(");
-    expect(auto).toContain("listWants(playerId)");
+    /* Still-open wants only: never a card already found (openWants).
+       The founder, after Mox Valley: "it auto posted all my flares and
+       then some ... even though i deleted / found the cards already." */
+    expect(auto).toContain("openWants(playerId)");
+    expect(auto).not.toContain("listWants(playerId)");
     expect(auto).toContain("listOfferings(playerId)");
     expect(auto).toContain('"want"');
     expect(auto).toContain('"showcase"');
