@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Tour } from "@/components/onboarding/tour";
 import { Suspense } from "react";
 import { CalendarClock, MapPin } from "lucide-react";
 
@@ -795,6 +796,9 @@ async function RoomBody({
           )}
         </>
       )}
+
+      {/* A new player's first room: three stops, once (onboarding/tour). */}
+      {inRoom && !finished && <Tour id="room" />}
 
       {(readable || finished) && (
         <FlaresAtNight

@@ -125,7 +125,7 @@ describe("hold and drag on the phone, in one touch", () => {
     expect(page).toContain(".enabled(enabled)");
     expect(page).toContain("enabled: yours,");
     expect(page).toMatch(
-      /<GestureDetector gesture=\{drag\.gesture\}>\s*<View onLayout=\{onFrameLayout\}/,
+      /<GestureDetector gesture=\{drag\.gesture\}>\s*<View\s+onLayout=\{onFrameLayout\}/,
     );
     /* No PanResponder, no long press handed to the picture, no second press. */
     for (const gone of [

@@ -7,8 +7,8 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { REPLAY_LABEL, REPLAY_TOUR_LABEL } from "../intro-copy";
-import { queueProfileTour } from "../profile-tour";
+import { REPLAY_LABEL, REPLAY_TIPS_LABEL } from "../intro-copy";
+import { queueTours } from "../tour";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { AppState, Linking, ScrollView, Text, View } from "react-native";
@@ -1152,11 +1152,12 @@ function HelpCard() {
       <Title>Help</Title>
       {/* The new player's thirty seconds again (intro.tsx). */}
       <Row label={REPLAY_LABEL} onPress={() => navigation.navigate("Intro")} />
-      {/* The profile tour again: queued, then the Profile, where it runs. */}
+      {/* Every tour again: queued, then the Profile, where the first runs;
+          the others wait for their own screens. */}
       <Row
-        label={REPLAY_TOUR_LABEL}
+        label={REPLAY_TIPS_LABEL}
         onPress={() => {
-          void queueProfileTour();
+          void queueTours();
           navigation.navigate("Tabs", { screen: "Profile" });
         }}
       />

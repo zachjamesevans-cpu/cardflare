@@ -59,7 +59,7 @@ import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
 import { ReplayIntro } from "./src/intro";
 import { queueSpotlight } from "./src/spotlight";
-import { queueProfileTour } from "./src/profile-tour";
+import { queueTours } from "./src/tour";
 import { keepNavigation, takeNavigation } from "./src/backdrop";
 import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
@@ -996,7 +996,7 @@ function AppGates() {
             /* The intro's last answer, acted on once the tabs exist. */
             if (end === "look") void queueSpotlight();
             /* A new player: the Profile's tour, on their first visit. */
-            if (end === "look" || end === "post") void queueProfileTour();
+            if (end === "look" || end === "post") void queueTours();
             afterWelcome = end === "post" || end === "scan" ? end : null;
             setGate("open");
           }}
@@ -1116,7 +1116,7 @@ function AppGates() {
               <WelcomeScreen
                 initialStep="account"
                 onDone={(end) => {
-                  if (end === "look" || end === "post") void queueProfileTour();
+                  if (end === "look" || end === "post") void queueTours();
                   if (end) followWelcome(end, navigation);
                   else navigation.goBack();
                 }}
@@ -1144,7 +1144,7 @@ function AppGates() {
                 <WelcomeScreen
                   preview
                   onDone={(end) => {
-                    if (end === "look" || end === "post") void queueProfileTour();
+                    if (end === "look" || end === "post") void queueTours();
                     if (end) followWelcome(end, navigation);
                     else navigation.goBack();
                   }}

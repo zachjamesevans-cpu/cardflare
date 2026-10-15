@@ -6,13 +6,16 @@ interface CardProps {
   id?: string;
   as?: "div" | "li" | "article";
   className?: string;
+  /** A first-visit tour's stop, "<tour>:<stop>" (onboarding/tour.tsx). */
+  tour?: string;
   children: ReactNode;
 }
 
-export function Card({ as: Tag = "div", id, className, children }: CardProps) {
+export function Card({ as: Tag = "div", id, className, tour, children }: CardProps) {
   return (
     <Tag
       id={id}
+      data-tour={tour}
       className={cn(
         "rounded-[var(--radius-card)] border border-border bg-surface p-6",
         "shadow-[var(--shadow-card)]",

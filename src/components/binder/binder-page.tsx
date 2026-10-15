@@ -8,6 +8,7 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
+import { Tour } from "@/components/onboarding/tour";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -488,18 +489,21 @@ export function BinderView({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {(binder.yours || shareable) && (
-            <ShareBinder
-              binderId={binder.id}
-              shareCode={binder.shareCode}
-              title={shareTitle}
-              forTrade={shareable}
-              onPrivate={() => setShareRefused(true)}
-            />
+            <span data-tour="binder:share" className="flex">
+              <ShareBinder
+                binderId={binder.id}
+                shareCode={binder.shareCode}
+                title={shareTitle}
+                forTrade={shareable}
+                onPrivate={() => setShareRefused(true)}
+              />
+            </span>
           )}
           {binder.yours && (
             <button
               type="button"
               aria-label="Binder settings"
+              data-tour="binder:settings"
               onClick={() => setSettingsOpen(true)}
               className={HEADER_BUTTON}
             >
@@ -544,7 +548,13 @@ export function BinderView({
 
       {/* The page: pockets on the binder-page background, the arrows
           over its middle. */}
-      <div className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]">
+      {/* Your own binder, still empty: three stops, once (onboarding/tour).
+          A binder with cards in it does not need "tap a pocket". */}
+      <Tour id="binder" when={binder.yours && binder.count === 0} />
+      <div
+        className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]"
+        data-tour="binder:pockets"
+      >
         <ul
           ref={grid}
           className="grid grid-cols-3 gap-2"

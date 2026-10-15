@@ -121,7 +121,7 @@ describe("the binder's banner", () => {
     const at = view.indexOf(
       "{binder.yours && <QueueBanners queues={queues.queues} onCheck={setChecking} />}",
     );
-    const grid = view.indexOf('<div className="cfa-bg-binder-page');
+    const grid = view.indexOf('className="cfa-bg-binder-page');
     expect(at).toBeGreaterThan(-1);
     expect(grid).toBeGreaterThan(at);
     expect(view).toContain(

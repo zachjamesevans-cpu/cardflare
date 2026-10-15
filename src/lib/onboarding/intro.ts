@@ -79,38 +79,75 @@ export const WHERE_SKIP = "Skip for now";
 export const REPLAY_LABEL = "Replay the intro";
 
 /*
- * THE PROFILE TOUR. The founder: "i think we need another similar vibe,
- * but when people click the profile for the first time", then "build it
- * go" on four stops. A new player's first Profile visit (queued when the
- * intro ends), and again from Settings -> Help. The same dim, ring and
- * bubble as the Feed's spotlight, one stop at a time.
+ * THE TOURS. The founder: "i think we need another similar vibe, but
+ * when people click the profile for the first time", then, asked what
+ * else would benefit, "build 1-3 go": a store room, your own binder, and
+ * Nearby. The Feed spotlight's dim, ring and bubble, one stop at a time.
+ *
+ * The rules, the same for every tour: a new player only (all are queued
+ * when the intro ends, so an update never shows one); each shows once,
+ * on the first visit to its screen; three or four stops at most; Skip
+ * always ends it; a stop with nothing to point at is passed over; and
+ * Settings -> Help -> "Replay tips" queues them all again.
  */
+export type TourId = "profile" | "room" | "binder" | "nearby";
+
 export interface TourStop {
-  key: "binders" | "share" | "wand" | "tabs";
+  key: string;
   line: string;
 }
 
-export const PROFILE_TOUR: readonly TourStop[] = [
-  {
-    key: "binders",
-    line: "Your binders live here. Tap New to start one: name it, pick a cover, keep it public or private.",
-  },
-  {
-    key: "share",
-    line: "Send anyone a link to your profile. Open a binder to share just that one.",
-  },
-  { key: "wand", line: "Make it yours: rings, auras and more from the Embers shop." },
-  { key: "tabs", line: "Your Flares, hunts and trades, all in one place." },
-];
+export const TOURS: Record<TourId, readonly TourStop[]> = {
+  profile: [
+    {
+      key: "binders",
+      line: "Your binders live here. Tap New to start one: name it, pick a cover, keep it public or private.",
+    },
+    {
+      key: "share",
+      line: "Send anyone a link to your profile. Open a binder to share just that one.",
+    },
+    { key: "wand", line: "Make it yours: rings, auras and more from the Embers shop." },
+    { key: "tabs", line: "Your Flares, hunts and trades, all in one place." },
+  ],
+  /* No "open to trades" stop: a signed-in player meets that switch in
+     the composer, not on the room, so it would never be there to ring. */
+  room: [
+    {
+      key: "board",
+      line: "Everyone’s Flares in this room. Tap a card you have to offer it.",
+    },
+    { key: "yours", line: "Your Flares went up when you joined." },
+    { key: "add", line: "Post another for this room here." },
+  ],
+  binder: [
+    { key: "pockets", line: "Tap a pocket to add a card." },
+    { key: "share", line: "Send this binder’s link to anyone." },
+    { key: "settings", line: "Change the cover, or make it private." },
+  ],
+  nearby: [
+    {
+      key: "wanted",
+      line: "People near you who want cards you have. Message them right from here.",
+    },
+    { key: "location", line: "Add your ZIP to see who’s close." },
+  ],
+};
+
+export const TOUR_IDS = Object.keys(TOURS) as TourId[];
+
+/** The first tour, kept by its old name for the profile's callers. */
+export const PROFILE_TOUR = TOURS.profile;
 
 export const TOUR_NEXT = "Next";
 export const TOUR_SKIP = "Skip";
 export const TOUR_DONE = "Got it";
-export const REPLAY_TOUR_LABEL = "Replay the profile tour";
+/** One line in Help for every tour, rather than one per tour. */
+export const REPLAY_TIPS_LABEL = "Replay tips";
 
-/** "1 of 4" */
-export function tourCount(at: number): string {
-  return `${at + 1} of ${PROFILE_TOUR.length}`;
+/** "1 of 3" */
+export function tourCount(at: number, total: number = PROFILE_TOUR.length): string {
+  return `${at + 1} of ${total}`;
 }
 
 /*

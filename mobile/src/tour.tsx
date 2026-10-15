@@ -10,27 +10,31 @@ import {
 } from "react-native";
 
 import {
-  PROFILE_TOUR,
   TOUR_DONE,
+  TOUR_IDS,
   TOUR_NEXT,
   TOUR_SKIP,
+  TOURS,
   tourCount,
-  type TourStop,
+  type TourId,
 } from "./intro-copy";
 import { HoleDim, type DimHole } from "./spotlight";
 import { colors, radius, spacing } from "./theme";
 
 /**
- * The profile tour: four stops the first time a new player opens their
- * Profile. The founder: "i think we need another similar vibe, but when
- * people click the profile for the first time", then "build it go" on
- * the plan - their binders, Share, the wand, the tabs. The Feed
- * spotlight's look (spotlight.tsx), one stop at a time, with Next and
- * Skip. Queued when the intro ends, so somebody who simply updated the
- * app never sees it; Settings -> Help replays it.
+ * The first-visit tours: a few stops the first time a new player opens a
+ * screen - the Profile, a store room, their own binder, Nearby. The
+ * founder: "i think we need another similar vibe, but when people click
+ * the profile for the first time", then "build 1-3 go" for the rest.
+ * The Feed spotlight's look (spotlight.tsx), one stop at a time, with
+ * Next and Skip. The words and the rules are in intro-copy.ts (TOURS).
+ *
+ * All are queued when the intro ends, so somebody who simply updated the
+ * app never sees one; each shows once, on its screen's first visit;
+ * Settings -> Help -> "Replay tips" queues them all again.
  */
 
-const PENDING_KEY = "cf-tour-profile";
+const pendingKey = (id: TourId) => `cf-tour-${id}`;
 /** How far the hole stands off what it points at. */
 const PAD = 6;
 /** Room the bubble needs below a stop before it goes above instead. */
@@ -38,17 +42,20 @@ const BUBBLE_ROOM = 170;
 
 /* --- The stops: whatever each one's view is. ---------------------- */
 
-const targets = new Map<TourStop["key"], React.RefObject<View | null>>();
+/* By tour and stop: a binder's "share" is not the profile's. */
+const targets = new Map<string, React.RefObject<View | null>>();
+const slot = (tour: TourId, key: string) => `${tour}:${key}`;
 
 /** Marks the view a stop points at. */
-export function useTourTarget(key: TourStop["key"]): React.RefObject<View | null> {
+export function useTourTarget(tour: TourId, key: string): React.RefObject<View | null> {
   const ref = useRef<View>(null);
   useEffect(() => {
-    targets.set(key, ref);
+    const at = slot(tour, key);
+    targets.set(at, ref);
     return () => {
-      if (targets.get(key) === ref) targets.delete(key);
+      if (targets.get(at) === ref) targets.delete(at);
     };
-  }, [key]);
+  }, [tour, key]);
   return ref;
 }
 
@@ -56,38 +63,46 @@ export function useTourTarget(key: TourStop["key"]): React.RefObject<View | null
 
 const listeners = new Set<() => void>();
 
-export async function queueProfileTour(): Promise<void> {
-  try {
-    await SecureStore.setItemAsync(PENDING_KEY, "1");
-  } catch {
-    /* A nicety: if it cannot be stored, the Profile just opens plain. */
+/** Every tour due again, or only the ones named. */
+export async function queueTours(ids: readonly TourId[] = TOUR_IDS): Promise<void> {
+  for (const id of ids) {
+    try {
+      await SecureStore.setItemAsync(pendingKey(id), "1");
+    } catch {
+      /* A nicety: if it cannot be stored, the screen just opens plain. */
+    }
   }
   for (const listener of listeners) listener();
 }
 
-async function takeTour(): Promise<boolean> {
+async function takeTour(id: TourId): Promise<boolean> {
   try {
-    if ((await SecureStore.getItemAsync(PENDING_KEY)) !== "1") return false;
-    await SecureStore.deleteItemAsync(PENDING_KEY);
+    if ((await SecureStore.getItemAsync(pendingKey(id))) !== "1") return false;
+    await SecureStore.deleteItemAsync(pendingKey(id));
     return true;
   } catch {
     return false;
   }
 }
 
-/** The round ones are icons; the others are rows. */
-const ROUND: ReadonlySet<TourStop["key"]> = new Set(["share", "wand"]);
+/** The round ones are icons; the others are rows and panels. */
+const ROUND: ReadonlySet<string> = new Set([
+  "profile:share",
+  "profile:wand",
+  "binder:share",
+  "binder:settings",
+]);
 
 /** How far a row's ring stays inside the screen's edges. */
 const EDGE = 4;
 
-function measure(key: TourStop["key"], screenWidth: number): Promise<DimHole | null> {
+function measure(at: string, screenWidth: number): Promise<DimHole | null> {
   return new Promise((resolve) => {
-    const view = targets.get(key)?.current;
+    const view = targets.get(at)?.current;
     if (!view) return resolve(null);
     view.measureInWindow((x, y, width, height) => {
       if (width <= 0 || height <= 0) return resolve(null);
-      if (ROUND.has(key)) {
+      if (ROUND.has(at)) {
         const size = Math.max(width, height) + PAD * 2;
         return resolve({
           x: x + width / 2 - size / 2,
@@ -117,17 +132,23 @@ function measure(key: TourStop["key"], screenWidth: number): Promise<DimHole | n
   });
 }
 
-/** Drawn by the Profile. Waits for a queued tour, then walks the stops. */
-export function ProfileTour() {
+/**
+ * Drawn by a screen. Waits for its tour to be due, then walks the stops.
+ * `when` false holds the tour back - it stays due for a later visit (a
+ * binder that already has cards does not need "tap a pocket").
+ */
+export function Tour({ id, when = true }: { id: TourId; when?: boolean }) {
   const window = useWindowDimensions();
+  const stops = TOURS[id];
   const [at, setAt] = useState<number | null>(null);
   const [hole, setHole] = useState<DimHole | null>(null);
 
   useEffect(() => {
+    if (!when) return;
     let live = true;
     const check = () => {
-      void takeTour().then((due) => {
-        /* After the Profile has drawn, so the stops are where they stay. */
+      void takeTour(id).then((due) => {
+        /* After the screen has drawn, so the stops are where they stay. */
         if (due && live) setTimeout(() => live && setAt(0), 800);
       });
     };
@@ -137,7 +158,7 @@ export function ProfileTour() {
       live = false;
       listeners.delete(check);
     };
-  }, []);
+  }, [id, when]);
 
   /* Each stop measured as it comes up; one that is not on the screen is
      passed over rather than pointed at in the wrong place. */
@@ -146,9 +167,16 @@ export function ProfileTour() {
     let live = true;
     setHole(null);
     void (async () => {
-      /* Up to about four seconds: the Profile may still be loading. */
+      /*
+       * Up to about four seconds when the stop is on the screen but not
+       * drawn yet (still loading); about a second when nothing has
+       * claimed it at all - the ZIP ask once a ZIP is saved - so a stop
+       * that will never come is not a pause.
+       */
+      const at_ = slot(id, stops[at].key);
       for (let tries = 0; tries < 16 && live; tries++) {
-        const found = await measure(PROFILE_TOUR[at].key, window.width);
+        if (tries >= 4 && !targets.get(at_)?.current) break;
+        const found = await measure(at_, window.width);
         if (found && found.y + found.height <= window.height && found.y >= 0) {
           if (live) setHole(found);
           return;
@@ -169,13 +197,13 @@ export function ProfileTour() {
   };
   const next = () =>
     setAt((current) =>
-      current === null || current >= PROFILE_TOUR.length - 1 ? null : current + 1,
+      current === null || current >= stops.length - 1 ? null : current + 1,
     );
 
   if (at === null || !hole) return null;
 
-  const stop = PROFILE_TOUR[at];
-  const last = at === PROFILE_TOUR.length - 1;
+  const stop = stops[at];
+  const last = at === stops.length - 1;
   const below = hole.y + hole.height + BUBBLE_ROOM < window.height;
 
   return (
@@ -211,7 +239,7 @@ export function ProfileTour() {
       >
         <Text style={styles.line}>{stop.line}</Text>
         <View style={styles.actions}>
-          <Text style={styles.count}>{tourCount(at)}</Text>
+          <Text style={styles.count}>{tourCount(at, stops.length)}</Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
             {last ? null : (
               <Pressable onPress={close} hitSlop={8} accessibilityRole="button">
@@ -295,3 +323,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
 });
+
+/** The Profile's tour, by its old name. */
+export function ProfileTour() {
+  return <Tour id="profile" />;
+}

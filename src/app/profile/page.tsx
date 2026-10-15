@@ -12,7 +12,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PROFILE_BLOCK, ProfileHeader } from "@/components/players/profile-header";
 import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileTabs } from "@/components/players/profile-tabs";
-import { ProfileTour } from "@/components/onboarding/profile-tour";
+import { Tour } from "@/components/onboarding/tour";
 import { profileTabFrom } from "@/lib/players/profile-tabs";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
 import { listFollowers, listFollowing } from "@/lib/players/follows";
@@ -199,8 +199,8 @@ export default async function ProfilePage({
                 screen, not a section, so it is not a tab. */}
             <div className="absolute top-3 right-3 z-10 flex gap-2">
               {/* Share and the wand are the profile tour's second and
-                  third stops (ProfileTour). */}
-              <span data-tour="share" className="flex">
+                  third stops (Tour). */}
+              <span data-tour="profile:share" className="flex">
                 <ShareProfileButton
                   url={`${siteUrl()}/p/${profile.playerId}`}
                   title={`${profile.displayName} on cardflare`}
@@ -208,7 +208,7 @@ export default async function ProfilePage({
               </span>
               <Link
                 href="/profile/customize"
-                data-tour="wand"
+                data-tour="profile:wand"
                 title="Customize"
                 className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
               >
@@ -290,11 +290,11 @@ export default async function ProfilePage({
 
             {/* Your binders, in your order, and a "+" to start another.
                 The public page draws the same row without the "+". */}
-            <div data-tour="binders">
+            <div data-tour="profile:binders">
               <BinderHighlights binders={profile.binders} yours base="/profile" />
             </div>
             {/* A new player's first visit, or the replay: four stops. */}
-            <ProfileTour />
+            <Tour id="profile" />
 
             {/* The sections, as tabs that slide in place under the
                 strip. Each pane is rendered here and handed over whole;

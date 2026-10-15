@@ -57,7 +57,7 @@ import { ProfileFlares, stillWanted } from "../profile-flares";
 import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
 import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
-import { ProfileTour, useTourTarget } from "../profile-tour";
+import { ProfileTour, useTourTarget } from "../tour";
 import { HuntsPanel } from "../hunts-panel";
 import {
   OWN_TABS,
@@ -182,10 +182,10 @@ export function ProfileScreen() {
 
   /* The wand's two doors - your look, and the Embers shop - when open. */
   const [wandMenu, setWandMenu] = useState<ActionItem[] | null>(null);
-  /* The profile tour's stops on this screen (profile-tour.tsx). */
-  const tourBinders = useTourTarget("binders");
-  const tourShare = useTourTarget("share");
-  const tourWand = useTourTarget("wand");
+  /* The profile tour's stops on this screen (tour.tsx). */
+  const tourBinders = useTourTarget("profile", "binders");
+  const tourShare = useTourTarget("profile", "share");
+  const tourWand = useTourTarget("profile", "wand");
 
   /* The showcase explainer, folded behind its "?". */
   const [showcaseHelp, setShowcaseHelp] = useState(false);
@@ -940,7 +940,7 @@ export function ProfileScreen() {
           }}
         >
           {/* Share and the wand are the profile tour's second and third
-              stops (profile-tour.tsx). */}
+              stops (tour.tsx). */}
           <View ref={tourShare} collapsable={false}>
             <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
           </View>

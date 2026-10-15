@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Tour } from "@/components/onboarding/tour";
 import { useRouter } from "next/navigation";
 import { Fragment, useCallback, useEffect, useState, useTransition } from "react";
 import {
@@ -233,8 +234,12 @@ export function LocalScreen({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* A new player's first look: two stops, once (onboarding/tour). A
+          stop with nothing showing - no ZIP ask once one is saved - is
+          passed over. */}
+      <Tour id="nearby" />
       {feed.source === "none" ? (
-        <Card className="flex flex-col gap-4">
+        <Card className="flex flex-col gap-4" tour="nearby:location">
           <div className="flex items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-accent/30 bg-accent/10">
               <MapPin className="size-5 text-accent" aria-hidden="true" />
@@ -308,7 +313,11 @@ export function LocalScreen({
        * answered; the Flare tab is where they are written.
        */}
       {feed.source !== "none" && (
-        <section className="flex flex-col gap-3" aria-label="Wanted near you">
+        <section
+          className="flex flex-col gap-3"
+          aria-label="Wanted near you"
+          data-tour="nearby:wanted"
+        >
           <h2 className="text-sm font-semibold tracking-wide text-text-secondary uppercase">
             Wanted near you
           </h2>
