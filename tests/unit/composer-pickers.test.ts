@@ -1,0 +1,106 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * The composer's printing and hunt choices. The founder (2026-10-15):
+ * "it feels weird to scroll left when everywhere else on the app you
+ * scroll down to change printing ... the 'add to a hunt' thing at
+ * bottom is very weirdly placed." Then: "build your suggestions".
+ */
+
+const root = path.resolve(__dirname, "../..");
+const read = (file: string) => readFileSync(path.join(root, file), "utf8");
+const app = read("mobile/src/screens/flare-composer.tsx");
+const web = read("src/components/flares/flare-composer.tsx");
+
+describe("the printing", () => {
+  it("is a row that opens a list down, with each printing's art", () => {
+    expect(app).toContain('label="Printing"');
+    expect(app).toContain("<PrintingSheet");
+    expect(web).toContain('label="Printing"');
+    expect(web).toContain("<PrintingSheet");
+    const appSheets = read("mobile/src/composer-sheets.tsx");
+    expect(appSheets).toContain('label="Any printing"');
+    expect(appSheets).toMatch(/art=\{\s*<CardImage imageUrl=\{printing\.imageUrl\}/);
+    const webSheets = read("src/components/flares/composer-sheets.tsx");
+    expect(webSheets).toContain('label="Any printing"');
+    expect(webSheets).toContain("printing.imageUrl &&");
+  });
+
+  it("no longer scrolls sideways or drops down", () => {
+    const editor = app.slice(app.indexOf("function CardEditor("));
+    expect(editor.slice(0, editor.indexOf("Copies needed"))).not.toContain(
+      "horizontal",
+    );
+    expect(web).not.toContain('<option value="">Any printing</option>');
+  });
+});
+
+describe("the hunt", () => {
+  it("sits under Looking for / Offering, not at the foot of the form", () => {
+    for (const source of [app, web]) {
+      const intent = source.indexOf("Looking for");
+      const hunt = source.indexOf('label="Hunt"');
+      const cards = source.indexOf("Cards in this flare");
+      expect(hunt).toBeGreaterThan(intent);
+      expect(hunt).toBeLessThan(cards);
+    }
+    expect(app).not.toContain("function HuntPicker(");
+    expect(web).not.toContain('<option value="__new">New hunt</option>');
+  });
+
+  it("opens a sheet: no hunt, theirs, or a new one named there", () => {
+    for (const file of [
+      "mobile/src/composer-sheets.tsx",
+      "src/components/flares/composer-sheets.tsx",
+    ]) {
+      const sheets = read(file);
+      expect(sheets, file).toContain('label="No hunt"');
+      expect(sheets, file).toContain('label="Start a new hunt"');
+      expect(sheets, file).toContain("Start this hunt");
+    }
+  });
+});
+
+describe("a card's own choices", () => {
+  /* The founder: "if you click on the card itself, it like fades into
+     an overlay and blurs the background behind it ... in there is where
+     you'll change quantity, printing, etc." */
+  it("open in an overlay over the blurred page, not inline in the form", () => {
+    expect(app).toMatch(/<CardOverlay onClose=\{\(\) => setEditing\(null\)\}>/);
+    expect(app).toContain("<SheetBackdrop />");
+    expect(web).toMatch(/<Sheet\s+open=\{editingCard !== null\}/);
+    for (const source of [app, web]) expect(source).toMatch(/Done/);
+  });
+
+  /* "you should be able to swipe between the cards so you don't have to
+     tap out to go to next card" - the cards in this flare. */
+  it("pages along the cards in this flare without closing", () => {
+    expect(app).toContain("<CardPager");
+    expect(app).toContain("pagingEnabled");
+    expect(web).toContain("<CardSteps");
+    expect(web).toContain('event.key === "ArrowRight"');
+  });
+});
+
+describe("no offering in the composer", () => {
+  /* The founder (2026-10-15): "delete the offering thing altogether. i
+     truly think just having a binder is more than enough for trades.
+     and delete the 'looking for' text." Every post is a want. */
+  it("has no Looking for / Offering choice or line", () => {
+    for (const source of [app, web]) {
+      expect(source).not.toContain("Switch to offering");
+      expect(source).not.toContain("Switch to looking for");
+    }
+    expect(app).not.toContain("function IntentControl(");
+  });
+
+  it("treats a draft saved as an offer as a want", () => {
+    expect(app).toMatch(/Always a want now[\s\S]{0,80}intent: "want",/);
+    expect(read("src/components/flares/draft.ts")).toMatch(
+      /Always a want now[\s\S]{0,80}intent: "want",/,
+    );
+  });
+});

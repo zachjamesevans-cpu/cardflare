@@ -1,5 +1,12 @@
 "use client";
 
+import { Sheet } from "@/components/ui/sheet";
+import {
+  HuntSheet,
+  PickerRow,
+  PrintingSheet,
+  huntRowValue,
+} from "@/components/flares/composer-sheets";
 import { CardNoteField } from "@/components/flares/card-note-field";
 import {
   useEffect,
@@ -9,7 +16,15 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, Plus, Star, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -32,7 +47,7 @@ import {
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, Textarea, TextInput } from "@/components/ui/controls";
+import { Textarea } from "@/components/ui/controls";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
@@ -149,6 +164,8 @@ function ComposerBody({
   });
   const [step, setStep] = useState<Step>("compose");
   const [editing, setEditing] = useState<string | null>(null);
+  /* The hunt sheet, open or not (composer-sheets.tsx). */
+  const [choosingHunt, setChoosingHunt] = useState(false);
   /** The line key being dragged, while a tile is in the air. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -240,8 +257,11 @@ function ComposerBody({
           })),
         ),
         hunt,
-        acceptsTrade: draft.acceptsTrade,
-        acceptsCash: draft.acceptsCash,
+        /* No "Trade or cash" choice any more: the founder, "people can type
+           that on their own. it will free up space." Every post is the plain
+           default, open to trade, and a draft saved before still posts that. */
+        acceptsTrade: true,
+        acceptsCash: false,
         toRoom: room !== null,
       });
       if (!result.ok) {
@@ -362,35 +382,26 @@ function ComposerBody({
         </p>
       </div>
 
-      {/* One direction for the whole post. */}
-      <div
-        role="radiogroup"
-        aria-label="What this flare is"
-        className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-border bg-canvas p-1"
-      >
-        {(
-          [
-            ["want", "Looking for"],
-            ["showcase", "Offering"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={draft.intent === value}
-            onClick={() => patch({ intent: value })}
-            className={cn(
-              "cursor-pointer rounded-[8px] py-2 text-sm font-semibold transition-colors",
-              draft.intent === value
-                ? "bg-accent text-accent-contrast"
-                : "text-text-secondary hover:text-text-primary",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* THE HUNT, with what the post is for, not at the foot of the
+          form. The founder: "the 'add to a hunt' thing at bottom is very
+          weirdly placed." Wants only. */}
+      {draft.intent === "want" && (
+        <>
+          <PickerRow
+            label="Hunt"
+            icon={Crosshair}
+            value={huntRowValue(draft.hunt, hunts)}
+            onClick={() => setChoosingHunt(true)}
+          />
+          <HuntSheet
+            open={choosingHunt}
+            hunts={hunts}
+            value={draft.hunt}
+            onChange={(hunt) => patch({ hunt })}
+            onClose={() => setChoosingHunt(false)}
+          />
+        </>
+      )}
 
       {/* The cards, in order, with the cover first. */}
       <div className="flex flex-col gap-3">
@@ -507,23 +518,50 @@ function ComposerBody({
           </li>
         </ul>
 
-        {editingCard && (
-          <CardEditor
-            item={editingCard}
-            index={draft.cards.findIndex((item) => keyOf(item) === keyOf(editingCard))}
-            count={draft.cards.length}
-            copiesLabel={copiesLabel}
-            onPrinting={(printingId) => {
-              const key = keyOf(editingCard);
-              patch({ cards: changePrinting(draft.cards, key, printingId) });
-              setEditing(lineKey(editingCard.card.id, printingId));
-            }}
-            onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
-            onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
-            onCover={() => makeCover(keyOf(editingCard))}
-            onRemove={() => remove(keyOf(editingCard))}
-          />
-        )}
+        {/* The card being edited, lifted out of the form into a sheet over
+            the blurred page: printing, copies and its note live there and
+            nowhere else. The founder: "having a text box, then another
+            text box right below is quite confusing." The app's overlay
+            is the same. */}
+        <Sheet
+          open={editingCard !== null}
+          onClose={() => setEditing(null)}
+          title={editingCard?.card.exactName ?? ""}
+        >
+          {/* Along the cards in this flare without closing: the founder,
+              "you should be able to swipe between the cards so you don't
+              have to tap out to go to next card." Arrows, the keyboard's
+              arrow keys, and a swipe on a touch screen. */}
+          {editingCard && draft.cards.length > 1 && (
+            <CardSteps
+              index={draft.cards.findIndex(
+                (item) => keyOf(item) === keyOf(editingCard),
+              )}
+              count={draft.cards.length}
+              onStep={(index) => setEditing(keyOf(draft.cards[index]))}
+            />
+          )}
+          {editingCard && (
+            <CardEditor
+              onDone={() => setEditing(null)}
+              item={editingCard}
+              index={draft.cards.findIndex(
+                (item) => keyOf(item) === keyOf(editingCard),
+              )}
+              count={draft.cards.length}
+              copiesLabel={copiesLabel}
+              onPrinting={(printingId) => {
+                const key = keyOf(editingCard);
+                patch({ cards: changePrinting(draft.cards, key, printingId) });
+                setEditing(lineKey(editingCard.card.id, printingId));
+              }}
+              onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
+              onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
+              onCover={() => makeCover(keyOf(editingCard))}
+              onRemove={() => remove(keyOf(editingCard))}
+            />
+          )}
+        </Sheet>
       </div>
 
       {/* What goes with every card. */}
@@ -551,100 +589,6 @@ function ComposerBody({
           className="min-h-0"
         />
       </label>
-
-      {draft.intent === "want" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-text-secondary">
-              Add to a hunt
-            </span>
-            <Select
-              value={
-                draft.hunt.kind === "existing"
-                  ? draft.hunt.id
-                  : draft.hunt.kind === "new"
-                    ? "__new"
-                    : ""
-              }
-              onChange={(event) => {
-                const value = event.target.value;
-                patch({
-                  hunt:
-                    value === ""
-                      ? { kind: "none" }
-                      : value === "__new"
-                        ? { kind: "new", name: "" }
-                        : { kind: "existing", id: value },
-                });
-              }}
-            >
-              <option value="">No hunt</option>
-              {hunts.map((hunt) => (
-                <option key={hunt.id} value={hunt.id}>
-                  {hunt.name}
-                </option>
-              ))}
-              <option value="__new">New hunt</option>
-            </Select>
-          </label>
-          {draft.hunt.kind === "new" && (
-            <TextInput
-              value={draft.hunt.name}
-              onChange={(event) =>
-                patch({ hunt: { kind: "new", name: event.target.value.slice(0, 60) } })
-              }
-              maxLength={60}
-              placeholder="Hunt name, like Green Zoro"
-              aria-label="Hunt name"
-              autoFocus
-            />
-          )}
-          {draft.hunt.kind !== "none" && (
-            <p className="text-xs text-text-muted">
-              Cards already on the hunt keep their copies; new cards are added.
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* What they will do for it. */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Open to</span>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["acceptsTrade", "Trade"],
-              ["acceptsCash", "Cash ok"],
-            ] as const
-          ).map(([key, label]) => {
-            /* The last one on cannot be switched off: a Flare open to
-               nothing is not a Flare, and the database says so too. The
-               app's composer holds the same line. */
-            const last =
-              draft[key] &&
-              !draft[key === "acceptsTrade" ? "acceptsCash" : "acceptsTrade"];
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={draft[key]}
-                aria-disabled={last || undefined}
-                onClick={() => {
-                  if (!last) patch({ [key]: !draft[key] });
-                }}
-                className={cn(
-                  "cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors",
-                  draft[key]
-                    ? "border-accent bg-accent text-accent-contrast"
-                    : "border-border-strong text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {error && (
         <p role="alert" className="text-sm text-danger">
@@ -697,7 +641,9 @@ function CardEditor({
   onNote,
   onCover,
   onRemove,
+  onDone,
 }: {
+  onDone: () => void;
   item: DraftCard;
   index: number;
   count: number;
@@ -709,18 +655,20 @@ function CardEditor({
   onRemove: () => void;
 }) {
   const printing = chosenPrinting(item);
-  const hasChoice = item.card.printings.length > 1;
+  /* Any printing or this one is a choice even with one printing. */
+  const hasChoice = item.card.printings.length > 0;
+  const [choosingPrinting, setChoosingPrinting] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3">
-      <div className="flex items-start gap-3">
-        <span className="block h-[70px] w-[50px] shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="block h-[184px] w-[132px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
           {printing?.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={printing.imageUrl} alt="" className="size-full object-cover" />
+            <img src={printing.imageUrl} alt="" className="size-full object-contain" />
           )}
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <p className="truncate font-semibold text-text-primary">
             {item.card.exactName}
           </p>
@@ -733,24 +681,33 @@ function CardEditor({
         </div>
       </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Printing</span>
-        {hasChoice ? (
-          <Select
-            value={item.printingId ?? ""}
-            onChange={(event) => onPrinting(event.target.value || null)}
-          >
-            <option value="">Any printing</option>
-            {item.card.printings.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {printingLabel(entry, item.card.exactName) ?? "This printing"}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <span className="text-sm text-text-muted">Any printing</span>
-        )}
-      </label>
+      {/* Which printing: one row saying which, the list down in a sheet
+          with each version's art. The app's composer is the same. */}
+      {hasChoice ? (
+        <>
+          <PickerRow
+            label="Printing"
+            value={
+              printing && item.printingId
+                ? (printingLabel(printing, item.card.exactName) ?? "This printing")
+                : "Any printing"
+            }
+            onClick={() => setChoosingPrinting(true)}
+          />
+          <PrintingSheet
+            open={choosingPrinting}
+            name={item.card.exactName}
+            printings={item.card.printings.map((entry) => ({
+              id: entry.id,
+              label: printingLabel(entry, item.card.exactName) ?? "This printing",
+              imageUrl: entry.imageUrl,
+            }))}
+            value={item.printingId}
+            onPick={onPrinting}
+            onClose={() => setChoosingPrinting(false)}
+          />
+        </>
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-text-secondary">{copiesLabel}</span>
@@ -795,6 +752,82 @@ function CardEditor({
           Remove
         </Button>
       </div>
+
+      <Button type="button" onClick={onDone}>
+        Done
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * "‹ 2 of 3 ›" over the card in the sheet, and the same steps from the
+ * keyboard's arrows and a sideways swipe: the cards in this flare, one
+ * after another, without closing. The app's overlay swipes the same way.
+ */
+function CardSteps({
+  index,
+  count,
+  onStep,
+}: {
+  index: number;
+  count: number;
+  onStep: (index: number) => void;
+}) {
+  const go = (delta: number) => {
+    const next = index + delta;
+    if (next >= 0 && next < count) onStep(next);
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      /* Not while typing: the arrows move the caret in the note. */
+      const typing = (event.target as HTMLElement | null)?.closest("input, textarea");
+      if (typing) return;
+      if (event.key === "ArrowLeft") go(-1);
+      if (event.key === "ArrowRight") go(1);
+    };
+    document.addEventListener("keydown", onKey);
+    const start = { x: 0 };
+    const onTouchStart = (event: TouchEvent) => {
+      start.x = event.touches[0]?.clientX ?? 0;
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const dx = (event.changedTouches[0]?.clientX ?? 0) - start.x;
+      if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+    };
+    document.addEventListener("touchstart", onTouchStart);
+    document.addEventListener("touchend", onTouchEnd);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchend", onTouchEnd);
+    };
+  });
+
+  return (
+    <div className="mb-3 flex items-center justify-center gap-4">
+      <button
+        type="button"
+        onClick={() => go(-1)}
+        disabled={index === 0}
+        aria-label="Previous card"
+        className="cursor-pointer rounded-full p-1.5 text-text-secondary hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+      >
+        <ChevronLeft className="size-5" aria-hidden="true" />
+      </button>
+      <span className="text-sm text-text-muted">
+        {index + 1} of {count}
+      </span>
+      <button
+        type="button"
+        onClick={() => go(1)}
+        disabled={index === count - 1}
+        aria-label="Next card"
+        className="cursor-pointer rounded-full p-1.5 text-text-secondary hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+      >
+        <ChevronRight className="size-5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

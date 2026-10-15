@@ -1,10 +1,28 @@
+import {
+  HuntSheet,
+  PickerRow,
+  PrintingSheet,
+  huntRowValue,
+  type HuntChoice,
+} from "../composer-sheets";
 import { CardNoteField } from "../card-note-field";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+
+import { SheetBackdrop } from "../action-menu";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -76,8 +94,6 @@ type DraftItem = PickedLine;
 /** One line per printing: the picker's rule, src/card-select.tsx. */
 const keyOf = lineKey;
 
-type HuntChoice =
-  { kind: "existing"; id: string } | { kind: "new"; name: string } | null;
 
 /** What is saved between opens. Versioned so an older shape is dropped. */
 interface Draft {
@@ -190,6 +206,8 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /* The hunt sheet, open or not (composer-sheets.tsx). */
+  const [choosingHunt, setChoosingHunt] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
@@ -272,7 +290,8 @@ export function FlareComposer({
           const base: Draft = {
             ...saved,
             hunt: current.hunt ?? saved.hunt,
-            intent: current.hunt ? "want" : saved.intent,
+            /* Always a want now: offering lives in trade binders. */
+            intent: "want",
           };
           return card ? withCardFirst(base, card, handedLine) : base;
         });
@@ -454,8 +473,11 @@ export function FlareComposer({
             : draft.hunt.kind === "existing"
               ? { id: draft.hunt.id }
               : { name: draft.hunt.name.trim() },
-        acceptsTrade: draft.acceptsTrade,
-        acceptsCash: draft.acceptsCash,
+        /* No "Trade or cash" choice any more: the founder, "people can type
+           that on their own. it will free up space." Every post is the plain
+           default, open to trade, and a draft saved before still posts that. */
+        acceptsTrade: true,
+        acceptsCash: false,
         latitude: at?.latitude,
         longitude: at?.longitude,
       });
@@ -597,12 +619,26 @@ export function FlareComposer({
             />
           ) : (
             <>
-              <IntentControl
-                value={draft.intent}
-                onChange={(intent) =>
-                  patch({ intent, hunt: intent === "want" ? draft.hunt : null })
-                }
-              />
+              {/* THE HUNT, with what the post is for, not at the foot of
+                  the form. The founder: "the 'add to a hunt' thing at
+                  bottom is very weirdly placed." Wants only. */}
+              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
+                <PickerRow
+                  label="Hunt"
+                  icon="locate-outline"
+                  value={huntRowValue(draft.hunt, hunts)}
+                  onPress={() => setChoosingHunt(true)}
+                />
+              ) : null}
+              {choosingHunt ? (
+                <HuntSheet
+                  hunts={hunts}
+                  limit={huntLimit}
+                  value={draft.hunt}
+                  onChange={(hunt) => patch({ hunt })}
+                  onClose={() => setChoosingHunt(false)}
+                />
+              ) : null}
 
               <View
                 style={{
@@ -656,53 +692,75 @@ export function FlareComposer({
                 }}
               />
 
-              {editing ? (
-                <CardEditor
-                  item={draft.items.find((item) => keyOf(item) === editing) ?? null}
-                  index={draft.items.findIndex((item) => keyOf(item) === editing)}
-                  count={draft.items.length}
-                  intent={draft.intent}
-                  onChange={(next) => {
-                    /* A printing change re-keys the line; landing on a
-                       line already there folds the two into one. */
-                    const target = keyOf(next);
-                    const twin = draft.items.find(
-                      (item) => keyOf(item) === target && keyOf(item) !== editing,
-                    );
-                    if (twin) {
-                      setItems(
-                        draft.items
-                          .filter((item) => keyOf(item) !== editing)
-                          .map((item) =>
-                            keyOf(item) === target
-                              ? {
-                                  ...item,
-                                  quantity: Math.min(99, item.quantity + next.quantity),
-                                  /* Folding keeps a note: the twin's, or this one's. */
-                                  cardNote: item.cardNote || next.cardNote,
-                                }
-                              : item,
-                          ),
+              {editing && draft.items.some((item) => keyOf(item) === editing) ? (
+                <CardOverlay onClose={() => setEditing(null)}>
+                  {/* Swipe between the cards in this flare without
+                      closing: the founder, "you should be able to swipe
+                      between the cards so you don't have to tap out to go
+                      to next card." Remounted when the order changes, so
+                      it always opens on the card being edited. */}
+                  <CardPager
+                    key={draft.items.map(keyOf).join("|")}
+                    count={draft.items.length}
+                    index={draft.items.findIndex((item) => keyOf(item) === editing)}
+                    onIndex={(index) => setEditing(keyOf(draft.items[index]))}
+                    renderPage={(index) => {
+                      const item = draft.items[index];
+                      const key = keyOf(item);
+                      return (
+                        <CardEditor
+                          onDone={() => setEditing(null)}
+                          item={item}
+                          index={index}
+                          count={draft.items.length}
+                          intent={draft.intent}
+                          onChange={(next) => {
+                            /* A printing change re-keys the line; landing on
+                               a line already there folds the two into one. */
+                            const target = keyOf(next);
+                            const twin = draft.items.find(
+                              (entry) => keyOf(entry) === target && keyOf(entry) !== key,
+                            );
+                            if (twin) {
+                              setItems(
+                                draft.items
+                                  .filter((entry) => keyOf(entry) !== key)
+                                  .map((entry) =>
+                                    keyOf(entry) === target
+                                      ? {
+                                          ...entry,
+                                          quantity: Math.min(
+                                            99,
+                                            entry.quantity + next.quantity,
+                                          ),
+                                          /* Folding keeps a note: the twin's,
+                                             or this one's. */
+                                          cardNote: entry.cardNote || next.cardNote,
+                                        }
+                                      : entry,
+                                  ),
+                              );
+                            } else {
+                              setItems(
+                                draft.items.map((entry) =>
+                                  keyOf(entry) === key ? next : entry,
+                                ),
+                              );
+                            }
+                            setEditing(target);
+                          }}
+                          onCover={() =>
+                            setItems([item, ...draft.items.filter((entry) => entry !== item)])
+                          }
+                          onRemove={() => {
+                            setItems(draft.items.filter((entry) => keyOf(entry) !== key));
+                            setEditing(null);
+                          }}
+                        />
                       );
-                    } else {
-                      setItems(
-                        draft.items.map((item) =>
-                          keyOf(item) === editing ? next : item,
-                        ),
-                      );
-                    }
-                    setEditing(target);
-                  }}
-                  onCover={() => {
-                    const item = draft.items.find((entry) => keyOf(entry) === editing);
-                    if (!item) return;
-                    setItems([item, ...draft.items.filter((entry) => entry !== item)]);
-                  }}
-                  onRemove={() => {
-                    setItems(draft.items.filter((item) => keyOf(item) !== editing));
-                    setEditing(null);
-                  }}
-                />
+                    }}
+                  />
+                </CardOverlay>
               ) : null}
 
               <Input
@@ -713,33 +771,6 @@ export function FlareComposer({
                 multiline
                 style={{ minHeight: 64, textAlignVertical: "top" }}
               />
-
-              <Body>Trade or cash?</Body>
-              <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                {/* Never both off: a Flare nobody can answer is not a
-                    Flare. The server enforces it too. */}
-                <Pill
-                  label="Trade"
-                  active={draft.acceptsTrade}
-                  disabled={draft.acceptsTrade && !draft.acceptsCash}
-                  onPress={() => patch({ acceptsTrade: !draft.acceptsTrade })}
-                />
-                <Pill
-                  label="Cash"
-                  active={draft.acceptsCash}
-                  disabled={draft.acceptsCash && !draft.acceptsTrade}
-                  onPress={() => patch({ acceptsCash: !draft.acceptsCash })}
-                />
-              </View>
-
-              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
-                <HuntPicker
-                  hunts={hunts}
-                  limit={huntLimit}
-                  value={draft.hunt}
-                  onChange={(hunt) => patch({ hunt })}
-                />
-              ) : null}
 
               {/* Nearby matching rides with Local: off the screen entirely
                   while Local is off, the same rule the website's form
@@ -856,60 +887,6 @@ function StepStrip({ step }: { step: Step }) {
 }
 
 /** Looking for | Offering, one answer for the whole post. */
-function IntentControl({
-  value,
-  onChange,
-}: {
-  value: "want" | "showcase";
-  onChange: (intent: "want" | "showcase") => void;
-}) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: 3,
-      }}
-    >
-      {(
-        [
-          { key: "want", label: "Looking for" },
-          { key: "showcase", label: "Offering" },
-        ] as const
-      ).map((option) => {
-        const on = value === option.key;
-        return (
-          <Tap
-            key={option.key}
-            onPress={() => onChange(option.key)}
-            accessibilityLabel={option.label}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              paddingVertical: spacing(2),
-              borderRadius: radius.control - 3,
-              backgroundColor: on ? colors.accent : "transparent",
-            }}
-          >
-            <Text
-              style={{
-                color: on ? colors.accentContrast : colors.textSecondary,
-                fontSize: 13,
-                fontWeight: "700",
-              }}
-            >
-              {option.label}
-            </Text>
-          </Tap>
-        );
-      })}
-    </View>
-  );
-}
-
 /** The art for a tray tile: the chosen printing's, else the lead's. */
 function artFor(item: DraftItem): string | null {
   if (item.printingId) {
@@ -928,6 +905,7 @@ function CardEditor({
   onChange,
   onCover,
   onRemove,
+  onDone,
 }: {
   item: DraftItem | null;
   index: number;
@@ -936,7 +914,9 @@ function CardEditor({
   onChange: (next: DraftItem) => void;
   onCover: () => void;
   onRemove: () => void;
+  onDone: () => void;
 }) {
+  const [choosingPrinting, setChoosingPrinting] = useState(false);
   if (!item) return null;
   const options: { id: string | null; label: string }[] = [
     { id: null, label: "Any printing" },
@@ -945,21 +925,13 @@ function CardEditor({
       label: printing.label ?? "Standard printing",
     })),
   ];
+  /* The overlay is the panel; this is only what goes in it. */
   return (
-    <View
-      style={{
-        gap: spacing(2.5),
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: spacing(3),
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+    <View style={{ gap: spacing(3) }}>
+      <View style={{ alignItems: "center", gap: spacing(2) }}>
         <CardImage
           imageUrl={artFor(item)}
-          width={48}
+          width={132}
           name={item.name}
           cardNumber={item.cardNumber}
           caption={
@@ -969,10 +941,15 @@ function CardEditor({
               : null
           }
         />
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <View style={{ alignItems: "center", gap: 2 }}>
           <Text
             numberOfLines={2}
-            style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
+            style={{
+              color: colors.textPrimary,
+              fontWeight: "700",
+              fontSize: 16,
+              textAlign: "center",
+            }}
           >
             {item.name}
           </Text>
@@ -982,41 +959,26 @@ function CardEditor({
         </View>
       </View>
 
-      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Printing</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
-      >
-        {options.map((option) => {
-          const on = item.printingId === option.id;
-          return (
-            <Tap
-              key={option.id ?? "any"}
-              onPress={() => onChange({ ...item, printingId: option.id })}
-              accessibilityLabel={option.label}
-              style={{
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: on ? colors.accent : colors.borderStrong,
-                backgroundColor: on ? colors.accent : "transparent",
-                paddingHorizontal: spacing(3),
-                paddingVertical: spacing(1),
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.accentContrast : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: "700",
-                }}
-              >
-                {option.label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </ScrollView>
+      {/* Which printing: one row saying which, the list down in a sheet.
+          The founder: "it feels weird to scroll left when everywhere else
+          on the app you scroll down to change printing." */}
+      {item.printings.length > 0 ? (
+        <PickerRow
+          label="Printing"
+          value={options.find((option) => option.id === item.printingId)?.label ?? "Any printing"}
+          onPress={() => setChoosingPrinting(true)}
+        />
+      ) : null}
+      {choosingPrinting ? (
+        <PrintingSheet
+          name={item.name}
+          cardNumber={item.cardNumber}
+          printings={item.printings}
+          value={item.printingId}
+          onPick={(printingId) => onChange({ ...item, printingId })}
+          onClose={() => setChoosingPrinting(false)}
+        />
+      ) : null}
 
       <View
         style={{
@@ -1050,7 +1012,130 @@ function CardEditor({
         {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
         <SmallAction label="Remove" onPress={onRemove} danger />
       </View>
+
+      <Button label="Done" onPress={onDone} />
     </View>
+  );
+}
+
+/**
+ * The cards in this flare, side by side in the overlay, one page each:
+ * swipe to the next without closing. Dots under them say where you are.
+ */
+function CardPager({
+  count,
+  index,
+  onIndex,
+  renderPage,
+}: {
+  count: number;
+  index: number;
+  onIndex: (index: number) => void;
+  renderPage: (index: number) => ReactNode;
+}) {
+  const { width } = useWindowDimensions();
+  /* The overlay's panel: the window less its margins and its border. */
+  const page = width - spacing(4) * 2 - 2;
+  const [at, setAt] = useState(index);
+  const rail = useRef<ScrollView>(null);
+  /* Only a swipe the player made moves the card; the jump to the
+     opening card below is not one, and must not report page 0. */
+  const dragged = useRef(false);
+  return (
+    <View>
+      <ScrollView
+        ref={rail}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        /* Open on the card that was tapped, once there is a width to
+           scroll by: contentOffset alone is dropped before layout. */
+        onLayout={() => rail.current?.scrollTo({ x: index * page, animated: false })}
+        onScrollBeginDrag={() => {
+          dragged.current = true;
+        }}
+        onMomentumScrollEnd={(event) => {
+          if (!dragged.current) return;
+          dragged.current = false;
+          const next = Math.round(event.nativeEvent.contentOffset.x / page);
+          if (next < 0 || next >= count || next === at) return;
+          setAt(next);
+          onIndex(next);
+        }}
+      >
+        {Array.from({ length: count }, (_, page_) => (
+          <View key={page_} style={{ width: page, padding: spacing(4) }}>
+            {renderPage(page_)}
+          </View>
+        ))}
+      </ScrollView>
+      {count > 1 ? (
+        <View
+          accessibilityLabel={`Card ${at + 1} of ${count}`}
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: spacing(1.5),
+            paddingBottom: spacing(4),
+          }}
+        >
+          {Array.from({ length: count }, (_, dot) => (
+            <View
+              key={dot}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: dot === at ? colors.accent : colors.borderStrong,
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * A card being edited, lifted out of the form: the page fades and blurs
+ * behind it, and the card's own choices - printing, copies, its note,
+ * cover, remove - are all here and nowhere else. The founder: "if you
+ * click on the card itself, it like fades into an overlay and blurs the
+ * background behind it ... in there is where you'll change quantity,
+ * printing, etc. because currently, having a text box, then another
+ * text box right below is quite confusing." The editor used to open
+ * inline above the caption. The website's composer does the same in
+ * its sheet.
+ */
+function CardOverlay({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable
+          onPress={onClose}
+          style={{ flex: 1, justifyContent: "center", padding: spacing(4) }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              maxHeight: "90%",
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              overflow: "hidden",
+            }}
+          >
+            <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -1086,143 +1171,6 @@ function SmallAction({
         {label}
       </Text>
     </Tap>
-  );
-}
-
-/** "Add to a hunt": one of theirs, or a new one by name. Wants only. */
-function HuntPicker({
-  hunts,
-  limit,
-  value,
-  onChange,
-}: {
-  hunts: Hunt[];
-  limit: number | null;
-  value: HuntChoice;
-  onChange: (next: HuntChoice) => void;
-}) {
-  const [open, setOpen] = useState(value !== null);
-  useEffect(() => {
-    if (value) setOpen(true);
-  }, [value]);
-  const atLimit = limit !== null && hunts.length >= limit;
-
-  if (!open) {
-    return (
-      <Tap
-        onPress={() => setOpen(true)}
-        accessibilityLabel="Add to a hunt"
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-      >
-        <Ionicons name="locate-outline" size={18} color={colors.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-            Add to a hunt
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            Building a deck? Keep the cards together with what is found.
-          </Text>
-        </View>
-        <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
-      </Tap>
-    );
-  }
-
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}>
-          Add to a hunt
-        </Text>
-        <Tap
-          accessibilityLabel="Not in a hunt"
-          onPress={() => {
-            onChange(null);
-            setOpen(false);
-          }}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>Clear</Text>
-        </Tap>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
-      >
-        {hunts
-          .filter((hunt): hunt is Hunt & { id: string } => Boolean(hunt.id))
-          .map((hunt) => {
-            const on = value?.kind === "existing" && value.id === hunt.id;
-            return (
-              <Tap
-                key={hunt.id}
-                onPress={() => onChange({ kind: "existing", id: hunt.id })}
-                accessibilityLabel={hunt.name}
-                style={{
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: on ? colors.accent : colors.borderStrong,
-                  backgroundColor: on ? colors.accent : "transparent",
-                  paddingHorizontal: spacing(3),
-                  paddingVertical: spacing(1),
-                }}
-              >
-                <Text
-                  style={{
-                    color: on ? colors.accentContrast : colors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: "700",
-                  }}
-                >
-                  {hunt.name}
-                </Text>
-              </Tap>
-            );
-          })}
-        <Tap
-          onPress={() =>
-            onChange({ kind: "new", name: value?.kind === "new" ? value.name : "" })
-          }
-          disabled={atLimit}
-          accessibilityLabel="New hunt"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 3,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderStyle: "dashed",
-            borderColor: value?.kind === "new" ? colors.accent : colors.borderStrong,
-            paddingHorizontal: spacing(3),
-            paddingVertical: spacing(1),
-            opacity: atLimit ? 0.5 : 1,
-          }}
-        >
-          <Ionicons name="add" size={12} color={colors.accent} />
-          <Text
-            style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "700" }}
-          >
-            New hunt
-          </Text>
-        </Tap>
-      </ScrollView>
-      {value?.kind === "new" ? (
-        <Input
-          value={value.name}
-          onChangeText={(name) => onChange({ kind: "new", name })}
-          placeholder={'Name it, like "Green Zoro"'}
-          maxLength={40}
-          autoCapitalize="words"
-          autoFocus
-        />
-      ) : null}
-      {atLimit ? (
-        <Muted>{`You are at ${limit} hunts. Add to one of them, or finish one first.`}</Muted>
-      ) : null}
-      {value?.kind === "existing" ? (
-        <Muted>Cards already on the hunt keep their copies; new cards are added.</Muted>
-      ) : null}
-    </View>
   );
 }
 
@@ -1304,8 +1252,8 @@ export function FlareComposerPreview({
     direction: draft.intent,
     deckLabel: huntName,
     postedAt: new Date().toISOString(),
-    acceptsTrade: draft.acceptsTrade,
-    acceptsCash: draft.acceptsCash,
+    acceptsTrade: true,
+    acceptsCash: false,
     note: draft.caption.trim() || null,
     offers: 0,
     hunt:

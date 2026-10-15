@@ -45,11 +45,17 @@ describe("a Flare is open to something", () => {
     expect(publish).not.toMatch(/acceptsTrade: input\.acceptsTrade,/);
   });
 
-  it("the composer never lets the last one be switched off", () => {
-    const composer = read("src/components/flares/flare-composer.tsx");
-    expect(composer).toMatch(/if \(!last\) patch\(\{ \[key\]: !draft\[key\] \}\)/);
-    const app = read("mobile/src/screens/flare-composer.tsx");
-    expect(app).toMatch(/disabled=\{draft\.acceptsTrade && !draft\.acceptsCash\}/);
-    expect(app).toMatch(/disabled=\{draft\.acceptsCash && !draft\.acceptsTrade\}/);
+  /* The choice is gone - the founder (2026-10-15), "delete even the
+     'trade or cash' button. people can type that on their own" - so
+     every post is open to trade, and nothing can switch it off. */
+  it("the composer always posts open to trade", () => {
+    for (const file of [
+      "src/components/flares/flare-composer.tsx",
+      "mobile/src/screens/flare-composer.tsx",
+    ]) {
+      const composer = read(file);
+      expect(composer, file).toContain("acceptsTrade: true,");
+      expect(composer, file).not.toMatch(/Trade or cash\?|"Cash ok"/);
+    }
   });
 });

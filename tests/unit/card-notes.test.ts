@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CARD_NOTE_MAX,
-  CARD_NOTE_SUGGESTIONS,
+  CARD_NOTE_PLACEHOLDER,
   tidyCardNote,
 } from "@/lib/flares/card-note";
 
@@ -29,13 +29,16 @@ describe("the note itself", () => {
     expect(CARD_NOTE_MAX).toBe(80);
   });
 
-  it("offers the common reasons as one tap", () => {
-    expect(CARD_NOTE_SUGGESTIONS).toEqual([
-      "For my PC",
-      "Building a deck",
-      "Trading up",
-      "Need it this week",
-    ]);
+  /* One field, the example in its placeholder: the founder, of the
+     one-tap buttons above it, "just needs to be simplified." */
+  it("is one field, the example in its placeholder", () => {
+    expect(CARD_NOTE_PLACEHOLDER).toContain("For my PC");
+    for (const file of [
+      "mobile/src/ui.tsx",
+      "src/components/flares/card-note-field.tsx",
+    ]) {
+      expect(read(file), file).not.toContain("CARD_NOTE_SUGGESTIONS");
+    }
   });
 
   it("is the same module, word for word, in the app", () => {
