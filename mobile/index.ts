@@ -1,9 +1,9 @@
 import { registerRootComponent } from 'expo';
 import { createElement, useEffect, useState, type ComponentType } from 'react';
-import { View } from 'react-native';
 
 import { loadBackdrop, onRedraw } from './src/backdrop';
 import { installBootErrorTrap } from './src/boot-errors';
+import { LaunchView } from './src/launch-view';
 
 // Before the first render, so a module that dies initializing is
 // caught with its real name - see src/boot-errors.ts for the why.
@@ -35,7 +35,8 @@ function Root() {
     };
   }, []);
 
-  if (!App) return createElement(View, { style: { flex: 1, backgroundColor: '#000000' } });
+  /* The launch screen's twin while the app's own modules load (launch-view.tsx). */
+  if (!App) return createElement(LaunchView);
   return createElement(App, { key: version });
 }
 
