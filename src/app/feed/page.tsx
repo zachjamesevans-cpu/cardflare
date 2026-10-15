@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PostSpotlight } from "@/components/onboarding/post-spotlight";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FeedFilterTabs } from "@/components/feed/feed-filter-tabs";
 import { Plus, Search } from "lucide-react";
@@ -79,10 +80,13 @@ export const dynamic = "force-dynamic";
 function Shell({
   playerId = null,
   unread = 0,
+  tour = false,
   children,
 }: {
   playerId?: string | null;
   unread?: number;
+  /** A new player's first look, from the intro: point at the + (PostSpotlight). */
+  tour?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -95,9 +99,17 @@ function Shell({
          guest posts from a room. */
       leading={
         playerId ? (
-          <Link href="/flare" aria-label="Post a Flare" className={HEADER_BUTTON}>
-            <Plus className={HEADER_ICON} aria-hidden="true" />
-          </Link>
+          <>
+            <Link
+              href="/flare"
+              aria-label="Post a Flare"
+              className={HEADER_BUTTON}
+              data-spotlight="post-flare"
+            >
+              <Plus className={HEADER_ICON} aria-hidden="true" />
+            </Link>
+            {tour && <PostSpotlight />}
+          </>
         ) : undefined
       }
       trailing={
@@ -120,9 +132,9 @@ const TABS: FeedTab[] = FEED_TAB_VALUES;
 export default async function FeedPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; tour?: string }>;
 }) {
-  const { tab: rawTab } = await searchParams;
+  const { tab: rawTab, tour } = await searchParams;
   const tab: FeedTab = TABS.includes(rawTab as FeedTab)
     ? (rawTab as FeedTab)
     : "following";
@@ -217,7 +229,7 @@ export default async function FeedPage({
     tab === "following" ? 0 : new Set(shown.map((item) => item.section)).size;
 
   return (
-    <Shell playerId={playerId} unread={unread}>
+    <Shell playerId={playerId} unread={unread} tour={tour === "post"}>
       <FeedFilterTabs value={tab} />
 
       {/* The Room tab's job, as a banner: gone from the bar, never gone

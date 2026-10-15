@@ -51,11 +51,14 @@ export function NearbyLocationAsk({
    * near you does not need it: its coordinate rides the request.
    */
   keepAsZip = false,
+  /** The sign-up preview (demo mode): every answer moves on, nothing saves. */
+  dryRun = false,
 }: {
   onDone: () => void;
   intro?: string | null;
   saveLabel?: string;
   keepAsZip?: boolean;
+  dryRun?: boolean;
 }) {
   /* Calm: a refusal, or a device with Location Services off. */
   const [note, setNote] = useState<string | null>(null);
@@ -70,6 +73,10 @@ export function NearbyLocationAsk({
   const useDevice = async () => {
     setNote(null);
     setError(null);
+    if (dryRun) {
+      onDone();
+      return;
+    }
 
     const outcome = await requestCoords();
 
@@ -109,6 +116,10 @@ export function NearbyLocationAsk({
 
   const saveZip = async () => {
     setError(null);
+    if (dryRun) {
+      onDone();
+      return;
+    }
 
     try {
       await savePostalCode(zip);

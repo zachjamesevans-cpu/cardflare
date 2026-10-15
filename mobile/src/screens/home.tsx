@@ -94,6 +94,7 @@ import {
   useHeaderScroll,
 } from "../collapsing-header";
 import { NearbyLocationAsk } from "../nearby-location-ask";
+import { Spotlight } from "../spotlight";
 import { NearbyHeader } from "../nearby-parts";
 import { planNearby } from "../nearby-plan";
 import { answerDraft } from "../nearby-shared";
@@ -1809,6 +1810,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
         onInbox={guest ? toSignUp : () => navigation.navigate("Inbox")}
         unread={unread}
       />
+      {/* A new player's one-time pointer at the +, after the intro. */}
+      {guest ? null : (
+        <Spotlight onOpen={() => navigation.navigate("Tabs", { screen: "Flare" })} />
+      )}
       <Animated.ScrollView
         /*
          * flex: 1, and it is load-bearing rather than tidy.

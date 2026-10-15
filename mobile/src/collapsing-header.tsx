@@ -1,6 +1,6 @@
 import { BlurView } from "expo-blur";
 import type { ReactNode } from "react";
-import { Image, type ViewStyle } from "react-native";
+import { Image, View, type ViewStyle } from "react-native";
 import Animated, {
   interpolate,
   useAnimatedStyle,
@@ -14,6 +14,7 @@ import { GLASS_AVAILABLE, GlassSurface } from "./glass";
 import { HeaderButton } from "./header";
 import { dockCompact } from "./dock";
 import { HEADER } from "./header-metrics";
+import { useSpotlightTarget } from "./spotlight";
 import { BRAND, colors } from "./theme";
 
 /**
@@ -180,6 +181,7 @@ export function CollapsingHeader({
   unread: number;
 }) {
   const insets = useSafeAreaInsets();
+  const postTarget = useSpotlightTarget();
 
   /*
    * The bar is the status-bar strip AND the row, so it travels both to
@@ -299,7 +301,10 @@ export function CollapsingHeader({
         >
           {left ??
             (onPost ? (
-              <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+              /* What a new player's spotlight rings (spotlight.tsx). */
+              <View ref={postTarget} collapsable={false}>
+                <HeaderButton icon="add" label="Post a Flare" onPress={onPost} />
+              </View>
             ) : null)}
         </Animated.View>
 

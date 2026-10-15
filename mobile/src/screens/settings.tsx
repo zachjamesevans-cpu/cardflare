@@ -7,6 +7,7 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { REPLAY_LABEL } from "../intro-copy";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { AppState, Linking, ScrollView, Text, View } from "react-native";
@@ -1144,9 +1145,12 @@ function ProCard() {
 
 /** HELP: getting in touch, and the two pages App Review reads for. */
 function HelpCard() {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   return (
     <Card>
       <Title>Help</Title>
+      {/* The new player's thirty seconds again (intro.tsx). */}
+      <Row label={REPLAY_LABEL} onPress={() => navigation.navigate("Intro")} />
       <Row label="Contact us" onPress={() => void Linking.openURL(`${API_BASE}/contact`)} />
       <Row label="Terms of use" onPress={() => void Linking.openURL(`${API_BASE}/terms`)} />
       <Row

@@ -113,7 +113,9 @@ describe("the Feed's bell", () => {
     expect(web.feedPage).toMatch(
       /playerId \? \(\s*<NotificationBell unread=\{unread\} \/>/,
     );
-    expect(web.feedPage).toContain("<Shell playerId={playerId} unread={unread}>");
+    expect(web.feedPage).toContain(
+      '<Shell playerId={playerId} unread={unread} tour={tour === "post"}>',
+    );
     /* One button each side, so the mark stays centred. */
     expect(web.feedPage).not.toContain("trailingCount=");
     expect(web.shell).toContain('trailingCount === 2 ? "h-11 w-[5.75rem]" : "size-11"');

@@ -24,6 +24,9 @@ import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, playersLine, type GameSlug } from "../games";
 import { registerForPush } from "../push";
+import { Intro } from "../intro";
+import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE } from "../intro-copy";
+import { NearbyLocationAsk } from "../nearby-location-ask";
 import { SignInScreen } from "./sign-in";
 import {
   AsyncButton,
@@ -98,14 +101,23 @@ async function markWelcomeSeen(): Promise<void> {
   }
 }
 
-type Step = "splash" | "account" | "games" | "signin";
+type Step = "splash" | "account" | "games" | "where" | "intro" | "signin";
+
+/**
+ * How a welcome ended: "post" from the intro's last button (open the
+ * composer), "look" from its quieter one or Skip (the Feed, with the +
+ * pointed at), or nothing - signed in, or browsing as a guest, where no
+ * intro was shown.
+ */
+export type WelcomeEnd = "post" | "look" | undefined;
 
 export function WelcomeScreen({
   onDone,
   initialStep = "splash",
   onCancel,
+  preview = false,
 }: {
-  onDone: () => void;
+  onDone: (end: WelcomeEnd) => void;
   /**
    * "account" opens straight on the sign-up form: a guest who tapped
    * Create account inside a room has already chosen, and the
@@ -114,12 +126,19 @@ export function WelcomeScreen({
   initialStep?: "splash" | "account";
   /** Back out of the account step when this was opened from a room. */
   onCancel?: () => void;
+  /**
+   * Demo mode's sign-up preview: the whole flow, nothing created. The
+   * founder: "i want to make sure I can see the sign up process." Every
+   * step's answer moves on without a call that writes, and the welcome
+   * is not marked seen.
+   */
+  preview?: boolean;
 }) {
   const [step, setStep] = useState<Step>(initialStep);
 
-  const done = () => {
-    void markWelcomeSeen();
-    onDone();
+  const done = (end?: WelcomeEnd) => {
+    if (!preview) void markWelcomeSeen();
+    onDone(end);
   };
 
   return (
@@ -128,7 +147,7 @@ export function WelcomeScreen({
         <Splash
           onCreate={() => setStep("account")}
           onSignIn={() => setStep("signin")}
-          onSkip={done}
+          onSkip={() => done()}
         />
       )}
       {step === "account" && (
@@ -138,18 +157,26 @@ export function WelcomeScreen({
             initialStep === "account" && onCancel ? onCancel : () => setStep("splash")
           }
         >
-          <AccountStep onDone={() => setStep("games")} />
+          <AccountStep preview={preview} onDone={() => setStep("games")} />
         </StepShell>
       )}
       {step === "games" && (
         <StepShell title="Which games do you play?">
-          <GamesStep onDone={done} />
+          <GamesStep preview={preview} onDone={() => setStep("where")} />
         </StepShell>
+      )}
+      {step === "where" && (
+        <StepShell title={WHERE_TITLE}>
+          <WhereStep preview={preview} onDone={() => setStep("intro")} />
+        </StepShell>
+      )}
+      {step === "intro" && (
+        <Intro onPost={() => done("post")} onLook={() => done("look")} />
       )}
       {step === "signin" && (
         <ScrollView contentContainerStyle={{ paddingTop: spacing(14) }}>
           <SignInScreen
-            onSignedIn={done}
+            onSignedIn={() => done()}
             onCreateAccount={() => setStep("account")}
           />
           <Tap onPress={() => setStep("splash")}>
@@ -447,7 +474,7 @@ function HandleAvailabilityLine({
   return null;
 }
 
-function AccountStep({ onDone }: { onDone: () => void }) {
+function AccountStep({ onDone, preview }: { onDone: () => void; preview: boolean }) {
   const [email, setEmail] = useState("");
   /* The address twice, as on the website: a typo here is an account
      whose password reset goes to somebody else, or nowhere. */
@@ -462,8 +489,8 @@ function AccountStep({ onDone }: { onDone: () => void }) {
   return (
     <Card>
       <Body>
-        Your email and a password, then who you are to other players. The only thing
-        after this is which games you play.
+        Your email and a password, then who you are to other players. After this,
+        which games you play and roughly where.
       </Body>
       <Input
         value={email}
@@ -557,6 +584,10 @@ function AccountStep({ onDone }: { onDone: () => void }) {
             setError(`A handle needs at least ${HANDLE_MIN} characters.`);
             return;
           }
+          if (preview) {
+            onDone();
+            return;
+          }
 
           const result = await signUp(email, password, name.trim(), handle.trim());
           if (!result.ok) {
@@ -570,7 +601,7 @@ function AccountStep({ onDone }: { onDone: () => void }) {
   );
 }
 
-function GamesStep({ onDone }: { onDone: () => void }) {
+function GamesStep({ onDone, preview }: { onDone: () => void; preview: boolean }) {
   const [picked, setPicked] = useState<Set<GameSlug>>(new Set());
   const [error, setError] = useState<string | null>(null);
   /* A save has failed once: the way past it appears. */
@@ -655,6 +686,10 @@ function GamesStep({ onDone }: { onDone: () => void }) {
         pendingLabel="Saving…"
         onPress={async () => {
           setError(null);
+          if (preview) {
+            onDone();
+            return;
+          }
           /*
            * A failed save is a note, never a wall. The account already
            * exists by this step, there is no Back, and nothing else
@@ -698,6 +733,38 @@ function GamesStep({ onDone }: { onDone: () => void }) {
           </Text>
         </Tap>
       ) : null}
+    </Card>
+  );
+}
+
+/**
+ * Roughly where they play, optional: the ZIP Nearby measures from. The
+ * intro's next card promises "players near you", so the question comes
+ * first. Skip is always there; Settings asks again later.
+ */
+function WhereStep({ onDone, preview }: { onDone: () => void; preview: boolean }) {
+  return (
+    <Card>
+      <Body>{WHERE_BODY}</Body>
+      <NearbyLocationAsk
+        intro={null}
+        saveLabel="Save"
+        keepAsZip
+        dryRun={preview}
+        onDone={onDone}
+      />
+      <Tap onPress={onDone} hitSlop={8}>
+        <Text
+          style={{
+            color: colors.accent,
+            fontWeight: "600",
+            textAlign: "center",
+            paddingVertical: spacing(2),
+          }}
+        >
+          {WHERE_SKIP}
+        </Text>
+      </Tap>
     </Card>
   );
 }
