@@ -497,7 +497,10 @@ describe("the Flares grid", () => {
       );
       expect(source.flares, name).toContain("flares.length");
     }
-    expect(web.flares).toContain("grid-cols-3");
+    /* Four across on both: the founder, shown three and four, "okay
+       yeah commit it". */
+    expect(web.flares).toContain("grid-cols-4");
+    expect(app.flares).toContain("const ACROSS = 4;");
     expect(web.flares).toContain("<CardImageZoom");
     expect(web.flares).toContain('href="/flare"');
     expect(web.flares).toContain("flares.map(");
