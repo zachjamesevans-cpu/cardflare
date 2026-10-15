@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
-import { useRef, type ReactNode } from "react";
-import { StyleSheet, Text, type LayoutChangeEvent } from "react-native";
+import { useEffect, useRef, type ReactNode } from "react";
+import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   runOnJS,
@@ -26,7 +26,40 @@ import { Tap } from "./ui";
  * server hears about it: "it should delete immediately visually even
  * if it takes a second for the server to respond." `onDelete` runs once
  * the row is gone, and the list it lives in drops it at once.
+ *
+ * One Delete showing at a time. The founder: "tapping anywhere on the
+ * screen removes that delete button visibility. currently, you can
+ * swipe all of these cards slightly on the same screen, and a delete
+ * button can be simultaneously viewed on all." Opening a row closes
+ * the last one, and the screen calls `dismissSwipe` on every touch and
+ * scroll; only a touch on the showing Delete itself leaves it be.
  */
+
+/** The row showing its Delete, if any. */
+let shown: {
+  id: object;
+  close: () => void;
+  /** Whether a touch at these window coordinates is on its Delete. */
+  onDelete: (pageX: number, pageY: number) => boolean;
+} | null = null;
+
+/**
+ * Closes the Delete that is showing, unless the touch is on it. For a
+ * screen's onTouchStart and onScrollBeginDrag; call with no point to
+ * close it regardless.
+ */
+export function dismissSwipe(pageX?: number, pageY?: number): void {
+  if (!shown) return;
+  if (pageX !== undefined && pageY !== undefined && shown.onDelete(pageX, pageY)) return;
+  const row = shown;
+  shown = null;
+  row.close();
+}
+
+/* A Delete opening: a little past, then back, so it lands like iOS's.
+   Closing stays firm; a bounce on the way shut reads as a wobble. */
+const OPEN = { damping: 12, stiffness: 190, mass: 0.9 };
+const SHUT = { damping: 22, stiffness: 220 };
 
 export function SwipeToDelete({
   label,
@@ -48,14 +81,42 @@ export function SwipeToDelete({
   const armed = useSharedValue(false);
   const gone = useSharedValue(false);
   const deleted = useRef(false);
+  const self = useRef({}).current;
+  const box = useRef<View>(null);
+
+  const closed = () => {
+    if (shown?.id === self) shown = null;
+  };
+  const opened = () => {
+    if (shown && shown.id !== self) dismissSwipe();
+    box.current?.measureInWindow((left, top, rowWidth, rowHeight) => {
+      shown = {
+        id: self,
+        close: () => {
+          x.value = withSpring(0, SHUT);
+        },
+        onDelete: (pageX, pageY) =>
+          pageY >= top &&
+          pageY <= top + rowHeight &&
+          pageX >= left + rowWidth - ACTION_WIDTH &&
+          pageX <= left + rowWidth,
+      };
+    });
+  };
+  useEffect(() => closed, []);
 
   const finish = () => {
+    closed();
     if (deleted.current) return;
     deleted.current = true;
     onDelete();
   };
-  const tick = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+  /* Past the line: a firm tick, it will delete. Back out of it: a light
+     one, it will not. */
+  const tick = (over: boolean) => {
+    Haptics.impactAsync(
+      over ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light,
+    ).catch(() => {});
   };
 
   /* Off to the left, then the gap closes: "closes in on itself". */
@@ -85,7 +146,7 @@ export function SwipeToDelete({
       const over = pastFullSwipe(next, width.value);
       if (over !== armed.value) {
         armed.value = over;
-        if (over) runOnJS(tick)();
+        runOnJS(tick)(over);
       }
     })
     .onEnd((event) => {
@@ -96,10 +157,13 @@ export function SwipeToDelete({
         remove();
         return;
       }
-      x.value = withSpring(outcome === "open" ? -ACTION_WIDTH : 0, {
-        damping: 22,
-        stiffness: 220,
-      });
+      if (outcome === "open") {
+        x.value = withSpring(-ACTION_WIDTH, { ...OPEN, velocity: event.velocityX });
+        runOnJS(opened)();
+      } else {
+        x.value = withSpring(0, SHUT);
+        runOnJS(closed)();
+      }
     });
 
   const measure = (event: LayoutChangeEvent) => {
@@ -117,6 +181,8 @@ export function SwipeToDelete({
 
   return (
     <Animated.View style={[styles.frame, fold]}>
+      {/* Measured for where the Delete sits on screen (dismissSwipe). */}
+      <View ref={box} collapsable={false} pointerEvents="none" style={StyleSheet.absoluteFill} />
       <Animated.View style={[styles.red, red]}>
         <Tap
           accessibilityLabel={`Delete ${label}`}

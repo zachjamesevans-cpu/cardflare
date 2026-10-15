@@ -53,10 +53,34 @@ describe("the row on screen", () => {
     expect(swipe).toMatch(
       /x\.value = withTiming\([\s\S]*?height\.value = withTiming\(0[\s\S]*?runOnJS\(finish\)\(\)/,
     );
-    /* The armed tick, once, as the swipe crosses the line. */
-    expect(swipe).toContain("if (over) runOnJS(tick)();");
     expect(swipe).toContain("return colors.destructive;");
     expect(swipe).toContain(">\n            Delete\n");
+  });
+
+  /* "add a bit of haptic feedback once it goes past the mark of
+     deletable when swiping. also, it should be a little more 'bouncy'
+     when the swipe to delete thing opens." */
+  it("ticks across the line, and springs open with a bounce", () => {
+    expect(swipe).toContain("runOnJS(tick)(over);");
+    expect(swipe).toContain("Haptics.ImpactFeedbackStyle.Medium");
+    expect(swipe).toMatch(/const OPEN = \{ damping: 12,/);
+    expect(swipe).toContain(
+      "withSpring(-ACTION_WIDTH, { ...OPEN, velocity: event.velocityX })",
+    );
+  });
+
+  /* "tapping anywhere on the screen removes that delete button
+     visibility ... a delete button can be simultaneously viewed on all." */
+  it("shows one Delete at a time, and a touch anywhere closes it", () => {
+    expect(swipe).toContain("if (shown && shown.id !== self) dismissSwipe();");
+    expect(swipe).toMatch(
+      /export function dismissSwipe\([\s\S]*?shown\.onDelete\(pageX, pageY\)\) return;/,
+    );
+    const composer = read("mobile/src/screens/flare-composer.tsx");
+    expect(composer).toMatch(
+      /onTouchStart=\{\(event\) =>\s*dismissSwipe\(event\.nativeEvent\.pageX, event\.nativeEvent\.pageY\)/,
+    );
+    expect(composer).toContain("onScrollBeginDrag={() => dismissSwipe()}");
   });
 
   it("is what the Flare list's rows wear, with no Remove link", () => {
