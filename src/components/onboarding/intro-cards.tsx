@@ -118,23 +118,31 @@ export function IntroCards({ game }: { game: IntroGame }) {
         ))}
       </div>
 
-      {last ? (
-        <div className="flex w-full flex-col gap-2">
-          <Link href="/flare" className={buttonStyles("primary")}>
+      {/* The same place on every card: one button whose words change,
+          and the line under it always kept, empty until the last card.
+          The app's rule (intro.tsx); the founder found the shift
+          "disorienting". */}
+      <div className="flex w-full flex-col gap-2">
+        {last ? (
+          <Link href="/flare" className={cn(buttonStyles("primary"), "w-full")}>
             {INTRO_POST}
           </Link>
-          <Link
-            href={LOOK_HREF}
-            className="py-2 text-center font-semibold text-accent hover:underline"
-          >
-            {INTRO_LOOK}
-          </Link>
+        ) : (
+          <Button type="button" className="w-full" onClick={() => go(index + 1)}>
+            {INTRO_NEXT}
+          </Button>
+        )}
+        <div className="flex h-9 items-center justify-center">
+          {last && (
+            <Link
+              href={LOOK_HREF}
+              className="font-semibold text-accent hover:underline"
+            >
+              {INTRO_LOOK}
+            </Link>
+          )}
         </div>
-      ) : (
-        <Button type="button" className="w-full" onClick={() => go(index + 1)}>
-          {INTRO_NEXT}
-        </Button>
-      )}
+      </div>
     </div>
   );
 }
