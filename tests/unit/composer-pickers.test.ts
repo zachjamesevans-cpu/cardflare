@@ -77,3 +77,16 @@ describe("a card's own choices", () => {
     for (const source of [app, web]) expect(source).toMatch(/Done/);
   });
 });
+
+describe("looking for or offering", () => {
+  /* Kept as a choice - matching, hunts and Wanted near you run on it -
+     but one quiet line, Looking for by default. */
+  it("is one line with a switch, not two big buttons", () => {
+    for (const source of [app, web]) {
+      expect(source).toContain('"Switch to offering"');
+      expect(source).toContain('"Switch to looking for"');
+    }
+    expect(app).not.toContain('{ key: "showcase", label: "Offering" }');
+    expect(web).not.toContain('aria-label="What this flare is"');
+  });
+});

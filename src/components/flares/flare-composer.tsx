@@ -374,35 +374,28 @@ function ComposerBody({
         </p>
       </div>
 
-      {/* One direction for the whole post. */}
-      <div
-        role="radiogroup"
-        aria-label="What this flare is"
-        className="grid grid-cols-2 gap-1 rounded-[var(--radius-control)] border border-border bg-canvas p-1"
-      >
-        {(
-          [
-            ["want", "Looking for"],
-            ["showcase", "Offering"],
-          ] as const
-        ).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={draft.intent === value}
-            onClick={() => patch({ intent: value })}
-            className={cn(
-              "cursor-pointer rounded-[8px] py-2 text-sm font-semibold transition-colors",
-              draft.intent === value
-                ? "bg-accent text-accent-contrast"
-                : "text-text-secondary hover:text-text-primary",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* One direction for the whole post, as ONE LINE: "Looking for" is
+          the quiet default - most posts are wants - and offering is a
+          click away. It stays a choice, because what a post wants is what
+          matching, hunts and Wanted near you run on. The app's is the
+          same. */}
+      <p className="flex items-center gap-1.5 text-sm">
+        <span className="text-base font-bold text-text-primary">
+          {draft.intent === "want" ? "Looking for" : "Offering"}
+        </span>
+        <span className="text-text-muted" aria-hidden="true">
+          ·
+        </span>
+        <button
+          type="button"
+          onClick={() =>
+            patch({ intent: draft.intent === "want" ? "showcase" : "want" })
+          }
+          className="cursor-pointer font-semibold text-accent hover:underline"
+        >
+          {draft.intent === "want" ? "Switch to offering" : "Switch to looking for"}
+        </button>
+      </p>
 
       {/* THE HUNT, with what the post is for, not at the foot of the
           form. The founder: "the 'add to a hunt' thing at bottom is very

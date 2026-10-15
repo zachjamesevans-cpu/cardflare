@@ -880,49 +880,29 @@ function IntentControl({
   value: "want" | "showcase";
   onChange: (intent: "want" | "showcase") => void;
 }) {
+  /*
+   * ONE LINE, not two big buttons. "Looking for" is the quiet default -
+   * most posts are wants - and offering is a tap away. The founder asked
+   * whether to drop the choice for the caption; it stays, because what a
+   * post wants is what matching, hunts and Wanted near you run on, but
+   * it no longer takes a row of the form. The website's is the same.
+   */
+  const wanting = value === "want";
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: 3,
-      }}
-    >
-      {(
-        [
-          { key: "want", label: "Looking for" },
-          { key: "showcase", label: "Offering" },
-        ] as const
-      ).map((option) => {
-        const on = value === option.key;
-        return (
-          <Tap
-            key={option.key}
-            onPress={() => onChange(option.key)}
-            accessibilityLabel={option.label}
-            style={{
-              flex: 1,
-              alignItems: "center",
-              paddingVertical: spacing(2),
-              borderRadius: radius.control - 3,
-              backgroundColor: on ? colors.accent : "transparent",
-            }}
-          >
-            <Text
-              style={{
-                color: on ? colors.accentContrast : colors.textSecondary,
-                fontSize: 13,
-                fontWeight: "700",
-              }}
-            >
-              {option.label}
-            </Text>
-          </Tap>
-        );
-      })}
+    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+      <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "700" }}>
+        {wanting ? "Looking for" : "Offering"}
+      </Text>
+      <Text style={{ color: colors.textMuted }}>·</Text>
+      <Tap
+        accessibilityLabel={wanting ? "Switch to offering" : "Switch to looking for"}
+        onPress={() => onChange(wanting ? "showcase" : "want")}
+        hitSlop={8}
+      >
+        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
+          {wanting ? "Switch to offering" : "Switch to looking for"}
+        </Text>
+      </Tap>
     </View>
   );
 }
