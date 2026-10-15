@@ -57,7 +57,7 @@ import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
-import { Intro } from "./src/intro";
+import { ReplayIntro } from "./src/intro";
 import { queueSpotlight } from "./src/spotlight";
 import { keepNavigation, takeNavigation } from "./src/backdrop";
 import { takeQueuedShot } from "./src/demo/demo-mode";
@@ -1124,7 +1124,7 @@ function AppGates() {
             options={{ headerShown: false, animation: "fade" }}
           >
             {({ navigation }) => (
-              <Intro
+              <ReplayIntro
                 onPost={() => followWelcome("post", navigation)}
                 onLook={() => followWelcome("look", navigation)}
               />

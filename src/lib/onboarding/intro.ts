@@ -50,3 +50,48 @@ export const WHERE_SKIP = "Skip for now";
 
 /** In Settings, under Help. */
 export const REPLAY_LABEL = "Replay the intro";
+
+/*
+ * THE SCENES. Each card shows a small scene of the app instead of an
+ * icon - the founder: "the big screen that shows all the big icons ...
+ * isn't enough. maybe a screenshot of the app or something for each".
+ * Drawn from the app's own pieces, with art from the games the player
+ * just picked: three cards per game, bundled (public/intro and
+ * mobile/assets/intro), so the intro needs no network on first launch.
+ */
+export type IntroGame = "one-piece" | "pokemon" | "lorcana" | "mtg" | "flesh-and-blood";
+
+/** The three cards per game, in rail order: names for the scenes' words. */
+export const INTRO_ART: Record<IntroGame, readonly [string, string, string]> = {
+  "one-piece": ["Luffy", "Zoro", "Nami"],
+  pokemon: ["Pikachu", "Charizard", "Umbreon"],
+  lorcana: ["Mickey Mouse", "Elsa", "Stitch"],
+  mtg: ["Lightning Bolt", "Llanowar Elves", "Counterspell"],
+  "flesh-and-blood": ["Dorinthea", "Bravo", "Katsu"],
+};
+
+/** The game whose art the scenes use: the first picked that has some. */
+export function introGame(picked: readonly string[]): IntroGame {
+  for (const slug of picked) {
+    if (slug in INTRO_ART) return slug as IntroGame;
+  }
+  /* One Piece is cardflare's home game, and Riftbound has no catalogue
+     art yet, so a Riftbound player sees it too. */
+  return "one-piece";
+}
+
+/** Made-up players for the second scene, nearest first. */
+export const INTRO_PEOPLE = [
+  { name: "Zoe", miles: "1.2 mi" },
+  { name: "Kaito", miles: "2.4 mi" },
+  { name: "Maya", miles: "3.1 mi" },
+] as const;
+
+/** The first scene's poster, and the second scene's raised hand. */
+export const INTRO_YOU = "You";
+export const INTRO_HAS_IT = "has it";
+
+/** The third scene's two messages, about the rail's last card. */
+export function introChat(card: string): readonly [string, string] {
+  return [`I have ${card}. Want to trade?`, "Yes! Meet at the store Thursday?"];
+}
