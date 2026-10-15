@@ -60,7 +60,8 @@ export function WantRow({
       <View
         style={{
           flexDirection: "row",
-          gap: spacing(2),
+          /* The website's gap-3 beside its card. */
+          gap: spacing(3),
           /* A found card is dimmed the same way a removal is: still
              on the list, no longer asking. */
           opacity: busy || want.found ? 0.6 : 1,
@@ -69,7 +70,12 @@ export function WantRow({
       >
         <CardImage
           imageUrl={want.imageUrl}
-          width={40}
+          /* Tall enough to fill the row: at 40 the art stopped short of
+             the stepper and left a gap under it - the founder: "there's
+             some dead space under the card image ... I would like to
+             make the card fit more into that space." 56 is the website's
+             own thumbnail width (CardThumbnail). */
+          width={56}
           name={want.cardName}
           cardNumber={want.cardNumber}
           caption={want.printingLabel ?? "Any printing"}
