@@ -115,7 +115,6 @@ export const SHOTS: Shot[] = [
         draft: answerDraft(DEMO_CARDS.umbreonCol.cardName),
       }),
   },
-  { title: "TEMP flare", tip: "", go: (nav) => nav.navigate("Tabs", { screen: "Flare" }) }, // TEMP-SHOT
 ];
 
 export function DemoShotsScreen() {
