@@ -171,29 +171,42 @@ export function Intro({
           ))}
         </View>
 
-        {last ? (
-          <View style={{ gap: spacing(2) }}>
-            <Button label={INTRO_POST} onPress={onPost} />
-            <Tap onPress={onLook} hitSlop={8}>
-              <Text
-                style={{
-                  color: colors.accent,
-                  fontWeight: "600",
-                  textAlign: "center",
-                  paddingVertical: spacing(2),
-                }}
-              >
-                {INTRO_LOOK}
-              </Text>
-            </Tap>
+        {/*
+         * THE SAME PLACE ON EVERY CARD. The founder: "on the final tab, the
+         * little box at the bottom moves up to make room for first flare.
+         * the 'post your first flare' button should be in same spot as the
+         * next button ... so that it isn't disorienting." One button that
+         * changes its words, and the line under it always kept, empty
+         * until the last card fills it - so nothing above it moves.
+         */}
+        <View style={{ gap: spacing(2) }}>
+          <Button
+            label={last ? INTRO_POST : INTRO_NEXT}
+            onPress={last ? onPost : () => go(index + 1)}
+          />
+          <View style={{ height: LOOK_ROW, justifyContent: "center" }}>
+            {last ? (
+              <Tap onPress={onLook} hitSlop={8}>
+                <Text
+                  style={{
+                    color: colors.accent,
+                    fontWeight: "600",
+                    textAlign: "center",
+                  }}
+                >
+                  {INTRO_LOOK}
+                </Text>
+              </Tap>
+            ) : null}
           </View>
-        ) : (
-          <Button label={INTRO_NEXT} onPress={() => go(index + 1)} />
-        )}
+        </View>
       </View>
     </View>
   );
 }
+
+/** The line under the button, kept on every card (see the button). */
+const LOOK_ROW = 36;
 
 /** Room for the tallest scene (intro-scenes.tsx), the trade. */
 const SCENE_HEIGHT = 300;

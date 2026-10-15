@@ -168,7 +168,11 @@ describe("the intro's cards", () => {
     const app = read("mobile/src/intro.tsx");
     expect(app).toContain("pagingEnabled");
     expect(app).toContain("disableIntervalMomentum");
-    expect(app).toContain("onPress={() => go(index + 1)}");
+    expect(app).toContain("onPress={last ? onPost : () => go(index + 1)}");
+    /* "the 'post your first flare' button should be in same spot as the
+       next button": one button, and the line under it always kept. */
+    expect(app).toContain("label={last ? INTRO_POST : INTRO_NEXT}");
+    expect(app).toContain("height: LOOK_ROW");
     const web = read("src/components/onboarding/intro-cards.tsx");
     expect(web).toContain("snap-x snap-mandatory");
     expect(web).toContain('if (event.key === "ArrowLeft") go(index - 1);');
