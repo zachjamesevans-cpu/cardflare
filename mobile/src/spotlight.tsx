@@ -129,35 +129,28 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
   };
   const close = () => setHole(null);
 
+
   return (
     <Modal transparent animationType="fade" onRequestClose={close}>
-      {/* The dim, in four pieces around the ring, so the + shows through. */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close">
-        <View style={[styles.dim, { left: 0, right: 0, top: 0, height: ring.top }]} />
-        <View
-          style={[
-            styles.dim,
-            { left: 0, right: 0, top: ring.top + ring.size, bottom: 0 },
-          ]}
-        />
-        <View
-          style={[
-            styles.dim,
-            { left: 0, width: ring.left, top: ring.top, height: ring.size },
-          ]}
-        />
-        <View
-          style={[
-            styles.dim,
-            {
-              left: ring.left + ring.size,
-              right: 0,
-              top: ring.top,
-              height: ring.size,
-            },
-          ]}
-        />
-      </Pressable>
+      {/* Any tap closes it. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close" />
+
+      {/*
+       * THE DIM, WITH A ROUND HOLE. It was four rectangles around the
+       * ring, which left a square of undimmed page around a round ring -
+       * the founder: "see how there's a square around the icon ... just
+       * make it a circle ... it's like clipping over your circle." Now one
+       * Skia shape: the window, less the ring's circle (even-odd fill),
+       * so the page shows through that circle and nowhere else. A border
+       * as thick as the screen was tried first; iOS drew none of it.
+       */}
+      <Dim
+        width={window.width}
+        height={window.height}
+        cx={ring.left + ring.size / 2}
+        cy={ring.top + ring.size / 2}
+        r={ring.size / 2}
+      />
 
       {/* The ring, and a tap on it opens the composer. */}
       <Pressable
@@ -200,13 +193,37 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
   );
 }
 
+/**
+ * The scrim with a circle cut out of it. Skia is loaded here, when a
+ * spotlight shows, never at launch: the launch path loads no Skia
+ * (welcome.tsx says why), and the cosmetics load it the same lazy way.
+ */
+function Dim({
+  width,
+  height,
+  cx,
+  cy,
+  r,
+}: {
+  width: number;
+  height: number;
+  cx: number;
+  cy: number;
+  r: number;
+}) {
+  const { Canvas, Path } =
+    require("@shopify/react-native-skia") as typeof import("@shopify/react-native-skia");
+  const shape =
+    `M0 0 H${width} V${height} H0 Z ` +
+    `M${cx - r} ${cy} a${r} ${r} 0 1 0 ${r * 2} 0 a${r} ${r} 0 1 0 ${-r * 2} 0 Z`;
+  return (
+    <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Path path={shape} fillType="evenOdd" color={colors.scrim} />
+    </Canvas>
+  );
+}
+
 const styles = StyleSheet.create({
-  dim: {
-    position: "absolute",
-    get backgroundColor() {
-      return colors.scrim;
-    },
-  },
   ring: {
     position: "absolute",
     borderWidth: 2,

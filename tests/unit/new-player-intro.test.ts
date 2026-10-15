@@ -238,6 +238,19 @@ describe("the intro's scenes", () => {
   });
 });
 
+/* "see how there's a square around the icon ... just make it a circle
+   ... it's like clipping over your circle." */
+describe("the spotlight's hole", () => {
+  it("is round on both platforms, not four rectangles", () => {
+    const app = read("mobile/src/spotlight.tsx");
+    expect(app).toContain('fillType="evenOdd"');
+    expect(app).not.toContain("The dim, in four pieces");
+    const web = read("src/components/onboarding/post-spotlight.tsx");
+    expect(web).toContain("rounded-full shadow-[0_0_0_200vmax_rgba(0,0,0,0.75)]");
+    expect(web).not.toContain('const dim = "fixed bg-black/75"');
+  });
+});
+
 describe("the share card's link", () => {
   it("is a real link's shape, not the handle", () => {
     /* app/b/[binderId] takes an eight-letter share code. */

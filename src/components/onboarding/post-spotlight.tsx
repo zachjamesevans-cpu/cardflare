@@ -54,8 +54,6 @@ export function PostSpotlight() {
     router.replace("/feed", { scroll: false });
   };
 
-  const dim = "fixed bg-black/75";
-
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-label={SPOTLIGHT_LINE}>
       <button
@@ -63,26 +61,17 @@ export function PostSpotlight() {
         aria-label="Close"
         onClick={close}
         className="fixed inset-0 cursor-default"
-      >
-        <span className={dim} style={{ left: 0, right: 0, top: 0, height: ring.top }} />
-        <span
-          className={dim}
-          style={{ left: 0, right: 0, top: ring.top + ring.size, bottom: 0 }}
-        />
-        <span
-          className={dim}
-          style={{ left: 0, width: ring.left, top: ring.top, height: ring.size }}
-        />
-        <span
-          className={dim}
-          style={{
-            left: ring.left + ring.size,
-            right: 0,
-            top: ring.top,
-            height: ring.size,
-          }}
-        />
-      </button>
+      />
+
+      {/* The dim with a round hole: a circle the ring's size whose shadow
+          covers the page. It was four rectangles, which left a square of
+          undimmed page around the round ring - the founder: "just make
+          it a circle ... it's like clipping over your circle." */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none fixed rounded-full shadow-[0_0_0_200vmax_rgba(0,0,0,0.75)]"
+        style={{ left: ring.left, top: ring.top, width: ring.size, height: ring.size }}
+      />
 
       <button
         type="button"
