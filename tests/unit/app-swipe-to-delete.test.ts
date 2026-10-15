@@ -96,3 +96,17 @@ describe("the row on screen", () => {
     );
   });
 });
+
+/* "upon swiping to delete, the card delete for a second, then comes
+   right back": demo mode never sends the delete, and the list is a real
+   read, so demo mode remembers the delete and leaves the card out. */
+describe("a delete in demo mode", () => {
+  it("stays deleted when the real list is read back", () => {
+    const server = read("mobile/src/demo/demo-server.ts");
+    expect(server).toContain(
+      'if (method === "DELETE" && parts[2] === "wants" && parts[3]) {',
+    );
+    expect(server).toContain("droppedWants.add(parts[3]);");
+    expect(server).toContain("!droppedWants.has(want.id)");
+  });
+});

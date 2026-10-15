@@ -51,6 +51,15 @@ let me: { playerId: string; displayName: string; avatarUrl: string | null } = {
 };
 const cardsSeen = new Map<string, Omit<FeedCard, "match">>();
 const huntsSeen = new Map<string, string>();
+/*
+ * Cards deleted from the Flare tab's list in demo mode. The delete never
+ * leaves the phone, but the list is a real read, so without this the
+ * card came straight back - the founder: "upon swiping to delete, the
+ * card delete for a second, then comes right back." Remembered for the
+ * session and left out of every /me read after (demoSaw).
+ */
+const droppedWants = new Set<string>();
+const droppedOfferings = new Set<string>();
 
 const isDemoId = (id: string) => id.startsWith("demo-");
 
@@ -99,6 +108,13 @@ export function demoSaw(method: string, path: string, value: unknown): unknown {
   const body = value as Record<string, unknown>;
 
   if (route === "/api/v1/me") {
+    if (Array.isArray(body.wants)) {
+      body.wants = (body.wants as { id: string; cardId: string; direction?: string }[]).filter(
+        (want) =>
+          !droppedWants.has(want.id) &&
+          !(want.direction === "offering" && droppedOfferings.has(want.cardId)),
+      );
+    }
     const player = body.player as
       | { id: string; displayName: string; avatarUrl?: string | null }
       | undefined;
@@ -211,6 +227,19 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
   }
 
   /* --- Writes: never sent ----------------------------------------- */
+  if (method === "DELETE" && parts[2] === "wants" && parts[3]) {
+    droppedWants.add(parts[3]);
+    return ok();
+  }
+  if (
+    route === "/api/v1/offerings" &&
+    input.action === "remove" &&
+    typeof input.cardId === "string"
+  ) {
+    droppedOfferings.add(input.cardId);
+    return ok();
+  }
+
   if (route === "/api/v1/notifications") {
     demoMarkRead(Array.isArray(input.ids) ? (input.ids as string[]) : []);
     return ok();
