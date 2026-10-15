@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import ReanimatedSwipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 
 import type { Me } from "./api";
 import { CardImage, Muted, Tap } from "./ui";
@@ -16,6 +17,11 @@ import { colors, spacing } from "./theme";
  * way down (at one it removes the card outright), and every tap greys
  * the row under a spinner so a slow write never reads as a frozen
  * screen.
+ *
+ * Removing is a swipe, the way iOS lists remove: drag the row left and
+ * the red Delete is under it. The founder: "flares on this screen should
+ * be swipe to remove (itll show that delete red thing thats build into
+ * ios)". It replaced the underlined Remove beside the name.
  */
 export function WantRow({
   want,
@@ -43,6 +49,24 @@ export function WantRow({
   };
 
   return (
+    <ReanimatedSwipeable
+      friction={2}
+      rightThreshold={40}
+      overshootRight={false}
+      enabled={!busy}
+      renderRightActions={(_progress, _translation, swipeable) => (
+        <Tap
+          accessibilityLabel={`Delete ${want.cardName}`}
+          onPress={() => {
+            swipeable.close();
+            void run(onDrop);
+          }}
+          style={styles.deleteAction}
+        >
+          <Text style={styles.deleteLabel}>Delete</Text>
+        </Tap>
+      )}
+    >
     <View style={styles.wantRow}>
       {/* Two layers: dim the row, keep the spinner above it at full
           strength — the same trick every removal wears. */}
@@ -81,9 +105,6 @@ export function WantRow({
             {want.direction === "offering" ? (
               <Text style={styles.offeringTag}>Offering</Text>
             ) : null}
-            <Tap onPress={() => void run(onDrop)} disabled={busy} hitSlop={8}>
-              <Text style={styles.removeLink}>Remove</Text>
-            </Tap>
           </View>
 
           <Muted>
@@ -204,6 +225,7 @@ export function WantRow({
         </View>
       ) : null}
     </View>
+    </ReanimatedSwipeable>
   );
 }
 
@@ -213,7 +235,25 @@ const styles = StyleSheet.create({
     get borderTopColor() {
       return colors.border;
     },
+    /* Opaque, the card's own colour, so the Delete under it shows only
+       as the row slides off it. */
+    get backgroundColor() {
+      return colors.surface;
+    },
     paddingVertical: spacing(2),
+  },
+  deleteAction: {
+    width: 88,
+    alignItems: "center",
+    justifyContent: "center",
+    get backgroundColor() {
+      return colors.destructive;
+    },
+  },
+  deleteLabel: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: "600",
   },
   // The Flare row's name scale exactly, so the two lists read as one.
   wantName: {
@@ -221,12 +261,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 16,
     fontWeight: "700",
-  },
-  // The room's Remove link exactly, so the word reads the same everywhere.
-  removeLink: {
-    color: colors.textMuted,
-    textDecorationLine: "underline",
-    fontSize: 14,
   },
   offeringTag: {
     color: colors.accent,
