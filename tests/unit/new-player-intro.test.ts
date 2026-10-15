@@ -49,9 +49,9 @@ describe("the app's sign-up", () => {
     );
   });
 
-  it("shows no intro to somebody signing in or browsing", () => {
+  it("shows no intro to somebody signing in or scanning into a store", () => {
     expect(welcome).toContain("onSignedIn={() => done()}");
-    expect(welcome).toContain("onSkip={() => done()}");
+    expect(welcome).toContain('onScan={() => done("scan")}');
   });
 
   it("creates and saves nothing in the preview", () => {
@@ -73,7 +73,7 @@ describe("the app's sign-up", () => {
     expect(app).toMatch(
       /void queueSpotlight\(\);\s*go\("Tabs", \{ screen: "Feed" \}\);/,
     );
-    expect(app).toContain('if (afterWelcome === "post") {');
+    expect(app).toContain('afterWelcome = end === "post" || end === "scan" ? end : null;');
   });
 });
 

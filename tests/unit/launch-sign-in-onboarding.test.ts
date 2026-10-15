@@ -145,13 +145,36 @@ describe("sign-up", () => {
     expect(welcome).toContain("Continue without saving");
   });
 
-  it("names the games under the pitch, from the one list", () => {
+  it("names the games from the one list", () => {
     expect(appPlayersLine()).toBe(webPlayersLine());
     expect(webPlayersLine()).toBe(
       "For One Piece, Riftbound, Lorcana, Magic, Pokémon and Flesh & Blood players",
     );
-    expect(read("mobile/src/screens/welcome.tsx")).toContain("{playersLine()}.");
     expect(read("src/app/signup/page.tsx")).toContain("{playersLine()}.");
+    /* Not on the app's splash any more: the founder, "this splash screen
+       is a bit too much imo. lots of random text". The games step asks a
+       screen later. */
+    expect(read("mobile/src/screens/welcome.tsx")).not.toContain("{playersLine()}.");
+  });
+
+  it("keeps the app's splash to the wordmark, one line and three ways in", () => {
+    const welcome = read("mobile/src/screens/welcome.tsx");
+    const splash = welcome.slice(welcome.indexOf("function Splash("));
+    expect(splash).toContain("Find your cards. Trade in person.");
+    expect(splash).toContain('<Button label="Create account" onPress={onCreate} />');
+    expect(splash).toContain("Have an account?");
+    expect(splash).toContain("At a store? Scan the code");
+    for (const gone of [
+      "Browse without an account",
+      "Built for collectors, not marketplaces.",
+      "Meet nearby.",
+      'label="I already have an account"',
+    ]) {
+      expect(splash).not.toContain(gone);
+    }
+    /* The guest door opens the scanner. */
+    expect(welcome).toContain('onScan={() => done("scan")}');
+    expect(read("mobile/App.tsx")).toContain('go("Scan");');
   });
 });
 

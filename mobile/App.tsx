@@ -845,18 +845,24 @@ export default function App() {
 /*
  * Where a new player goes after the intro (intro.tsx). "post" opens the
  * composer; "look" lands on the Feed and points at its + (spotlight.tsx).
- * The gate's welcome has no navigator yet, so its "post" waits here for
+ * "scan" opens the scanner, from the splash's guest door. The gate's
+ * welcome has no navigator yet, so its "post" and "scan" wait here for
  * onReady.
  */
-let afterWelcome: "post" | null = null;
+let afterWelcome: "post" | "scan" | null = null;
 
 function followWelcome(
-  end: "post" | "look",
+  end: "post" | "look" | "scan",
   navigation: { navigate: (...args: never[]) => void },
 ): void {
   const go = navigation.navigate as (name: string, params?: object) => void;
   if (end === "post") {
     go("Tabs", { screen: "Flare" });
+    return;
+  }
+  /* The splash's guest door: "At a store? Scan the code". */
+  if (end === "scan") {
+    go("Scan");
     return;
   }
   void queueSpotlight();
@@ -988,7 +994,7 @@ function AppGates() {
           onDone={(end) => {
             /* The intro's last answer, acted on once the tabs exist. */
             if (end === "look") void queueSpotlight();
-            afterWelcome = end === "post" ? "post" : null;
+            afterWelcome = end === "post" || end === "scan" ? end : null;
             setGate("open");
           }}
         />
@@ -1008,10 +1014,12 @@ function AppGates() {
           void Notifications.getLastNotificationResponseAsync()
             .then(openNotificationLink)
             .catch(() => {});
-          /* "Post your first Flare", the intro's last button. */
-          if (afterWelcome === "post") {
+          /* "Post your first Flare", the intro's last button, or the
+             splash's "Scan the code". */
+          if (afterWelcome) {
+            const end = afterWelcome;
             afterWelcome = null;
-            setTimeout(() => followWelcome("post", navigationRef as never), 300);
+            setTimeout(() => followWelcome(end, navigationRef as never), 300);
           }
           /* Demo mode's queued shot, development builds only: launch
              straight onto one screen of the shot list. */
