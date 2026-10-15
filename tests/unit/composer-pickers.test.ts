@@ -63,3 +63,17 @@ describe("the hunt", () => {
     }
   });
 });
+
+describe("a card's own choices", () => {
+  /* The founder: "if you click on the card itself, it like fades into
+     an overlay and blurs the background behind it ... in there is where
+     you'll change quantity, printing, etc." */
+  it("open in an overlay over the blurred page, not inline in the form", () => {
+    expect(app).toMatch(
+      /<CardOverlay onClose=\{\(\) => setEditing\(null\)\}>\s*<CardEditor/,
+    );
+    expect(app).toContain("<SheetBackdrop />");
+    expect(web).toMatch(/<Sheet\s+open=\{editingCard !== null\}/);
+    for (const source of [app, web]) expect(source).toMatch(/Done/);
+  });
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import { Sheet } from "@/components/ui/sheet";
 import {
   HuntSheet,
   PickerRow,
@@ -248,8 +249,11 @@ function ComposerBody({
           })),
         ),
         hunt,
-        acceptsTrade: draft.acceptsTrade,
-        acceptsCash: draft.acceptsCash,
+        /* No "Trade or cash" choice any more: the founder, "people can type
+           that on their own. it will free up space." Every post is the plain
+           default, open to trade, and a draft saved before still posts that. */
+        acceptsTrade: true,
+        acceptsCash: false,
         toRoom: room !== null,
       });
       if (!result.ok) {
@@ -536,23 +540,37 @@ function ComposerBody({
           </li>
         </ul>
 
-        {editingCard && (
-          <CardEditor
-            item={editingCard}
-            index={draft.cards.findIndex((item) => keyOf(item) === keyOf(editingCard))}
-            count={draft.cards.length}
-            copiesLabel={copiesLabel}
-            onPrinting={(printingId) => {
-              const key = keyOf(editingCard);
-              patch({ cards: changePrinting(draft.cards, key, printingId) });
-              setEditing(lineKey(editingCard.card.id, printingId));
-            }}
-            onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
-            onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
-            onCover={() => makeCover(keyOf(editingCard))}
-            onRemove={() => remove(keyOf(editingCard))}
-          />
-        )}
+        {/* The card being edited, lifted out of the form into a sheet over
+            the blurred page: printing, copies and its note live there and
+            nowhere else. The founder: "having a text box, then another
+            text box right below is quite confusing." The app's overlay
+            is the same. */}
+        <Sheet
+          open={editingCard !== null}
+          onClose={() => setEditing(null)}
+          title={editingCard?.card.exactName ?? ""}
+        >
+          {editingCard && (
+            <CardEditor
+              onDone={() => setEditing(null)}
+              item={editingCard}
+              index={draft.cards.findIndex(
+                (item) => keyOf(item) === keyOf(editingCard),
+              )}
+              count={draft.cards.length}
+              copiesLabel={copiesLabel}
+              onPrinting={(printingId) => {
+                const key = keyOf(editingCard);
+                patch({ cards: changePrinting(draft.cards, key, printingId) });
+                setEditing(lineKey(editingCard.card.id, printingId));
+              }}
+              onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
+              onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
+              onCover={() => makeCover(keyOf(editingCard))}
+              onRemove={() => remove(keyOf(editingCard))}
+            />
+          )}
+        </Sheet>
       </div>
 
       {/* What goes with every card. */}
@@ -580,45 +598,6 @@ function ComposerBody({
           className="min-h-0"
         />
       </label>
-
-      {/* What they will do for it. */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Open to</span>
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["acceptsTrade", "Trade"],
-              ["acceptsCash", "Cash ok"],
-            ] as const
-          ).map(([key, label]) => {
-            /* The last one on cannot be switched off: a Flare open to
-               nothing is not a Flare, and the database says so too. The
-               app's composer holds the same line. */
-            const last =
-              draft[key] &&
-              !draft[key === "acceptsTrade" ? "acceptsCash" : "acceptsTrade"];
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={draft[key]}
-                aria-disabled={last || undefined}
-                onClick={() => {
-                  if (!last) patch({ [key]: !draft[key] });
-                }}
-                className={cn(
-                  "cursor-pointer rounded-full border px-3 py-1 text-xs font-bold transition-colors",
-                  draft[key]
-                    ? "border-accent bg-accent text-accent-contrast"
-                    : "border-border-strong text-text-secondary hover:text-text-primary",
-                )}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
 
       {error && (
         <p role="alert" className="text-sm text-danger">
@@ -671,7 +650,9 @@ function CardEditor({
   onNote,
   onCover,
   onRemove,
+  onDone,
 }: {
+  onDone: () => void;
   item: DraftCard;
   index: number;
   count: number;
@@ -688,15 +669,15 @@ function CardEditor({
   const [choosingPrinting, setChoosingPrinting] = useState(false);
 
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3">
-      <div className="flex items-start gap-3">
-        <span className="block h-[70px] w-[50px] shrink-0 overflow-hidden rounded-[6px] border border-border bg-elevated">
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col items-center gap-2 text-center">
+        <span className="block h-[184px] w-[132px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
           {printing?.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={printing.imageUrl} alt="" className="size-full object-cover" />
+            <img src={printing.imageUrl} alt="" className="size-full object-contain" />
           )}
         </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <p className="truncate font-semibold text-text-primary">
             {item.card.exactName}
           </p>
@@ -780,6 +761,10 @@ function CardEditor({
           Remove
         </Button>
       </div>
+
+      <Button type="button" onClick={onDone}>
+        Done
+      </Button>
     </div>
   );
 }

@@ -44,7 +44,6 @@ import {
   CARD_NOTE_LABEL,
   CARD_NOTE_MAX,
   CARD_NOTE_PLACEHOLDER,
-  CARD_NOTE_SUGGESTIONS,
 } from "./card-note";
 import { colors, radius, spacing } from "./theme";
 
@@ -2015,8 +2014,8 @@ const styles = StyleSheet.create({
 });
 
 /**
- * The note on one card: the common reasons as one-tap chips, and a line
- * to type in, so most people say something without typing. Used by the
+ * The note on one card: one line to type in, the examples in its
+ * placeholder. Used by the
  * composer's card editor and by "Edit note" under an open card. The
  * website's CardNoteField is the same
  * (src/components/flares/card-note-field.tsx).
@@ -2033,37 +2032,6 @@ export function CardNoteField({
   return (
     <View style={{ gap: spacing(1.5) }}>
       <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{CARD_NOTE_LABEL}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(1.5) }}>
-        {CARD_NOTE_SUGGESTIONS.map((suggestion) => {
-          const on = value.trim() === suggestion;
-          return (
-            <Tap
-              key={suggestion}
-              accessibilityLabel={suggestion}
-              accessibilityState={{ selected: on }}
-              onPress={() => onChange(on ? "" : suggestion)}
-              style={{
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: on ? colors.accent : colors.border,
-                backgroundColor: on ? colors.accentTint : "transparent",
-                paddingHorizontal: spacing(2.5),
-                paddingVertical: spacing(1),
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.accent : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: "600",
-                }}
-              >
-                {suggestion}
-              </Text>
-            </Tap>
-          );
-        })}
-      </View>
       <Input
         value={value}
         onChangeText={onChange}

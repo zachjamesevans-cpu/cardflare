@@ -10,8 +10,18 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
-import { useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+
+import { SheetBackdrop } from "../action-menu";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -461,8 +471,11 @@ export function FlareComposer({
             : draft.hunt.kind === "existing"
               ? { id: draft.hunt.id }
               : { name: draft.hunt.name.trim() },
-        acceptsTrade: draft.acceptsTrade,
-        acceptsCash: draft.acceptsCash,
+        /* No "Trade or cash" choice any more: the founder, "people can type
+           that on their own. it will free up space." Every post is the plain
+           default, open to trade, and a draft saved before still posts that. */
+        acceptsTrade: true,
+        acceptsCash: false,
         latitude: at?.latitude,
         longitude: at?.longitude,
       });
@@ -685,7 +698,9 @@ export function FlareComposer({
               />
 
               {editing ? (
+                <CardOverlay onClose={() => setEditing(null)}>
                 <CardEditor
+                  onDone={() => setEditing(null)}
                   item={draft.items.find((item) => keyOf(item) === editing) ?? null}
                   index={draft.items.findIndex((item) => keyOf(item) === editing)}
                   count={draft.items.length}
@@ -731,6 +746,7 @@ export function FlareComposer({
                     setEditing(null);
                   }}
                 />
+                </CardOverlay>
               ) : null}
 
               <Input
@@ -741,24 +757,6 @@ export function FlareComposer({
                 multiline
                 style={{ minHeight: 64, textAlignVertical: "top" }}
               />
-
-              <Body>Trade or cash?</Body>
-              <View style={{ flexDirection: "row", gap: spacing(2) }}>
-                {/* Never both off: a Flare nobody can answer is not a
-                    Flare. The server enforces it too. */}
-                <Pill
-                  label="Trade"
-                  active={draft.acceptsTrade}
-                  disabled={draft.acceptsTrade && !draft.acceptsCash}
-                  onPress={() => patch({ acceptsTrade: !draft.acceptsTrade })}
-                />
-                <Pill
-                  label="Cash"
-                  active={draft.acceptsCash}
-                  disabled={draft.acceptsCash && !draft.acceptsTrade}
-                  onPress={() => patch({ acceptsCash: !draft.acceptsCash })}
-                />
-              </View>
 
               {/* Nearby matching rides with Local: off the screen entirely
                   while Local is off, the same rule the website's form
@@ -947,6 +945,7 @@ function CardEditor({
   onChange,
   onCover,
   onRemove,
+  onDone,
 }: {
   item: DraftItem | null;
   index: number;
@@ -955,6 +954,7 @@ function CardEditor({
   onChange: (next: DraftItem) => void;
   onCover: () => void;
   onRemove: () => void;
+  onDone: () => void;
 }) {
   const [choosingPrinting, setChoosingPrinting] = useState(false);
   if (!item) return null;
@@ -965,21 +965,13 @@ function CardEditor({
       label: printing.label ?? "Standard printing",
     })),
   ];
+  /* The overlay is the panel; this is only what goes in it. */
   return (
-    <View
-      style={{
-        gap: spacing(2.5),
-        borderRadius: radius.control,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.elevated,
-        padding: spacing(3),
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
+    <View style={{ gap: spacing(3) }}>
+      <View style={{ alignItems: "center", gap: spacing(2) }}>
         <CardImage
           imageUrl={artFor(item)}
-          width={48}
+          width={132}
           name={item.name}
           cardNumber={item.cardNumber}
           caption={
@@ -989,10 +981,15 @@ function CardEditor({
               : null
           }
         />
-        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+        <View style={{ alignItems: "center", gap: 2 }}>
           <Text
             numberOfLines={2}
-            style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 15 }}
+            style={{
+              color: colors.textPrimary,
+              fontWeight: "700",
+              fontSize: 16,
+              textAlign: "center",
+            }}
           >
             {item.name}
           </Text>
@@ -1055,7 +1052,56 @@ function CardEditor({
         {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
         <SmallAction label="Remove" onPress={onRemove} danger />
       </View>
+
+      <Button label="Done" onPress={onDone} />
     </View>
+  );
+}
+
+/**
+ * A card being edited, lifted out of the form: the page fades and blurs
+ * behind it, and the card's own choices - printing, copies, its note,
+ * cover, remove - are all here and nowhere else. The founder: "if you
+ * click on the card itself, it like fades into an overlay and blurs the
+ * background behind it ... in there is where you'll change quantity,
+ * printing, etc. because currently, having a text box, then another
+ * text box right below is quite confusing." The editor used to open
+ * inline above the caption. The website's composer does the same in
+ * its sheet.
+ */
+function CardOverlay({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  return (
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <SheetBackdrop />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <Pressable
+          onPress={onClose}
+          style={{ flex: 1, justifyContent: "center", padding: spacing(4) }}
+        >
+          <Pressable
+            onPress={() => {}}
+            style={{
+              maxHeight: "90%",
+              borderRadius: radius.card,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.surface,
+              overflow: "hidden",
+            }}
+          >
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ padding: spacing(4) }}
+            >
+              {children}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -1172,8 +1218,8 @@ export function FlareComposerPreview({
     direction: draft.intent,
     deckLabel: huntName,
     postedAt: new Date().toISOString(),
-    acceptsTrade: draft.acceptsTrade,
-    acceptsCash: draft.acceptsCash,
+    acceptsTrade: true,
+    acceptsCash: false,
     note: draft.caption.trim() || null,
     offers: 0,
     hunt:

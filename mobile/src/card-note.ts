@@ -16,16 +16,14 @@
 /** Short on purpose: a reason, read in a list of ten people. */
 export const CARD_NOTE_MAX = 80;
 
-/** One tap rather than typing, so most people say something. */
-export const CARD_NOTE_SUGGESTIONS = [
-  "For my PC",
-  "Building a deck",
-  "Trading up",
-  "Need it this week",
-] as const;
-
 export const CARD_NOTE_LABEL = "Note";
-export const CARD_NOTE_PLACEHOLDER = "Why this card? (optional)";
+
+/*
+ * The examples live in the placeholder. They were one-tap buttons
+ * above the field, and the founder: "look at the 'note' section with
+ * the little buttons. just needs to be simplified."
+ */
+export const CARD_NOTE_PLACEHOLDER = 'Why this card? Like "For my PC" (optional)';
 
 /** One line, trimmed and cut to the limit; empty is no note. */
 export function tidyCardNote(raw: string | null | undefined): string | null {
