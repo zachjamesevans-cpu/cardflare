@@ -16,7 +16,15 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, Crosshair, Plus, Star, Trash2 } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Crosshair,
+  Plus,
+  Star,
+  Trash2,
+} from "lucide-react";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -374,29 +382,6 @@ function ComposerBody({
         </p>
       </div>
 
-      {/* One direction for the whole post, as ONE LINE: "Looking for" is
-          the quiet default - most posts are wants - and offering is a
-          click away. It stays a choice, because what a post wants is what
-          matching, hunts and Wanted near you run on. The app's is the
-          same. */}
-      <p className="flex items-center gap-1.5 text-sm">
-        <span className="text-base font-bold text-text-primary">
-          {draft.intent === "want" ? "Looking for" : "Offering"}
-        </span>
-        <span className="text-text-muted" aria-hidden="true">
-          ·
-        </span>
-        <button
-          type="button"
-          onClick={() =>
-            patch({ intent: draft.intent === "want" ? "showcase" : "want" })
-          }
-          className="cursor-pointer font-semibold text-accent hover:underline"
-        >
-          {draft.intent === "want" ? "Switch to offering" : "Switch to looking for"}
-        </button>
-      </p>
-
       {/* THE HUNT, with what the post is for, not at the foot of the
           form. The founder: "the 'add to a hunt' thing at bottom is very
           weirdly placed." Wants only. */}
@@ -543,6 +528,19 @@ function ComposerBody({
           onClose={() => setEditing(null)}
           title={editingCard?.card.exactName ?? ""}
         >
+          {/* Along the cards in this flare without closing: the founder,
+              "you should be able to swipe between the cards so you don't
+              have to tap out to go to next card." Arrows, the keyboard's
+              arrow keys, and a swipe on a touch screen. */}
+          {editingCard && draft.cards.length > 1 && (
+            <CardSteps
+              index={draft.cards.findIndex(
+                (item) => keyOf(item) === keyOf(editingCard),
+              )}
+              count={draft.cards.length}
+              onStep={(index) => setEditing(keyOf(draft.cards[index]))}
+            />
+          )}
           {editingCard && (
             <CardEditor
               onDone={() => setEditing(null)}
@@ -758,6 +756,78 @@ function CardEditor({
       <Button type="button" onClick={onDone}>
         Done
       </Button>
+    </div>
+  );
+}
+
+/**
+ * "‹ 2 of 3 ›" over the card in the sheet, and the same steps from the
+ * keyboard's arrows and a sideways swipe: the cards in this flare, one
+ * after another, without closing. The app's overlay swipes the same way.
+ */
+function CardSteps({
+  index,
+  count,
+  onStep,
+}: {
+  index: number;
+  count: number;
+  onStep: (index: number) => void;
+}) {
+  const go = (delta: number) => {
+    const next = index + delta;
+    if (next >= 0 && next < count) onStep(next);
+  };
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      /* Not while typing: the arrows move the caret in the note. */
+      const typing = (event.target as HTMLElement | null)?.closest("input, textarea");
+      if (typing) return;
+      if (event.key === "ArrowLeft") go(-1);
+      if (event.key === "ArrowRight") go(1);
+    };
+    document.addEventListener("keydown", onKey);
+    const start = { x: 0 };
+    const onTouchStart = (event: TouchEvent) => {
+      start.x = event.touches[0]?.clientX ?? 0;
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const dx = (event.changedTouches[0]?.clientX ?? 0) - start.x;
+      if (Math.abs(dx) > 60) go(dx < 0 ? 1 : -1);
+    };
+    document.addEventListener("touchstart", onTouchStart);
+    document.addEventListener("touchend", onTouchEnd);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchend", onTouchEnd);
+    };
+  });
+
+  return (
+    <div className="mb-3 flex items-center justify-center gap-4">
+      <button
+        type="button"
+        onClick={() => go(-1)}
+        disabled={index === 0}
+        aria-label="Previous card"
+        className="cursor-pointer rounded-full p-1.5 text-text-secondary hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+      >
+        <ChevronLeft className="size-5" aria-hidden="true" />
+      </button>
+      <span className="text-sm text-text-muted">
+        {index + 1} of {count}
+      </span>
+      <button
+        type="button"
+        onClick={() => go(1)}
+        disabled={index === count - 1}
+        aria-label="Next card"
+        className="cursor-pointer rounded-full p-1.5 text-text-secondary hover:text-text-primary disabled:cursor-default disabled:opacity-30"
+      >
+        <ChevronRight className="size-5" aria-hidden="true" />
+      </button>
     </div>
   );
 }

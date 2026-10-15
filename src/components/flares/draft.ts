@@ -184,7 +184,8 @@ export function parseDraft(raw: string): Draft | null {
     const parsed = JSON.parse(raw) as Partial<Draft>;
     if (!parsed || !Array.isArray(parsed.cards)) return null;
     return {
-      intent: parsed.intent === "showcase" ? "showcase" : "want",
+      /* Always a want now: offering lives in trade binders. */
+      intent: "want",
       cards: parsed.cards.filter((item): item is DraftCard =>
         Boolean(item && typeof item === "object" && item.card && item.card.id),
       ),

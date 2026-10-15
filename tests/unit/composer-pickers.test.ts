@@ -69,24 +69,38 @@ describe("a card's own choices", () => {
      an overlay and blurs the background behind it ... in there is where
      you'll change quantity, printing, etc." */
   it("open in an overlay over the blurred page, not inline in the form", () => {
-    expect(app).toMatch(
-      /<CardOverlay onClose=\{\(\) => setEditing\(null\)\}>\s*<CardEditor/,
-    );
+    expect(app).toMatch(/<CardOverlay onClose=\{\(\) => setEditing\(null\)\}>/);
     expect(app).toContain("<SheetBackdrop />");
     expect(web).toMatch(/<Sheet\s+open=\{editingCard !== null\}/);
     for (const source of [app, web]) expect(source).toMatch(/Done/);
   });
+
+  /* "you should be able to swipe between the cards so you don't have to
+     tap out to go to next card" - the cards in this flare. */
+  it("pages along the cards in this flare without closing", () => {
+    expect(app).toContain("<CardPager");
+    expect(app).toContain("pagingEnabled");
+    expect(web).toContain("<CardSteps");
+    expect(web).toContain('event.key === "ArrowRight"');
+  });
 });
 
-describe("looking for or offering", () => {
-  /* Kept as a choice - matching, hunts and Wanted near you run on it -
-     but one quiet line, Looking for by default. */
-  it("is one line with a switch, not two big buttons", () => {
+describe("no offering in the composer", () => {
+  /* The founder (2026-10-15): "delete the offering thing altogether. i
+     truly think just having a binder is more than enough for trades.
+     and delete the 'looking for' text." Every post is a want. */
+  it("has no Looking for / Offering choice or line", () => {
     for (const source of [app, web]) {
-      expect(source).toContain('"Switch to offering"');
-      expect(source).toContain('"Switch to looking for"');
+      expect(source).not.toContain("Switch to offering");
+      expect(source).not.toContain("Switch to looking for");
     }
-    expect(app).not.toContain('{ key: "showcase", label: "Offering" }');
-    expect(web).not.toContain('aria-label="What this flare is"');
+    expect(app).not.toContain("function IntentControl(");
+  });
+
+  it("treats a draft saved as an offer as a want", () => {
+    expect(app).toMatch(/Always a want now[\s\S]{0,80}intent: "want",/);
+    expect(read("src/components/flares/draft.ts")).toMatch(
+      /Always a want now[\s\S]{0,80}intent: "want",/,
+    );
   });
 });

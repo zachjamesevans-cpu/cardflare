@@ -18,6 +18,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 
@@ -289,7 +290,8 @@ export function FlareComposer({
           const base: Draft = {
             ...saved,
             hunt: current.hunt ?? saved.hunt,
-            intent: current.hunt ? "want" : saved.intent,
+            /* Always a want now: offering lives in trade binders. */
+            intent: "want",
           };
           return card ? withCardFirst(base, card, handedLine) : base;
         });
@@ -617,13 +619,6 @@ export function FlareComposer({
             />
           ) : (
             <>
-              <IntentControl
-                value={draft.intent}
-                onChange={(intent) =>
-                  patch({ intent, hunt: intent === "want" ? draft.hunt : null })
-                }
-              />
-
               {/* THE HUNT, with what the post is for, not at the foot of
                   the form. The founder: "the 'add to a hunt' thing at
                   bottom is very weirdly placed." Wants only. */}
@@ -697,55 +692,74 @@ export function FlareComposer({
                 }}
               />
 
-              {editing ? (
+              {editing && draft.items.some((item) => keyOf(item) === editing) ? (
                 <CardOverlay onClose={() => setEditing(null)}>
-                <CardEditor
-                  onDone={() => setEditing(null)}
-                  item={draft.items.find((item) => keyOf(item) === editing) ?? null}
-                  index={draft.items.findIndex((item) => keyOf(item) === editing)}
-                  count={draft.items.length}
-                  intent={draft.intent}
-                  onChange={(next) => {
-                    /* A printing change re-keys the line; landing on a
-                       line already there folds the two into one. */
-                    const target = keyOf(next);
-                    const twin = draft.items.find(
-                      (item) => keyOf(item) === target && keyOf(item) !== editing,
-                    );
-                    if (twin) {
-                      setItems(
-                        draft.items
-                          .filter((item) => keyOf(item) !== editing)
-                          .map((item) =>
-                            keyOf(item) === target
-                              ? {
-                                  ...item,
-                                  quantity: Math.min(99, item.quantity + next.quantity),
-                                  /* Folding keeps a note: the twin's, or this one's. */
-                                  cardNote: item.cardNote || next.cardNote,
-                                }
-                              : item,
-                          ),
+                  {/* Swipe between the cards in this flare without
+                      closing: the founder, "you should be able to swipe
+                      between the cards so you don't have to tap out to go
+                      to next card." Remounted when the order changes, so
+                      it always opens on the card being edited. */}
+                  <CardPager
+                    key={draft.items.map(keyOf).join("|")}
+                    count={draft.items.length}
+                    index={draft.items.findIndex((item) => keyOf(item) === editing)}
+                    onIndex={(index) => setEditing(keyOf(draft.items[index]))}
+                    renderPage={(index) => {
+                      const item = draft.items[index];
+                      const key = keyOf(item);
+                      return (
+                        <CardEditor
+                          onDone={() => setEditing(null)}
+                          item={item}
+                          index={index}
+                          count={draft.items.length}
+                          intent={draft.intent}
+                          onChange={(next) => {
+                            /* A printing change re-keys the line; landing on
+                               a line already there folds the two into one. */
+                            const target = keyOf(next);
+                            const twin = draft.items.find(
+                              (entry) => keyOf(entry) === target && keyOf(entry) !== key,
+                            );
+                            if (twin) {
+                              setItems(
+                                draft.items
+                                  .filter((entry) => keyOf(entry) !== key)
+                                  .map((entry) =>
+                                    keyOf(entry) === target
+                                      ? {
+                                          ...entry,
+                                          quantity: Math.min(
+                                            99,
+                                            entry.quantity + next.quantity,
+                                          ),
+                                          /* Folding keeps a note: the twin's,
+                                             or this one's. */
+                                          cardNote: entry.cardNote || next.cardNote,
+                                        }
+                                      : entry,
+                                  ),
+                              );
+                            } else {
+                              setItems(
+                                draft.items.map((entry) =>
+                                  keyOf(entry) === key ? next : entry,
+                                ),
+                              );
+                            }
+                            setEditing(target);
+                          }}
+                          onCover={() =>
+                            setItems([item, ...draft.items.filter((entry) => entry !== item)])
+                          }
+                          onRemove={() => {
+                            setItems(draft.items.filter((entry) => keyOf(entry) !== key));
+                            setEditing(null);
+                          }}
+                        />
                       );
-                    } else {
-                      setItems(
-                        draft.items.map((item) =>
-                          keyOf(item) === editing ? next : item,
-                        ),
-                      );
-                    }
-                    setEditing(target);
-                  }}
-                  onCover={() => {
-                    const item = draft.items.find((entry) => keyOf(entry) === editing);
-                    if (!item) return;
-                    setItems([item, ...draft.items.filter((entry) => entry !== item)]);
-                  }}
-                  onRemove={() => {
-                    setItems(draft.items.filter((item) => keyOf(item) !== editing));
-                    setEditing(null);
-                  }}
-                />
+                    }}
+                  />
                 </CardOverlay>
               ) : null}
 
@@ -873,40 +887,6 @@ function StepStrip({ step }: { step: Step }) {
 }
 
 /** Looking for | Offering, one answer for the whole post. */
-function IntentControl({
-  value,
-  onChange,
-}: {
-  value: "want" | "showcase";
-  onChange: (intent: "want" | "showcase") => void;
-}) {
-  /*
-   * ONE LINE, not two big buttons. "Looking for" is the quiet default -
-   * most posts are wants - and offering is a tap away. The founder asked
-   * whether to drop the choice for the caption; it stays, because what a
-   * post wants is what matching, hunts and Wanted near you run on, but
-   * it no longer takes a row of the form. The website's is the same.
-   */
-  const wanting = value === "want";
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
-      <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "700" }}>
-        {wanting ? "Looking for" : "Offering"}
-      </Text>
-      <Text style={{ color: colors.textMuted }}>·</Text>
-      <Tap
-        accessibilityLabel={wanting ? "Switch to offering" : "Switch to looking for"}
-        onPress={() => onChange(wanting ? "showcase" : "want")}
-        hitSlop={8}
-      >
-        <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "600" }}>
-          {wanting ? "Switch to offering" : "Switch to looking for"}
-        </Text>
-      </Tap>
-    </View>
-  );
-}
-
 /** The art for a tray tile: the chosen printing's, else the lead's. */
 function artFor(item: DraftItem): string | null {
   if (item.printingId) {
@@ -1039,6 +1019,85 @@ function CardEditor({
 }
 
 /**
+ * The cards in this flare, side by side in the overlay, one page each:
+ * swipe to the next without closing. Dots under them say where you are.
+ */
+function CardPager({
+  count,
+  index,
+  onIndex,
+  renderPage,
+}: {
+  count: number;
+  index: number;
+  onIndex: (index: number) => void;
+  renderPage: (index: number) => ReactNode;
+}) {
+  const { width } = useWindowDimensions();
+  /* The overlay's panel: the window less its margins and its border. */
+  const page = width - spacing(4) * 2 - 2;
+  const [at, setAt] = useState(index);
+  const rail = useRef<ScrollView>(null);
+  /* Only a swipe the player made moves the card; the jump to the
+     opening card below is not one, and must not report page 0. */
+  const dragged = useRef(false);
+  return (
+    <View>
+      <ScrollView
+        ref={rail}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        /* Open on the card that was tapped, once there is a width to
+           scroll by: contentOffset alone is dropped before layout. */
+        onLayout={() => rail.current?.scrollTo({ x: index * page, animated: false })}
+        onScrollBeginDrag={() => {
+          dragged.current = true;
+        }}
+        onMomentumScrollEnd={(event) => {
+          if (!dragged.current) return;
+          dragged.current = false;
+          const next = Math.round(event.nativeEvent.contentOffset.x / page);
+          if (next < 0 || next >= count || next === at) return;
+          setAt(next);
+          onIndex(next);
+        }}
+      >
+        {Array.from({ length: count }, (_, page_) => (
+          <View key={page_} style={{ width: page, padding: spacing(4) }}>
+            {renderPage(page_)}
+          </View>
+        ))}
+      </ScrollView>
+      {count > 1 ? (
+        <View
+          accessibilityLabel={`Card ${at + 1} of ${count}`}
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            gap: spacing(1.5),
+            paddingBottom: spacing(4),
+          }}
+        >
+          {Array.from({ length: count }, (_, dot) => (
+            <View
+              key={dot}
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: 3,
+                backgroundColor: dot === at ? colors.accent : colors.borderStrong,
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * A card being edited, lifted out of the form: the page fades and blurs
  * behind it, and the card's own choices - printing, copies, its note,
  * cover, remove - are all here and nowhere else. The founder: "if you
@@ -1072,12 +1131,7 @@ function CardOverlay({ onClose, children }: { onClose: () => void; children: Rea
               overflow: "hidden",
             }}
           >
-            <ScrollView
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ padding: spacing(4) }}
-            >
-              {children}
-            </ScrollView>
+            <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
