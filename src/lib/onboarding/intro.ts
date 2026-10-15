@@ -3,45 +3,53 @@
  *
  * The founder (2026-10-15): "id like a quick 30 second introduction to
  * the app when people first sign up - such as highlighting the post a
- * flare button, a quick 30 word summary or something." Four cards since
- * the founder asked for the social one, about forty-five words in all,
- * then the one button that matters.
+ * flare button, a quick 30 word summary or something." Five cards now,
+ * about fifty-five words, then the one button that matters - the
+ * founder: "if you had to summarize cardflare into the 4-5 most eye
+ * catching slides and features what would you do? ... id love to
+ * highlight the binder feature". What you want (Post a Flare, Find it
+ * nearby), what you have (your binders, and the link that shares one),
+ * then the payoff (Meet up and trade).
  *
  * Free of imports so the app carries a word-for-word twin
  * (mobile/src/intro-copy.ts): both sign-ups say exactly this.
  */
 
 export interface IntroCard {
-  key: "post" | "social" | "nearby" | "trade";
+  key: "post" | "nearby" | "binders" | "share" | "trade";
   title: string;
   body: string;
 }
 
 export const INTRO_CARDS: readonly IntroCard[] = [
-  { key: "post", title: "Post a Flare", body: "For the cards you’re hunting." },
-  /*
-   * What happens once it is up, in two cards. The founder: "i like the
-   * idea of the social features - honestly maybe a forth slide ... that
-   * showcases someone commenting on a flare post. think it's important
-   * to showcase that a flare gets posted - your followers can comment,
-   * players nearby can offer it to you if they have it". And on the
-   * nearby card, after "Who have them raise a hand" read oddly:
-   * "players near you find it for you from their binders".
-   */
+  /* Posting and the followers' answer, one moment: it was two cards. */
   {
-    key: "social",
-    title: "Your followers chime in",
-    body: "They see your Flare, like it and comment.",
+    key: "post",
+    title: "Post a Flare",
+    body: "Post the cards you’re hunting. Followers like and comment.",
   },
+  /* "players near you find it for you from their binders" */
   {
     key: "nearby",
     title: "Find it nearby",
-    body: "Players near you find it in their binders and offer it to you.",
+    body: "Players near you check their binders and offer it to you.",
+  },
+  {
+    key: "binders",
+    title: "Your binders, your way",
+    body: "Name them, pick a cover, show them off or keep them private.",
+  },
+  /* The founder's own line: "want someone to see your trade binder?
+     send them a link". */
+  {
+    key: "share",
+    title: "Share your binder",
+    body: "Want someone to see your trade binder? Send them a link.",
   },
   {
     key: "trade",
-    title: "Message, meet up, trade",
-    body: "Mark it found when it’s yours.",
+    title: "Meet up and trade",
+    body: "Message, meet at the store, mark it found.",
   },
 ];
 
@@ -111,12 +119,49 @@ export const INTRO_PEOPLE = [
 export const INTRO_YOU = "You";
 export const INTRO_OFFERED = "Offered";
 
-/** The social scene: a like count, and two followers' comments. */
+/** The post scene's answer: a like count, a comment count, and the
+    first comment. */
 export const INTRO_LIKES = 12;
-export const INTRO_COMMENTS = [
-  { name: "Maya", body: "Saw one at the shop on Main!" },
-  { name: "Kaito", body: "I’ll check my binder tonight." },
+export const INTRO_COMMENT_COUNT = 3;
+export const INTRO_COMMENT = {
+  name: "Maya",
+  body: "Saw one at the shop on Main!",
+} as const;
+
+/*
+ * The binders scene: three of a player's own, by cover and name, one
+ * kept private. Real covers from the seven (BINDER_COVERS); a cover has
+ * no picture on it by the founder's rule, so the art stays in the cards.
+ */
+export const INTRO_BINDERS = [
+  { cover: "lime", name: "Trades", private: false },
+  { cover: "gold", name: "Grails", private: false },
+  { cover: "galaxy", name: "PC", private: true },
 ] as const;
+export const INTRO_PUBLIC = "On your profile";
+export const INTRO_PRIVATE = "Private";
+
+/*
+ * The share scene: the link to a trade binder, sent in a message, and
+ * the friend who opens it wanting a card - the binder page's own words
+ * (BINDER_OFFER_COPY.want), then the offer gone.
+ */
+export const INTRO_SHARE_MESSAGE = "Here’s my trade binder!";
+export const INTRO_WANT = "I want this card";
+export const INTRO_OFFER_SENT = "Offer sent";
+/** A handle for the link's title before the player has one. */
+export const INTRO_HANDLE_FALLBACK = "yourname";
+
+/** The link, in the real shape: a binder's eight-letter share code
+    (app/b/[binderId]), never the handle - that is not a link that
+    exists. */
+export const INTRO_SHARE_LINK = "cardflare.gg/b/k7q2m9xa";
+
+/** The link card's title, as the friend sees it: whose, and which. */
+export function introShareTitle(handle: string | null | undefined): string {
+  const tidy = (handle ?? "").replace(/^@/, "").trim();
+  return `@${tidy || INTRO_HANDLE_FALLBACK} · ${INTRO_BINDERS[0].name}`;
+}
 
 /** The third scene's two messages, about the rail's last card. */
 export function introChat(card: string): readonly [string, string] {

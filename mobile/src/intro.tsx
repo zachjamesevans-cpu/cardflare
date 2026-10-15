@@ -11,7 +11,7 @@ import {
   introGame,
   type IntroGame,
 } from "./intro-copy";
-import { getGames } from "./api";
+import { getGames, getMe } from "./api";
 import { IntroScene } from "./intro-scenes";
 import { LAUNCH_BACKGROUND } from "./launch-view";
 import { colors, spacing } from "./theme";
@@ -37,11 +37,14 @@ export function Intro({
   onPost,
   onLook,
   game = "one-piece",
+  handle = null,
 }: {
   onPost: () => void;
   onLook: () => void;
   /** Whose art the scenes draw: introGame() of the games they play. */
   game?: IntroGame;
+  /** Their handle, so the shared binder link reads as theirs. */
+  handle?: string | null;
 }) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -113,7 +116,7 @@ export function Intro({
           >
             {/* A fixed height, so the words do not jump when it draws. */}
             <View style={{ height: SCENE_HEIGHT, justifyContent: "center" }}>
-              {at < drawn ? <IntroScene card={card.key} game={game} /> : null}
+              {at < drawn ? <IntroScene card={card.key} game={game} handle={handle} /> : null}
             </View>
             <View style={{ alignItems: "center", gap: spacing(2) }}>
               <Text
@@ -218,6 +221,7 @@ const SCENE_HEIGHT = 300;
  */
 export function ReplayIntro({ onPost, onLook }: { onPost: () => void; onLook: () => void }) {
   const [game, setGame] = useState<IntroGame>("one-piece");
+  const [handle, setHandle] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
     getGames()
@@ -225,9 +229,14 @@ export function ReplayIntro({ onPost, onLook }: { onPost: () => void; onLook: ()
         if (live) setGame(introGame(result.mine));
       })
       .catch(() => {});
+    getMe()
+      .then((me) => {
+        if (live) setHandle(me.player.handle ?? null);
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };
   }, []);
-  return <Intro game={game} onPost={onPost} onLook={onLook} />;
+  return <Intro game={game} handle={handle} onPost={onPost} onLook={onLook} />;
 }
