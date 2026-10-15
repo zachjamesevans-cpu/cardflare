@@ -92,10 +92,14 @@ function statusLabel(item: HuntItem): string {
     return item.total === 1 ? "found it" : "found them all";
   }
   if (item.direction === "showcase") return "is offering";
-  /* The founder: "soupie posted 17 cards to her ace hunt. but it just
-     says 'is looking for' with a little tiny ace 'view hunt' button
-     below". A post in a hunt says so, and names it (see FlareStatus). */
-  return item.hunt ? "is hunting" : "is looking for";
+  /* A post in a hunt says what it did to the hunt, and names it after
+     the words (see FlareStatus). The founder, on taking the hunt picker
+     out of the composer: "in the feed it'll say 'so and so updated
+     their hunt' or 'so and so added a new hunt'." The hunt's first post
+     started it; every later one added to it. */
+  if (!item.hunt) return "is looking for";
+  if (item.hunt.started) return "started a hunt:";
+  return `added ${item.total} ${item.total === 1 ? "card" : "cards"} to`;
 }
 
 /**
@@ -126,7 +130,7 @@ export function FlareStatus({
    * hunt" line under the post, which was the only sign it belonged to
    * a hunt and the easiest thing on it to miss.
    */
-  hunt?: { id: string; name: string } | null;
+  hunt?: { id: string; name: string; started?: boolean } | null;
   /** False in the composer's preview, where there is nowhere to go yet. */
   linkHunt?: boolean;
 }) {

@@ -3421,7 +3421,7 @@ export interface PostDetail {
   direction?: "want" | "showcase";
   caption?: string | null;
   /** The hunt the post belongs to. */
-  hunt?: { id: string; name: string } | null;
+  hunt?: { id: string; name: string; started?: boolean } | null;
   remainingCopies?: number;
   completed?: boolean;
   cards: PostCard[];
@@ -3976,7 +3976,7 @@ export type FeedItem =
       /** How many people have raised a hand on any card in it. */
       offers?: number;
       /** The hunt the post belongs to, for "Green Zoro · View hunt". */
-      hunt?: { id: string; name: string } | null;
+      hunt?: { id: string; name: string; started?: boolean } | null;
       /** Copies still wanted across every card shown. */
       remainingCopies?: number;
       /** Every copy is in hand: nothing left to offer on. */

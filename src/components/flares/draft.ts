@@ -190,8 +190,10 @@ export function parseDraft(raw: string): Draft | null {
         Boolean(item && typeof item === "object" && item.card && item.card.id),
       ),
       caption: typeof parsed.caption === "string" ? parsed.caption : "",
-      hunt:
-        parsed.hunt && typeof parsed.hunt === "object" ? parsed.hunt : { kind: "none" },
+      /* Never restored: a hunt comes only from the "+" the composer was
+         opened from, so a post cannot slip into one the player chose on
+         an earlier visit and no longer sees. */
+      hunt: { kind: "none" },
       /* Open to something, always: see EMPTY_DRAFT. */
       acceptsTrade: Boolean(parsed.acceptsTrade) || !parsed.acceptsCash,
       acceptsCash: Boolean(parsed.acceptsCash),

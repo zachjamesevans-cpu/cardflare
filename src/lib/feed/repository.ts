@@ -1,3 +1,4 @@
+import { huntStartPosts } from "@/lib/feed/hunt-starts";
 import {
   nearbyMatchesForHolder,
   wantedSummaryOf,
@@ -374,8 +375,12 @@ export interface HuntItem {
   note: string | null;
   /** How many people have raised a hand on any card in it. */
   offers: number;
-  /** The hunt the post belongs to, for the "Green Zoro · View hunt" line. */
-  hunt: { id: string; name: string } | null;
+  /**
+   * The hunt the post belongs to, named in the status line. `started`
+   * is true for the hunt's first post: "started a hunt", where a later
+   * one reads "added 3 cards to" (hunt-starts.ts).
+   */
+  hunt: { id: string; name: string; started?: boolean } | null;
   /** Copies still wanted across every card shown. */
   remainingCopies: number;
   /** Every copy is in hand: nothing left to offer on. */
@@ -1920,13 +1925,17 @@ async function decorateHunts(
   const huntIds = [
     ...new Set(posts.flatMap((post) => (post.hunt_id ? [post.hunt_id] : []))),
   ];
-  const huntNames = new Map(
+  const [huntRows, huntStarts] = await Promise.all([
     huntIds.length > 0
-      ? (
-          (await admin.from("hunts").select("id, name").in("id", huntIds)).data ?? []
-        ).map((hunt) => [hunt.id, hunt.name] as const)
-      : [],
-  );
+      ? admin
+          .from("hunts")
+          .select("id, name")
+          .in("id", huntIds)
+          .then((result) => result.data ?? [])
+      : Promise.resolve([]),
+    huntStartPosts(huntIds),
+  ]);
+  const huntNames = new Map(huntRows.map((hunt) => [hunt.id, hunt.name] as const));
   const postById = new Map(posts.map((post) => [post.id, post]));
   const requestById = new Map(requests.map((request) => [request.id, request]));
   const printingById = new Map(printings.map((row) => [row.id, toPrinting(row)]));
@@ -1960,7 +1969,14 @@ async function decorateHunts(
       hunt.direction = post.intent === "showcase" ? "showcase" : "want";
       if (post.caption) hunt.note = post.caption;
       const name = post.hunt_id ? huntNames.get(post.hunt_id) : undefined;
-      hunt.hunt = post.hunt_id && name ? { id: post.hunt_id, name } : null;
+      hunt.hunt =
+        post.hunt_id && name
+          ? {
+              id: post.hunt_id,
+              name,
+              started: huntStarts.get(post.hunt_id) === post.id,
+            }
+          : null;
     }
 
     /* Hands up across the whole post, each person once; copies still

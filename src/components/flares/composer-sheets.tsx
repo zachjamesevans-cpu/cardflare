@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { Check, ChevronRight, PlusCircle, type LucideIcon } from "lucide-react";
+import { Check, ChevronRight, Crosshair, X, type LucideIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { TextInput } from "@/components/ui/controls";
 import { Sheet } from "@/components/ui/sheet";
 import { cn } from "@/lib/cn";
 
 /**
- * The composer's two choices as a row that says what is chosen and a
- * sheet that lists the options down: the printing, and the hunt. The
+ * The composer's printing as a row that says what is chosen and a
+ * sheet that lists the options down, and the hunt it was opened from. The
  * founder: "it feels weird to scroll left when everywhere else on the
  * app you scroll down to change printing ... the 'add to a hunt' thing
  * at bottom is very weirdly placed." The app's composer draws the same
@@ -146,89 +143,36 @@ export function PrintingSheet({
   );
 }
 
-export type HuntPick =
-  { kind: "none" } | { kind: "existing"; id: string } | { kind: "new"; name: string };
-
-/** What the hunt row says: the hunt's name, a new one's, or None. */
-export function huntRowValue(
-  value: HuntPick,
-  hunts: { id: string; name: string }[],
-): string {
-  if (value.kind === "none") return "None";
-  if (value.kind === "new") return value.name.trim() || "New hunt";
-  return hunts.find((hunt) => hunt.id === value.id)?.name ?? "None";
-}
-
-/** Which hunt these cards go in: none, one of theirs, or a new one named here. */
-export function HuntSheet({
-  open,
-  hunts,
-  value,
-  onChange,
-  onClose,
+/**
+ * The one sign of a hunt in the composer: "Adding to Green Zoro", and
+ * only when it was opened from that hunt's "+". There is no picker any
+ * more. The founder: "okay, im posting a flare, but also adding to a
+ * hunt? ... i think it's a bit convoluted when you're posting a
+ * flare." A Flare is the cards you are looking for; a hunt is built on
+ * its own screen. The cross posts the same cards as a plain Flare.
+ */
+export function AddingToHunt({
+  name,
+  onLeave,
 }: {
-  open: boolean;
-  hunts: { id: string; name: string }[];
-  value: HuntPick;
-  onChange: (next: HuntPick) => void;
-  onClose: () => void;
+  name: string | null;
+  onLeave: () => void;
 }) {
-  const [naming, setNaming] = useState(value.kind === "new");
-  const [name, setName] = useState(value.kind === "new" ? value.name : "");
-  const choose = (next: HuntPick) => {
-    onChange(next);
-    onClose();
-  };
-
   return (
-    <Sheet open={open} onClose={onClose} title="Add to a hunt">
-      <div className="flex flex-col gap-3">
-        <p className="text-sm text-text-muted">
-          Building a deck? Keep these cards together with what is found.
-        </p>
-        <ul className="flex flex-col gap-1">
-          <OptionRow
-            label="No hunt"
-            on={value.kind === "none"}
-            onClick={() => choose({ kind: "none" })}
-          />
-          {hunts.map((hunt) => (
-            <OptionRow
-              key={hunt.id}
-              label={hunt.name}
-              on={value.kind === "existing" && value.id === hunt.id}
-              onClick={() => choose({ kind: "existing", id: hunt.id })}
-            />
-          ))}
-          {!naming && (
-            <OptionRow
-              label="Start a new hunt"
-              on={false}
-              onClick={() => setNaming(true)}
-              art={<PlusCircle className="size-5 text-accent" aria-hidden="true" />}
-            />
-          )}
-        </ul>
-        {naming && (
-          <div className="flex flex-col gap-2">
-            <TextInput
-              value={name}
-              onChange={(event) => setName(event.target.value.slice(0, 60))}
-              maxLength={60}
-              placeholder="Name it, like Green Zoro"
-              aria-label="Hunt name"
-              autoFocus
-            />
-            <Button
-              type="button"
-              disabled={!name.trim()}
-              onClick={() => choose({ kind: "new", name: name.trim() })}
-            >
-              Start this hunt
-            </Button>
-          </div>
-        )}
-      </div>
-    </Sheet>
+    <div className="flex w-full items-center gap-2.5 rounded-[var(--radius-control)] border border-border bg-elevated py-1.5 pr-1.5 pl-3">
+      <Crosshair className="size-4 shrink-0 text-accent" aria-hidden="true" />
+      <p className="min-w-0 flex-1 truncate text-sm text-text-secondary">
+        Adding to{" "}
+        <span className="font-semibold text-text-primary">{name ?? "your hunt"}</span>
+      </p>
+      <button
+        type="button"
+        onClick={onLeave}
+        aria-label="Post without the hunt"
+        className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full text-text-muted hover:text-text-primary"
+      >
+        <X className="size-4" aria-hidden="true" />
+      </button>
+    </div>
   );
 }

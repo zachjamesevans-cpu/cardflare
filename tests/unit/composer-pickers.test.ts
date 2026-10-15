@@ -39,28 +39,45 @@ describe("the printing", () => {
 });
 
 describe("the hunt", () => {
-  it("sits under Looking for / Offering, not at the foot of the form", () => {
+  /* The founder (2026-10-15): "okay, im posting a flare, but also adding
+     to a hunt? ... if they want to add to their hunt, they go to their
+     hunts screen ... i think it's a bit convoluted when you're posting a
+     flare." No picker: a hunt's own "+" opens the composer into it. */
+  it("has no picker in the composer, on either platform", () => {
     for (const source of [app, web]) {
-      const intent = source.indexOf("Looking for");
-      const hunt = source.indexOf('label="Hunt"');
-      const cards = source.indexOf("Cards in this flare");
-      expect(hunt).toBeGreaterThan(intent);
-      expect(hunt).toBeLessThan(cards);
+      expect(source).not.toContain('label="Hunt"');
+      expect(source).not.toContain("HuntSheet");
+      expect(source).not.toContain("huntRowValue");
     }
-    expect(app).not.toContain("function HuntPicker(");
-    expect(web).not.toContain('<option value="__new">New hunt</option>');
-  });
-
-  it("opens a sheet: no hunt, theirs, or a new one named there", () => {
     for (const file of [
       "mobile/src/composer-sheets.tsx",
       "src/components/flares/composer-sheets.tsx",
     ]) {
       const sheets = read(file);
-      expect(sheets, file).toContain('label="No hunt"');
-      expect(sheets, file).toContain('label="Start a new hunt"');
-      expect(sheets, file).toContain("Start this hunt");
+      expect(sheets, file).not.toContain("Start a new hunt");
+      expect(sheets, file).toContain("export function AddingToHunt(");
+      expect(sheets, file).toContain("Post without the hunt");
     }
+  });
+
+  it("says Adding to, only when opened from a hunt", () => {
+    expect(app).toMatch(/draft\.hunt\?\.kind === "existing" \? \(\s*<AddingToHunt/);
+    expect(web).toMatch(/draft\.hunt\.kind === "existing" && \(\s*<AddingToHunt/);
+  });
+
+  it("never restores a hunt from a saved draft", () => {
+    expect(app).toContain("hunt: current.hunt,");
+    expect(app).not.toContain("current.hunt ?? saved.hunt");
+    expect(read("src/components/flares/draft.ts")).toMatch(
+      /Never restored[\s\S]{0,240}hunt: \{ kind: "none" \},/,
+    );
+  });
+
+  it("opens into the same hunt again on a second +", () => {
+    const hub = read("mobile/src/screens/hub.tsx");
+    expect(hub).toContain("n: (last?.n ?? 0) + 1");
+    expect(hub).toContain("huntSignal={openInto?.n}");
+    expect(app).toContain("}, [initialHuntId, huntSignal]);");
   });
 });
 

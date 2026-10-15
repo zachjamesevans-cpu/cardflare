@@ -1,5 +1,6 @@
 import "server-only";
 
+import { huntStartPosts } from "@/lib/feed/hunt-starts";
 import { randomUUID } from "node:crypto";
 
 import { cardArt, printingLabel, type CardPrinting } from "@/lib/cards/schema";
@@ -90,8 +91,8 @@ export interface PostDetail extends PostSocial {
   direction: "want" | "showcase";
   /** What they wrote with it. */
   caption: string | null;
-  /** The hunt the post belongs to. */
-  hunt: { id: string; name: string } | null;
+  /** The hunt the post belongs to; `started` for its first post (hunt-starts.ts). */
+  hunt: { id: string; name: string; started?: boolean } | null;
   /** Copies still wanted across the cards, and whether none are. */
   remainingCopies: number;
   completed: boolean;
@@ -658,10 +659,17 @@ export async function postDetail(
         .eq("id", event.data.store_id)
         .maybeSingle()
     : { data: null };
-  const huntName = context.huntId
-    ? ((await admin.from("hunts").select("name").eq("id", context.huntId).maybeSingle())
-        .data?.name ?? null)
-    : null;
+  const [huntName, huntStarts] = context.huntId
+    ? await Promise.all([
+        admin
+          .from("hunts")
+          .select("name")
+          .eq("id", context.huntId)
+          .maybeSingle()
+          .then((result) => result.data?.name ?? null),
+        huntStartPosts([context.huntId]),
+      ])
+    : [null, new Map<string, string>()];
 
   const cardById = new Map((cards.data ?? []).map((row) => [row.id, row]));
   /* Every printing per card, so the art is the best imaged one rather than
@@ -747,7 +755,13 @@ export async function postDetail(
     deckLabel: context.deckLabel,
     direction: context.direction,
     caption: context.caption,
-    hunt: huntName ? { id: context.huntId as string, name: huntName } : null,
+    hunt: huntName
+      ? {
+          id: context.huntId as string,
+          name: huntName,
+          started: huntStarts.get(context.huntId as string) === postId,
+        }
+      : null,
     remainingCopies,
     completed: context.direction === "want" && remainingCopies === 0,
     cards: [...postCards].sort(foundLast),

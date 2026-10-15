@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
@@ -12,15 +12,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { SheetBackdrop } from "./action-menu";
-import type { Hunt } from "./api";
 import { SwipeToClose } from "./sheet-swipe";
 import { colors, radius, spacing } from "./theme";
-import { Button, CardImage, Input, Muted, Tap } from "./ui";
+import { CardImage, Tap } from "./ui";
 
 /**
- * The composer's two choices that used to scroll sideways - the
- * printing, and the hunt - as a row that says what is chosen and a
- * sheet that lists the options DOWN, the way the rest of the app picks.
+ * The composer's printing, which used to scroll sideways, as a row that
+ * says what is chosen and a sheet that lists the options DOWN, the way
+ * the rest of the app picks; and the hunt it was opened from.
  * The founder: "it feels weird to scroll left when everywhere else on
  * the app you scroll down to change printing ... the 'add to a hunt'
  * thing at bottom is very weirdly placed." The website's composer draws
@@ -220,85 +219,57 @@ export function PrintingSheet({
   );
 }
 
-export type HuntChoice =
-  | { kind: "existing"; id: string }
-  | { kind: "new"; name: string }
-  | null;
-
-/** What the hunt row says: the hunt's name, a new one's, or None. */
-export function huntRowValue(value: HuntChoice, hunts: Hunt[]): string {
-  if (!value) return "None";
-  if (value.kind === "new") return value.name.trim() || "New hunt";
-  return hunts.find((hunt) => hunt.id === value.id)?.name ?? "None";
-}
+/** The hunt a post goes into: only ever the one it was opened from. */
+export type HuntChoice = { kind: "existing"; id: string } | null;
 
 /**
- * Which hunt these cards go in: none, one of theirs with how far along
- * it is, or a new one named right here. Wants only - a hunt is what you
- * are chasing.
+ * The one sign of a hunt in the composer: "Adding to Green Zoro", and
+ * only when it was opened from that hunt's "+". There is no picker any
+ * more. The founder: "okay, im posting a flare, but also adding to a
+ * hunt? ... i think it's a bit convoluted when you're posting a
+ * flare." A Flare is the cards you are looking for; a hunt is built on
+ * its own screen. The cross posts the same cards as a plain Flare.
  */
-export function HuntSheet({
-  hunts,
-  limit,
-  value,
-  onChange,
-  onClose,
+export function AddingToHunt({
+  name,
+  onLeave,
 }: {
-  hunts: Hunt[];
-  limit: number | null;
-  value: HuntChoice;
-  onChange: (next: HuntChoice) => void;
-  onClose: () => void;
+  name: string | null;
+  onLeave: () => void;
 }) {
-  const [naming, setNaming] = useState(value?.kind === "new");
-  const [name, setName] = useState(value?.kind === "new" ? value.name : "");
-  const atLimit = limit !== null && hunts.length >= limit;
-  const choose = (next: HuntChoice) => {
-    onChange(next);
-    onClose();
-  };
-
   return (
-    <PickerSheet title="Add to a hunt" onClose={onClose}>
-      <Muted>Building a deck? Keep these cards together with what is found.</Muted>
-      <OptionRow label="No hunt" on={value === null} onPress={() => choose(null)} />
-      {hunts
-        .filter((hunt): hunt is Hunt & { id: string } => Boolean(hunt.id))
-        .map((hunt) => (
-          <OptionRow
-            key={hunt.id}
-            label={hunt.name}
-            detail={`${hunt.looking + hunt.found} cards · ${hunt.found} found`}
-            on={value?.kind === "existing" && value.id === hunt.id}
-            onPress={() => choose({ kind: "existing", id: hunt.id })}
-          />
-        ))}
-      {naming ? (
-        <View style={{ gap: spacing(2), paddingTop: spacing(2) }}>
-          <Input
-            value={name}
-            onChangeText={setName}
-            placeholder={'Name it, like "Green Zoro"'}
-            maxLength={40}
-            autoCapitalize="words"
-            autoFocus
-          />
-          <Button
-            label="Start this hunt"
-            disabled={!name.trim()}
-            onPress={() => choose({ kind: "new", name: name.trim() })}
-          />
-        </View>
-      ) : atLimit ? (
-        <Muted>{`You are at ${limit} hunts. Add to one of them, or finish one first.`}</Muted>
-      ) : (
-        <OptionRow
-          label="Start a new hunt"
-          on={false}
-          onPress={() => setNaming(true)}
-          art={<Ionicons name="add-circle-outline" size={22} color={colors.accent} />}
-        />
-      )}
-    </PickerSheet>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(2.5),
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.elevated,
+        paddingLeft: spacing(3),
+        paddingRight: spacing(1),
+        paddingVertical: spacing(1),
+      }}
+    >
+      <Ionicons name="locate-outline" size={18} color={colors.accent} />
+      <Text
+        numberOfLines={1}
+        style={{ flex: 1, minWidth: 0, color: colors.textSecondary, fontSize: 14 }}
+      >
+        {"Adding to "}
+        <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+          {name ?? "your hunt"}
+        </Text>
+      </Text>
+      <Tap
+        accessibilityLabel="Post without the hunt"
+        hitSlop={8}
+        onPress={onLeave}
+        style={{ width: 36, height: 36, alignItems: "center", justifyContent: "center" }}
+      >
+        <Ionicons name="close" size={18} color={colors.textMuted} />
+      </Tap>
+    </View>
   );
 }

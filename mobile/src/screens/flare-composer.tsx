@@ -1,8 +1,7 @@
 import {
-  HuntSheet,
   PickerRow,
   PrintingSheet,
-  huntRowValue,
+  AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
 import { CardNoteField } from "../card-note-field";
@@ -163,6 +162,7 @@ type Step = "select" | "compose" | "preview";
 export function FlareComposer({
   target,
   initialHuntId,
+  huntSignal,
   initialCard,
   resolveTarget,
   resetSignal,
@@ -171,8 +171,10 @@ export function FlareComposer({
   openToTrades = false,
 }: {
   target: PostTarget;
-  /** The hunt to open into, from a profile's "Add cards". */
+  /** The hunt to open into, from a hunt's "+". */
   initialHuntId?: string;
+  /** Bumped on every "+", so the same hunt twice still opens into it. */
+  huntSignal?: number;
   /** The card to open with as the first line, from a card page. */
   initialCard?: HandedCard;
   /**
@@ -206,8 +208,6 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
-  /* The hunt sheet, open or not (composer-sheets.tsx). */
-  const [choosingHunt, setChoosingHunt] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
@@ -277,9 +277,11 @@ export function FlareComposer({
       if (!live) return;
       if (saved && saved.v === 1 && Array.isArray(saved.items)) {
         /* What was typed since mount wins over what was saved before
-           it; a hunt handed in by "Add cards" survives the restore, and
-           so does a card handed in by a card page: the saved lines
-           stay, the handed card goes first. */
+           it, and so does a card handed in by a card page: the saved
+           lines stay, the handed card goes first. A hunt is never
+           restored: it comes only from the "+" this was opened from
+           (AddingToHunt), so a post cannot slip into one chosen on an
+           earlier visit. */
         setDraft((current) => {
           const card = handed.current;
           const handedLine = card
@@ -289,7 +291,7 @@ export function FlareComposer({
           if (current.items.length > 0 && !onlyHanded) return current;
           const base: Draft = {
             ...saved,
-            hunt: current.hunt ?? saved.hunt,
+            hunt: current.hunt,
             /* Always a want now: offering lives in trade binders. */
             intent: "want",
           };
@@ -315,7 +317,7 @@ export function FlareComposer({
     };
   }, [draft, restored, draftKey]);
 
-  /* "Add cards" on a hunt arrives with its id: a want, into that hunt. */
+  /* A hunt's "+" arrives with its id: a want, into that hunt. */
   useEffect(() => {
     if (!initialHuntId) return;
     setDraft((current) => ({
@@ -325,7 +327,7 @@ export function FlareComposer({
     }));
     setPosted(null);
     setPreviewing(false);
-  }, [initialHuntId]);
+  }, [initialHuntId, huntSignal]);
 
   /*
    * "Post a Flare for it" on a card page arrives with the card: the
@@ -372,16 +374,14 @@ export function FlareComposer({
     setPicking(false);
   }, [resetSignal]);
 
-  /* Their hunts, for "Add to a hunt". A guest has none. */
+  /* Their hunts, for the name on "Adding to". A guest has none. */
   const [hunts, setHunts] = useState<Hunt[]>([]);
-  const [huntLimit, setHuntLimit] = useState<number | null>(null);
   const huntsFresh = useRef(false);
   const loadHunts = () =>
     getHunts()
       .then(async (result) => {
         huntsFresh.current = true;
         setHunts(result.hunts);
-        setHuntLimit(result.limit);
         const id = await cachedPlayerId();
         if (id) void writeCache("composerHunts", id, result);
       })
@@ -401,7 +401,6 @@ export function FlareComposer({
       if (!cached || !live || huntsFresh.current || !Array.isArray(cached.hunts))
         return;
       setHunts(cached.hunts);
-      setHuntLimit(cached.limit ?? null);
     })();
     return () => {
       live = false;
@@ -434,22 +433,12 @@ export function FlareComposer({
       : "compose";
   const chosenHunt = draft.hunt;
   const huntName =
-    chosenHunt?.kind === "new"
-      ? chosenHunt.name
-      : chosenHunt?.kind === "existing"
-        ? (hunts.find((hunt) => hunt.id === chosenHunt.id)?.name ?? null)
-        : null;
-  /* A new hunt with no name: Preview and Post wait for one, rather than
-     posting without the hunt the player thought they had started. */
-  const huntUnnamed =
-    draft.intent === "want" && chosenHunt?.kind === "new" && !chosenHunt.name.trim();
+    chosenHunt?.kind === "existing"
+      ? (hunts.find((hunt) => hunt.id === chosenHunt.id)?.name ?? null)
+      : null;
 
   const post = async () => {
     setError(null);
-    if (huntUnnamed) {
-      setError("Name your hunt.");
-      return;
-    }
     try {
       /* The decided target, never a painted one. */
       const where = resolveTarget ? await resolveTarget() : target;
@@ -467,12 +456,7 @@ export function FlareComposer({
           quantity: item.quantity,
           cardNote: item.cardNote?.trim() || null,
         })),
-        hunt:
-          draft.intent !== "want" || !draft.hunt
-            ? null
-            : draft.hunt.kind === "existing"
-              ? { id: draft.hunt.id }
-              : { name: draft.hunt.name.trim() },
+        hunt: draft.hunt?.kind === "existing" ? { id: draft.hunt.id } : null,
         /* No "Trade or cash" choice any more: the founder, "people can type
            that on their own. it will free up space." Every post is the plain
            default, open to trade, and a draft saved before still posts that. */
@@ -619,25 +603,11 @@ export function FlareComposer({
             />
           ) : (
             <>
-              {/* THE HUNT, with what the post is for, not at the foot of
-                  the form. The founder: "the 'add to a hunt' thing at
-                  bottom is very weirdly placed." Wants only. */}
-              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
-                <PickerRow
-                  label="Hunt"
-                  icon="locate-outline"
-                  value={huntRowValue(draft.hunt, hunts)}
-                  onPress={() => setChoosingHunt(true)}
-                />
-              ) : null}
-              {choosingHunt ? (
-                <HuntSheet
-                  hunts={hunts}
-                  limit={huntLimit}
-                  value={draft.hunt}
-                  onChange={(hunt) => patch({ hunt })}
-                  onClose={() => setChoosingHunt(false)}
-                />
+              {/* No hunt picker: a hunt is built from its own screen,
+                  whose "+" opens this with the hunt set (AddingToHunt
+                  says why). */}
+              {draft.hunt?.kind === "existing" ? (
+                <AddingToHunt name={huntName} onLeave={() => patch({ hunt: null })} />
               ) : null}
 
               <View
@@ -779,8 +749,8 @@ export function FlareComposer({
 
               <ErrorLine message={error} />
               <Button
-                label={huntUnnamed ? "Name your hunt" : "Preview"}
-                disabled={draft.items.length === 0 || huntUnnamed}
+                label="Preview"
+                disabled={draft.items.length === 0}
                 onPress={() => {
                   setEditing(null);
                   setPreviewing(true);
@@ -1259,7 +1229,7 @@ export function FlareComposerPreview({
     hunt:
       draft.intent === "want" && huntName
         ? {
-            id: draft.hunt?.kind === "existing" ? draft.hunt.id : "new",
+            id: draft.hunt?.id ?? "preview",
             name: huntName,
           }
         : null,
