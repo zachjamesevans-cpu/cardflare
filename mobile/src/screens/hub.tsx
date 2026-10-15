@@ -378,13 +378,23 @@ export function HubScreen() {
                           : nudgeWant(want.id, delta),
                       )
                     }
-                    onDrop={() =>
-                      editWant(() =>
+                    /* Gone from the list now, not when the server
+                       answers: "it should delete immediately visually
+                       even if it takes a second for the server to
+                       respond." editWant re-reads after, so a refused
+                       delete comes back, with the error under the list. */
+                    onDrop={() => {
+                      setWants((list) => {
+                        const next = list?.filter((row) => row.id !== want.id) ?? list;
+                        memory.wants = next;
+                        return next;
+                      });
+                      return editWant(() =>
                         want.direction === "offering"
                           ? dropOffering(want.cardId)
                           : dropWant(want.id),
-                      )
-                    }
+                      );
+                    }}
                     /* Remember the room, then open it - the same two
                        steps the Feed's own buttons take. */
                     onOpenRoom={(code) => {

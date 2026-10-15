@@ -21,6 +21,7 @@ import {
   View,
 } from "react-native";
 
+import { dismissSwipe } from "../swipe-delete";
 import { SheetBackdrop } from "../action-menu";
 
 import type { StackParams, TabParams } from "../../App";
@@ -548,6 +549,12 @@ export function FlareComposer({
         paddingBottom: spacing(4) + tabInset,
       }}
       keyboardShouldPersistTaps="handled"
+      /* A touch anywhere, or a scroll, closes a Delete left showing on
+         the Flares list (swipe-delete.tsx). */
+      onTouchStart={(event) =>
+        dismissSwipe(event.nativeEvent.pageX, event.nativeEvent.pageY)
+      }
+      onScrollBeginDrag={() => dismissSwipe()}
     >
       {posted ? (
         <Card>
