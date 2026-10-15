@@ -24,6 +24,7 @@ import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, playersLine, type GameSlug } from "../games";
 import { registerForPush } from "../push";
+import { LAUNCH_WORDMARK_WIDTH } from "../launch-view";
 import { Intro } from "../intro";
 import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE } from "../intro-copy";
 import { NearbyLocationAsk } from "../nearby-location-ask";
@@ -64,9 +65,10 @@ const SEEN_KEY = "cf-welcome-seen";
    future master with different proportions stays correctly shaped. */
 const WORDMARK = require("../../assets/wordmark.png");
 const WORDMARK_SOURCE = Image.resolveAssetSource(WORDMARK);
-/* The CF mark, the logo while BRAND is "soft". */
-const CF_MARK = require("../../assets/cf-mark.png");
-const CF_MARK_SOURCE = Image.resolveAssetSource(CF_MARK);
+/* The full wordmark in the soft green, the logo while BRAND is "soft":
+   the art the launch screen and the Feed's header draw. */
+const WORDMARK_SOFT = require("../../assets/wordmark-soft.png");
+const WORDMARK_SOFT_SOURCE = Image.resolveAssetSource(WORDMARK_SOFT);
 
 export async function hasSeenWelcome(): Promise<boolean> {
   try {
@@ -240,14 +242,17 @@ function Splash({
        * it rather than drifting from it.
        */}
       {BRAND === "soft" ? (
-        /* The founder's CF mark, flat and alone: the logo "for now", in
-           place of the flame card and the glowing wordmark. See BRAND in
-           theme.ts. */
+        /* The full cardflare wordmark, not the CF mark alone - the
+           founder: "make the cf logo the cardflare logo full". The launch
+           screen's width (launch-view.tsx), so the hand-over from the
+           launch screen keeps the same art at the same size. */
         <Image
-          source={CF_MARK}
+          source={WORDMARK_SOFT}
           style={{
-            height: 72,
-            width: 72 * (CF_MARK_SOURCE.width / CF_MARK_SOURCE.height),
+            width: LAUNCH_WORDMARK_WIDTH,
+            height:
+              LAUNCH_WORDMARK_WIDTH *
+              (WORDMARK_SOFT_SOURCE.height / WORDMARK_SOFT_SOURCE.width),
             resizeMode: "contain",
           }}
           accessibilityLabel="cardflare"
@@ -284,7 +289,9 @@ function Splash({
           fontWeight: "500",
           textAlign: "center",
           lineHeight: 24,
-          marginTop: -spacing(1.5),
+          /* Pulled up under the old CF mark; the wordmark is wide and
+             short, so the lines get a little room below it instead. */
+          marginTop: BRAND === "soft" ? spacing(1.5) : -spacing(1.5),
         }}
       >
         Find your cards.{"\n"}Meet nearby.{"\n"}Trade in person.
