@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeftRight, Crosshair, Hand, type LucideIcon } from "lucide-react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
 import {
@@ -11,31 +10,25 @@ import {
   INTRO_NEXT,
   INTRO_POST,
   INTRO_SKIP,
-  type IntroCard,
+  type IntroGame,
 } from "@/lib/onboarding/intro";
+import { IntroScene } from "@/components/onboarding/intro-scenes";
 import { cn } from "@/lib/cn";
 
 /**
  * The thirty seconds after signing up, on the website: the same three
  * cards and words as the app (mobile/src/intro.tsx), the same last two
  * ways out. "Look around first" lands on the Feed with its + pointed at
- * (PostSpotlight).
+ * (PostSpotlight). Each card shows a scene of the app (IntroScene) in
+ * the art of the player's game.
  */
-
-/* The same marks as the app's: the Flare crosshair, a hand, a trade. */
-const ICONS: Record<IntroCard["key"], LucideIcon> = {
-  post: Crosshair,
-  nearby: Hand,
-  trade: ArrowLeftRight,
-};
 
 const LOOK_HREF = "/feed?tour=post";
 
-export function IntroCards() {
+export function IntroCards({ game }: { game: IntroGame }) {
   const [index, setIndex] = useState(0);
   const card = INTRO_CARDS[index];
   const last = index === INTRO_CARDS.length - 1;
-  const Icon = ICONS[card.key];
 
   return (
     <div className="flex w-full max-w-md flex-col items-center gap-8">
@@ -51,9 +44,7 @@ export function IntroCards() {
       </div>
 
       <div key={card.key} className="flex flex-col items-center gap-6 text-center">
-        <div className="flex size-32 items-center justify-center rounded-full border border-accent bg-accent/15 shadow-[0_0_24px_-4px_var(--color-accent)]">
-          <Icon className="size-14 text-accent" aria-hidden="true" />
-        </div>
+        <IntroScene card={card.key} game={game} />
         <div className="flex flex-col gap-2">
           <h1 className="text-3xl font-extrabold tracking-tight text-text-primary">
             {card.title}

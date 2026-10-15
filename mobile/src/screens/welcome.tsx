@@ -28,7 +28,7 @@ import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
 import { LAUNCH_BACKGROUND, LAUNCH_WORDMARK_WIDTH } from "../launch-view";
 import { Intro } from "../intro";
-import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE } from "../intro-copy";
+import { WHERE_BODY, WHERE_SKIP, WHERE_TITLE, introGame } from "../intro-copy";
 import { NearbyLocationAsk } from "../nearby-location-ask";
 import { SignInScreen } from "./sign-in";
 import {
@@ -139,6 +139,8 @@ export function WelcomeScreen({
   preview?: boolean;
 }) {
   const [step, setStep] = useState<Step>(initialStep);
+  /* The games picked a step before the intro, for its scenes' art. */
+  const [played, setPlayed] = useState<string[]>([]);
 
   const done = (end?: WelcomeEnd) => {
     if (!preview) void markWelcomeSeen();
@@ -168,7 +170,13 @@ export function WelcomeScreen({
       )}
       {step === "games" && (
         <StepShell title="Which games do you play?">
-          <GamesStep preview={preview} onDone={() => setStep("where")} />
+          <GamesStep
+            preview={preview}
+            onDone={(picked) => {
+              setPlayed(picked);
+              setStep("where");
+            }}
+          />
         </StepShell>
       )}
       {step === "where" && (
@@ -177,7 +185,11 @@ export function WelcomeScreen({
         </StepShell>
       )}
       {step === "intro" && (
-        <Intro onPost={() => done("post")} onLook={() => done("look")} />
+        <Intro
+          game={introGame(played)}
+          onPost={() => done("post")}
+          onLook={() => done("look")}
+        />
       )}
       {step === "signin" && (
         <ScrollView contentContainerStyle={{ paddingTop: spacing(14) }}>
@@ -596,7 +608,13 @@ function AccountStep({ onDone, preview }: { onDone: () => void; preview: boolean
   );
 }
 
-function GamesStep({ onDone, preview }: { onDone: () => void; preview: boolean }) {
+function GamesStep({
+  onDone,
+  preview,
+}: {
+  onDone: (picked: GameSlug[]) => void;
+  preview: boolean;
+}) {
   const [picked, setPicked] = useState<Set<GameSlug>>(new Set());
   const [error, setError] = useState<string | null>(null);
   /* A save has failed once: the way past it appears. */
@@ -682,7 +700,7 @@ function GamesStep({ onDone, preview }: { onDone: () => void; preview: boolean }
         onPress={async () => {
           setError(null);
           if (preview) {
-            onDone();
+            onDone([...picked]);
             return;
           }
           /*
@@ -705,14 +723,14 @@ function GamesStep({ onDone, preview }: { onDone: () => void; preview: boolean }
           }
           // Push becomes worth asking for the moment an account exists.
           await registerForPush();
-          onDone();
+          onDone([...picked]);
         }}
       />
       {saveFailed ? (
         <Tap
           onPress={() => {
             void registerForPush();
-            onDone();
+            onDone([...picked]);
           }}
           hitSlop={8}
         >

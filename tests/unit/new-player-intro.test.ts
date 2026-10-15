@@ -3,7 +3,9 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { INTRO_CARDS } from "../../src/lib/onboarding/intro";
+import { existsSync } from "node:fs";
+
+import { INTRO_ART, INTRO_CARDS, introGame } from "../../src/lib/onboarding/intro";
 
 /**
  * A new player's first run. The founder (2026-10-15): "id like a quick
@@ -38,14 +40,14 @@ describe("the app's sign-up", () => {
     expect(welcome).toContain(
       '<AccountStep preview={preview} onDone={() => setStep("games")} />',
     );
-    expect(welcome).toContain(
-      '<GamesStep preview={preview} onDone={() => setStep("where")} />',
+    expect(welcome).toMatch(
+      /<GamesStep\s+preview=\{preview\}\s+onDone=\{\(picked\) => \{\s*setPlayed\(picked\);\s*setStep\("where"\);/,
     );
     expect(welcome).toContain(
       '<WhereStep preview={preview} onDone={() => setStep("intro")} />',
     );
-    expect(welcome).toContain(
-      '<Intro onPost={() => done("post")} onLook={() => done("look")} />',
+    expect(welcome).toMatch(
+      /<Intro\s+game=\{introGame\(played\)\}\s+onPost=\{\(\) => done\("post"\)\}\s+onLook=\{\(\) => done\("look"\)\}/,
     );
   });
 
@@ -59,7 +61,7 @@ describe("the app's sign-up", () => {
       /if \(preview\) \{\s*onDone\(\);\s*return;\s*\}\s*const result = await signUp/,
     );
     expect(welcome).toMatch(
-      /if \(preview\) \{\s*onDone\(\);\s*return;\s*\}\s*\/\*\s*\* A failed save/,
+      /if \(preview\) \{\s*onDone\(\[\.\.\.picked\]\);\s*return;\s*\}\s*\/\*\s*\* A failed save/,
     );
     expect(welcome).toContain("dryRun={preview}");
     expect(welcome).toContain("if (!preview) void markWelcomeSeen();");
@@ -73,7 +75,9 @@ describe("the app's sign-up", () => {
     expect(app).toMatch(
       /void queueSpotlight\(\);\s*go\("Tabs", \{ screen: "Feed" \}\);/,
     );
-    expect(app).toContain('afterWelcome = end === "post" || end === "scan" ? end : null;');
+    expect(app).toContain(
+      'afterWelcome = end === "post" || end === "scan" ? end : null;',
+    );
   });
 });
 
@@ -108,7 +112,9 @@ describe("the website's sign-up", () => {
     const where = read("src/app/welcome/where/page.tsx");
     expect(where).toContain('href="/welcome/intro"');
     expect(where).toContain("<PostalAsk");
-    expect(read("src/app/welcome/intro/page.tsx")).toContain("<IntroCards />");
+    expect(read("src/app/welcome/intro/page.tsx")).toContain(
+      "<IntroCards game={game} />",
+    );
   });
 });
 
@@ -129,5 +135,49 @@ describe("again, later", () => {
     expect(read("mobile/App.tsx")).toMatch(
       /name="SignUpPreview"[\s\S]{0,200}<WelcomeScreen\s+preview/,
     );
+  });
+});
+
+/*
+ * The founder: "the big screen that shows all the big icons ... isn't
+ * enough. maybe a screenshot of the app or something for each of those
+ * things", then "build it go" on drawing small scenes of the app.
+ */
+describe("the intro's scenes", () => {
+  it("are on both platforms, in place of the icons", () => {
+    expect(read("mobile/src/intro.tsx")).toContain(
+      "<IntroScene card={card.key} game={game} />",
+    );
+    expect(read("src/components/onboarding/intro-cards.tsx")).toContain(
+      "<IntroScene card={card.key} game={game} />",
+    );
+  });
+
+  it("are drawn from the app's own pieces", () => {
+    const app = read("mobile/src/intro-scenes.tsx");
+    expect(app).toContain("<FlareStatus />");
+    expect(app).toContain('<StateBand state="found" />');
+    expect(read("src/components/onboarding/intro-scenes.tsx")).toContain(
+      "<FlareStatus />",
+    );
+  });
+
+  it("wear the picked game's art, bundled on both platforms", () => {
+    const table = read("mobile/src/intro-art.ts");
+    for (const game of Object.keys(INTRO_ART)) {
+      for (const n of [1, 2, 3]) {
+        expect(
+          existsSync(resolve(ROOT, `mobile/assets/intro/${game}-${n}.jpg`)),
+          game,
+        ).toBe(true);
+        expect(existsSync(resolve(ROOT, `public/intro/${game}-${n}.jpg`)), game).toBe(
+          true,
+        );
+        expect(table).toContain(`../assets/intro/${game}-${n}.jpg`);
+      }
+    }
+    expect(introGame(["riftbound", "pokemon"])).toBe("pokemon");
+    expect(introGame(["riftbound"])).toBe("one-piece");
+    expect(introGame([])).toBe("one-piece");
   });
 });

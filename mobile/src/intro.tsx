@@ -1,5 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -9,8 +8,11 @@ import {
   INTRO_NEXT,
   INTRO_POST,
   INTRO_SKIP,
-  type IntroCard,
+  introGame,
+  type IntroGame,
 } from "./intro-copy";
+import { getGames } from "./api";
+import { IntroScene } from "./intro-scenes";
 import { LAUNCH_BACKGROUND } from "./launch-view";
 import { colors, spacing } from "./theme";
 import { Button, Tap } from "./ui";
@@ -26,21 +28,20 @@ import { Button, Tap } from "./ui";
  * around first", which lands on the Feed with the + pointed at
  * (spotlight.tsx). Skip is on every card and does the same as the
  * second.
+ *
+ * Each card shows a scene of the app (intro-scenes.tsx), in the art of
+ * the game the player picked a step before.
  */
-
-/* The app's own marks: the Flare crosshair, a hand going up, a trade. */
-const ICONS: Record<IntroCard["key"], React.ComponentProps<typeof Ionicons>["name"]> = {
-  post: "locate-outline",
-  nearby: "hand-left-outline",
-  trade: "swap-horizontal",
-};
 
 export function Intro({
   onPost,
   onLook,
+  game = "one-piece",
 }: {
   onPost: () => void;
   onLook: () => void;
+  /** Whose art the scenes draw: introGame() of the games they play. */
+  game?: IntroGame;
 }) {
   const [index, setIndex] = useState(0);
   const insets = useSafeAreaInsets();
@@ -72,24 +73,7 @@ export function Intro({
         key={card.key}
         style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: spacing(5) }}
       >
-        <View
-          style={{
-            width: 128,
-            height: 128,
-            borderRadius: 64,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: colors.accentTint,
-            borderWidth: 1,
-            borderColor: colors.accent,
-            shadowColor: colors.accent,
-            shadowOpacity: 0.45,
-            shadowRadius: 24,
-            shadowOffset: { width: 0, height: 0 },
-          }}
-        >
-          <Ionicons name={ICONS[card.key]} size={60} color={colors.accent} />
-        </View>
+        <IntroScene card={card.key} game={game} />
         <View style={{ alignItems: "center", gap: spacing(2) }}>
           <Text
             style={{
@@ -158,4 +142,25 @@ export function Intro({
       )}
     </View>
   );
+}
+
+/**
+ * The intro again, from Settings -> Help: in the art of the games the
+ * account plays, read once. One Piece until the answer lands, or if it
+ * never does - the intro must not wait on the network to say hello.
+ */
+export function ReplayIntro({ onPost, onLook }: { onPost: () => void; onLook: () => void }) {
+  const [game, setGame] = useState<IntroGame>("one-piece");
+  useEffect(() => {
+    let live = true;
+    getGames()
+      .then((result) => {
+        if (live) setGame(introGame(result.mine));
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return <Intro game={game} onPost={onPost} onLook={onLook} />;
 }
