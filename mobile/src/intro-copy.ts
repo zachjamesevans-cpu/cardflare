@@ -3,27 +3,40 @@
  *
  * The founder (2026-10-15): "id like a quick 30 second introduction to
  * the app when people first sign up - such as highlighting the post a
- * flare button, a quick 30 word summary or something." Three cards,
- * about twenty-five words in all, then the one button that matters.
+ * flare button, a quick 30 word summary or something." Four cards since
+ * the founder asked for the social one, about forty-five words in all,
+ * then the one button that matters.
  *
  * Free of imports so the app carries a word-for-word twin
  * (mobile/src/intro-copy.ts): both sign-ups say exactly this.
  */
 
 export interface IntroCard {
-  key: "post" | "nearby" | "trade";
+  key: "post" | "social" | "nearby" | "trade";
   title: string;
   body: string;
 }
 
 export const INTRO_CARDS: readonly IntroCard[] = [
   { key: "post", title: "Post a Flare", body: "For the cards you’re hunting." },
-  /* It said "Players near you / Who have them raise a hand." The founder:
-     "the 'who have them raise a hand' verbiage is a bit odd." */
+  /*
+   * What happens once it is up, in two cards. The founder: "i like the
+   * idea of the social features - honestly maybe a forth slide ... that
+   * showcases someone commenting on a flare post. think it's important
+   * to showcase that a flare gets posted - your followers can comment,
+   * players nearby can offer it to you if they have it". And on the
+   * nearby card, after "Who have them raise a hand" read oddly:
+   * "players near you find it for you from their binders".
+   */
+  {
+    key: "social",
+    title: "Your followers chime in",
+    body: "They see your Flare, like it and comment.",
+  },
   {
     key: "nearby",
     title: "Find it nearby",
-    body: "See who near you has the card you want.",
+    body: "Players near you find it in their binders and offer it to you.",
   },
   {
     key: "trade",
@@ -93,9 +106,17 @@ export const INTRO_PEOPLE = [
   { name: "Maya", miles: "3.1 mi" },
 ] as const;
 
-/** The first scene's poster, and the second scene's raised hand. */
+/** The first scene's poster, and the nearby scene's answer: the app's
+    own word for a card somebody has put forward ("OFFERED"). */
 export const INTRO_YOU = "You";
-export const INTRO_HAS_IT = "has it";
+export const INTRO_OFFERED = "Offered";
+
+/** The social scene: a like count, and two followers' comments. */
+export const INTRO_LIKES = 12;
+export const INTRO_COMMENTS = [
+  { name: "Maya", body: "Saw one at the shop on Main!" },
+  { name: "Kaito", body: "I’ll check my binder tonight." },
+] as const;
 
 /** The third scene's two messages, about the rail's last card. */
 export function introChat(card: string): readonly [string, string] {

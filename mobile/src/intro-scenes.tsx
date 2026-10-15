@@ -6,7 +6,9 @@ import { FlareStatus } from "./flare-feed-card";
 import { INTRO_IMAGES } from "./intro-art";
 import {
   INTRO_ART,
-  INTRO_HAS_IT,
+  INTRO_COMMENTS,
+  INTRO_LIKES,
+  INTRO_OFFERED,
   INTRO_PEOPLE,
   INTRO_YOU,
   introChat,
@@ -53,6 +55,7 @@ export function IntroScene({ card, game }: { card: IntroCard["key"]; game: Intro
       }}
     >
       {card === "post" ? <PostScene art={art} /> : null}
+      {card === "social" ? <SocialScene art={art} /> : null}
       {card === "nearby" ? <NearbyScene art={art[2]} /> : null}
       {card === "trade" ? <TradeScene art={art[2]} name={names[2]} /> : null}
     </View>
@@ -139,7 +142,64 @@ function PostScene({ art }: { art: readonly ImageSourcePropType[] }) {
   );
 }
 
-/* 2. Players near you with the card: the nearest one's hand goes up. */
+/* 2. Your followers on the post: a like count, then two comments. */
+function SocialScene({ art }: { art: readonly ImageSourcePropType[] }) {
+  return (
+    <>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
+        <Face name={INTRO_YOU} size={28} />
+        <View style={{ gap: 2 }}>
+          <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 14 }}>
+            {INTRO_YOU}
+          </Text>
+          <FlareStatus />
+        </View>
+      </View>
+      <View style={{ flexDirection: "row", gap: spacing(1.5) }}>
+        {art.map((source, index) => (
+          <Art key={index} source={source} width={56} />
+        ))}
+      </View>
+      {/* The Feed's own marks: a filled heart and a speech bubble. */}
+      <Animated.View
+        entering={FadeIn.delay(250)}
+        style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="heart" size={16} color={colors.accent} />
+          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
+            {INTRO_LIKES}
+          </Text>
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+          <Ionicons name="chatbubble-outline" size={15} color={colors.textSecondary} />
+          <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>
+            {INTRO_COMMENTS.length}
+          </Text>
+        </View>
+      </Animated.View>
+      <View style={{ gap: spacing(2) }}>
+        {INTRO_COMMENTS.map((comment, index) => (
+          <Animated.View
+            key={comment.name}
+            entering={FadeInDown.delay(550 + index * 400)}
+            style={{ flexDirection: "row", alignItems: "flex-start", gap: spacing(2) }}
+          >
+            <Face name={comment.name} size={24} />
+            <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+              <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                {comment.name}{" "}
+              </Text>
+              {comment.body}
+            </Text>
+          </Animated.View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+/* 3. Players near you with it in a binder: the nearest one offers it. */
 function NearbyScene({ art }: { art: ImageSourcePropType }) {
   return (
     <View style={{ flexDirection: "row", gap: spacing(3), alignItems: "center" }}>
@@ -173,7 +233,7 @@ function NearbyScene({ art }: { art: ImageSourcePropType }) {
               >
                 <Ionicons name="hand-left" size={12} color={colors.accentContrast} />
                 <Text style={{ color: colors.accentContrast, fontSize: 11, fontWeight: "800" }}>
-                  {INTRO_HAS_IT}
+                  {INTRO_OFFERED}
                 </Text>
               </Animated.View>
             ) : null}
@@ -184,7 +244,7 @@ function NearbyScene({ art }: { art: ImageSourcePropType }) {
   );
 }
 
-/* 3. Two messages, then the card is yours: FOUND, the app's own band. */
+/* 4. Two messages, then the card is yours: FOUND, the app's own band. */
 function TradeScene({ art, name }: { art: ImageSourcePropType; name: string }) {
   const [ask, answer] = introChat(name);
   return (

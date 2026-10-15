@@ -24,12 +24,19 @@ describe("the intro's words", () => {
     expect(read("mobile/src/intro-copy.ts")).toBe(read("src/lib/onboarding/intro.ts"));
   });
 
-  it("are three cards and about thirty words", () => {
-    expect(INTRO_CARDS.map((card) => card.key)).toEqual(["post", "nearby", "trade"]);
+  /* Four since the founder asked for the social card: "maybe a forth
+     slide ... that showcases someone commenting on a flare post". */
+  it("are four cards and under fifty words", () => {
+    expect(INTRO_CARDS.map((card) => card.key)).toEqual([
+      "post",
+      "social",
+      "nearby",
+      "trade",
+    ]);
     const words = INTRO_CARDS.flatMap((card) =>
       `${card.title} ${card.body}`.split(/\s+/),
     );
-    expect(words.length).toBeLessThanOrEqual(30);
+    expect(words.length).toBeLessThanOrEqual(50);
   });
 });
 
@@ -146,10 +153,15 @@ describe("again, later", () => {
 /* "the 'who have them raise a hand' verbiage is a bit odd ... people
    should be able to swipe between these screens ... go back and forth." */
 describe("the intro's cards", () => {
-  it("say the second one plainly", () => {
+  /* "players near you find it for you from their binders" */
+  it("say the nearby one plainly", () => {
     const nearby = INTRO_CARDS.find((card) => card.key === "nearby");
     expect(nearby?.title).toBe("Find it nearby");
-    expect(nearby?.body).toBe("See who near you has the card you want.");
+    expect(nearby?.body).toBe(
+      "Players near you find it in their binders and offer it to you.",
+    );
+    const social = INTRO_CARDS.find((card) => card.key === "social");
+    expect(social?.title).toBe("Your followers chime in");
   });
 
   it("swipe both ways, one at a time, on both platforms", () => {
@@ -178,6 +190,11 @@ describe("the intro's scenes", () => {
     const app = read("mobile/src/intro-scenes.tsx");
     expect(app).toContain("<FlareStatus />");
     expect(app).toContain('<StateBand state="found" />');
+    /* The social card shows comments on both platforms. */
+    expect(app).toContain("INTRO_COMMENTS.map(");
+    expect(read("src/components/onboarding/intro-scenes.tsx")).toContain(
+      "INTRO_COMMENTS.map(",
+    );
     expect(read("src/components/onboarding/intro-scenes.tsx")).toContain(
       "<FlareStatus />",
     );

@@ -1,11 +1,13 @@
 import Image from "next/image";
-import { Bell, Hand, Plus } from "lucide-react";
+import { Bell, Hand, Heart, MessageCircle, Plus } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { FlareStatus } from "@/components/feed/flare-feed-card";
 import {
   INTRO_ART,
-  INTRO_HAS_IT,
+  INTRO_COMMENTS,
+  INTRO_LIKES,
+  INTRO_OFFERED,
   INTRO_PEOPLE,
   INTRO_YOU,
   introChat,
@@ -105,6 +107,54 @@ export function IntroScene({
         </>
       )}
 
+      {card === "social" && (
+        <>
+          <div className="flex items-center gap-2">
+            <Face name={INTRO_YOU} size={28} />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-bold text-text-primary">{INTRO_YOU}</span>
+              <FlareStatus />
+            </div>
+          </div>
+          <div className="flex gap-1.5">
+            {([1, 2, 3] as const).map((n, index) => (
+              <Art key={n} src={art(game, n)} alt={names[index]} width={56} />
+            ))}
+          </div>
+          {/* The Feed's own marks: a filled heart and a speech bubble. */}
+          <div
+            className="flex items-center gap-4 text-[13px] font-semibold text-text-secondary motion-safe:[animation:var(--a)]"
+            style={{ ["--a" as string]: play("cf-flare-in", 250).animation }}
+          >
+            <span className="flex items-center gap-1">
+              <Heart className="size-4 fill-accent text-accent" />
+              {INTRO_LIKES}
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageCircle className="size-4" />
+              {INTRO_COMMENTS.length}
+            </span>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {INTRO_COMMENTS.map((comment, index) => (
+              <li
+                key={comment.name}
+                className="flex items-start gap-2 motion-safe:[animation:var(--a)]"
+                style={{
+                  ["--a" as string]: play("cf-flare-in", 550 + index * 400).animation,
+                }}
+              >
+                <Face name={comment.name} size={24} />
+                <p className="flex-1 text-[13px] leading-snug text-text-secondary">
+                  <span className="font-bold text-text-primary">{comment.name} </span>
+                  {comment.body}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
       {card === "nearby" && (
         <div className="flex items-center gap-3">
           <Art src={art(game, 3)} alt={names[2]} width={96} />
@@ -131,7 +181,7 @@ export function IntroScene({
                     style={{ ["--a" as string]: play("cf-intro-pop", 900).animation }}
                   >
                     <Hand className="size-3" />
-                    {INTRO_HAS_IT}
+                    {INTRO_OFFERED}
                   </span>
                 )}
               </li>
