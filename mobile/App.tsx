@@ -1,3 +1,4 @@
+import { LaunchView } from "./src/launch-view";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
@@ -947,8 +948,9 @@ function AppGates() {
     };
   }, [gate]);
 
+  /* Still the launch screen while the session is read (launch-view.tsx). */
   if (gate === "checking") {
-    return <View style={{ flex: 1, backgroundColor: colors.canvas }} />;
+    return <LaunchView />;
   }
 
   if (gate === "welcome") {

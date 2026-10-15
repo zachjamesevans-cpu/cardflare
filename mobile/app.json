@@ -70,10 +70,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
-          "imageWidth": 280,
+          "image": "./assets/wordmark-soft.png",
+          "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#111710"
         }
       ],
       "@bacons/apple-targets"

@@ -56,6 +56,7 @@ describe("the logo", () => {
       );
       expect(source, file).toContain("cf-mark.png");
     }
-    expect(read("mobile/app.json")).toContain('"image": "./assets/splash-icon.png"');
+    /* The launch screen is the wordmark now (launch-screen.test.ts). */
+    expect(read("mobile/app.json")).toContain('"image": "./assets/wordmark-soft.png"');
   });
 });
