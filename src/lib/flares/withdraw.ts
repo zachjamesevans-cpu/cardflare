@@ -1,6 +1,7 @@
 import "server-only";
 
 import { sessionsForPlayers } from "@/lib/players/accounts";
+import { clearWant, saveWant } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 /**
@@ -18,6 +19,13 @@ import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
  * and `restoreFlares` reopens only rows the SAME player took down
  * within the last minute: a toast's worth of time, not a way to revive
  * a Flare a room closed for a no-show months ago.
+ *
+ * Taking a want down takes it off the player's list too. Posting one
+ * saves the ask, so the list kept every card ever taken down, and the
+ * next room joined posted them all again - the founder, after Mox
+ * Valley: "the app is saving old flares somewhere and reposting them
+ * even though i deleted / found the cards already and removed them."
+ * The undo puts the want back with the Flare.
  */
 
 export const UNDO_WINDOW_MS = 60 * 1000;
@@ -52,7 +60,11 @@ export async function withdrawFlares(
   const admin = getSupabaseAdmin();
   const owned = await ownedBy(playerId);
 
-  let query = admin.from("flares").select("id").eq("status", "open").or(owned);
+  let query = admin
+    .from("flares")
+    .select("id, intent, card_id, printing_id")
+    .eq("status", "open")
+    .or(owned);
   query =
     "postId" in target
       ? query.or(`posted_batch.eq.${target.postId},id.eq.${target.postId}`)
@@ -78,7 +90,48 @@ export async function withdrawFlares(
     return { ok: false, flareIds: [] };
   }
 
+  await forgetWants(playerId, owned, rows ?? []);
   return { ok: true, flareIds };
+}
+
+/** One saved want per card and printing; null printing is "any". */
+const keyOf = (row: { card_id: string; printing_id: string | null }) =>
+  `${row.card_id}:${row.printing_id ?? ""}`;
+
+/**
+ * Clears the saved want behind each want Flare just taken down, unless
+ * another open want Flare of the player's still asks for the same card
+ * and printing: a card up in two places stays wanted until both go.
+ */
+async function forgetWants(
+  playerId: string,
+  owned: string,
+  rows: { intent: string; card_id: string; printing_id: string | null }[],
+): Promise<void> {
+  const wants = rows.filter((row) => row.intent === "want");
+  if (wants.length === 0) return;
+
+  const { data: still, error } = await getSupabaseAdmin()
+    .from("flares")
+    .select("card_id, printing_id")
+    .eq("status", "open")
+    .eq("intent", "want")
+    .in("card_id", [...new Set(wants.map((row) => row.card_id))])
+    .or(owned);
+  if (error) {
+    /* Unsure what is still up: keep the wants. A want left behind is
+       the old behaviour; one cleared wrongly loses a card. */
+    console.error("Could not check what is still wanted", error);
+    return;
+  }
+
+  const stillUp = new Set((still ?? []).map(keyOf));
+  const gone = new Map(
+    wants.filter((row) => !stillUp.has(keyOf(row))).map((row) => [keyOf(row), row]),
+  );
+  await Promise.all(
+    [...gone.values()].map((row) => clearWant(playerId, row.card_id, row.printing_id)),
+  );
 }
 
 /**
@@ -141,11 +194,28 @@ export async function restoreFlares(
     .eq("status", "cancelled")
     .gte("withdrawn_at", since)
     .or(owned)
-    .select("id");
+    .select("id, intent, card_id, printing_id, quantity, card_note, deck_label");
 
   if (error) {
     console.error("Could not put the Flares back", error);
     return { ok: false, restored: 0 };
+  }
+
+  /* The take-down cleared the wants; the undo saves them again. */
+  if (playerId) {
+    await Promise.all(
+      (data ?? [])
+        .filter((row) => row.intent === "want")
+        .map((row) =>
+          saveWant(playerId, {
+            cardId: row.card_id,
+            printingId: row.printing_id,
+            quantity: row.quantity,
+            ...(row.card_note ? { note: row.card_note } : {}),
+            deckLabel: row.deck_label,
+          }),
+        ),
+    );
   }
 
   return { ok: true, restored: (data ?? []).length };
