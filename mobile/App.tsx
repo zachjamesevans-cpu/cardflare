@@ -57,6 +57,8 @@ import { HubScreen } from "./src/screens/hub";
 import { InboxScreen } from "./src/screens/inbox";
 import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
+import { Intro } from "./src/intro";
+import { queueSpotlight } from "./src/spotlight";
 import { keepNavigation, takeNavigation } from "./src/backdrop";
 import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
@@ -201,6 +203,10 @@ export type StackParams = {
   SignIn: undefined;
   /** The welcome screen's sign-up, opened from a room's account pitch. */
   CreateAccount: undefined;
+  /** The new player's intro again, from Settings → Help (intro.tsx). */
+  Intro: undefined;
+  /** Demo mode's walk through sign-up, nothing created. Development only. */
+  SignUpPreview: undefined;
   Scan: undefined;
   /** No section is the menu; a section opens that category (settings-sections.ts). */
   Settings: { section?: import("./src/settings-sections").SettingsSection } | undefined;
@@ -836,6 +842,27 @@ export default function App() {
   );
 }
 
+/*
+ * Where a new player goes after the intro (intro.tsx). "post" opens the
+ * composer; "look" lands on the Feed and points at its + (spotlight.tsx).
+ * The gate's welcome has no navigator yet, so its "post" waits here for
+ * onReady.
+ */
+let afterWelcome: "post" | null = null;
+
+function followWelcome(
+  end: "post" | "look",
+  navigation: { navigate: (...args: never[]) => void },
+): void {
+  const go = navigation.navigate as (name: string, params?: object) => void;
+  if (end === "post") {
+    go("Tabs", { screen: "Flare" });
+    return;
+  }
+  void queueSpotlight();
+  go("Tabs", { screen: "Feed" });
+}
+
 function AppGates() {
   /*
    * The front door. A fresh install (no session, welcome never seen)
@@ -957,7 +984,14 @@ function AppGates() {
     return (
       <StartupGuard>
         <StatusBar style="light" />
-        <WelcomeScreen onDone={() => setGate("open")} />
+        <WelcomeScreen
+          onDone={(end) => {
+            /* The intro's last answer, acted on once the tabs exist. */
+            if (end === "look") void queueSpotlight();
+            afterWelcome = end === "post" ? "post" : null;
+            setGate("open");
+          }}
+        />
       </StartupGuard>
     );
   }
@@ -974,6 +1008,11 @@ function AppGates() {
           void Notifications.getLastNotificationResponseAsync()
             .then(openNotificationLink)
             .catch(() => {});
+          /* "Post your first Flare", the intro's last button. */
+          if (afterWelcome === "post") {
+            afterWelcome = null;
+            setTimeout(() => followWelcome("post", navigationRef as never), 300);
+          }
           /* Demo mode's queued shot, development builds only: launch
              straight onto one screen of the shot list. */
           if (__DEV__) {
@@ -1065,11 +1104,40 @@ function AppGates() {
             {({ navigation }) => (
               <WelcomeScreen
                 initialStep="account"
-                onDone={() => navigation.goBack()}
+                onDone={(end) =>
+                  end ? followWelcome(end, navigation) : navigation.goBack()
+                }
                 onCancel={() => navigation.goBack()}
               />
             )}
           </Stack.Screen>
+          <Stack.Screen
+            name="Intro"
+            options={{ headerShown: false, animation: "fade" }}
+          >
+            {({ navigation }) => (
+              <Intro
+                onPost={() => followWelcome("post", navigation)}
+                onLook={() => followWelcome("look", navigation)}
+              />
+            )}
+          </Stack.Screen>
+          {__DEV__ ? (
+            <Stack.Screen
+              name="SignUpPreview"
+              options={{ headerShown: false, animation: "fade" }}
+            >
+              {({ navigation }) => (
+                <WelcomeScreen
+                  preview
+                  onDone={(end) =>
+                    end ? followWelcome(end, navigation) : navigation.goBack()
+                  }
+                  onCancel={() => navigation.goBack()}
+                />
+              )}
+            </Stack.Screen>
+          ) : null}
           <Stack.Screen name="Scan" options={{ title: "Scan" }}>
             {({ navigation }) => <ScanScreen onCode={() => openRoom(navigation)} />}
           </Stack.Screen>

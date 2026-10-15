@@ -1,0 +1,247 @@
+import * as SecureStore from "expo-secure-store";
+import { useEffect, useRef, useState } from "react";
+import {
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
+
+import { SPOTLIGHT_DISMISS, SPOTLIGHT_LINE } from "./intro-copy";
+import { colors, radius, spacing } from "./theme";
+
+/**
+ * The one-time highlight on the Feed's +, after a new player's intro.
+ *
+ * The founder: "highlighting the post a flare button". Since the Flare
+ * tab left the dock, the + at the top left of the Feed is the way to
+ * post, and the easiest thing on the screen to miss on a first visit.
+ * So the screen dims around it, a ring sits on it, and one line says
+ * what it is for. Any tap closes it; a tap on the + itself opens the
+ * composer as well. It shows once, and only when the intro asked for it
+ * ("Look around first") - never to somebody who simply updated the app.
+ */
+
+const PENDING_KEY = "cf-spotlight-post";
+/** How far the ring stands off the button. */
+const RING_PAD = 6;
+
+/* --- The target: whatever the Feed's + is drawn in. ---------------- */
+
+let target: React.RefObject<View | null> | null = null;
+
+/** Marks the view the spotlight points at. One target: the +. */
+export function useSpotlightTarget(): React.RefObject<View | null> {
+  const ref = useRef<View>(null);
+  useEffect(() => {
+    target = ref;
+    return () => {
+      if (target === ref) target = null;
+    };
+  }, []);
+  return ref;
+}
+
+/* --- Pending: asked for by the intro, shown once. ------------------- */
+
+const listeners = new Set<() => void>();
+
+export async function queueSpotlight(): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PENDING_KEY, "1");
+  } catch {
+    /* A nicety: if it cannot be stored, the Feed just opens plain. */
+  }
+  for (const listener of listeners) listener();
+}
+
+async function takeSpotlight(): Promise<boolean> {
+  try {
+    if ((await SecureStore.getItemAsync(PENDING_KEY)) !== "1") return false;
+    await SecureStore.deleteItemAsync(PENDING_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+interface Hole {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Drawn by the Feed. Waits for a queued spotlight, measures the +, and
+ * covers the window around it.
+ */
+export function Spotlight({ onOpen }: { onOpen: () => void }) {
+  const [hole, setHole] = useState<Hole | null>(null);
+  const window = useWindowDimensions();
+
+  useEffect(() => {
+    let live = true;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const measure = () =>
+      target?.current?.measureInWindow((x, y, width, height) => {
+        if (!live || width <= 0) return;
+        setHole((last) =>
+          last &&
+          last.x === x &&
+          last.y === y &&
+          last.width === width &&
+          last.height === height
+            ? last
+            : { x, y, width, height },
+        );
+      });
+    const check = () => {
+      void takeSpotlight().then((due) => {
+        if (!due || !live) return;
+        /*
+         * Measured again for the first few seconds, not once. The Feed
+         * is often still settling when it is due - a sheet closing over
+         * it, the header easing in - and a single early reading left
+         * the ring a header's height above the +.
+         */
+        for (let at = 700; at <= 3500; at += 350) timers.push(setTimeout(measure, at));
+      });
+    };
+    check();
+    listeners.add(check);
+    return () => {
+      live = false;
+      listeners.delete(check);
+      for (const timer of timers) clearTimeout(timer);
+    };
+  }, []);
+
+  if (!hole) return null;
+
+  const size = Math.max(hole.width, hole.height) + RING_PAD * 2;
+  const ring = {
+    left: hole.x + hole.width / 2 - size / 2,
+    top: hole.y + hole.height / 2 - size / 2,
+    size,
+  };
+  const close = () => setHole(null);
+
+  return (
+    <Modal transparent animationType="fade" onRequestClose={close}>
+      {/* The dim, in four pieces around the ring, so the + shows through. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Close">
+        <View style={[styles.dim, { left: 0, right: 0, top: 0, height: ring.top }]} />
+        <View
+          style={[
+            styles.dim,
+            { left: 0, right: 0, top: ring.top + ring.size, bottom: 0 },
+          ]}
+        />
+        <View
+          style={[
+            styles.dim,
+            { left: 0, width: ring.left, top: ring.top, height: ring.size },
+          ]}
+        />
+        <View
+          style={[
+            styles.dim,
+            {
+              left: ring.left + ring.size,
+              right: 0,
+              top: ring.top,
+              height: ring.size,
+            },
+          ]}
+        />
+      </Pressable>
+
+      {/* The ring, and a tap on it opens the composer. */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Post a Flare"
+        onPress={() => {
+          close();
+          onOpen();
+        }}
+        style={[
+          styles.ring,
+          {
+            left: ring.left,
+            top: ring.top,
+            width: ring.size,
+            height: ring.size,
+            borderRadius: ring.size / 2,
+          },
+        ]}
+      />
+
+      {/* The line, under the ring, held inside the screen's edges. */}
+      <View
+        style={[
+          styles.bubble,
+          {
+            top: ring.top + ring.size + spacing(3),
+            left: spacing(4),
+            maxWidth: Math.min(320, window.width - spacing(8)),
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <Text style={styles.line}>{SPOTLIGHT_LINE}</Text>
+        <Pressable onPress={close} hitSlop={8} accessibilityRole="button">
+          <Text style={styles.dismiss}>{SPOTLIGHT_DISMISS}</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  dim: {
+    position: "absolute",
+    get backgroundColor() {
+      return colors.scrim;
+    },
+  },
+  ring: {
+    position: "absolute",
+    borderWidth: 2,
+    get borderColor() {
+      return colors.accent;
+    },
+    get shadowColor() {
+      return colors.accent;
+    },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  bubble: {
+    position: "absolute",
+    gap: spacing(2),
+    padding: spacing(3),
+    borderRadius: radius.card,
+    borderWidth: 1,
+    get borderColor() {
+      return colors.border;
+    },
+    get backgroundColor() {
+      return colors.elevated;
+    },
+  },
+  line: {
+    color: colors.textPrimary,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: "600",
+  },
+  dismiss: {
+    color: colors.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+});

@@ -34,5 +34,6 @@ export async function saveMyGamesAction(formData: FormData): Promise<void> {
 
   await setPlayerGames(playerId, games);
 
-  redirect("/profile");
+  /* Then where they play, then the intro (welcome/where, welcome/intro). */
+  redirect("/welcome/where");
 }

@@ -115,6 +115,11 @@ export const SHOTS: Shot[] = [
         draft: answerDraft(DEMO_CARDS.umbreonCol.cardName),
       }),
   },
+  {
+    title: "16. Sign-up preview",
+    tip: "A new player's whole first run: welcome, account, games, where, the intro, then the + pointed at. Type anything; nothing is created.",
+    go: (nav) => nav.navigate("SignUpPreview"),
+  },
 ];
 
 export function DemoShotsScreen() {
