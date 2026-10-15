@@ -65,7 +65,7 @@ export function IntroScene({
   const names = INTRO_ART[game];
   return (
     <div
-      className="flex w-[300px] max-w-full flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-3 shadow-[0_0_28px_-8px_var(--color-accent)]"
+      className="flex w-[300px] max-w-full flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-3 text-left shadow-[0_0_28px_-8px_var(--color-accent)]"
       aria-hidden="true"
     >
       {card === "post" && (

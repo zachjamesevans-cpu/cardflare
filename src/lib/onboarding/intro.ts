@@ -18,7 +18,13 @@ export interface IntroCard {
 
 export const INTRO_CARDS: readonly IntroCard[] = [
   { key: "post", title: "Post a Flare", body: "For the cards you’re hunting." },
-  { key: "nearby", title: "Players near you", body: "Who have them raise a hand." },
+  /* It said "Players near you / Who have them raise a hand." The founder:
+     "the 'who have them raise a hand' verbiage is a bit odd." */
+  {
+    key: "nearby",
+    title: "Find it nearby",
+    body: "See who near you has the card you want.",
+  },
   {
     key: "trade",
     title: "Message, meet up, trade",

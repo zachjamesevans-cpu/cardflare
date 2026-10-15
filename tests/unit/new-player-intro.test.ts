@@ -143,6 +143,27 @@ describe("again, later", () => {
  * enough. maybe a screenshot of the app or something for each of those
  * things", then "build it go" on drawing small scenes of the app.
  */
+/* "the 'who have them raise a hand' verbiage is a bit odd ... people
+   should be able to swipe between these screens ... go back and forth." */
+describe("the intro's cards", () => {
+  it("say the second one plainly", () => {
+    const nearby = INTRO_CARDS.find((card) => card.key === "nearby");
+    expect(nearby?.title).toBe("Find it nearby");
+    expect(nearby?.body).toBe("See who near you has the card you want.");
+  });
+
+  it("swipe both ways, one at a time, on both platforms", () => {
+    const app = read("mobile/src/intro.tsx");
+    expect(app).toContain("pagingEnabled");
+    expect(app).toContain("disableIntervalMomentum");
+    expect(app).toContain("onPress={() => go(index + 1)}");
+    const web = read("src/components/onboarding/intro-cards.tsx");
+    expect(web).toContain("snap-x snap-mandatory");
+    expect(web).toContain('if (event.key === "ArrowLeft") go(index - 1);');
+    expect(web).toContain("onClick={() => go(index + 1)}");
+  });
+});
+
 describe("the intro's scenes", () => {
   it("are on both platforms, in place of the icons", () => {
     expect(read("mobile/src/intro.tsx")).toContain(
