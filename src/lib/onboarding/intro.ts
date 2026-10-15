@@ -79,6 +79,41 @@ export const WHERE_SKIP = "Skip for now";
 export const REPLAY_LABEL = "Replay the intro";
 
 /*
+ * THE PROFILE TOUR. The founder: "i think we need another similar vibe,
+ * but when people click the profile for the first time", then "build it
+ * go" on four stops. A new player's first Profile visit (queued when the
+ * intro ends), and again from Settings -> Help. The same dim, ring and
+ * bubble as the Feed's spotlight, one stop at a time.
+ */
+export interface TourStop {
+  key: "binders" | "share" | "wand" | "tabs";
+  line: string;
+}
+
+export const PROFILE_TOUR: readonly TourStop[] = [
+  {
+    key: "binders",
+    line: "Your binders live here. Tap New to start one: name it, pick a cover, keep it public or private.",
+  },
+  {
+    key: "share",
+    line: "Send anyone a link to your profile. Open a binder to share just that one.",
+  },
+  { key: "wand", line: "Make it yours: rings, auras and more from the Embers shop." },
+  { key: "tabs", line: "Your Flares, hunts and trades, all in one place." },
+];
+
+export const TOUR_NEXT = "Next";
+export const TOUR_SKIP = "Skip";
+export const TOUR_DONE = "Got it";
+export const REPLAY_TOUR_LABEL = "Replay the profile tour";
+
+/** "1 of 4" */
+export function tourCount(at: number): string {
+  return `${at + 1} of ${PROFILE_TOUR.length}`;
+}
+
+/*
  * THE SCENES. Each card shows a small scene of the app instead of an
  * icon - the founder: "the big screen that shows all the big icons ...
  * isn't enough. maybe a screenshot of the app or something for each".

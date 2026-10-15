@@ -7,7 +7,8 @@ import {
   useRoute,
 } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { REPLAY_LABEL } from "../intro-copy";
+import { REPLAY_LABEL, REPLAY_TOUR_LABEL } from "../intro-copy";
+import { queueProfileTour } from "../profile-tour";
 import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { AppState, Linking, ScrollView, Text, View } from "react-native";
@@ -1151,6 +1152,14 @@ function HelpCard() {
       <Title>Help</Title>
       {/* The new player's thirty seconds again (intro.tsx). */}
       <Row label={REPLAY_LABEL} onPress={() => navigation.navigate("Intro")} />
+      {/* The profile tour again: queued, then the Profile, where it runs. */}
+      <Row
+        label={REPLAY_TOUR_LABEL}
+        onPress={() => {
+          void queueProfileTour();
+          navigation.navigate("Tabs", { screen: "Profile" });
+        }}
+      />
       <Row label="Contact us" onPress={() => void Linking.openURL(`${API_BASE}/contact`)} />
       <Row label="Terms of use" onPress={() => void Linking.openURL(`${API_BASE}/terms`)} />
       <Row

@@ -144,12 +144,16 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
        * so the page shows through that circle and nowhere else. A border
        * as thick as the screen was tried first; iOS drew none of it.
        */}
-      <Dim
+      <HoleDim
         width={window.width}
         height={window.height}
-        cx={ring.left + ring.size / 2}
-        cy={ring.top + ring.size / 2}
-        r={ring.size / 2}
+        hole={{
+          x: ring.left,
+          y: ring.top,
+          width: ring.size,
+          height: ring.size,
+          radius: ring.size / 2,
+        }}
       />
 
       {/* The ring, and a tap on it opens the composer. */}
@@ -198,28 +202,50 @@ export function Spotlight({ onOpen }: { onOpen: () => void }) {
  * spotlight shows, never at launch: the launch path loads no Skia
  * (welcome.tsx says why), and the cosmetics load it the same lazy way.
  */
-function Dim({
+/** A hole in the dim: a rounded rectangle, a circle when the radius is
+    half its size. */
+export interface DimHole {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius: number;
+}
+
+/**
+ * The scrim with a hole cut out of it: the window less the hole, filled
+ * even-odd. Shared by this spotlight and the profile tour
+ * (profile-tour.tsx). Skia is loaded here, when one shows, never at
+ * launch: the launch path loads no Skia (welcome.tsx says why), and the
+ * cosmetics load it the same lazy way.
+ */
+export function HoleDim({
   width,
   height,
-  cx,
-  cy,
-  r,
+  hole,
 }: {
   width: number;
   height: number;
-  cx: number;
-  cy: number;
-  r: number;
+  hole: DimHole;
 }) {
   const { Canvas, Path } =
     require("@shopify/react-native-skia") as typeof import("@shopify/react-native-skia");
+  const { x, y, width: w, height: h } = hole;
+  const r = Math.min(hole.radius, w / 2, h / 2);
   const shape =
     `M0 0 H${width} V${height} H0 Z ` +
-    `M${cx - r} ${cy} a${r} ${r} 0 1 0 ${r * 2} 0 a${r} ${r} 0 1 0 ${-r * 2} 0 Z`;
+    `M${x + r} ${y} H${x + w - r} A${r} ${r} 0 0 1 ${x + w} ${y + r} ` +
+    `V${y + h - r} A${r} ${r} 0 0 1 ${x + w - r} ${y + h} ` +
+    `H${x + r} A${r} ${r} 0 0 1 ${x} ${y + h - r} ` +
+    `V${y + r} A${r} ${r} 0 0 1 ${x + r} ${y} Z`;
   return (
-    <Canvas style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Path path={shape} fillType="evenOdd" color={colors.scrim} />
-    </Canvas>
+    /* The wrapper lets taps through to what is under the dim: a Skia
+       canvas takes them itself, whatever its own pointerEvents say. */
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Canvas style={StyleSheet.absoluteFill}>
+        <Path path={shape} fillType="evenOdd" color={colors.scrim} />
+      </Canvas>
+    </View>
   );
 }
 

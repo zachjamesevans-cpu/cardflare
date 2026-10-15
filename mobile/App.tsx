@@ -59,6 +59,7 @@ import { LabScreen } from "./src/screens/lab";
 import { DemoShotsScreen, SHOTS } from "./src/screens/demo-shots";
 import { ReplayIntro } from "./src/intro";
 import { queueSpotlight } from "./src/spotlight";
+import { queueProfileTour } from "./src/profile-tour";
 import { keepNavigation, takeNavigation } from "./src/backdrop";
 import { takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
@@ -994,6 +995,8 @@ function AppGates() {
           onDone={(end) => {
             /* The intro's last answer, acted on once the tabs exist. */
             if (end === "look") void queueSpotlight();
+            /* A new player: the Profile's tour, on their first visit. */
+            if (end === "look" || end === "post") void queueProfileTour();
             afterWelcome = end === "post" || end === "scan" ? end : null;
             setGate("open");
           }}
@@ -1112,9 +1115,11 @@ function AppGates() {
             {({ navigation }) => (
               <WelcomeScreen
                 initialStep="account"
-                onDone={(end) =>
-                  end ? followWelcome(end, navigation) : navigation.goBack()
-                }
+                onDone={(end) => {
+                  if (end === "look" || end === "post") void queueProfileTour();
+                  if (end) followWelcome(end, navigation);
+                  else navigation.goBack();
+                }}
                 onCancel={() => navigation.goBack()}
               />
             )}
@@ -1138,9 +1143,11 @@ function AppGates() {
               {({ navigation }) => (
                 <WelcomeScreen
                   preview
-                  onDone={(end) =>
-                    end ? followWelcome(end, navigation) : navigation.goBack()
-                  }
+                  onDone={(end) => {
+                    if (end === "look" || end === "post") void queueProfileTour();
+                    if (end) followWelcome(end, navigation);
+                    else navigation.goBack();
+                  }}
                   onCancel={() => navigation.goBack()}
                 />
               )}
