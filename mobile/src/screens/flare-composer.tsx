@@ -1,3 +1,10 @@
+import {
+  HuntSheet,
+  PickerRow,
+  PrintingSheet,
+  huntRowValue,
+  type HuntChoice,
+} from "../composer-sheets";
 import { CardNoteField } from "../card-note-field";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -76,8 +83,6 @@ type DraftItem = PickedLine;
 /** One line per printing: the picker's rule, src/card-select.tsx. */
 const keyOf = lineKey;
 
-type HuntChoice =
-  { kind: "existing"; id: string } | { kind: "new"; name: string } | null;
 
 /** What is saved between opens. Versioned so an older shape is dropped. */
 interface Draft {
@@ -190,6 +195,8 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /* The hunt sheet, open or not (composer-sheets.tsx). */
+  const [choosingHunt, setChoosingHunt] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
@@ -604,6 +611,27 @@ export function FlareComposer({
                 }
               />
 
+              {/* THE HUNT, with what the post is for, not at the foot of
+                  the form. The founder: "the 'add to a hunt' thing at
+                  bottom is very weirdly placed." Wants only. */}
+              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
+                <PickerRow
+                  label="Hunt"
+                  icon="locate-outline"
+                  value={huntRowValue(draft.hunt, hunts)}
+                  onPress={() => setChoosingHunt(true)}
+                />
+              ) : null}
+              {choosingHunt ? (
+                <HuntSheet
+                  hunts={hunts}
+                  limit={huntLimit}
+                  value={draft.hunt}
+                  onChange={(hunt) => patch({ hunt })}
+                  onClose={() => setChoosingHunt(false)}
+                />
+              ) : null}
+
               <View
                 style={{
                   flexDirection: "row",
@@ -731,15 +759,6 @@ export function FlareComposer({
                   onPress={() => patch({ acceptsCash: !draft.acceptsCash })}
                 />
               </View>
-
-              {draft.intent === "want" && draftKey && draftKey !== "guest" ? (
-                <HuntPicker
-                  hunts={hunts}
-                  limit={huntLimit}
-                  value={draft.hunt}
-                  onChange={(hunt) => patch({ hunt })}
-                />
-              ) : null}
 
               {/* Nearby matching rides with Local: off the screen entirely
                   while Local is off, the same rule the website's form
@@ -937,6 +956,7 @@ function CardEditor({
   onCover: () => void;
   onRemove: () => void;
 }) {
+  const [choosingPrinting, setChoosingPrinting] = useState(false);
   if (!item) return null;
   const options: { id: string | null; label: string }[] = [
     { id: null, label: "Any printing" },
@@ -982,41 +1002,26 @@ function CardEditor({
         </View>
       </View>
 
-      <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Printing</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
-      >
-        {options.map((option) => {
-          const on = item.printingId === option.id;
-          return (
-            <Tap
-              key={option.id ?? "any"}
-              onPress={() => onChange({ ...item, printingId: option.id })}
-              accessibilityLabel={option.label}
-              style={{
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: on ? colors.accent : colors.borderStrong,
-                backgroundColor: on ? colors.accent : "transparent",
-                paddingHorizontal: spacing(3),
-                paddingVertical: spacing(1),
-              }}
-            >
-              <Text
-                style={{
-                  color: on ? colors.accentContrast : colors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: "700",
-                }}
-              >
-                {option.label}
-              </Text>
-            </Tap>
-          );
-        })}
-      </ScrollView>
+      {/* Which printing: one row saying which, the list down in a sheet.
+          The founder: "it feels weird to scroll left when everywhere else
+          on the app you scroll down to change printing." */}
+      {item.printings.length > 0 ? (
+        <PickerRow
+          label="Printing"
+          value={options.find((option) => option.id === item.printingId)?.label ?? "Any printing"}
+          onPress={() => setChoosingPrinting(true)}
+        />
+      ) : null}
+      {choosingPrinting ? (
+        <PrintingSheet
+          name={item.name}
+          cardNumber={item.cardNumber}
+          printings={item.printings}
+          value={item.printingId}
+          onPick={(printingId) => onChange({ ...item, printingId })}
+          onClose={() => setChoosingPrinting(false)}
+        />
+      ) : null}
 
       <View
         style={{
@@ -1086,143 +1091,6 @@ function SmallAction({
         {label}
       </Text>
     </Tap>
-  );
-}
-
-/** "Add to a hunt": one of theirs, or a new one by name. Wants only. */
-function HuntPicker({
-  hunts,
-  limit,
-  value,
-  onChange,
-}: {
-  hunts: Hunt[];
-  limit: number | null;
-  value: HuntChoice;
-  onChange: (next: HuntChoice) => void;
-}) {
-  const [open, setOpen] = useState(value !== null);
-  useEffect(() => {
-    if (value) setOpen(true);
-  }, [value]);
-  const atLimit = limit !== null && hunts.length >= limit;
-
-  if (!open) {
-    return (
-      <Tap
-        onPress={() => setOpen(true)}
-        accessibilityLabel="Add to a hunt"
-        style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}
-      >
-        <Ionicons name="locate-outline" size={18} color={colors.accent} />
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textPrimary, fontWeight: "600" }}>
-            Add to a hunt
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            Building a deck? Keep the cards together with what is found.
-          </Text>
-        </View>
-        <Ionicons name="chevron-down" size={14} color={colors.textMuted} />
-      </Tap>
-    );
-  }
-
-  return (
-    <View style={{ gap: spacing(2) }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Text style={{ color: colors.textPrimary, fontWeight: "700", flex: 1 }}>
-          Add to a hunt
-        </Text>
-        <Tap
-          accessibilityLabel="Not in a hunt"
-          onPress={() => {
-            onChange(null);
-            setOpen(false);
-          }}
-        >
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>Clear</Text>
-        </Tap>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: spacing(1.5) }}
-      >
-        {hunts
-          .filter((hunt): hunt is Hunt & { id: string } => Boolean(hunt.id))
-          .map((hunt) => {
-            const on = value?.kind === "existing" && value.id === hunt.id;
-            return (
-              <Tap
-                key={hunt.id}
-                onPress={() => onChange({ kind: "existing", id: hunt.id })}
-                accessibilityLabel={hunt.name}
-                style={{
-                  borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: on ? colors.accent : colors.borderStrong,
-                  backgroundColor: on ? colors.accent : "transparent",
-                  paddingHorizontal: spacing(3),
-                  paddingVertical: spacing(1),
-                }}
-              >
-                <Text
-                  style={{
-                    color: on ? colors.accentContrast : colors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: "700",
-                  }}
-                >
-                  {hunt.name}
-                </Text>
-              </Tap>
-            );
-          })}
-        <Tap
-          onPress={() =>
-            onChange({ kind: "new", name: value?.kind === "new" ? value.name : "" })
-          }
-          disabled={atLimit}
-          accessibilityLabel="New hunt"
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 3,
-            borderRadius: 999,
-            borderWidth: 1,
-            borderStyle: "dashed",
-            borderColor: value?.kind === "new" ? colors.accent : colors.borderStrong,
-            paddingHorizontal: spacing(3),
-            paddingVertical: spacing(1),
-            opacity: atLimit ? 0.5 : 1,
-          }}
-        >
-          <Ionicons name="add" size={12} color={colors.accent} />
-          <Text
-            style={{ color: colors.textSecondary, fontSize: 12, fontWeight: "700" }}
-          >
-            New hunt
-          </Text>
-        </Tap>
-      </ScrollView>
-      {value?.kind === "new" ? (
-        <Input
-          value={value.name}
-          onChangeText={(name) => onChange({ kind: "new", name })}
-          placeholder={'Name it, like "Green Zoro"'}
-          maxLength={40}
-          autoCapitalize="words"
-          autoFocus
-        />
-      ) : null}
-      {atLimit ? (
-        <Muted>{`You are at ${limit} hunts. Add to one of them, or finish one first.`}</Muted>
-      ) : null}
-      {value?.kind === "existing" ? (
-        <Muted>Cards already on the hunt keep their copies; new cards are added.</Muted>
-      ) : null}
-    </View>
   );
 }
 

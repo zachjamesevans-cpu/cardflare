@@ -1,5 +1,11 @@
 "use client";
 
+import {
+  HuntSheet,
+  PickerRow,
+  PrintingSheet,
+  huntRowValue,
+} from "@/components/flares/composer-sheets";
 import { CardNoteField } from "@/components/flares/card-note-field";
 import {
   useEffect,
@@ -9,7 +15,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, Plus, Star, Trash2 } from "lucide-react";
+import { Check, Crosshair, Plus, Star, Trash2 } from "lucide-react";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -32,7 +38,7 @@ import {
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Select, Textarea, TextInput } from "@/components/ui/controls";
+import { Textarea } from "@/components/ui/controls";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
@@ -149,6 +155,8 @@ function ComposerBody({
   });
   const [step, setStep] = useState<Step>("compose");
   const [editing, setEditing] = useState<string | null>(null);
+  /* The hunt sheet, open or not (composer-sheets.tsx). */
+  const [choosingHunt, setChoosingHunt] = useState(false);
   /** The line key being dragged, while a tile is in the air. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -392,6 +400,27 @@ function ComposerBody({
         ))}
       </div>
 
+      {/* THE HUNT, with what the post is for, not at the foot of the
+          form. The founder: "the 'add to a hunt' thing at bottom is very
+          weirdly placed." Wants only. */}
+      {draft.intent === "want" && (
+        <>
+          <PickerRow
+            label="Hunt"
+            icon={Crosshair}
+            value={huntRowValue(draft.hunt, hunts)}
+            onClick={() => setChoosingHunt(true)}
+          />
+          <HuntSheet
+            open={choosingHunt}
+            hunts={hunts}
+            value={draft.hunt}
+            onChange={(hunt) => patch({ hunt })}
+            onClose={() => setChoosingHunt(false)}
+          />
+        </>
+      )}
+
       {/* The cards, in order, with the cover first. */}
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline justify-between gap-3">
@@ -552,61 +581,6 @@ function ComposerBody({
         />
       </label>
 
-      {draft.intent === "want" && (
-        <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium text-text-secondary">
-              Add to a hunt
-            </span>
-            <Select
-              value={
-                draft.hunt.kind === "existing"
-                  ? draft.hunt.id
-                  : draft.hunt.kind === "new"
-                    ? "__new"
-                    : ""
-              }
-              onChange={(event) => {
-                const value = event.target.value;
-                patch({
-                  hunt:
-                    value === ""
-                      ? { kind: "none" }
-                      : value === "__new"
-                        ? { kind: "new", name: "" }
-                        : { kind: "existing", id: value },
-                });
-              }}
-            >
-              <option value="">No hunt</option>
-              {hunts.map((hunt) => (
-                <option key={hunt.id} value={hunt.id}>
-                  {hunt.name}
-                </option>
-              ))}
-              <option value="__new">New hunt</option>
-            </Select>
-          </label>
-          {draft.hunt.kind === "new" && (
-            <TextInput
-              value={draft.hunt.name}
-              onChange={(event) =>
-                patch({ hunt: { kind: "new", name: event.target.value.slice(0, 60) } })
-              }
-              maxLength={60}
-              placeholder="Hunt name, like Green Zoro"
-              aria-label="Hunt name"
-              autoFocus
-            />
-          )}
-          {draft.hunt.kind !== "none" && (
-            <p className="text-xs text-text-muted">
-              Cards already on the hunt keep their copies; new cards are added.
-            </p>
-          )}
-        </div>
-      )}
-
       {/* What they will do for it. */}
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-text-secondary">Open to</span>
@@ -709,7 +683,9 @@ function CardEditor({
   onRemove: () => void;
 }) {
   const printing = chosenPrinting(item);
-  const hasChoice = item.card.printings.length > 1;
+  /* Any printing or this one is a choice even with one printing. */
+  const hasChoice = item.card.printings.length > 0;
+  const [choosingPrinting, setChoosingPrinting] = useState(false);
 
   return (
     <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-3">
@@ -733,24 +709,33 @@ function CardEditor({
         </div>
       </div>
 
-      <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">Printing</span>
-        {hasChoice ? (
-          <Select
-            value={item.printingId ?? ""}
-            onChange={(event) => onPrinting(event.target.value || null)}
-          >
-            <option value="">Any printing</option>
-            {item.card.printings.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {printingLabel(entry, item.card.exactName) ?? "This printing"}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <span className="text-sm text-text-muted">Any printing</span>
-        )}
-      </label>
+      {/* Which printing: one row saying which, the list down in a sheet
+          with each version's art. The app's composer is the same. */}
+      {hasChoice ? (
+        <>
+          <PickerRow
+            label="Printing"
+            value={
+              printing && item.printingId
+                ? (printingLabel(printing, item.card.exactName) ?? "This printing")
+                : "Any printing"
+            }
+            onClick={() => setChoosingPrinting(true)}
+          />
+          <PrintingSheet
+            open={choosingPrinting}
+            name={item.card.exactName}
+            printings={item.card.printings.map((entry) => ({
+              id: entry.id,
+              label: printingLabel(entry, item.card.exactName) ?? "This printing",
+              imageUrl: entry.imageUrl,
+            }))}
+            value={item.printingId}
+            onPick={onPrinting}
+            onClose={() => setChoosingPrinting(false)}
+          />
+        </>
+      ) : null}
 
       <div className="flex flex-col gap-1.5">
         <span className="text-sm font-medium text-text-secondary">{copiesLabel}</span>

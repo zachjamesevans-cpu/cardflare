@@ -1,0 +1,65 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+import { describe, expect, it } from "vitest";
+
+/**
+ * The composer's printing and hunt choices. The founder (2026-10-15):
+ * "it feels weird to scroll left when everywhere else on the app you
+ * scroll down to change printing ... the 'add to a hunt' thing at
+ * bottom is very weirdly placed." Then: "build your suggestions".
+ */
+
+const root = path.resolve(__dirname, "../..");
+const read = (file: string) => readFileSync(path.join(root, file), "utf8");
+const app = read("mobile/src/screens/flare-composer.tsx");
+const web = read("src/components/flares/flare-composer.tsx");
+
+describe("the printing", () => {
+  it("is a row that opens a list down, with each printing's art", () => {
+    expect(app).toContain('label="Printing"');
+    expect(app).toContain("<PrintingSheet");
+    expect(web).toContain('label="Printing"');
+    expect(web).toContain("<PrintingSheet");
+    const appSheets = read("mobile/src/composer-sheets.tsx");
+    expect(appSheets).toContain('label="Any printing"');
+    expect(appSheets).toMatch(/art=\{\s*<CardImage imageUrl=\{printing\.imageUrl\}/);
+    const webSheets = read("src/components/flares/composer-sheets.tsx");
+    expect(webSheets).toContain('label="Any printing"');
+    expect(webSheets).toContain("printing.imageUrl &&");
+  });
+
+  it("no longer scrolls sideways or drops down", () => {
+    const editor = app.slice(app.indexOf("function CardEditor("));
+    expect(editor.slice(0, editor.indexOf("Copies needed"))).not.toContain(
+      "horizontal",
+    );
+    expect(web).not.toContain('<option value="">Any printing</option>');
+  });
+});
+
+describe("the hunt", () => {
+  it("sits under Looking for / Offering, not at the foot of the form", () => {
+    for (const source of [app, web]) {
+      const intent = source.indexOf("Looking for");
+      const hunt = source.indexOf('label="Hunt"');
+      const cards = source.indexOf("Cards in this flare");
+      expect(hunt).toBeGreaterThan(intent);
+      expect(hunt).toBeLessThan(cards);
+    }
+    expect(app).not.toContain("function HuntPicker(");
+    expect(web).not.toContain('<option value="__new">New hunt</option>');
+  });
+
+  it("opens a sheet: no hunt, theirs, or a new one named there", () => {
+    for (const file of [
+      "mobile/src/composer-sheets.tsx",
+      "src/components/flares/composer-sheets.tsx",
+    ]) {
+      const sheets = read(file);
+      expect(sheets, file).toContain('label="No hunt"');
+      expect(sheets, file).toContain('label="Start a new hunt"');
+      expect(sheets, file).toContain("Start this hunt");
+    }
+  });
+});
