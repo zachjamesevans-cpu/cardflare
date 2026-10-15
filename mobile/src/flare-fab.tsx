@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Text } from "react-native";
+import type { Ref } from "react";
+import { Text, View } from "react-native";
 
 import { POST_A_FLARE } from "./night-copy";
 import { colors, gutter, spacing } from "./theme";
@@ -19,15 +20,29 @@ export const FAB_HEIGHT = 48;
  * which already attaches the Flare to this night. Drawn only for a
  * signed-in viewer in a writable phase; the room decides.
  */
-export function FlareFab({ onPress, bottom }: { onPress: () => void; bottom: number }) {
+export function FlareFab({
+  onPress,
+  bottom,
+  tourRef,
+}: {
+  onPress: () => void;
+  bottom: number;
+  /** The room tour's last stop rings this (tour.tsx). */
+  tourRef?: Ref<View>;
+}) {
   return (
+    /* The place on the outside: Tap puts its style on an inner view, and
+       the tour needs a view of its own to measure. */
+    <View
+      ref={tourRef}
+      collapsable={false}
+      pointerEvents="box-none"
+      style={{ position: "absolute", right: gutter + spacing(2), bottom }}
+    >
     <Tap
       onPress={onPress}
       accessibilityLabel={POST_A_FLARE}
       style={{
-        position: "absolute",
-        right: gutter + spacing(2),
-        bottom,
         height: FAB_HEIGHT,
         flexDirection: "row",
         alignItems: "center",
@@ -48,5 +63,6 @@ export function FlareFab({ onPress, bottom }: { onPress: () => void; bottom: num
         Flare
       </Text>
     </Tap>
+    </View>
   );
 }

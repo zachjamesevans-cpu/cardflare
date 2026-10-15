@@ -215,7 +215,7 @@ export interface DimHole {
 /**
  * The scrim with a hole cut out of it: the window less the hole, filled
  * even-odd. Shared by this spotlight and the profile tour
- * (profile-tour.tsx). Skia is loaded here, when one shows, never at
+ * (tour.tsx). Skia is loaded here, when one shows, never at
  * launch: the launch path loads no Skia (welcome.tsx says why), and the
  * cosmetics load it the same lazy way.
  */

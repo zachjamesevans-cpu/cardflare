@@ -247,7 +247,7 @@ export function ProfileTabs({
           underline that slides to whichever tab is on. */}
       <div
         role="tablist"
-        data-tour="tabs"
+        data-tour="profile:tabs"
         aria-label={yours ? "Your profile" : "This profile"}
         onKeyDown={onKeyDown}
         className="relative flex w-full border-b border-border"

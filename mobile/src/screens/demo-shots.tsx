@@ -8,7 +8,7 @@ import { DEMO_CARDS } from "../demo/demo-cards";
 import { PEOPLE } from "../demo/demo-people";
 import { answerDraft } from "../nearby-shared";
 import { huntId, postId } from "../demo/demo-world";
-import { queueProfileTour } from "../profile-tour";
+import { queueTours } from "../tour";
 import { colors, gutter, spacing } from "../theme";
 import { Body, Button, Card, Muted, Tap, Title } from "../ui";
 
@@ -130,7 +130,23 @@ export const SHOTS: Shot[] = [
     title: "18. The profile tour",
     tip: "Four stops on your Profile: binders, Share, the wand, the tabs. Next or a tap moves on.",
     go: (nav) => {
-      void queueProfileTour();
+      void queueTours(["profile"]);
+      nav.navigate("Tabs", { screen: "Profile" });
+    },
+  },
+  {
+    title: "19. The Nearby tour",
+    tip: "Wanted near you, then the ZIP ask - a stop with nothing showing is passed over.",
+    go: (nav) => {
+      void queueTours(["nearby"]);
+      nav.navigate("Tabs", { screen: "Nearby" });
+    },
+  },
+  {
+    title: "20. All tours on",
+    tip: "Every tour due again: the Profile now, a room the next time you open one, a binder the next time you open an empty one of yours.",
+    go: (nav) => {
+      void queueTours();
       nav.navigate("Tabs", { screen: "Profile" });
     },
   },

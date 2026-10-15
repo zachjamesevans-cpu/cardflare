@@ -1,41 +1,50 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import {
-  PROFILE_TOUR,
   TOUR_DONE,
+  TOUR_IDS,
   TOUR_NEXT,
   TOUR_SKIP,
+  TOURS,
   tourCount,
-  type TourStop,
+  type TourId,
 } from "@/lib/onboarding/intro";
 
 /**
- * The profile tour on the website: the app's four stops
- * (mobile/src/profile-tour.tsx), over the elements marked data-tour on
- * /profile. Due once after the intro (it leaves a note in this browser)
- * or from Settings -> Help (/profile?tour=profile). The founder: "i
- * think we need another similar vibe, but when people click the profile
- * for the first time."
+ * The first-visit tours on the website: the app's stops (mobile/src/
+ * tour.tsx) over elements marked data-tour="<tour>:<stop>" - the
+ * Profile, a store room, your own binder, Nearby. Each is due once
+ * after the intro (it leaves a note in this browser per tour), and all
+ * again from Settings -> Help -> Replay tips (/profile?tour=all). The
+ * founder: "i think we need another similar vibe, but when people click
+ * the profile for the first time", then "build 1-3 go".
  */
 
-/** The intro leaves this; the first /profile visit reads and clears it. */
-export const TOUR_NOTE = "cf-tour-profile";
+const noteKey = (id: TourId) => `cf-tour-${id}`;
 
-/** Called by the intro's last buttons: the tour is due. */
-export function noteProfileTour(): void {
-  try {
-    window.localStorage.setItem(TOUR_NOTE, "1");
-  } catch {
-    /* A nicety: without storage the Profile just opens plain. */
+/** Called by the intro's last buttons, and the replay: every tour due. */
+export function noteTours(): void {
+  for (const id of TOUR_IDS) {
+    try {
+      window.localStorage.setItem(noteKey(id), "1");
+    } catch {
+      /* A nicety: without storage the screens just open plain. */
+    }
   }
 }
 
 const PAD = 6;
 const EDGE = 4;
-const ROUND: ReadonlySet<TourStop["key"]> = new Set(["share", "wand"]);
+/** The round ones are icons; the others are rows and panels. */
+const ROUND: ReadonlySet<string> = new Set([
+  "profile:share",
+  "profile:wand",
+  "binder:share",
+  "binder:settings",
+]);
 
 interface Hole {
   x: number;
@@ -45,7 +54,7 @@ interface Hole {
   radius: number;
 }
 
-function holeFor(key: TourStop["key"]): Hole | null {
+function holeFor(key: string): Hole | null {
   const el = document.querySelector<HTMLElement>(`[data-tour="${key}"]`);
   if (!el) return null;
   const box = el.getBoundingClientRect();
@@ -73,46 +82,55 @@ function holeFor(key: TourStop["key"]): Hole | null {
   };
 }
 
-export function ProfileTour() {
+/**
+ * Drawn by a page. Waits for its tour to be due, then walks the stops.
+ * `when` false holds it back for a later visit (a binder that already
+ * has cards). `?tour=all` (Replay tips) marks every tour due first.
+ */
+export function Tour({ id, when = true }: { id: TourId; when?: boolean }) {
   const router = useRouter();
+  const path = usePathname();
+  const stops = TOURS[id];
   const [at, setAt] = useState<number | null>(null);
   const [hole, setHole] = useState<Hole | null>(null);
 
   useEffect(() => {
-    let due = new URLSearchParams(window.location.search).get("tour") === "profile";
+    if (new URLSearchParams(window.location.search).get("tour") === "all") noteTours();
+    if (!when) return;
+    let due = false;
     try {
-      if (window.localStorage.getItem(TOUR_NOTE) === "1") {
-        window.localStorage.removeItem(TOUR_NOTE);
+      if (window.localStorage.getItem(noteKey(id)) === "1") {
+        window.localStorage.removeItem(noteKey(id));
         due = true;
       }
     } catch {
-      /* No storage: the replay link still works. */
+      /* No storage: nothing is due. */
     }
     if (!due) return;
     const timer = window.setTimeout(() => setAt(0), 600);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [id, when]);
 
   const close = useCallback(() => {
     setAt(null);
     setHole(null);
     if (window.location.search.includes("tour=")) {
-      router.replace("/profile", { scroll: false });
+      router.replace(path, { scroll: false });
     }
-  }, [router]);
+  }, [router, path]);
 
   const next = useCallback(() => {
     setHole(null);
     setAt((current) =>
-      current === null || current >= PROFILE_TOUR.length - 1 ? null : current + 1,
+      current === null || current >= stops.length - 1 ? null : current + 1,
     );
-  }, []);
+  }, [stops.length]);
 
   useEffect(() => {
     if (at === null) {
       return;
     }
-    const key = PROFILE_TOUR[at].key;
+    const key = `${id}:${stops[at].key}`;
     /* Into view first, then measured where it settled; a stop with
        nothing on the page is passed over. */
     document
@@ -124,7 +142,7 @@ export function ProfileTour() {
       else next();
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [at, next]);
+  }, [at, next, id, stops]);
 
   useEffect(() => {
     if (at === null && hole === null) return;
@@ -137,8 +155,8 @@ export function ProfileTour() {
 
   if (at === null || !hole) return null;
 
-  const stop = PROFILE_TOUR[at];
-  const last = at === PROFILE_TOUR.length - 1;
+  const stop = stops[at];
+  const last = at === stops.length - 1;
   const below = hole.y + hole.height + 180 < window.innerHeight;
 
   return (
@@ -174,7 +192,9 @@ export function ProfileTour() {
           {stop.line}
         </p>
         <div className="flex items-center justify-between">
-          <span className="text-sm font-semibold text-text-muted">{tourCount(at)}</span>
+          <span className="text-sm font-semibold text-text-muted">
+            {tourCount(at, stops.length)}
+          </span>
           <div className="flex items-center gap-4">
             {!last && (
               <button

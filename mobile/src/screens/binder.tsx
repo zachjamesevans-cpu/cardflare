@@ -21,6 +21,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { Tour, useTourTarget } from "../tour";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   Easing,
@@ -245,6 +246,10 @@ export function BinderScreen({
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const id = binderId || "";
   const [binder, setBinder] = useState<Binder | null>(null);
+  /* The binder tour's stops (tour.tsx): the pockets, Share, the pencil. */
+  const tourPockets = useTourTarget("binder", "pockets");
+  const tourShare = useTourTarget("binder", "share");
+  const tourSettings = useTourTarget("binder", "settings");
   const [error, setError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
   /* What the last batch said: "Added 3 cards." */
@@ -315,14 +320,18 @@ export function BinderScreen({
       title: binderTitle(binder),
       headerRight: binder.yours
         ? () => (
-            <HeaderButton
-              icon="pencil-outline"
-              label="Binder settings"
-              onPress={() => setSettingsOpen(true)}
-            />
+            <View ref={tourSettings} collapsable={false}>
+              <HeaderButton
+                icon="pencil-outline"
+                label="Binder settings"
+                onPress={() => setSettingsOpen(true)}
+              />
+            </View>
           )
         : undefined,
     });
+    /* tourSettings is a ref: the same object every render. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [binder, navigation]);
 
   /* Writes go to the binder's own id once it is known: a share link
@@ -674,7 +683,12 @@ export function BinderScreen({
               {`${binder.count} ${binder.count === 1 ? "card" : "cards"} · Page ${at + 1} of ${pageCount}`}
             </Text>
           </View>
-          <ShareButton onPress={share} />
+          <View ref={tourShare} collapsable={false}>
+            <ShareButton onPress={share} />
+          </View>
+          {/* Your own binder, still empty: three stops, once. A binder
+              with cards in it does not need "tap a pocket". */}
+          <Tour id="binder" when={binder.yours && binder.count === 0} />
         </View>
 
         {/* The chips: a visitor whose hunts this binder answers can
@@ -761,7 +775,12 @@ export function BinderScreen({
             away. The card in hand is drawn beside the pager, not in
             it, so the pager keeps clipping and paging like any other. */}
         <GestureDetector gesture={drag.gesture}>
-          <View onLayout={onFrameLayout} style={{ alignSelf: "stretch" }}>
+          <View
+            onLayout={onFrameLayout}
+            ref={tourPockets}
+            collapsable={false}
+            style={{ alignSelf: "stretch" }}
+          >
             {pageWidth > 0 ? (
               <ScrollView
                 ref={pager}

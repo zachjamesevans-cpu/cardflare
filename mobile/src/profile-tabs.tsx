@@ -8,7 +8,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
-import { useTourTarget } from "./profile-tour";
+import { useTourTarget } from "./tour";
 import Animated, {
   runOnJS,
   useAnimatedScrollHandler,
@@ -124,8 +124,8 @@ export function ProfileTabs({
    */
   const window = useWindowDimensions();
   const root = useRef<View>(null);
-  /* The profile tour's last stop points at the strip (profile-tour.tsx). */
-  const strip = useTourTarget("tabs");
+  /* The profile tour's last stop points at the strip (tour.tsx). */
+  const strip = useTourTarget("profile", "tabs");
   const [top, setTop] = useState(0);
   const fill = top > 0 ? Math.max(0, Math.round(window.height - top)) : 0;
   const [active, setActive] = useState(() =>

@@ -940,6 +940,7 @@ export function FlareBoard({
           <Card
             as="li"
             key={group.playerSessionId}
+            tour={isYou ? "room:yours" : undefined}
             className="flex flex-col gap-1.5 px-3 pt-2.5 pb-2"
           >
             {/*

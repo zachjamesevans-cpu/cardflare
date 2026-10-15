@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+import { Tour, useTourTarget } from "../tour";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
@@ -382,6 +383,9 @@ interface CachedFeed {
 export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
+  /* The Nearby tour's stops (tour.tsx): Wanted near you, the ZIP ask. */
+  const tourWanted = useTourTarget("nearby", "wanted");
+  const tourLocation = useTourTarget("nearby", "location");
   /* What is on at the places you go, and who needs what you have. The
      website's Feed, from the same server answer. */
   const [feed, setFeed] = useState<FeedEntry[]>([]);
@@ -977,6 +981,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
         ) : null}
         {/* Nothing here works without a place, so the ask comes first. */}
         {plan?.ask ? (
+          <View ref={tourLocation} collapsable={false}>
           <Card>
             <Title>See Flares near you</Title>
             <NearbyLocationAsk
@@ -985,6 +990,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
               onDone={() => void load(() => true)}
             />
           </Card>
+          </View>
         ) : null}
             {/*
              * The Feed leads. Everything here is derived - nobody posts to it -
@@ -1033,13 +1039,21 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                      and the way into everybody (screens/wanted.tsx).
                      Nothing from a server too old to send the summary. */
                   item.summary ? (
-                    <WantedSummaryCard
+                    <View
                       key={`nearby-match-${index}`}
-                      summary={item.summary}
-                      onOpen={(cardId) =>
-                        navigation.navigate("WantedNearYou", cardId ? { cardId } : undefined)
-                      }
-                    />
+                      ref={tourWanted}
+                      collapsable={false}
+                    >
+                      <WantedSummaryCard
+                        summary={item.summary}
+                        onOpen={(cardId) =>
+                          navigation.navigate(
+                            "WantedNearYou",
+                            cardId ? { cardId } : undefined,
+                          )
+                        }
+                      />
+                    </View>
                   ) : null
                 ) : item.kind === "wanted" ? (
                   <Card
@@ -1814,6 +1828,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       {guest ? null : (
         <Spotlight onOpen={() => navigation.navigate("Tabs", { screen: "Flare" })} />
       )}
+      {/* A new player's first Nearby: two stops, once (tour.tsx). A stop
+          with nothing showing - no matches yet, a ZIP already saved - is
+          passed over. */}
+      {mode === "nearby" && !guest ? <Tour id="nearby" /> : null}
       <Animated.ScrollView
         /*
          * flex: 1, and it is load-bearing rather than tidy.

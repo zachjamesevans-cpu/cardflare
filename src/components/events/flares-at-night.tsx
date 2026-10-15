@@ -46,7 +46,11 @@ export function FlaresAtNight({
   const id = useId();
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={`${id}-label`}>
+    <section
+      className="flex flex-col gap-3"
+      aria-labelledby={`${id}-label`}
+      data-tour="room:board"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2
           id={`${id}-label`}

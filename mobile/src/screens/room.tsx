@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native";
 
+import { Tour, useTourTarget } from "../tour";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { RemoteImage } from "../remote-image";
@@ -432,6 +433,10 @@ function RoomScreen({
   const tabInset = useTabBarInset();
   const bottomClear = Math.max(tabInset, insets.bottom);
   const [state, setState] = useState<RoomState | null>(null);
+  /* The room tour's stops (tour.tsx): the board, your own Flares, the +. */
+  const tourBoard = useTourTarget("room", "board");
+  const tourYours = useTourTarget("room", "yours");
+  const tourAdd = useTourTarget("room", "add");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1198,6 +1203,7 @@ function RoomScreen({
             closed night the server sends no Flares for has nothing to
             filter, and "Nothing posted yet" would be a lie about it. */}
         {shut && (state.flares ?? []).length === 0 ? null : (
+          <View ref={tourBoard} collapsable={false}>
           <NightSection
             label={FLARES_AT_THIS_NIGHT}
             right={<FlareFilterRow value={filter} onChange={setFilter} />}
@@ -1441,6 +1447,8 @@ function RoomScreen({
                   return (
                     <View
                       key={sessionId}
+                      ref={mine ? tourYours : undefined}
+                      collapsable={false}
                       style={{
                         gap: spacing(1),
                         /* The hairline between players; the card's own gap
@@ -1734,6 +1742,7 @@ function RoomScreen({
               <ReadOnlyBoard flares={flares} filter={filter} />
             )}
           </NightSection>
+          </View>
         )}
 
         {/* PLAYERS GOING: low on the page, and each row says why the
@@ -1883,12 +1892,15 @@ function RoomScreen({
        */}
       {joined && writable ? (
         <FlareFab
+          tourRef={tourAdd}
           bottom={bottomClear + spacing(4)}
           onPress={() =>
             navigation.navigate("PostFlare", { code, openToTrades: youOpen })
           }
         />
       ) : null}
+      {/* A new player's first room: three stops, once (tour.tsx). */}
+      {joined ? <Tour id="room" /> : null}
 
       {/* The undo, above the floating button and whatever it clears. */}
       <UndoToast

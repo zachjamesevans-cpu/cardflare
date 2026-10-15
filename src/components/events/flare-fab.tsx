@@ -28,6 +28,7 @@ export function FlareFab({ onOpen }: { onOpen: () => void }) {
       onClick={onOpen}
       aria-label={POST_A_FLARE}
       title={POST_A_FLARE}
+      data-tour="room:add"
       className="fixed right-[max(1rem,calc((100vw-42rem)/2))] bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-40 inline-flex h-11 cursor-pointer items-center gap-1 rounded-full bg-accent pr-4 pl-3 text-sm font-semibold text-accent-contrast shadow-[0_0_28px_-8px_var(--color-accent)] transition-colors hover:bg-accent-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas focus-visible:outline-none"
     >
       <Plus className="size-5" aria-hidden="true" />
