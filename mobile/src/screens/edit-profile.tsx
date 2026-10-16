@@ -1,13 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useEffect, useState, type ReactNode } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Alert, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
   friendlyError,
   getProfile,
+  type CustomizeKind,
   type Profile,
   renameProfile,
   setAbout,
@@ -21,7 +22,16 @@ import {
   type PictureKind,
   type PictureReporter,
 } from "../change-picture";
+import type { ArtFile } from "../cosmetic-film";
 import { CropSheet, type CropSubject } from "../crop-picture";
+import { HeaderTextButton } from "../header";
+import {
+  saveLook,
+  usePendingLook,
+  wearPending,
+  type LookArt,
+  type LookDraft,
+} from "../look-save";
 import { Wardrobe } from "./customize";
 import { HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
@@ -107,6 +117,62 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
      Instagram opens one field per screen. */
   const [open, setOpen] = useState<Row | null>(null);
 
+  /*
+   * What the Look and Showcase tabs have picked and not saved. The
+   * founder: "i think we need a 'done' button... the second i press done
+   * or whatever, it updates on my account and the server stuff happens
+   * in the background. if it doesn't save, it'll just revert back." A
+   * tap stages; Done hands the lot to saveLook (look-save.ts) and
+   * leaves, and the profile wears it at once. Back with picks unsaved
+   * asks first, so nothing is lost by a slip.
+   */
+  const { pending } = usePendingLook();
+  const [draft, setDraft] = useState<LookDraft>({});
+  const [draftArt, setDraftArt] = useState<LookArt>({});
+  const dirty = Object.keys(draft).length > 0;
+  const leaving = useRef(false);
+
+  const pick = (kind: CustomizeKind, slug: string | null, art: ArtFile | null) => {
+    const was = (profile ? wearPending(profile, pending).equips?.[kind] : null) ?? null;
+    setDraft((current) => {
+      const next = { ...current };
+      if (slug === was) delete next[kind];
+      else next[kind] = slug;
+      return next;
+    });
+    if (kind === "ring") setDraftArt((current) => ({ ...current, ringArt: art }));
+    if (kind === "aura") setDraftArt((current) => ({ ...current, auraArt: art }));
+  };
+
+  const done = () => {
+    leaving.current = true;
+    if (dirty) void saveLook(draft, draftArt);
+    navigation.goBack();
+  };
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => <HeaderTextButton label="Done" onPress={done} />,
+    });
+    /* done reads draft and draftArt: set again whenever they change. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, draft, draftArt]);
+
+  usePreventRemove(dirty, ({ data }) => {
+    if (leaving.current) {
+      navigation.dispatch(data.action);
+      return;
+    }
+    Alert.alert("Discard your changes?", "What you picked has not been saved. Tap Done to keep it.", [
+      { text: "Keep editing", style: "cancel" },
+      {
+        text: "Discard",
+        style: "destructive",
+        onPress: () => navigation.dispatch(data.action),
+      },
+    ]);
+  });
+
   const load = async () => {
     try {
       const result = await getProfile();
@@ -144,6 +210,12 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
   }
 
   const reporter: PictureReporter = { say: setMessage, busy: setBusy };
+
+  /* The picture wears what is saving and what is picked, as Done will. */
+  const shown = wearPending(
+    wearPending(profile, pending),
+    dirty ? { equips: draft, ...draftArt } : null,
+  );
 
   /* A new picture is on the server: read the profile back so the
      circle at the top shows it. The profile tab re-reads on focus. */
@@ -236,6 +308,8 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
             frame: profile.equipped.avatarFrame,
             cardImage: profile.showcase[0]?.imageUrl ?? null,
           }}
+          draft={draft}
+          onPick={pick}
         />
       ) : (
       <>
@@ -256,10 +330,10 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
             seed={profile.playerId}
             avatarUrl={profile.avatarUrl}
             frame={profile.equipped.avatarFrame}
-            ring={profile.wear?.ring ?? null}
-            aura={profile.wear?.aura ?? null}
-            ringArt={profile.wear?.ringArt ?? null}
-            auraArt={profile.wear?.auraArt ?? null}
+            ring={shown.wear?.ring ?? null}
+            aura={shown.wear?.aura ?? null}
+            ringArt={shown.wear?.ringArt ?? null}
+            auraArt={shown.wear?.auraArt ?? null}
             size={CIRCLE}
           />
           <Tap

@@ -11,17 +11,12 @@ import {
 } from "react-native";
 
 import type { StackParams } from "../../App";
-import {
-  ApiError,
-  getCustomize,
-  setCustomizeEquip,
-  type CustomizeKind,
-  type CustomizeSection,
-} from "../api";
+import { getCustomize, type CustomizeKind, type CustomizeSection } from "../api";
 import { CosmeticCard } from "../cosmetic-card";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
-import { CosmeticFilm } from "../cosmetic-film";
+import { CosmeticFilm, type ArtFile } from "../cosmetic-film";
+import { usePendingLook, type LookDraft } from "../look-save";
 import {
   TrackedView,
   WornBackground,
@@ -385,16 +380,25 @@ const WIDE: ReadonlySet<CustomizeKind> = new Set(["scene", "background"]);
 export function Wardrobe({
   area,
   owner,
+  draft,
+  onPick,
 }: {
   area: "profile" | "showcase";
   owner: WardrobeOwner;
+  /** What is picked and not yet saved; Edit profile's Done saves it. */
+  draft: LookDraft;
+  /** A tile tapped: staged, not written. The art rides along for a
+      dropped-in ring or aura, which the profile draws from a file. */
+  onPick: (kind: CustomizeKind, slug: string | null, art: ArtFile | null) => void;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const { width: screen } = useWindowDimensions();
   const [sections, setSections] = useState<CustomizeSection[] | null>(null);
-  /* The worn slug per kind, flipped locally the moment a tile is
-     tapped so the tick never waits on the network. */
-  const [worn, setWorn] = useState<Record<string, string | null>>({});
+  /* The worn slug per kind, as the server last said. A tap does not
+     change it: picks are staged in `draft` until Done. */
+  const [saved, setSaved] = useState<Record<string, string | null>>({});
+  /* A look Done is still saving shows as worn here too. */
+  const { pending } = usePendingLook();
   /* Whether this tier may WEAR any of it; the server refuses with
      "not-pro" if this optimism was wrong. */
   const [allowed, setAllowed] = useState(true);
@@ -413,7 +417,7 @@ export function Wardrobe({
     try {
       const result = await getCustomize();
       setSections(result.sections);
-      setWorn(result.equips);
+      setSaved(result.equips);
       setAllowed(result.customizationAllowed ?? true);
       setMessage(null);
       const id = await cachedPlayerId();
@@ -439,7 +443,7 @@ export function Wardrobe({
       const cached = await readCache<CachedWardrobe>("customize", id);
       if (!cached || !live || sectionsRef.current) return;
       setSections(cached.sections);
-      setWorn(cached.equips);
+      setSaved(cached.equips);
       setAllowed(cached.allowed ?? true);
     })();
     return () => {
@@ -459,17 +463,17 @@ export function Wardrobe({
       navigation.navigate("Pro");
       return;
     }
-    const before = worn[on] ?? null;
-    setWorn((current) => ({ ...current, [on]: slug }));
-    setCustomizeEquip(on, slug).catch((caught: unknown) => {
-      setWorn((current) => ({ ...current, [on]: before }));
-      if (caught instanceof ApiError && caught.code === "not-pro") {
-        setAllowed(false);
-        navigation.navigate("Pro");
-        return;
-      }
-      setMessage("That change did not save. Check your connection and try again.");
-    });
+    const art =
+      sections?.find((entry) => entry.kind === on)?.items.find((item) => item.slug === slug)
+        ?.art ?? null;
+    onPick(on, slug, art);
+  };
+
+  /* What the preview and the ticks show: saved, then saving, then picked. */
+  const worn: Record<string, string | null> = {
+    ...saved,
+    ...(pending?.equips ?? {}),
+    ...draft,
   };
 
   if (!sections) {

@@ -77,13 +77,20 @@ describe("the app's header", () => {
     expect(feedHeader.match(/<HeaderButton/g)).toHaveLength(2);
   });
 
+  it("draws the word button in the same slot height, so the bar does not shift", () => {
+    const word = header.slice(header.indexOf("export function HeaderTextButton("));
+    expect(word).toContain("height: HEADER.slot");
+    expect(word).toContain("color: colors.accent");
+  });
+
   it("gives every screen's header button the shared one, so none sizes its own", () => {
     for (const path of filesUnder("mobile/src/screens")) {
       const source = spoken(read(path));
       let at = source.indexOf("headerRight:");
       while (at !== -1) {
         const block = source.slice(at, at + 400);
-        expect(block, path).toContain("<HeaderButton");
+        /* The glyph button, or the shared word one (Edit profile's Done). */
+        expect(block, path).toMatch(/<HeaderButton|<HeaderTextButton/);
         expect(block, path).not.toContain("<Ionicons");
         at = source.indexOf("headerRight:", at + 1);
       }

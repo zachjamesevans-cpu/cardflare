@@ -247,7 +247,9 @@ describe("the recent searches list", () => {
 
 describe("back is a plain chevron on a player's pages", () => {
   const PAGES = [
-    "src/app/profile/edit/page.tsx",
+    /* Edit profile's back sits beside Done, which asks before it
+       drops unsaved picks. */
+    "src/components/players/look-draft.tsx",
     "src/app/profile/settings/settings-content.tsx",
     "src/app/profile/store/page.tsx",
     "src/app/profile/binders/[binderId]/page.tsx",

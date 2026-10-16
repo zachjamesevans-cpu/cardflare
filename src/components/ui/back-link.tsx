@@ -18,9 +18,23 @@ import { cn } from "@/lib/cn";
  * Players' pages only. The store console and the admin console keep
  * their own named links, which go between consoles rather than back.
  */
-export function BackLink({ href, className }: { href: string; className?: string }) {
+export function BackLink({
+  href,
+  className,
+  onClick,
+}: {
+  href: string;
+  className?: string;
+  /** For a page that asks before leaving: Edit profile with picks unsaved. */
+  onClick?: React.MouseEventHandler<HTMLAnchorElement>;
+}) {
   return (
-    <Link href={href} aria-label="Back" className={cn(HEADER_BACK, className)}>
+    <Link
+      href={href}
+      aria-label="Back"
+      className={cn(HEADER_BACK, className)}
+      onClick={onClick}
+    >
       <ChevronLeft className={HEADER_ICON} aria-hidden="true" />
     </Link>
   );
