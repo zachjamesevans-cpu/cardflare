@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -55,6 +55,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares, stillWanted } from "../profile-flares";
 import { HeaderButton } from "../header";
+import { clearLookMessage, usePendingLook, wearPending } from "../look-save";
 import { ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { ProfileTour, useTourTarget } from "../tour";
 import { HuntsPanel } from "../hunts-panel";
@@ -151,7 +152,17 @@ export function ProfileScreen() {
   const pull = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
 
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loaded, setProfile] = useState<Profile | null>(null);
+  /*
+   * A look Edit profile's Done is still saving, worn over what was read
+   * so a read that beats the server cannot flash the old one back
+   * (look-save.ts). When the save settles this screen reads again.
+   */
+  const look = usePendingLook();
+  const profile = useMemo(
+    () => (loaded ? wearPending(loaded, look.pending) : null),
+    [loaded, look.pending],
+  );
   /* Read inside `load`, which is a stable useCallback — its closure
      would otherwise hold whatever `profile` was at mount. */
   const profileRef = useRef<Profile | null>(null);
@@ -312,6 +323,16 @@ export function ProfileScreen() {
   useEffect(() => {
     profileRef.current = profile;
   }, [profile]);
+
+  /* A look save settled: read the truth, and say so if it did not take. */
+  useEffect(() => {
+    if (look.settled === 0) return;
+    void load();
+    if (look.failed) {
+      setMessage(look.failed);
+      clearLookMessage();
+    }
+  }, [look.settled, look.failed, load]);
 
   useFocusEffect(
     useCallback(() => {

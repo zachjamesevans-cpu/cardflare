@@ -205,3 +205,20 @@ export function TabHeader({ options, route }: BottomTabHeaderProps) {
     />
   );
 }
+
+/**
+ * A word in the header instead of a glyph - "Done" - in the accent, the
+ * height of every other header button so the bar does not shift.
+ */
+export function HeaderTextButton({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{ height: HEADER.slot, paddingHorizontal: 6, justifyContent: "center" }}
+    >
+      <Text style={{ color: colors.accent, fontSize: 16, fontWeight: "700" }}>{label}</Text>
+    </Tap>
+  );
+}

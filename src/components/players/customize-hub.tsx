@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { Ban, Check, ChevronRight, Store } from "lucide-react";
 
 import { CosmeticArt } from "@/components/players/cosmetic-art";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { WornCardShell, WornNameRow, WornTitleChip } from "@/components/players/worn";
 import { Card } from "@/components/ui/card";
-import { equipCosmeticAction } from "@/lib/players/equip-actions";
+import { useLookDraft } from "@/components/players/look-draft";
 import type { CustomizeSection, EquipKind } from "@/lib/players/equips";
 import { cn } from "@/lib/cn";
 
@@ -27,7 +27,8 @@ import { cn } from "@/lib/cn";
  * - What you own, art first, with None to take a category off.
  * - "More in the Embers shop": buying stays in the shop.
  *
- * A click equips at once - the tick flips before the server answers.
+ * A click picks; Edit profile's Done saves (look-draft.tsx), so a
+ * look can be tried on and left without a trace.
  */
 
 const SECTION_COPY: Record<EquipKind, { title: string; blurb: string }> = {
@@ -65,24 +66,19 @@ export function CustomizeHub({
   area: "profile" | "showcase";
   owner: HubOwner;
 }) {
-  const [worn, setWorn] = useState<Record<string, string | null>>(() =>
-    Object.fromEntries(
-      sections.map((section) => [
-        section.kind,
-        section.items.find((item) => item.equipped)?.slug ?? null,
-      ]),
-    ),
+  /* What is saved, as the server read it; picks sit over it until Done. */
+  const saved: Record<string, string | null> = Object.fromEntries(
+    sections.map((section) => [
+      section.kind,
+      section.items.find((item) => item.equipped)?.slug ?? null,
+    ]),
   );
+  const { draft, pick } = useLookDraft();
+  const worn: Record<string, string | null> = { ...saved, ...draft };
   const [kind, setKind] = useState<EquipKind | null>(sections[0]?.kind ?? null);
-  const [, start] = useTransition();
 
-  const wear = (on: EquipKind, slug: string | null) => {
-    setWorn((current) => ({ ...current, [on]: slug }));
-    const form = new FormData();
-    form.set("kind", on);
-    form.set("slug", slug ?? "");
-    start(() => void equipCosmeticAction(form));
-  };
+  const wear = (on: EquipKind, slug: string | null) =>
+    pick(on, slug, saved[on] ?? null);
 
   const section = sections.find((entry) => entry.kind === kind) ?? sections[0];
   const owned = section ? section.items.filter((item) => item.owned) : [];
