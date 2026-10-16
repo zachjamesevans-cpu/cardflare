@@ -62,6 +62,9 @@ export function usePendingLook(): LookState {
   return useSyncExternalStore(subscribe, () => state);
 }
 
+/** The store as it stands, outside React: for tests. */
+export const lookState = (): LookState => state;
+
 export function clearLookMessage() {
   if (state.failed) set({ failed: null });
 }
@@ -91,8 +94,23 @@ export async function saveLook(
     }
   }
 
-  set({ pending: null, failed, settled: state.settled + 1 });
+  /*
+   * A failure puts the old look back at once. A success keeps the new
+   * one on screen until the profile's re-read has landed (lookLanded):
+   * that read can take many seconds, and clearing here showed the old
+   * look for all of them, as though Done had not saved.
+   */
+  set({ pending: failed ? null : state.pending, failed, settled: state.settled + 1 });
   return failed === null;
+}
+
+/**
+ * The profile has read the server since save number `round` settled,
+ * so the server's look is the saved one and the pending one can go.
+ * A later save keeps its own pending look.
+ */
+export function lookLanded(round: number) {
+  if (state.pending && state.settled === round) set({ pending: null });
 }
 
 /** A profile wearing the pending look over what it was read with. */

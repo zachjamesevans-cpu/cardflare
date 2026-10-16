@@ -61,6 +61,17 @@ const huntsSeen = new Map<string, string>();
 const droppedWants = new Set<string>();
 const droppedOfferings = new Set<string>();
 
+/*
+ * What you put on in demo mode: worn for the session, never sent. The
+ * profile and the wardrobe are real reads, so without this a look saved
+ * with Done showed for a moment and then the real one came back - the
+ * founder, in demo mode without knowing it: "it seems like no cosmetics
+ * saved when i applied them". Laid over every read of your own profile
+ * and wardrobe (demoSaw), with a dropped-in ring's file carried along.
+ */
+const wornHere = new Map<string, string | null>();
+const artBySlug = new Map<string, unknown>();
+
 const isDemoId = (id: string) => id.startsWith("demo-");
 
 /** The crowd behind your follower count: made-up, pictured, many. */
@@ -152,10 +163,47 @@ export function demoSaw(method: string, path: string, value: unknown): unknown {
     }
   }
 
+  /* The wardrobe: what you own is real, what you wear is this session's. */
+  if (route === "/api/v1/customize" && Array.isArray(body.sections)) {
+    const sections = body.sections as {
+      kind: string;
+      items: { slug: string; equipped: boolean; art?: unknown }[];
+    }[];
+    for (const section of sections) {
+      for (const item of section.items) {
+        if (item.art) artBySlug.set(item.slug, item.art);
+        if (wornHere.has(section.kind)) item.equipped = item.slug === wornHere.get(section.kind);
+      }
+    }
+    body.equips = { ...(body.equips as object), ...Object.fromEntries(wornHere) };
+  }
+
   /* Your own profile stays real, but its counts agree with the
-     followers and following demo mode lists when they are opened. */
+     followers and following demo mode lists when they are opened, and
+     it wears what you put on here. */
   if (route === "/api/v1/profile" && body.profile && typeof body.profile === "object") {
-    const profile = body.profile as { stats?: Record<string, number> };
+    const profile = body.profile as {
+      stats?: Record<string, number>;
+      equips?: Record<string, string | null> | null;
+      wear?: Record<string, unknown> | null;
+    };
+    if (wornHere.size > 0) {
+      profile.equips = { ...profile.equips, ...Object.fromEntries(wornHere) };
+      const wear: Record<string, unknown> = {
+        ring: null,
+        aura: null,
+        ringArt: null,
+        auraArt: null,
+        ...profile.wear,
+      };
+      for (const kind of ["ring", "aura"] as const) {
+        if (!wornHere.has(kind)) continue;
+        const slug = wornHere.get(kind) ?? null;
+        wear[kind] = slug;
+        wear[`${kind}Art`] = slug ? (artBySlug.get(slug) ?? null) : null;
+      }
+      profile.wear = wear;
+    }
     if (profile.stats) {
       profile.stats = {
         ...profile.stats,
@@ -227,6 +275,10 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
   }
 
   /* --- Writes: never sent ----------------------------------------- */
+  if (route === "/api/v1/customize" && typeof input.kind === "string") {
+    wornHere.set(input.kind, typeof input.slug === "string" ? input.slug : null);
+    return ok();
+  }
   if (method === "DELETE" && parts[2] === "wants" && parts[3]) {
     droppedWants.add(parts[3]);
     return ok();
