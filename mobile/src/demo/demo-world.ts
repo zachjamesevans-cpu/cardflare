@@ -70,6 +70,27 @@ interface PostSpec {
 
 const POSTS: PostSpec[] = [
   {
+    key: "kaito-vintage",
+    by: "kaito",
+    direction: "want",
+    note: "Base set grails. Can trade or add cash.",
+    cards: [
+      { card: "charizardBase", note: "Childhood grail" },
+      { card: "umbreonCol", held: "exact", note: "For my PC" },
+      { card: "mewtwoBase" },
+      { card: "pikachuBase", quantity: 2 },
+    ],
+    likes: 21,
+    comments: [
+      ["sam", "Have a Mewtwo, PSA 8 though"],
+      ["zoe", "Umbreon gang 🌙"],
+    ],
+    offers: 1,
+    /* First in the Feed: the App Store's opening shot leads with it. */
+    minutes: 9,
+    tab: "following",
+  },
+  {
     key: "maya-crew",
     by: "maya",
     direction: "want",
@@ -93,26 +114,6 @@ const POSTS: PostSpec[] = [
     ],
     offers: 3,
     minutes: 14,
-    tab: "following",
-  },
-  {
-    key: "kaito-vintage",
-    by: "kaito",
-    direction: "want",
-    note: "Base set grails. Can trade or add cash.",
-    cards: [
-      { card: "charizardBase", note: "Childhood grail" },
-      { card: "umbreonCol", held: "exact", note: "For my PC" },
-      { card: "mewtwoBase" },
-      { card: "pikachuBase", quantity: 2 },
-    ],
-    likes: 21,
-    comments: [
-      ["sam", "Have a Mewtwo, PSA 8 though"],
-      ["zoe", "Umbreon gang 🌙"],
-    ],
-    offers: 1,
-    minutes: 52,
     tab: "following",
   },
   {
