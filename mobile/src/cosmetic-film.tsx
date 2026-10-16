@@ -80,7 +80,10 @@ export function siteOrigins(): string[] {
 export function playerUrl(art: ArtFile): string | null {
   let path: string;
   try {
-    const parsed = new URL(art.url);
+    /* Seeded art can arrive as "/cosmetics/x.svg" (the customize route
+       sends it as stored): that is our own origin, so resolve it there
+       rather than drawing nothing. Anything absolute is checked as is. */
+    const parsed = new URL(art.url, API_BASE);
     if (!siteOrigins().includes(parsed.origin)) return null;
     path = `${parsed.pathname}${parsed.search}`;
   } catch {

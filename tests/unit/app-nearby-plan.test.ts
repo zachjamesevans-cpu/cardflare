@@ -72,9 +72,7 @@ describe("Flares near you, from the server", () => {
   const repo = read("src/lib/feed/repository.ts");
 
   it("files posts by people near you that you do not follow under around", () => {
-    expect(repo).toContain(
-      'item.around\n          ? "around"',
-    );
+    expect(repo).toContain('item.around\n          ? "around"');
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(
       "await nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",

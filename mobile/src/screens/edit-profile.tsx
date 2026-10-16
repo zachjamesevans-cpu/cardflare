@@ -22,6 +22,7 @@ import {
   type PictureReporter,
 } from "../change-picture";
 import { CropSheet, type CropSubject } from "../crop-picture";
+import { Wardrobe } from "./customize";
 import { HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { ProMark } from "../pro-mark";
@@ -68,8 +69,29 @@ const CIRCLE = 88;
 
 type Row = "name" | "username" | "pronouns" | "bio";
 
-export function EditProfileScreen() {
+/** The screen's three tabs: who you are, and what you and your cards wear. */
+export type EditTab = "profile" | "look" | "showcase";
+
+const TABS: { key: EditTab; label: string }[] = [
+  { key: "profile", label: "Profile" },
+  { key: "look", label: "Look" },
+  { key: "showcase", label: "Showcase" },
+];
+
+/**
+ * Edit profile and Customize, one screen. The founder: "move the edit
+ * profile button into the wand, they do the exact same thing basically.
+ * like combine them", then "build it go" on three tabs - Profile (the
+ * picture, name, username, pronouns and bio), Look (what you wear) and
+ * Showcase (what your cards wear). The wand opens it; so does your
+ * picture; the old Customize route lands on its tab.
+ */
+export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: EditTab }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const [tab, setTab] = useState<EditTab>(initialTab);
+  useEffect(() => {
+    setTab(initialTab);
+  }, [initialTab]);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -162,9 +184,64 @@ export function EditProfileScreen() {
         gap: spacing(4),
       }}
     >
+      {/* The tabs. */}
+      <View
+        accessibilityRole="tablist"
+        style={{
+          flexDirection: "row",
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.elevated,
+          padding: 3,
+        }}
+      >
+        {TABS.map((entry) => {
+          const on = entry.key === tab;
+          return (
+            <Tap
+              key={entry.key}
+              onPress={() => setTab(entry.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                paddingVertical: spacing(2),
+                borderRadius: 999,
+                backgroundColor: on ? colors.accent : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  color: on ? colors.accentContrast : colors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: "700",
+                }}
+              >
+                {entry.label}
+              </Text>
+            </Tap>
+          );
+        })}
+      </View>
+
+      {tab !== "profile" ? (
+        <Wardrobe
+          area={tab === "look" ? "profile" : "showcase"}
+          owner={{
+            playerId: profile.playerId,
+            displayName: profile.displayName,
+            avatarUrl: profile.avatarUrl,
+            frame: profile.equipped.avatarFrame,
+            cardImage: profile.showcase[0]?.imageUrl ?? null,
+          }}
+        />
+      ) : (
+      <>
       <Card>
         {/* The picture as the profile shows it, and beside it the door
-            to the avatar effects: ring, aura, the lot. */}
+            to the Look tab: ring, aura, the lot. */}
         <View
           style={{
             flexDirection: "row",
@@ -186,7 +263,7 @@ export function EditProfileScreen() {
             size={CIRCLE}
           />
           <Tap
-            onPress={() => navigation.navigate("Customize", { area: "profile" })}
+            onPress={() => setTab("look")}
             accessibilityLabel="Avatar effects"
             style={{
               width: CIRCLE,
@@ -385,6 +462,8 @@ export function EditProfileScreen() {
           }
         />
       </Card>
+      </>
+      )}
     </ScrollView>
   );
 }

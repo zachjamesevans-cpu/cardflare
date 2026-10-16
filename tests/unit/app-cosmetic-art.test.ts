@@ -533,7 +533,6 @@ describe("card animations and profile scenes, in the app", () => {
     expect(customize).toContain("timings={avatarTiming ? [avatarTiming] : []}");
     expect(customize).toContain("const MINI_AVATAR = 32;");
     /* The honest note says what is true now, and nothing about Rive. */
-    expect(customize).toContain("Everything in the catalogue draws here now.");
     expect(customize).not.toContain("Rive");
   });
 });

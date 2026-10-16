@@ -251,7 +251,6 @@ describe("back is a plain chevron on a player's pages", () => {
     "src/app/profile/settings/settings-content.tsx",
     "src/app/profile/store/page.tsx",
     "src/app/profile/binders/[binderId]/page.tsx",
-    "src/app/profile/customize/page.tsx",
     "src/app/profile/password/page.tsx",
     "src/app/cards/[cardId]/page.tsx",
     "src/app/hunts/[huntId]/page.tsx",

@@ -54,7 +54,6 @@ import { DressingPicker, type DressingOption } from "../dressing-picker";
 import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares, stillWanted } from "../profile-flares";
-import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
 import { ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { ProfileTour, useTourTarget } from "../tour";
@@ -181,7 +180,6 @@ export function ProfileScreen() {
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
 
   /* The wand's two doors - your look, and the Embers shop - when open. */
-  const [wandMenu, setWandMenu] = useState<ActionItem[] | null>(null);
   /* The profile tour's stops on this screen (tour.tsx). */
   const tourBinders = useTourTarget("profile", "binders");
   const tourShare = useTourTarget("profile", "share");
@@ -944,45 +942,23 @@ export function ProfileScreen() {
           <View ref={tourShare} collapsable={false}>
             <ShareProfileIcon playerId={profile.playerId} name={profile.displayName} />
           </View>
-          {/* The wand: your look, and the Embers shop that pays for it.
-              The shop was a tab of its own until the strip went to three. */}
-          <View ref={tourWand} collapsable={false}>
+          {/* The Embers shop, its own icon again - the founder: "the
+              embers shop should be its own icon along with the top
+              right icons on profile". */}
           <HeaderButton
-            icon="color-wand"
-            label="Customize and Embers shop"
-            onPress={() =>
-              setWandMenu([
-                /*
-                 * Edit profile lives here now, first. The founder: "we can
-                 * move the large 'edit profile' button elsewhere. maybe
-                 * adding it into the wand icon ... it would be nice to have
-                 * a little more space on this screen considering not
-                 * everyone is going to use that edit profile button very
-                 * often." Your picture opens it too.
-                 */
-                {
-                  key: "edit",
-                  label: "Edit profile",
-                  icon: "person-circle-outline",
-                  onPress: () => navigation.navigate("EditProfile"),
-                },
-                {
-                  key: "customize",
-                  label: "Customize your look",
-                  icon: "color-wand-outline",
-                  onPress: () => navigation.navigate("Customize", { area: "profile" }),
-                },
-                {
-                  key: "store",
-                  label: `Embers shop · ${profile.embersBalance.toLocaleString()}`,
-                  icon: "storefront-outline",
-                  onPress: () => navigation.navigate("Store"),
-                },
-              ])
-            }
+            icon="storefront-outline"
+            label="Embers shop"
+            onPress={() => navigation.navigate("Store")}
           />
+          {/* The wand: Edit profile, which holds what you wear now (its
+              Look and Showcase tabs). Straight there, no menu. */}
+          <View ref={tourWand} collapsable={false}>
+            <HeaderButton
+              icon="color-wand"
+              label="Edit profile"
+              onPress={() => navigation.navigate("EditProfile")}
+            />
           </View>
-          <ActionSheet items={wandMenu} onClose={() => setWandMenu(null)} />
           <HeaderButton
             icon="settings-outline"
             label="Settings"

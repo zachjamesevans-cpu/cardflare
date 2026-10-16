@@ -1,8 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import type { StackParams } from "../../App";
 import {
@@ -15,6 +21,7 @@ import {
 import { CosmeticCard } from "../cosmetic-card";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { drawsBorder } from "../cosmetic-border";
+import { CosmeticFilm } from "../cosmetic-film";
 import {
   TrackedView,
   WornBackground,
@@ -35,6 +42,7 @@ import {
   hasTitleArt,
 } from "../cosmetic-art-data";
 import { Card, Muted, Tap } from "../ui";
+import { PlayerAvatar } from "../player-avatar";
 import { ProMark } from "../pro-mark";
 import { colors, gutter, radius, spacing } from "../theme";
 
@@ -65,20 +73,6 @@ const AREA_KINDS: Record<"profile" | "showcase", readonly CustomizeKind[]> = {
   showcase: ["border", "pattern", "animation", "background"],
 };
 
-const AREA_COPY = {
-  profile: {
-    title: "Customize profile",
-    blurb:
-      "Everything worn on you: your border, name style, title, badge and page effect. Changes land the moment you tap them.",
-    other: { area: "showcase", label: "Showcase cosmetics" },
-  },
-  showcase: {
-    title: "Customize showcase",
-    blurb:
-      "Everything worn on your cards: borders, foils, motion and the shelf behind them. Changes land the moment you tap them.",
-    other: { area: "profile", label: "Profile cosmetics" },
-  },
-} as const;
 
 const SECTION_COPY: Record<CustomizeKind, { title: string; blurb: string }> = {
   ring: { title: "Profile borders", blurb: "Drawn around your profile picture." },
@@ -348,31 +342,6 @@ const SCENE_SWATCH = { w: SWATCH.w * 2, h: SWATCH.h * 2 };
 /** The mini profile's avatar: the website's 32px circle. */
 const MINI_AVATAR = 32;
 
-function Pill({ label, tone }: { label: string; tone: "accent" | "neutral" }) {
-  return (
-    <View
-      style={{
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: tone === "accent" ? colors.accent : colors.border,
-        backgroundColor: tone === "accent" ? colors.accentTint : colors.elevated,
-        paddingHorizontal: spacing(2),
-        paddingVertical: 2,
-      }}
-    >
-      <Text
-        style={{
-          color: tone === "accent" ? colors.accent : colors.textSecondary,
-          fontSize: 11,
-          fontWeight: "600",
-        }}
-      >
-        {label}
-      </Text>
-    </View>
-  );
-}
-
 /** The wardrobe as it is kept between visits. */
 interface CachedWardrobe {
   sections: CustomizeSection[];
@@ -380,27 +349,65 @@ interface CachedWardrobe {
   allowed?: boolean;
 }
 
-export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
+/** Who the preview is: the profile Edit profile has already read. */
+export interface WardrobeOwner {
+  playerId: string;
+  displayName: string;
+  avatarUrl: string | null;
+  /** The older avatar frame, drawn as the profile draws it. */
+  frame: string | null;
+  /** A card of theirs to dress in the Showcase preview, if they have one. */
+  cardImage: string | null;
+}
+
+/** Scenes and backgrounds are wide panels: two to a row, not three. */
+const WIDE: ReadonlySet<CustomizeKind> = new Set(["scene", "background"]);
+
+/**
+ * The Look and Showcase tabs of Edit profile: everything you own in one
+ * category at a time, worn with a tap.
+ *
+ * It was its own screen, every category stacked down one long list -
+ * the founder: "take a look at the customize your look screen. it's just
+ * a long scrolling list of different types of cosmetics", then "build
+ * it go" on the plan:
+ *
+ * - A LIVE PREVIEW pinned on top: you, or one of your cards, wearing
+ *   what is picked, so a choice is seen before it is left.
+ * - CHIPS for the categories: one category on screen, not ten.
+ * - A GRID, art first, three across (two for the wide panels).
+ * - WHAT YOU OWN, then "More in the Embers shop": buying stays in the
+ *   shop, which is the one place that sells.
+ * - "None" first, to take a category off.
+ *
+ * The website's hub draws the same (components/players/customize-hub).
+ */
+export function Wardrobe({
+  area,
+  owner,
+}: {
+  area: "profile" | "showcase";
+  owner: WardrobeOwner;
+}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const { width: screen } = useWindowDimensions();
   const [sections, setSections] = useState<CustomizeSection[] | null>(null);
   /* The worn slug per kind, flipped locally the moment a tile is
-     tapped so the tick never waits on the network — same optimistic
-     shape as the website's hub. */
+     tapped so the tick never waits on the network. */
   const [worn, setWorn] = useState<Record<string, string | null>>({});
-  /* Whether this tier may WEAR any of it. Browsing is free either way —
-     seeing what exists is the store's advertisement. Defaults to true
-     so a stale cache never flashes a lock at a paying Pro; the server
-     still refuses with "not-pro" if the optimism was wrong. */
+  /* Whether this tier may WEAR any of it; the server refuses with
+     "not-pro" if this optimism was wrong. */
   const [allowed, setAllowed] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [kind, setKind] = useState<CustomizeKind>(AREA_KINDS[area][0]);
 
-  /* Read inside `load`, whose closure would otherwise hold whatever
-     `sections` was at mount. */
   const sectionsRef = useRef<CustomizeSection[] | null>(null);
-
   useEffect(() => {
     sectionsRef.current = sections;
   }, [sections]);
+  useEffect(() => {
+    setKind(AREA_KINDS[area][0]);
+  }, [area]);
 
   const load = useCallback(async () => {
     try {
@@ -409,7 +416,6 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
       setWorn(result.equips);
       setAllowed(result.customizationAllowed ?? true);
       setMessage(null);
-
       const id = await cachedPlayerId();
       if (id)
         void writeCache("customize", id, {
@@ -418,36 +424,24 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
           allowed: result.customizationAllowed ?? true,
         } satisfies CachedWardrobe);
     } catch {
-      /* Only complain when there is nothing to look at. A wardrobe
-         already on screen is better than an error where it used to be. */
       if (!sectionsRef.current) {
         setMessage("Could not load your wardrobe. Go back and try again.");
       }
     }
   }, []);
 
-  /*
-   * Last visit's wardrobe, painted before this one has loaded.
-   *
-   * The heaviest screen in the app and the one that changes least
-   * between two visits — what somebody owns moves when they buy
-   * something, and buying something reloads this anyway.
-   */
+  /* Last visit's wardrobe, painted before this one has loaded. */
   useEffect(() => {
     let live = true;
-
     void (async () => {
       const id = await cachedPlayerId();
       if (!id || !live) return;
-
       const cached = await readCache<CachedWardrobe>("customize", id);
       if (!cached || !live || sectionsRef.current) return;
-
       setSections(cached.sections);
       setWorn(cached.equips);
       setAllowed(cached.allowed ?? true);
     })();
-
     return () => {
       live = false;
     };
@@ -459,22 +453,17 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
     }, [load]),
   );
 
-  const wear = (kind: CustomizeKind, slug: string | null) => {
-    /* Wearing is Pro; the wall opens the pitch, not an error. Taking
-       something OFF stays free — a lapsed player can always undress —
-       so only the putting-on taps divert. */
+  const wear = (on: CustomizeKind, slug: string | null) => {
+    /* Wearing is Pro; taking something OFF stays free. */
     if (!allowed && slug !== null) {
       navigation.navigate("Pro");
       return;
     }
-
-    const before = worn[kind] ?? null;
-    setWorn((current) => ({ ...current, [kind]: slug }));
-    setCustomizeEquip(kind, slug).catch((caught: unknown) => {
-      /* Put it back honestly rather than showing a tick that lied. */
-      setWorn((current) => ({ ...current, [kind]: before }));
+    const before = worn[on] ?? null;
+    setWorn((current) => ({ ...current, [on]: slug }));
+    setCustomizeEquip(on, slug).catch((caught: unknown) => {
+      setWorn((current) => ({ ...current, [on]: before }));
       if (caught instanceof ApiError && caught.code === "not-pro") {
-        /* The server knows better than our cached flag. */
         setAllowed(false);
         navigation.navigate("Pro");
         return;
@@ -485,62 +474,86 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
 
   if (!sections) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.canvas, padding: spacing(6) }}>
-        {message ? (
-          <Muted>{message}</Muted>
-        ) : (
-          <ActivityIndicator color={colors.accent} />
-        )}
+      <View style={{ padding: spacing(6) }}>
+        {message ? <Muted>{message}</Muted> : <ActivityIndicator color={colors.accent} />}
       </View>
     );
   }
 
+  const shown = sections.filter((section) => AREA_KINDS[area].includes(section.kind));
+  const section = shown.find((entry) => entry.kind === kind) ?? shown[0];
+  const owned = section ? section.items.filter((item) => item.owned) : [];
+  const columns = section && WIDE.has(section.kind) ? 2 : 3;
+  const gap = spacing(2);
+  const tileWidth = Math.floor((screen - gutter * 2 - gap * (columns - 1)) / columns);
+  const current = section ? (worn[section.kind] ?? null) : null;
+  /* A dropped-in ring or aura is a file, not a slug the avatar knows:
+     hand the preview the worn item's art, as the profile does. */
+  const artOf = (on: CustomizeKind) =>
+    sections
+      ?.find((entry) => entry.kind === on)
+      ?.items.find((item) => item.slug === worn[on])?.art ?? null;
+
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.canvas }}
-      contentContainerStyle={{
-        paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
-        gap: spacing(4),
-      }}
-    >
-      <View style={{ gap: spacing(1) }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: "700" }}>
-          {AREA_COPY[area].title}
-        </Text>
-        <Muted>{AREA_COPY[area].blurb}</Muted>
-      </View>
+    <View style={{ gap: spacing(4) }}>
+      {/* THE PREVIEW: what you are wearing, as it will be seen. */}
+      <Card style={{ alignItems: "center", gap: spacing(2), paddingVertical: spacing(5) }}>
+        {area === "profile" ? (
+          <>
+            <PlayerAvatar
+              displayName={owner.displayName}
+              seed={owner.playerId}
+              avatarUrl={owner.avatarUrl}
+              frame={owner.frame}
+              ring={worn.ring ?? null}
+              aura={worn.aura ?? null}
+              ringArt={artOf("ring")}
+              auraArt={artOf("aura")}
+              size={88}
+            />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+              <WornName
+                name={owner.displayName}
+                nameplate={worn.nameplate ?? null}
+                fontSize={20}
+                baseStyle={{ fontSize: 20, fontWeight: "800", color: colors.textPrimary }}
+              />
+              <WornBadge badge={worn.badge ?? null} />
+            </View>
+            <WornTitle title={worn.title ?? null} />
+          </>
+        ) : (
+          <View
+            style={{
+              width: 200,
+              height: 170,
+              borderRadius: radius.control,
+              overflow: "hidden",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: colors.canvas,
+            }}
+          >
+            {worn.background && drawsBackground(worn.background) ? (
+              <View style={{ position: "absolute", left: 0, top: 0 }}>
+                <WornBackground background={worn.background} width={200} height={170} radius={0} />
+              </View>
+            ) : null}
+            <CosmeticCard
+              imageUrl={owner.cardImage}
+              width={100}
+              frame={null}
+              holo={null}
+              effect={null}
+              border={worn.border ?? null}
+              pattern={worn.pattern ?? null}
+              animation={worn.animation ?? null}
+            />
+          </View>
+        )}
+      </Card>
 
-      {/* The other menu, and only that. The Embers store's door is on
-          the profile; a second one here would make this screen a shop
-          front. Same link the website's page carries. */}
-      <Tap
-        onPress={() =>
-          navigation.navigate("Customize", { area: AREA_COPY[area].other.area })
-        }
-        accessibilityLabel={AREA_COPY[area].other.label}
-        style={{
-          alignSelf: "flex-start",
-          flexDirection: "row",
-          alignItems: "center",
-          gap: spacing(2),
-          borderRadius: radius.control,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.elevated,
-          paddingHorizontal: spacing(4),
-          paddingVertical: spacing(2),
-        }}
-      >
-        <Ionicons name="color-wand" size={16} color={colors.textPrimary} />
-        <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "600" }}>
-          {AREA_COPY[area].other.label}
-        </Text>
-      </Tap>
-
-      {/* Honest before anything is tapped: browsing is free, wearing is
-          Pro. The website shows the same banner; here it can actually
-          open the till. */}
+      {/* Honest before anything is tapped: browsing is free, wearing is Pro. */}
       {!allowed && (
         <Tap
           onPress={() => navigation.navigate("Pro")}
@@ -557,9 +570,7 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
           }}
         >
           <Ionicons name="sparkles" size={16} color={colors.accent} />
-          <Text
-            style={{ color: colors.accent, fontSize: 13, fontWeight: "700", flex: 1 }}
-          >
+          <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700", flex: 1 }}>
             Wearing cosmetics is a cardflare <ProMark size={13} /> feature. Tap to get{" "}
             <ProMark size={13} />.
           </Text>
@@ -567,115 +578,156 @@ export function CustomizeScreen({ area }: { area: "profile" | "showcase" }) {
         </Tap>
       )}
 
-      {/* The honest note: what a tile shows is what a profile draws. */}
-      <View
-        style={{
-          flexDirection: "row",
-          gap: spacing(2),
-          alignItems: "flex-start",
-          borderRadius: radius.control,
-          borderWidth: 1,
-          borderColor: colors.border,
-          backgroundColor: colors.elevated,
-          padding: spacing(3),
-        }}
+      {/* THE CHIPS: one category at a time. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: spacing(2) }}
       >
-        <Ionicons name="information-circle" size={16} color={colors.textMuted} />
-        <Text style={{ color: colors.textSecondary, fontSize: 12, flex: 1 }}>
-          Everything in the catalogue draws here now. Wearing something here equips it
-          everywhere.
-        </Text>
-      </View>
+        {shown.map((entry) => {
+          const on = entry.kind === section?.kind;
+          return (
+            <Tap
+              key={entry.kind}
+              onPress={() => setKind(entry.kind)}
+              accessibilityLabel={SECTION_COPY[entry.kind].title}
+              accessibilityState={{ selected: on }}
+              style={{
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: on ? colors.accent : colors.border,
+                backgroundColor: on ? colors.accentTint : colors.elevated,
+                paddingHorizontal: spacing(3.5),
+                paddingVertical: spacing(2),
+              }}
+            >
+              <Text
+                style={{
+                  color: on ? colors.accent : colors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: "600",
+                }}
+              >
+                {SECTION_COPY[entry.kind].title}
+              </Text>
+            </Tap>
+          );
+        })}
+      </ScrollView>
 
       {message && <Muted>{message}</Muted>}
 
-      {sections
-        .filter((section) => AREA_KINDS[area].includes(section.kind))
-        .map((section) => (
-          <Card key={section.kind} style={{ gap: spacing(3) }}>
-            <View style={{ gap: spacing(0.5) }}>
-              <Text
-                style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}
+      {section ? (
+        <View style={{ gap: spacing(3) }}>
+          <Muted>{SECTION_COPY[section.kind].blurb}</Muted>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap }}>
+            {/* None first: take this category off. */}
+            <WardrobeTile
+              width={tileWidth}
+              label="None"
+              on={current === null}
+              onPress={() => wear(section.kind, null)}
+            >
+              <Ionicons name="ban-outline" size={28} color={colors.textMuted} />
+            </WardrobeTile>
+            {owned.map((item) => (
+              <WardrobeTile
+                key={item.slug}
+                width={tileWidth}
+                label={item.name}
+                on={current === item.slug}
+                onPress={() =>
+                  wear(section.kind, current === item.slug ? null : item.slug)
+                }
               >
-                {SECTION_COPY[section.kind].title}
-              </Text>
-              <Muted>
-                {SECTION_COPY[section.kind].blurb} Tap to wear it; tap again to take it
-                off.
-              </Muted>
-            </View>
+                {/* A dropped-in file draws itself, as on the website's
+                    tiles; the catalogue draws from its CSS. */}
+                {item.art ? (
+                  <CosmeticFilm art={item.art} size={PREVIEW * 1.5} />
+                ) : (
+                  <CosmeticPreview kind={section.kind} slug={item.slug} />
+                )}
+              </WardrobeTile>
+            ))}
+          </View>
+          {owned.length === 0 ? (
+            <Muted>Nothing here yet. Find some in the Embers shop.</Muted>
+          ) : null}
+          {/* Buying stays in the shop: this is the door to it. */}
+          <Tap
+            onPress={() => navigation.navigate("Store")}
+            accessibilityLabel="More in the Embers shop"
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(2),
+              borderRadius: radius.control,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.elevated,
+              padding: spacing(3),
+            }}
+          >
+            <Ionicons name="storefront-outline" size={18} color={colors.accent} />
+            <Text
+              style={{ flex: 1, color: colors.textPrimary, fontSize: 14, fontWeight: "600" }}
+            >
+              More in the Embers shop
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+          </Tap>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
-            <View style={{ gap: spacing(2) }}>
-              {section.items.map((item) => {
-                const on = (worn[section.kind] ?? null) === item.slug;
-                return (
-                  <Tap
-                    key={item.slug}
-                    disabled={!item.owned}
-                    onPress={() => wear(section.kind, on ? null : item.slug)}
-                    accessibilityLabel={
-                      on ? `Take off ${item.name}` : `Wear ${item.name}`
-                    }
-                    style={{
-                      borderRadius: radius.control,
-                      borderWidth: 1,
-                      borderColor: on ? colors.accent : colors.border,
-                      backgroundColor: on ? colors.accentTint : colors.elevated,
-                      padding: spacing(3),
-                      gap: spacing(1),
-                      opacity: item.owned ? 1 : 0.45,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: spacing(1.5),
-                      }}
-                    >
-                      <CosmeticPreview kind={section.kind} slug={item.slug} />
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          color: colors.textPrimary,
-                          fontWeight: "600",
-                          fontSize: 14,
-                          flex: 1,
-                        }}
-                      >
-                        {item.name}
-                      </Text>
-                      {on && (
-                        <Ionicons name="checkmark" size={16} color={colors.accent} />
-                      )}
-                    </View>
-                    {item.description ? (
-                      <Text
-                        numberOfLines={2}
-                        style={{ color: colors.textSecondary, fontSize: 12 }}
-                      >
-                        {item.description}
-                      </Text>
-                    ) : null}
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        gap: spacing(1.5),
-                      }}
-                    >
-                      {item.status === "draft" && (
-                        <Pill label="unreleased" tone="neutral" />
-                      )}
-                      {!item.owned && <Pill label="not owned yet" tone="neutral" />}
-                      {on && <Pill label="wearing" tone="accent" />}
-                    </View>
-                  </Tap>
-                );
-              })}
-            </View>
-          </Card>
-        ))}
-    </ScrollView>
+/** One square in the wardrobe: the art, the name, a ring when worn. */
+function WardrobeTile({
+  width,
+  label,
+  on,
+  onPress,
+  children,
+}: {
+  width: number;
+  label: string;
+  on: boolean;
+  onPress: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityLabel={on ? `${label}, wearing` : label}
+      accessibilityState={{ selected: on }}
+      style={{
+        width,
+        minHeight: 104,
+        alignItems: "center",
+        justifyContent: "center",
+        gap: spacing(2),
+        borderRadius: radius.control,
+        borderWidth: on ? 2 : 1,
+        borderColor: on ? colors.accent : colors.border,
+        backgroundColor: on ? colors.accentTint : colors.elevated,
+        padding: spacing(2),
+      }}
+    >
+      <View style={{ minHeight: 48, alignItems: "center", justifyContent: "center" }}>
+        {children}
+      </View>
+      <Text
+        numberOfLines={2}
+        style={{
+          color: on ? colors.textPrimary : colors.textSecondary,
+          fontSize: 12,
+          fontWeight: on ? "700" : "500",
+          textAlign: "center",
+        }}
+      >
+        {label}
+      </Text>
+    </Tap>
   );
 }

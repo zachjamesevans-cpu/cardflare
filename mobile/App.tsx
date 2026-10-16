@@ -73,7 +73,6 @@ import { ScanScreen } from "./src/screens/scan";
 import { SettingsScreen } from "./src/screens/settings";
 import { DeckPasteScreen } from "./src/screens/deck-paste";
 import { StoreScreen } from "./src/screens/store";
-import { CustomizeScreen } from "./src/screens/customize";
 import { ProScreen } from "./src/screens/pro";
 import { SignInScreen } from "./src/screens/sign-in";
 import { WelcomeScreen, forgetWelcome, hasSeenWelcome } from "./src/screens/welcome";
@@ -215,7 +214,8 @@ export type StackParams = {
   DeckPaste: undefined;
   /** Instagram's Edit profile: picture, effects, name, username,
       pronouns, bio. The website's /profile/edit. */
-  EditProfile: undefined;
+  /** Profile, Look or Showcase; Profile when none is named. */
+  EditProfile: { tab?: import("./src/screens/edit-profile").EditTab } | undefined;
   /**
    * Somebody's hunts on their own screen: the website's /profile/hunts
    * with no id, /p/[playerId]/hunts with one. The Hunts stop in the
@@ -1182,11 +1182,9 @@ function AppGates() {
             component={DeckPasteScreen}
             options={{ title: "Paste a deck list" }}
           />
-          <Stack.Screen
-            name="EditProfile"
-            component={EditProfileScreen}
-            options={{ title: "Edit profile" }}
-          />
+          <Stack.Screen name="EditProfile" options={{ title: "Edit profile" }}>
+            {({ route }) => <EditProfileScreen initialTab={route.params?.tab} />}
+          </Stack.Screen>
           <Stack.Screen name="Hunts" options={{ title: "Hunts" }}>
             {({ route }) => <HuntsScreen playerId={route.params?.playerId} />}
           </Stack.Screen>
@@ -1208,8 +1206,14 @@ function AppGates() {
             component={StoreScreen}
             options={{ title: "Embers shop" }}
           />
-          <Stack.Screen name="Customize" options={{ title: "Customize" }}>
-            {({ route }) => <CustomizeScreen area={route.params?.area ?? "profile"} />}
+          {/* Customize is a tab of Edit profile now; the old route lands
+              on it, so every link to it still works. */}
+          <Stack.Screen name="Customize" options={{ title: "Edit profile" }}>
+            {({ route }) => (
+              <EditProfileScreen
+                initialTab={route.params?.area === "showcase" ? "showcase" : "look"}
+              />
+            )}
           </Stack.Screen>
           <Stack.Screen
             name="Pro"

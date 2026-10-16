@@ -56,7 +56,8 @@ describe("Edit profile", () => {
 
   it("puts the avatar effects beside the picture, behind the wand", () => {
     expect(page).toContain("<PictureDoor");
-    expect(door).toContain('href="/profile/customize"');
+    /* Customize is the Look tab of Edit profile now. */
+    expect(door).toContain('href="/profile/edit?tab=look"');
     expect(door).toContain("<Wand2");
     expect(door).toContain("Edit picture or avatar");
     /* The picture and cover controls are behind that one link. */

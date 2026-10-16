@@ -34,14 +34,8 @@ export function DotsMenu({
   label = "More",
   className,
   header = false,
-  glyph,
-  buttonClassName,
 }: {
   items: MenuItem[];
-  /** Another icon in place of the dots: the profile's wand. */
-  glyph?: ReactNode;
-  /** The button's own look, when it is not the dots' or the header's. */
-  buttonClassName?: string;
   /** The button's accessible name: "More about this post". */
   label?: string;
   className?: string;
@@ -95,18 +89,15 @@ export function DotsMenu({
         aria-controls={id}
         onClick={() => setOpen((value) => !value)}
         className={
-          buttonClassName ??
-          (header
+          header
             ? HEADER_BUTTON
-            : "-m-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none")
+            : "-m-1 flex size-8 cursor-pointer items-center justify-center rounded-full text-text-muted transition-colors hover:bg-elevated hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
         }
       >
-        {glyph ?? (
-          <MoreHorizontal
-            className={header ? HEADER_ICON : "size-5"}
-            aria-hidden="true"
-          />
-        )}
+        <MoreHorizontal
+          className={header ? HEADER_ICON : "size-5"}
+          aria-hidden="true"
+        />
       </button>
 
       {open && (

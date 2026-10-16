@@ -388,8 +388,9 @@ describe("the PRO mark", () => {
       ],
       ["src/components/players/cosmetic-shop.tsx", /<ProMark \/> to wear/],
       ["src/components/marketing/pricing.tsx", /See <ProMark \/>/],
-      ["src/app/profile/customize/page.tsx", /a cardflare <ProMark \/> feature\./],
-      ["src/app/profile/customize/page.tsx", /Get <ProMark \/>\s*<\/Link>/],
+      /* Customize is a tab of Edit profile now; its Pro line went with it. */
+      ["src/app/profile/edit/page.tsx", /a cardflare <ProMark \/> feature\./],
+      ["src/app/profile/edit/page.tsx", /Get <ProMark \/>\s*<\/Link>/],
       ["src/app/pro/page.tsx", /You are on <ProMark \/>/],
       ["src/app/pro/page.tsx", /<ProMark \/> is for player accounts/],
       ["src/app/pro/page.tsx", /<ProMark \/> goes on top of it/],
@@ -413,7 +414,7 @@ describe("the PRO mark", () => {
       "src/components/trades/history.tsx",
       "src/components/players/cosmetic-shop.tsx",
       "src/components/marketing/pricing.tsx",
-      "src/app/profile/customize/page.tsx",
+      "src/app/profile/edit/page.tsx",
       "src/app/profile/settings/settings-content.tsx",
     ]) {
       const source = code(read(path));
