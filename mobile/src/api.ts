@@ -3852,6 +3852,8 @@ export type FeedSection =
   | "people"
   /* Posts by people near you that you do not follow: Nearby's heart. */
   | "around"
+  /* Real posts in a new player's games, while their Feed is new. */
+  | "popular"
   | "walkin"
   | "nearby"
   | "store";
@@ -3863,6 +3865,7 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   yours: "Your flares",
   people: "People you follow",
   around: "Flares near you",
+  popular: "Popular in your games",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -3941,6 +3944,8 @@ export type FeedItem =
         ring: string | null;
         aura: string | null;
         answers: number;
+        /** Why they are here when they answer none of your wants. */
+        note?: string | null;
       }[];
     }
   | {
@@ -3967,6 +3972,9 @@ export type FeedItem =
       postedAt?: string;
       /** How far away, or null when either side has no position. */
       milesAway?: number | null;
+      /** A suggested post for a new player, with why: "Popular in One
+          Piece". Drawn as a "Suggested" label in the header. */
+      suggested?: string | null;
       storeId?: string | null;
       /** What the poster will do for it: the Trade and Cash chips. */
       acceptsTrade?: boolean;

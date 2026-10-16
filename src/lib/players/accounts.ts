@@ -1,5 +1,6 @@
 import "server-only";
 
+import { followWelcomeAccount } from "./welcome-follow";
 import type { User } from "@supabase/supabase-js";
 
 import { ensureAuthUser } from "@/lib/auth/provision";
@@ -110,6 +111,10 @@ export async function claimPendingPlayerInvite(user: User): Promise<void> {
     .from("player_invites")
     .update({ accepted_at: new Date().toISOString(), accepted_by: user.id })
     .eq("id", invite.id);
+
+  /* Once per account: the invite is accepted now, so this never runs
+     again for it (welcome-follow.ts). */
+  await followWelcomeAccount(user.id);
 }
 
 /**

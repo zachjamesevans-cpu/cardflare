@@ -283,8 +283,11 @@ export function Item({
               </p>
               <p className="text-xs text-text-muted">
                 {/* Always "wants": the list is plural even when the
-                    overlap with it is one card. */}
-                has {person.answers} of your wants
+                    overlap with it is one card. None at all, and the
+                    server says why they are here instead. */}
+                {person.answers === 0 && person.note
+                  ? person.note
+                  : `has ${person.answers} of your wants`}
               </p>
             </div>
             <Link

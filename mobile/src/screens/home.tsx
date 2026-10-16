@@ -1295,7 +1295,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                           </Text>
                           {/* Always "wants": the list is plural even when the
                           overlap with it is one card. */}
-                          <Muted>{`has ${person.answers} of your wants`}</Muted>
+                          <Muted>
+                            {person.answers === 0 && person.note
+                              ? person.note
+                              : `has ${person.answers} of your wants`}
+                          </Muted>
                         </View>
                       </Tap>
                     ))}
@@ -2020,3 +2024,4 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
     </>
   );
 }
+

@@ -73,7 +73,7 @@ describe("Flares near you, from the server", () => {
 
   it("files posts by people near you that you do not follow under around", () => {
     expect(repo).toContain(
-      'return item.yours ? "yours" : item.around ? "around" : "people";',
+      'item.around\n          ? "around"',
     );
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(

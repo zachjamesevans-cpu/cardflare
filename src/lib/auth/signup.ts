@@ -1,5 +1,6 @@
 import "server-only";
 
+import { followWelcomeAccount } from "@/lib/players/welcome-follow";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { createPlayerWithFreeName } from "@/lib/players/accounts";
 
@@ -79,6 +80,9 @@ export async function openSignup(
     console.error("Could not create the player at sign-up", playerError);
     return { ok: false, reason: "failed" };
   }
+
+  /* Somebody in their Feed on day one: the founder (welcome-follow.ts). */
+  await followWelcomeAccount(created.user.id);
 
   return { ok: true };
 }
