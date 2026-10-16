@@ -73,7 +73,8 @@ export function ProfileHeader({
   onFollowers?: () => void;
   onFollowing?: () => void;
   /** The button row: edit and share, or follow and share. */
-  actions: ReactNode;
+  /** The row of buttons under the name; none draws no row at all. */
+  actions?: ReactNode;
 }) {
   return (
     <View style={{ gap: spacing(2.5) }}>
@@ -152,7 +153,9 @@ export function ProfileHeader({
         <OrganizerChips stores={organizerAt} />
       </View>
 
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>{actions}</View>
+      {actions ? (
+        <View style={{ flexDirection: "row", gap: spacing(2) }}>{actions}</View>
+      ) : null}
     </View>
   );
 }

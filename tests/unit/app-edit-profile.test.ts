@@ -84,7 +84,13 @@ describe("Edit profile, the app's screen", () => {
     expect(app).not.toContain("BACK_LABELS");
     expect(app).not.toContain("headerBackTitle");
     expect(profile).toContain('navigation.navigate("EditProfile")');
-    expect(profile).toContain('label="Edit profile"');
+    /* In the wand's menu and on your picture now, not a button under
+       the name - the founder: "we can move the large 'edit profile'
+       button elsewhere. maybe adding it into the wand icon". */
+    expect(profile).toContain('label: "Edit profile",');
+    expect(profile).toMatch(
+      /<Tap\s+onPress=\{\(\) => navigation\.navigate\("EditProfile"\)\}\s+accessibilityLabel="Edit profile"/,
+    );
   });
 
   it("has taken the name and handle out of Settings and the in-place editor off the tab", () => {

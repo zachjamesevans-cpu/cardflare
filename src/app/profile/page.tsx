@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flame, Settings, Store, Wand2 } from "lucide-react";
+import { ChevronRight, Flame, Settings } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
@@ -12,6 +12,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PROFILE_BLOCK, ProfileHeader } from "@/components/players/profile-header";
 import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileTabs } from "@/components/players/profile-tabs";
+import { ProfileWandMenu } from "@/components/players/profile-wand-menu";
 import { Tour } from "@/components/onboarding/tour";
 import { profileTabFrom } from "@/lib/players/profile-tabs";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
@@ -206,25 +207,11 @@ export default async function ProfilePage({
                   title={`${profile.displayName} on cardflare`}
                 />
               </span>
-              <Link
-                href="/profile/customize"
-                data-tour="profile:wand"
-                title="Customize"
-                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
-              >
-                <Wand2 className="size-5" aria-hidden="true" />
-                <span className="sr-only">Customize your profile</span>
-              </Link>
-              {/* The Embers shop: a tab until the strip went to three. The
-                  app puts it behind the wand; a link beside it here. */}
-              <Link
-                href="/profile/store"
-                title="Embers shop"
-                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
-              >
-                <Store className="size-5" aria-hidden="true" />
-                <span className="sr-only">Embers shop</span>
-              </Link>
+              {/* Edit profile, Customize and the Embers shop, behind the
+                  one wand (ProfileWandMenu) - the app's menu. */}
+              <span data-tour="profile:wand" className="flex">
+                <ProfileWandMenu />
+              </span>
               <Link
                 href="/profile/settings"
                 title="Settings"
@@ -241,17 +228,21 @@ export default async function ProfilePage({
             <div className="relative mt-16">
               <ProfileHeader
                 avatar={
-                  <PlayerAvatar
-                    displayName={profile.displayName}
-                    seed={profile.playerId}
-                    avatarUrl={profile.avatarUrl}
-                    frame={worn.avatarFrame}
-                    ring={dressed.ring}
-                    aura={dressed.aura}
-                    ringArt={dressedArt.ring}
-                    auraArt={dressedArt.aura}
-                    className="size-20 text-2xl sm:size-24"
-                  />
+                  /* Your picture opens Edit profile, the way Instagram's
+                     does; the wand is the other door. */
+                  <Link href="/profile/edit" aria-label="Edit profile">
+                    <PlayerAvatar
+                      displayName={profile.displayName}
+                      seed={profile.playerId}
+                      avatarUrl={profile.avatarUrl}
+                      frame={worn.avatarFrame}
+                      ring={dressed.ring}
+                      aura={dressed.aura}
+                      ringArt={dressedArt.ring}
+                      auraArt={dressedArt.aura}
+                      className="size-20 text-2xl sm:size-24"
+                    />
+                  </Link>
                 }
                 name={profile.displayName}
                 handle={profile.handle}
@@ -275,16 +266,6 @@ export default async function ProfilePage({
                     />
                   ),
                 }}
-                actions={
-                  <>
-                    <Link
-                      href="/profile/edit"
-                      className={cn(buttonStyles("secondary", "sm"), "flex-1")}
-                    >
-                      Edit profile
-                    </Link>
-                  </>
-                }
               />
             </div>
 

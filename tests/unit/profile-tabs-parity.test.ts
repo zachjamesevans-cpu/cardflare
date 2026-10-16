@@ -403,7 +403,7 @@ describe("the cog is back top right", () => {
   it("sits beside Share and the wand on the own profile, and is not a tab", () => {
     inOrder(
       web.ownProfile,
-      ["<ShareProfileButton", "<Wand2", '<Settings className="size-5"'],
+      ["<ShareProfileButton", "<ProfileWandMenu", '<Settings className="size-5"'],
       "web own",
     );
     expect(web.ownProfile).toContain('href="/profile/settings"');

@@ -85,8 +85,8 @@ export function ProfileHeader({
   pronouns?: string | null;
   /** The lines under the handle, breaks kept, up to four. Nothing when null. */
   bio?: string | null;
-  /** The button row: edit and share, or follow and share. */
-  actions: ReactNode;
+  /** The button row: follow and share. None draws no row at all. */
+  actions?: ReactNode;
 }) {
   const tile = (value: number, label: string) => (
     <span className={STACK}>
@@ -180,7 +180,7 @@ export function ProfileHeader({
         )}
       </div>
 
-      <div className="flex w-full items-center gap-2">{actions}</div>
+      {actions && <div className="flex w-full items-center gap-2">{actions}</div>}
     </div>
   );
 }
