@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, Flame, Settings } from "lucide-react";
+import { ChevronRight, Flame, Settings, Store, Wand2 } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AddShowcaseForm } from "@/components/players/add-showcase-form";
@@ -12,7 +12,6 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PROFILE_BLOCK, ProfileHeader } from "@/components/players/profile-header";
 import { ProfileFlares } from "@/components/players/profile-flares";
 import { ProfileTabs } from "@/components/players/profile-tabs";
-import { ProfileWandMenu } from "@/components/players/profile-wand-menu";
 import { Tour } from "@/components/onboarding/tour";
 import { profileTabFrom } from "@/lib/players/profile-tabs";
 import { ShareProfileButton } from "@/components/players/share-profile-button";
@@ -207,11 +206,28 @@ export default async function ProfilePage({
                   title={`${profile.displayName} on cardflare`}
                 />
               </span>
-              {/* Edit profile, Customize and the Embers shop, behind the
-                  one wand (ProfileWandMenu) - the app's menu. */}
-              <span data-tour="profile:wand" className="flex">
-                <ProfileWandMenu />
-              </span>
+              {/* The Embers shop, its own icon - the founder: "the embers
+                  shop should be its own icon along with the top right
+                  icons on profile". */}
+              <Link
+                href="/profile/store"
+                title="Embers shop"
+                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <Store className="size-5" aria-hidden="true" />
+                <span className="sr-only">Embers shop</span>
+              </Link>
+              {/* The wand: Edit profile, which holds what you wear now
+                  (its Look and Showcase tabs). */}
+              <Link
+                href="/profile/edit"
+                data-tour="profile:wand"
+                title="Edit profile"
+                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
+              >
+                <Wand2 className="size-5" aria-hidden="true" />
+                <span className="sr-only">Edit profile</span>
+              </Link>
               <Link
                 href="/profile/settings"
                 title="Settings"

@@ -1,100 +1,18 @@
-import type { Metadata } from "next";
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Wand2 } from "lucide-react";
-
-import { CustomizeHub } from "@/components/players/customize-hub";
-import { ProMark } from "@/components/stores/ultra-mark";
-import { BackLink } from "@/components/ui/back-link";
-import { getViewer } from "@/lib/auth/session";
-import { playerForUser } from "@/lib/players/accounts";
-import { customizeSections, equipArea, EQUIP_AREAS } from "@/lib/players/equips";
-
-export const metadata: Metadata = {
-  title: "Customize",
-  robots: { index: false, follow: false },
-};
-
-export const dynamic = "force-dynamic";
-
-const AREA_COPY = {
-  profile: {
-    title: "Customize profile",
-    blurb:
-      "Everything worn on you: your border, name style, title, badge and page effect. Changes land the moment you tap them.",
-    other: { area: "showcase", label: "Showcase cosmetics" },
-  },
-  showcase: {
-    title: "Customize showcase",
-    blurb:
-      "Everything worn on your cards: borders, foils, motion and the shelf behind them. Changes land the moment you tap them.",
-    other: { area: "profile", label: "Profile cosmetics" },
-  },
-} as const;
 
 /**
- * Getting dressed lives HERE now, not in the store. The store sells;
- * this wears. Split into two menus, profile and showcase, so neither
- * is a wall - the founder's call: "a separate one for showcase so the
- * menu isn't too crowded." One wand on the profile opens this page and
- * the header link here swaps menus. Unreleased cosmetics
- * appear only for an account whose admin grant reaches them, and wear
- * exactly like live ones so they can be judged on a real profile.
+ * Customize is a tab of Edit profile now (Look, and Showcase): the
+ * founder, "move the edit profile button into the wand, they do the
+ * exact same thing basically. like combine them". This address stays so
+ * every old link lands in the right place.
  */
 export default async function CustomizePage({
   searchParams,
 }: {
   searchParams: Promise<{ area?: string }>;
 }) {
-  const viewer = await getViewer();
-  if (viewer.kind === "anonymous") redirect("/login?next=/profile/customize");
-
-  const playerId =
-    viewer.kind === "player"
-      ? viewer.playerId
-      : ((await playerForUser(viewer.user.id))?.id ?? null);
-  if (!playerId) redirect("/profile/settings");
-
-  const area = equipArea((await searchParams).area);
-  const copy = AREA_COPY[area];
-  const kinds = EQUIP_AREAS[area];
-
-  const { sections, customizationAllowed } = await customizeSections(playerId);
-  const shown = sections.filter((section) =>
-    (kinds as readonly string[]).includes(section.kind),
-  );
-
-  return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-col gap-2">
-          <BackLink href="/profile" />
-          <h1 className="text-2xl font-bold text-text-primary">{copy.title}</h1>
-          <p className="text-sm text-text-secondary">{copy.blurb}</p>
-          {/* Honest before anything is tapped: browsing is free, wearing
-              is Pro. The door is /pro, which sells it where it can. */}
-          {!customizationAllowed && (
-            <p className="rounded-[var(--radius-control)] border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-semibold text-accent">
-              Wearing cosmetics is a cardflare <ProMark /> feature.{" "}
-              <Link href="/pro" className="underline underline-offset-4">
-                Get <ProMark />
-              </Link>
-              , and everything you equip shows here too.
-            </p>
-          )}
-        </div>
-        {/* The other menu, and only that. The Embers store's door is on
-            the profile; a second one here made this page a shop front. */}
-        <Link
-          href={`/profile/customize?area=${copy.other.area}`}
-          className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-elevated px-4 py-2 text-sm font-semibold text-text-primary transition-colors hover:border-border-strong"
-        >
-          <Wand2 className="size-4" aria-hidden="true" />
-          {copy.other.label}
-        </Link>
-      </div>
-
-      <CustomizeHub sections={shown} />
-    </main>
+  const { area } = await searchParams;
+  redirect(
+    area === "showcase" ? "/profile/edit?tab=showcase" : "/profile/edit?tab=look",
   );
 }

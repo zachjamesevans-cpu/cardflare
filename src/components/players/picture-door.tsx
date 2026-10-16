@@ -36,7 +36,7 @@ export function PictureDoor({
       <div className="flex items-start justify-center gap-5">
         {open ? editor : picture}
         <Link
-          href="/profile/customize"
+          href="/profile/edit?tab=look"
           title="Avatar effects"
           className="flex size-24 shrink-0 items-center justify-center rounded-full border border-dashed border-border-strong bg-elevated/60 text-text-secondary transition-colors hover:border-accent hover:text-text-primary"
         >

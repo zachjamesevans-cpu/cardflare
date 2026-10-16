@@ -107,7 +107,10 @@ export const TOURS: Record<TourId, readonly TourStop[]> = {
       key: "share",
       line: "Send anyone a link to your profile. Open a binder to share just that one.",
     },
-    { key: "wand", line: "Make it yours: rings, auras and more from the Embers shop." },
+    {
+      key: "wand",
+      line: "Edit your profile and what you wear: rings, auras, name styles and more.",
+    },
     { key: "tabs", line: "Your Flares, hunts and trades, all in one place." },
   ],
   /* No "open to trades" stop: a signed-in player meets that switch in

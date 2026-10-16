@@ -51,7 +51,8 @@ describe("Edit profile, the app's screen", () => {
   });
 
   it("puts the effects circle beside the picture and one link under them", () => {
-    expect(screen).toContain('navigation.navigate("Customize", { area: "profile" })');
+    /* The wand circle opens the Look tab of this same screen now. */
+    expect(screen).toContain('onPress={() => setTab("look")}');
     expect(screen).toContain('name="color-wand"');
     expect(screen).toContain("Edit picture or avatar");
     /* The cover stays reachable from that same door. */
@@ -77,7 +78,9 @@ describe("Edit profile, the app's screen", () => {
   });
 
   it("is a stack screen titled Edit profile, with the plain back chevron", () => {
-    expect(app).toContain("EditProfile: undefined;");
+    expect(app).toContain(
+      'EditProfile: { tab?: import("./src/screens/edit-profile").EditTab } | undefined;',
+    );
     expect(app).toContain('name="EditProfile"');
     expect(app).toContain('title: "Edit profile"');
     /* Round 16: back is a chevron with no words, on every screen. */
@@ -87,7 +90,9 @@ describe("Edit profile, the app's screen", () => {
     /* In the wand's menu and on your picture now, not a button under
        the name - the founder: "we can move the large 'edit profile'
        button elsewhere. maybe adding it into the wand icon". */
-    expect(profile).toContain('label: "Edit profile",');
+    expect(profile).toMatch(
+      /icon="color-wand"\s+label="Edit profile"\s+onPress=\{\(\) => navigation\.navigate\("EditProfile"\)\}/,
+    );
     expect(profile).toMatch(
       /<Tap\s+onPress=\{\(\) => navigation\.navigate\("EditProfile"\)\}\s+accessibilityLabel="Edit profile"/,
     );

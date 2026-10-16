@@ -31,5 +31,5 @@ export async function equipCosmeticAction(formData: FormData): Promise<void> {
   await setEquip(playerId, kind, slug || null);
 
   revalidatePath("/profile");
-  revalidatePath("/profile/customize");
+  revalidatePath("/profile/edit");
 }
