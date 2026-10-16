@@ -6,9 +6,6 @@ import {
   MapPin,
   PackageCheck,
   Sparkles,
-  CheckCircle2,
-  ChevronRight,
-  Circle,
 } from "lucide-react";
 
 import { agoFrom, FlareFeedCard } from "@/components/feed/flare-feed-card";
@@ -27,13 +24,6 @@ import { WantedSummaryCard } from "@/components/nearby/wanted-summary";
 import { Card } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import type { FeedItem } from "@/lib/feed/repository";
-import {
-  FIRST_STEPS,
-  FIRST_STEPS_FOLLOWS,
-  FIRST_STEPS_TITLE,
-  firstStepsCount,
-  type FirstStep,
-} from "@/lib/onboarding/intro";
 
 /**
  * What one item of the Feed looks like.
@@ -114,14 +104,6 @@ const STARTERS = {
   },
 } as const;
 
-/** Where each first step is done, on the website. */
-const STEP_HREF: Record<FirstStep, string> = {
-  post: "/flare",
-  follow: "/search",
-  binder: "/profile",
-  where: "/profile/settings/privacy",
-};
-
 export function Item({
   item,
   view = "classic",
@@ -152,63 +134,6 @@ export function Item({
             {item.linkLabel}
           </Link>
         )}
-      </Card>
-    );
-  }
-
-  /* A new player's checklist (onboarding/intro.ts, FIRST_STEPS). */
-  if (item.kind === "steps") {
-    const count = FIRST_STEPS.filter((step) => item.done[step.key]).length;
-    return (
-      <Card className="flex flex-col gap-3 p-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <p className="font-semibold text-text-primary">{FIRST_STEPS_TITLE}</p>
-          <p className="text-xs text-text-muted">{firstStepsCount(count)}</p>
-        </div>
-        <ul className="flex flex-col divide-y divide-border">
-          {FIRST_STEPS.map((step) => {
-            const done = item.done[step.key];
-            const label =
-              step.key === "follow" && !done
-                ? `${step.label} (${Math.min(item.following, FIRST_STEPS_FOLLOWS)}/${FIRST_STEPS_FOLLOWS})`
-                : step.label;
-            return (
-              <li key={step.key}>
-                <Link
-                  href={STEP_HREF[step.key]}
-                  className="flex items-center gap-3 py-2.5 text-sm hover:text-accent"
-                >
-                  {done ? (
-                    <CheckCircle2
-                      className="size-5 shrink-0 text-accent"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Circle
-                      className="size-5 shrink-0 text-text-muted"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <span
-                    className={
-                      done
-                        ? "flex-1 text-text-muted line-through"
-                        : "flex-1 font-medium text-text-primary"
-                    }
-                  >
-                    {label}
-                  </span>
-                  {!done && (
-                    <ChevronRight
-                      className="size-4 text-text-muted"
-                      aria-hidden="true"
-                    />
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
       </Card>
     );
   }

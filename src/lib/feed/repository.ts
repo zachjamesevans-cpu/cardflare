@@ -24,8 +24,6 @@ import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { listPlayerGames } from "@/lib/players/games";
 import { TCG_GAMES, type GameSlug } from "@/lib/players/games-catalog";
-import { FIRST_STEPS_FOLLOWS, type FirstStep } from "@/lib/onboarding/intro";
-import { postalCodeForPlayer } from "@/lib/players/location";
 import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
 import { goingStates } from "@/lib/events/going";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
@@ -499,17 +497,6 @@ export interface SuggestionItem {
  * It carries its own expiry in the database, so it leaves without
  * anybody remembering to take it down.
  */
-/**
- * "Your first steps": a new player's checklist at the top of the Feed,
- * ticking itself off (onboarding/intro.ts says which steps and why).
- */
-export interface StepsItem {
-  kind: "steps";
-  done: Record<FirstStep, boolean>;
-  /** How many players they follow, for "Follow 3 players". */
-  following: number;
-}
-
 export interface AnnouncementItem {
   kind: "announcement";
   id: string;
@@ -859,8 +846,7 @@ export type FeedItem =
   | ShopItem
   | NearbyStoresItem
   | SuggestionItem
-  | StartItem
-  | StepsItem;
+  | StartItem;
 
 /**
  * What the reader has to spend.
@@ -899,8 +885,6 @@ export type FeedSection =
   | "around"
   /* Real posts in a new player's games, while their Feed is new. */
   | "popular"
-  /* A new player's checklist, at the top. */
-  | "steps"
   | "walkin"
   | "nearby"
   | "store";
@@ -913,7 +897,6 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   people: "People you follow",
   around: "Flares near you",
   popular: "Popular in your games",
-  steps: "Get started",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -928,8 +911,6 @@ function sectionFor(item: FeedItem): FeedSection {
     case "board":
     case "start":
       return "tonight";
-    case "steps":
-      return "steps";
     /*
      * A night on the calendar is news; a shop that merely accepts
      * walk-ins is a place.
@@ -1028,8 +1009,6 @@ function reasonFor(item: FeedItem): string {
       return "Yours to spend Embers on";
     case "start":
       return "The Feed cannot answer this one for you";
-    case "steps":
-      return "New here: a few things to try";
   }
 }
 
@@ -1127,7 +1106,6 @@ export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
   if (
     section === "people" ||
     section === "popular" ||
-    section === "steps" ||
     section === "store" ||
     item.kind === "announcement" ||
     item.kind === "storePost"
@@ -2445,33 +2423,6 @@ async function nearbyAuthorsFor(
   return out;
 }
 
-/**
- * A new player's checklist, or nothing: past two weeks, or every step
- * done. Each step read from what the server already keeps.
- */
-async function stepsItem(
-  playerId: string,
-  following: number,
-  posted: boolean,
-): Promise<StepsItem[]> {
-  const admin = getSupabaseAdmin();
-  const [{ data: viewer }, { data: binders }, postal] = await Promise.all([
-    admin.from("players").select("created_at").eq("id", playerId).maybeSingle(),
-    admin.from("binders").select("id").eq("player_id", playerId).limit(1),
-    postalCodeForPlayer(playerId),
-  ]);
-  /* Only an account known to be new: no date is no checklist. */
-  if (!viewer?.created_at || viewer.created_at < since(NEW_PLAYER_DAYS)) return [];
-  const done: Record<FirstStep, boolean> = {
-    post: posted,
-    follow: following >= FIRST_STEPS_FOLLOWS,
-    binder: (binders ?? []).length > 0,
-    where: Boolean(postal),
-  };
-  if (Object.values(done).every(Boolean)) return [];
-  return [{ kind: "steps", done, following }];
-}
-
 /** How long a new player's Feed is topped up with suggested posts. */
 const NEW_PLAYER_DAYS = 14;
 /** How many players' posts, at most: a taste, not a takeover. */
@@ -3158,16 +3109,6 @@ export async function listFeed(
         }))
       : [];
 
-  /* The checklist: posted is any want saved or Flare of theirs up. */
-  const steps = await stepsItem(
-    playerId,
-    followed.size,
-    wants.length > 0 || areaHunts.some((hunt) => hunt.yours),
-  ).catch((caught) => {
-    console.error("Could not read the first steps", caught);
-    return [] as StepsItem[];
-  });
-
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -3311,8 +3252,6 @@ export async function listFeed(
     ...wantedFromYou,
     /* Flares near you, newest first: the heart of the Nearby tab. */
     ...byPostedAt<HuntItem>(aroundHunts),
-    /* A new player's checklist, first on the Following tab. */
-    ...steps,
     ...notices.map((notice): AnnouncementItem => ({
       kind: "announcement",
       id: notice.id,

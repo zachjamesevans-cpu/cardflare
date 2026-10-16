@@ -145,33 +145,6 @@ export const TOUR_DONE = "Got it";
 /** One line in Help for every tour, rather than one per tour. */
 export const REPLAY_TIPS_LABEL = "Replay tips";
 
-/*
- * YOUR FIRST STEPS: a checklist at the top of a new player's Feed that
- * ticks itself off. The founder, asking for things "waiting for them"
- * when they first sign up, then "build it all". Every step is one the
- * server can see done - sharing a binder is not recorded anywhere, so
- * it is not a step; where you play is. Gone when all four are done, or
- * when the account is two weeks old.
- */
-export type FirstStep = "post" | "follow" | "binder" | "where";
-
-export const FIRST_STEPS_TITLE = "Your first steps";
-
-export const FIRST_STEPS: readonly { key: FirstStep; label: string }[] = [
-  { key: "post", label: "Post your first Flare" },
-  { key: "follow", label: "Follow 3 players" },
-  { key: "binder", label: "Make a binder" },
-  { key: "where", label: "Set where you play" },
-];
-
-/** Follows that complete the "follow" step. */
-export const FIRST_STEPS_FOLLOWS = 3;
-
-/** "2 of 4 done" */
-export function firstStepsCount(done: number): string {
-  return `${done} of ${FIRST_STEPS.length} done`;
-}
-
 /** "1 of 3" */
 export function tourCount(at: number, total: number = PROFILE_TOUR.length): string {
   return `${at + 1} of ${total}`;

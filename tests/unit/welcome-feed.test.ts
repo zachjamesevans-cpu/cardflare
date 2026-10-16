@@ -3,12 +3,6 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  FIRST_STEPS,
-  FIRST_STEPS_FOLLOWS,
-  firstStepsCount,
-} from "../../src/lib/onboarding/intro";
-
 /**
  * A new player's Feed has things waiting in it. The founder: "i think we
  * need something that populates into someones feed when they first sign
@@ -79,30 +73,18 @@ describe("a new player's Feed is topped up with real posts", () => {
   });
 });
 
-describe("your first steps", () => {
-  it("are four, each one the server can see done", () => {
-    expect(FIRST_STEPS.map((step) => step.key)).toEqual([
-      "post",
-      "follow",
-      "binder",
-      "where",
-    ]);
-    expect(FIRST_STEPS_FOLLOWS).toBe(3);
-    expect(firstStepsCount(2)).toBe("2 of 4 done");
-  });
-
-  it("go away when all are done or the account is two weeks old", () => {
-    const repo = read("src/lib/feed/repository.ts");
-    expect(repo).toContain("if (Object.values(done).every(Boolean)) return [];");
-    expect(repo).toMatch(
-      /async function stepsItem[\s\S]*?viewer\.created_at < since\(NEW_PLAYER_DAYS\)/,
-    );
-  });
-
-  it("are drawn on both platforms", () => {
-    expect(read("src/components/feed/feed-items.tsx")).toContain(
-      'if (item.kind === "steps") {',
-    );
-    expect(read("mobile/src/screens/home.tsx")).toContain("<FirstStepsCard");
+/* "let's remove the 'your first steps' stuff altogether. I like the
+   little tutorials but giving ppl a checklist early on is kinda silly." */
+describe("no first-steps checklist", () => {
+  it("is on neither platform", () => {
+    for (const file of [
+      "src/lib/feed/repository.ts",
+      "src/components/feed/feed-items.tsx",
+      "mobile/src/screens/home.tsx",
+      "src/lib/onboarding/intro.ts",
+    ]) {
+      expect(read(file), file).not.toContain("FIRST_STEPS");
+      expect(read(file), file).not.toContain('kind: "steps"');
+    }
   });
 });

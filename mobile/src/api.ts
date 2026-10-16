@@ -3854,8 +3854,6 @@ export type FeedSection =
   | "around"
   /* Real posts in a new player's games, while their Feed is new. */
   | "popular"
-  /* A new player's checklist, at the top. */
-  | "steps"
   | "walkin"
   | "nearby"
   | "store";
@@ -3868,7 +3866,6 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   people: "People you follow",
   around: "Flares near you",
   popular: "Popular in your games",
-  steps: "Get started",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -3893,12 +3890,6 @@ export type FeedItem =
   | {
       kind: "start";
       topic: "store" | "deck";
-    }
-  /** A new player's checklist, ticking itself off (intro-copy.ts). */
-  | {
-      kind: "steps";
-      done: Record<import("./intro-copy").FirstStep, boolean>;
-      following: number;
     }
   | {
       kind: "board";
