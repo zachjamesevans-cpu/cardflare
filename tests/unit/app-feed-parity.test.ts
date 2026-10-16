@@ -48,6 +48,8 @@ const KINDS = [
   "shop",
   "suggest",
   "start",
+  /* A new player's checklist (welcome-feed.test.ts). */
+  "steps",
 ];
 
 describe("the Feed's items", () => {

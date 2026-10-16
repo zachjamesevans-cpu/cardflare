@@ -294,6 +294,16 @@ export function FlareFeedCard({
                     Your Flare
                   </span>
                 )}
+                {/* Not somebody you follow: a new player's suggestion,
+                    with why in its title ("Popular in One Piece"). */}
+                {item.suggested && !item.yours && (
+                  <span
+                    title={item.suggested}
+                    className="shrink-0 rounded-full border border-accent/40 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-accent uppercase"
+                  >
+                    Suggested
+                  </span>
+                )}
               </Link>
               <span className="shrink-0 text-[13px] text-text-muted">
                 · {agoFrom(item.postedAt)}

@@ -482,6 +482,27 @@ export function FlareFeedCard({
                     YOUR FLARE
                   </Text>
                 ) : null}
+                {/* Not somebody you follow: a new player's suggestion
+                    ("Popular in One Piece", read out by VoiceOver). */}
+                {item.suggested && !item.yours ? (
+                  <Text
+                    accessibilityLabel={`Suggested: ${item.suggested}`}
+                    style={{
+                      color: colors.accent,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 0.6,
+                      borderWidth: 1,
+                      borderColor: colors.accent,
+                      borderRadius: 999,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    SUGGESTED
+                  </Text>
+                ) : null}
                 {/* When and how far, on the name's line the way Instagram
                     writes "name • 2h": it used to be a column of its own
                     at the right, which left the status line too narrow

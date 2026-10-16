@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,6 +12,13 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+import {
+  FIRST_STEPS,
+  FIRST_STEPS_FOLLOWS,
+  FIRST_STEPS_TITLE,
+  firstStepsCount,
+  type FirstStep,
+} from "../intro-copy";
 import { Tour, useTourTarget } from "../tour";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -1166,6 +1173,12 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                       />
                     ) : null}
                   </Card>
+                ) : item.kind === "steps" ? (
+                  <FirstStepsCard
+                    key={`steps-${index}`}
+                    done={item.done}
+                    following={item.following}
+                  />
                 ) : item.kind === "start" ? (
                   <Card key={`start-${index}`}>
                     <View
@@ -1295,7 +1308,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                           </Text>
                           {/* Always "wants": the list is plural even when the
                           overlap with it is one card. */}
-                          <Muted>{`has ${person.answers} of your wants`}</Muted>
+                          <Muted>
+                            {person.answers === 0 && person.note
+                              ? person.note
+                              : `has ${person.answers} of your wants`}
+                          </Muted>
                         </View>
                       </Tap>
                     ))}
@@ -2018,5 +2035,86 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
           carry it off before it is read. */}
       <UndoToast offer={undo} onDismiss={dismissUndo} bottom={tabInset + spacing(2)} />
     </>
+  );
+}
+
+/**
+ * A new player's checklist (intro-copy.ts, FIRST_STEPS): each row goes
+ * to where the step is done, and ticks itself off once it is. The
+ * website draws the same (components/feed/feed-items.tsx).
+ */
+function FirstStepsCard({
+  done,
+  following,
+}: {
+  done: Record<FirstStep, boolean>;
+  following: number;
+}) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const go = (step: FirstStep) => {
+    const nav = navigation as unknown as {
+      navigate: (name: string, params?: object) => void;
+    };
+    if (step === "post") nav.navigate("Tabs", { screen: "Flare" });
+    else if (step === "follow") nav.navigate("Tabs", { screen: "Search" });
+    else if (step === "binder") nav.navigate("Tabs", { screen: "Profile" });
+    else nav.navigate("Settings", { section: "privacy" });
+  };
+  const count = FIRST_STEPS.filter((step) => done[step.key]).length;
+  return (
+    <Card>
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+        }}
+      >
+        <Title>{FIRST_STEPS_TITLE}</Title>
+        <Muted>{firstStepsCount(count)}</Muted>
+      </View>
+      {FIRST_STEPS.map((step) => {
+        const ticked = done[step.key];
+        const label =
+          step.key === "follow" && !ticked
+            ? `${step.label} (${Math.min(following, FIRST_STEPS_FOLLOWS)}/${FIRST_STEPS_FOLLOWS})`
+            : step.label;
+        return (
+          <Tap
+            key={step.key}
+            onPress={() => go(step.key)}
+            accessibilityLabel={ticked ? `${label}, done` : label}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: spacing(3),
+              paddingVertical: spacing(2),
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+            }}
+          >
+            <Ionicons
+              name={ticked ? "checkmark-circle" : "ellipse-outline"}
+              size={22}
+              color={ticked ? colors.accent : colors.textMuted}
+            />
+            <Text
+              style={{
+                flex: 1,
+                fontSize: 15,
+                color: ticked ? colors.textMuted : colors.textPrimary,
+                fontWeight: ticked ? "400" : "600",
+                textDecorationLine: ticked ? "line-through" : "none",
+              }}
+            >
+              {label}
+            </Text>
+            {ticked ? null : (
+              <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+            )}
+          </Tap>
+        );
+      })}
+    </Card>
   );
 }

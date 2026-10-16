@@ -22,6 +22,10 @@ import { listBinder } from "@/lib/lists/repository";
 import { sessionsForPlayers } from "@/lib/players/accounts";
 import { avatarWearFor } from "@/lib/players/equips";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
+import { listPlayerGames } from "@/lib/players/games";
+import { TCG_GAMES, type GameSlug } from "@/lib/players/games-catalog";
+import { FIRST_STEPS_FOLLOWS, type FirstStep } from "@/lib/onboarding/intro";
+import { postalCodeForPlayer } from "@/lib/players/location";
 import { listFollowing, type FollowedPlayer } from "@/lib/players/follows";
 import { goingStates } from "@/lib/events/going";
 import { listLocals, listOpenStores, type LocalStore } from "@/lib/players/locals";
@@ -412,6 +416,15 @@ export interface HuntItem {
    * a kinda flares near me vibe".
    */
   around?: boolean;
+  /**
+   * A post from somebody you do not follow, shown to a new player so the
+   * Feed is not empty on day one, with why: "Popular in One Piece". The
+   * founder: "i think we need something that populates into someones
+   * feed when they first sign up so that things are waiting for them."
+   * Real posts by real players - never made up - so an offer on one
+   * reaches a person. Drawn with a "Suggested" label in the header.
+   */
+  suggested?: string | null;
 }
 
 /**
@@ -466,6 +479,9 @@ export interface SuggestionItem {
     aura: string | null;
     /** How many cards on your want list they are carrying. */
     answers: number;
+    /** Said instead when they answer none of your wants: why they are
+        here at all, "Active in One Piece" for a new player. */
+    note?: string | null;
   }[];
 }
 
@@ -483,6 +499,17 @@ export interface SuggestionItem {
  * It carries its own expiry in the database, so it leaves without
  * anybody remembering to take it down.
  */
+/**
+ * "Your first steps": a new player's checklist at the top of the Feed,
+ * ticking itself off (onboarding/intro.ts says which steps and why).
+ */
+export interface StepsItem {
+  kind: "steps";
+  done: Record<FirstStep, boolean>;
+  /** How many players they follow, for "Follow 3 players". */
+  following: number;
+}
+
 export interface AnnouncementItem {
   kind: "announcement";
   id: string;
@@ -832,7 +859,8 @@ export type FeedItem =
   | ShopItem
   | NearbyStoresItem
   | SuggestionItem
-  | StartItem;
+  | StartItem
+  | StepsItem;
 
 /**
  * What the reader has to spend.
@@ -869,6 +897,10 @@ export type FeedSection =
   /* Posts by people near you that you do not follow: the Nearby tab's
      "Flares near me". */
   | "around"
+  /* Real posts in a new player's games, while their Feed is new. */
+  | "popular"
+  /* A new player's checklist, at the top. */
+  | "steps"
   | "walkin"
   | "nearby"
   | "store";
@@ -880,6 +912,8 @@ export const SECTION_TITLES: Record<FeedSection, string> = {
   yours: "Your flares",
   people: "People you follow",
   around: "Flares near you",
+  popular: "Popular in your games",
+  steps: "Get started",
   walkin: "Where you play",
   nearby: "Nearby stores",
   store: "New in the store",
@@ -894,6 +928,8 @@ function sectionFor(item: FeedItem): FeedSection {
     case "board":
     case "start":
       return "tonight";
+    case "steps":
+      return "steps";
     /*
      * A night on the calendar is news; a shop that merely accepts
      * walk-ins is a place.
@@ -912,7 +948,13 @@ function sectionFor(item: FeedItem): FeedSection {
     case "hunt":
       /* Your own post is not news about somebody else; a post from
          somebody near you that you do not follow is the Nearby tab's. */
-      return item.yours ? "yours" : item.around ? "around" : "people";
+      return item.yours
+        ? "yours"
+        : item.around
+          ? "around"
+          : item.suggested
+            ? "popular"
+            : "people";
     /* A shop you follow, under the same heading as the people you
        follow: it is the same relationship, and the founder's whole
        point was that following a store should read like following a
@@ -959,6 +1001,7 @@ function reasonFor(item: FeedItem): string {
          line between cards - the founder: "do not interrupt the feed
          with separate text between cards." */
       if (item.around) return "Near you";
+      if (item.suggested) return item.suggested;
       return item.yours ? "Your Flare" : "Because you follow them";
     case "added":
       return "Because you follow them";
@@ -985,6 +1028,8 @@ function reasonFor(item: FeedItem): string {
       return "Yours to spend Embers on";
     case "start":
       return "The Feed cannot answer this one for you";
+    case "steps":
+      return "New here: a few things to try";
   }
 }
 
@@ -1081,6 +1126,8 @@ export function tabFor(item: FeedItem, section: FeedSection): FeedTab {
   if (item.kind === "start" && item.topic === "deck") return "following";
   if (
     section === "people" ||
+    section === "popular" ||
+    section === "steps" ||
     section === "store" ||
     item.kind === "announcement" ||
     item.kind === "storePost"
@@ -2398,6 +2445,134 @@ async function nearbyAuthorsFor(
   return out;
 }
 
+/**
+ * A new player's checklist, or nothing: past two weeks, or every step
+ * done. Each step read from what the server already keeps.
+ */
+async function stepsItem(
+  playerId: string,
+  following: number,
+  posted: boolean,
+): Promise<StepsItem[]> {
+  const admin = getSupabaseAdmin();
+  const [{ data: viewer }, { data: binders }, postal] = await Promise.all([
+    admin.from("players").select("created_at").eq("id", playerId).maybeSingle(),
+    admin.from("binders").select("id").eq("player_id", playerId).limit(1),
+    postalCodeForPlayer(playerId),
+  ]);
+  /* Only an account known to be new: no date is no checklist. */
+  if (!viewer?.created_at || viewer.created_at < since(NEW_PLAYER_DAYS)) return [];
+  const done: Record<FirstStep, boolean> = {
+    post: posted,
+    follow: following >= FIRST_STEPS_FOLLOWS,
+    binder: (binders ?? []).length > 0,
+    where: Boolean(postal),
+  };
+  if (Object.values(done).every(Boolean)) return [];
+  return [{ kind: "steps", done, following }];
+}
+
+/** How long a new player's Feed is topped up with suggested posts. */
+const NEW_PLAYER_DAYS = 14;
+/** How many players' posts, at most: a taste, not a takeover. */
+const POPULAR_AUTHORS = 4;
+
+/**
+ * The most active posters in a new player's games, for "Popular in One
+ * Piece" while their Feed is new - the founder: "something that
+ * populates into someones feed when they first sign up so that things
+ * are waiting for them." Real players and their real posts, ranked by
+ * how many Flares they have up this month; nobody followed, blocked, or
+ * the viewer. Nothing once the account is two weeks old, or for an
+ * account that follows enough people to fill the Feed itself.
+ */
+async function popularAuthorsFor(
+  viewerId: string,
+  exclude: Set<string>,
+): Promise<{ authors: Map<string, FollowedPlayer>; label: string }> {
+  const none = { authors: new Map<string, FollowedPlayer>(), label: "" };
+  const admin = getSupabaseAdmin();
+  const { data: viewer } = await admin
+    .from("players")
+    .select("created_at")
+    .eq("id", viewerId)
+    .maybeSingle();
+  if (!viewer?.created_at || viewer.created_at < since(NEW_PLAYER_DAYS)) return none;
+  /* Following a handful already (the founder, plus a few): their Feed
+     has people in it, and suggestions would crowd them. */
+  if (exclude.size > 4) return none;
+
+  const games = await listPlayerGames(viewerId);
+  const [{ data: rows }, blocked] = await Promise.all([
+    admin
+      .from("flares")
+      .select("player_id, card_id")
+      .not("player_id", "is", null)
+      .is("event_id", null)
+      .eq("status", "open")
+      .in("intent", ["want", "showcase"])
+      .gte("created_at", since(FLARE_DAYS))
+      .order("created_at", { ascending: false })
+      .limit(RECENT_READ * 3),
+    blockedSet(viewerId),
+  ]);
+  const usable = (rows ?? []).filter((row) => {
+    const id = row.player_id as string | null;
+    return id && id !== viewerId && !exclude.has(id) && !blocked.has(id);
+  });
+  if (usable.length === 0) return none;
+
+  /* In their games, when they named any. */
+  let inGames = usable;
+  if (games.length > 0) {
+    const { data: cards } = await admin
+      .from("cards")
+      .select("id, game")
+      .in("id", [...new Set(usable.map((row) => row.card_id as string))]);
+    const gameOf = new Map((cards ?? []).map((card) => [card.id, card.game]));
+    inGames = usable.filter((row) =>
+      games.includes(gameOf.get(row.card_id as string) as GameSlug),
+    );
+  }
+
+  const count = new Map<string, number>();
+  for (const row of inGames) {
+    const id = row.player_id as string;
+    count.set(id, (count.get(id) ?? 0) + 1);
+  }
+  const ids = [...count.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, POPULAR_AUTHORS)
+    .map(([id]) => id);
+  if (ids.length === 0) return none;
+
+  const [{ data: players }, faces] = await Promise.all([
+    admin.from("players").select("id, display_name").in("id", ids),
+    facesFor(ids),
+  ]);
+  const authors = new Map<string, FollowedPlayer>();
+  for (const player of players ?? []) {
+    if (!player.display_name) continue;
+    const face = faces.get(player.id);
+    authors.set(player.id, {
+      playerId: player.id,
+      displayName: player.display_name,
+      avatarUrl: face?.avatarUrl ?? null,
+      frame: face?.frame ?? null,
+      ring: face?.ring ?? null,
+      aura: face?.aura ?? null,
+      ringArt: null,
+      auraArt: null,
+      partners: false,
+    });
+  }
+  const name =
+    games.length === 1
+      ? TCG_GAMES.find((game) => game.slug === games[0])?.shortName
+      : null;
+  return { authors, label: name ? `Popular in ${name}` : "Popular on cardflare" };
+}
+
 async function viewerAsAuthor(playerId: string): Promise<FollowedPlayer | null> {
   const [{ data }, faces] = await Promise.all([
     getSupabaseAdmin()
@@ -2965,6 +3140,34 @@ export async function listFeed(
     .filter((hunt) => hunt.milesAway !== null && hunt.milesAway <= reach)
     .map((hunt) => ({ ...hunt, around: true }));
 
+  /* A new player's first two weeks: real posts in their games, so the
+     Feed has something in it before they follow anybody. */
+  /* A suggestion never takes the Feed down: a failed read is no
+     suggestions, and the rest of the Feed draws as it always did. */
+  const popular = await popularAuthorsFor(playerId, new Set(followed.keys())).catch(
+    (caught) => {
+      console.error("Could not read the popular players", caught);
+      return { authors: new Map<string, FollowedPlayer>(), label: "" };
+    },
+  );
+  const popularHunts =
+    popular.authors.size > 0
+      ? (await areaHuntsFor(popular.authors, playerId, held, origin)).map((hunt) => ({
+          ...hunt,
+          suggested: popular.label,
+        }))
+      : [];
+
+  /* The checklist: posted is any want saved or Flare of theirs up. */
+  const steps = await stepsItem(
+    playerId,
+    followed.size,
+    wants.length > 0 || areaHunts.some((hunt) => hunt.yours),
+  ).catch((caught) => {
+    console.error("Could not read the first steps", caught);
+    return [] as StepsItem[];
+  });
+
   /* A Flare names the session that posted it; the follow list names accounts.
      This is the bridge, and it is one query rather than one per person. */
   const playerBySession = await sessionsForPlayers([...followed.keys()]);
@@ -3035,7 +3238,7 @@ export async function listFeed(
      twice under two different headings. */
   const shown = new Set([...live, ...elsewhere].map((local) => local.storeId));
 
-  const [traded, added, suggested, recent, pack, shop, nearbyStores, storePosts] =
+  const [traded, added, matched, recent, pack, shop, nearbyStores, storePosts] =
     await Promise.all([
       tradedItems(locals.map((local) => local.storeId)),
       addedItems(followed, playerBySession, wanted),
@@ -3046,6 +3249,27 @@ export async function listFeed(
       nearbyStoreItems(playerId, locals, device),
       storePostItems(playerId, sessionId),
     ]);
+
+  /* Nobody answers their wants yet - a new player's usual case - so the
+     players behind the suggested posts are offered to follow instead. */
+  const suggested: SuggestionItem[] =
+    matched.length > 0 || popular.authors.size === 0
+      ? matched
+      : [
+          {
+            kind: "suggest",
+            players: [...popular.authors.values()].map((person) => ({
+              playerId: person.playerId,
+              displayName: person.displayName,
+              avatarUrl: person.avatarUrl,
+              frame: person.frame,
+              ring: person.ring,
+              aura: person.aura,
+              answers: 0,
+              note: popular.label.replace("Popular", "Active"),
+            })),
+          },
+        ];
 
   /* The lead item, and the one that needs nothing from anybody else
      having posted this week. See wantedItems. */
@@ -3087,6 +3311,8 @@ export async function listFeed(
     ...wantedFromYou,
     /* Flares near you, newest first: the heart of the Nearby tab. */
     ...byPostedAt<HuntItem>(aroundHunts),
+    /* A new player's checklist, first on the Following tab. */
+    ...steps,
     ...notices.map((notice): AnnouncementItem => ({
       kind: "announcement",
       id: notice.id,
@@ -3115,6 +3341,9 @@ export async function listFeed(
         ...recent.map(asPost).filter((item): item is HuntItem => item.kind === "hunt"),
       ]),
     ),
+    /* Then, for a new player, the suggested posts: below everything they
+       follow, so a real follow always leads. */
+    ...byPostedAt<HuntItem>(popularHunts),
     ...boards.filter((item) => item.kind === "board" && item.yours),
     ...upcoming.filter((item) => item.nextEventAt !== null),
     ...starters,
