@@ -58,6 +58,8 @@ interface LookModule {
     send: (kind: string, slug: string | null) => Promise<unknown>,
   ) => Promise<boolean>;
   wearPending: <P extends Wearer>(profile: P, pending: Pending | null) => P;
+  lookLanded: (round: number) => void;
+  lookState: () => { pending: Pending | null; failed: string | null; settled: number };
 }
 const LOOK_PATH = "../../mobile/src/look-save";
 const loadLook = () => import(/* @vite-ignore */ LOOK_PATH) as Promise<LookModule>;
@@ -107,6 +109,26 @@ describe("the app saves a look behind Done", () => {
     expect(send).toHaveBeenCalledTimes(2);
   });
 
+  it("keeps a saved look on until the profile's re-read lands", async () => {
+    const look = await loadLook();
+    expect(await look.saveLook({ ring: "ring-gold" }, {}, async () => {})).toBe(true);
+    /* Saved, but the profile has not read it back yet: still worn. */
+    const { settled, pending } = look.lookState();
+    expect(pending?.equips.ring).toBe("ring-gold");
+    look.lookLanded(settled - 1);
+    expect(look.lookState().pending).not.toBeNull();
+    look.lookLanded(settled);
+    expect(look.lookState().pending).toBeNull();
+  });
+
+  it("drops a look that did not save at once, so the old one is back", async () => {
+    const look = await loadLook();
+    await look.saveLook({ ring: "ring-gold" }, {}, async () => {
+      throw new Error("offline");
+    });
+    expect(look.lookState().pending).toBeNull();
+  });
+
   it("names Pro when the server refuses for that", async () => {
     const look = await loadLook();
     const send = vi.fn().mockRejectedValue(new FakeApiError("not-pro"));
@@ -152,6 +174,7 @@ describe("the app's screens", () => {
   it("wears the pending look on the profile and reads again when it settles", () => {
     expect(profile).toContain("wearPending(loaded, look.pending)");
     expect(profile).toContain("setMessage(look.failed);");
+    expect(profile).toContain("void load().then(() => lookLanded(round));");
   });
 });
 

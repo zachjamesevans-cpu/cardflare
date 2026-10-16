@@ -24,6 +24,7 @@ import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Animated,
   AppState,
+  LogBox,
   Pressable,
   ScrollView,
   Text,
@@ -61,7 +62,7 @@ import { ReplayIntro } from "./src/intro";
 import { queueSpotlight } from "./src/spotlight";
 import { queueTours } from "./src/tour";
 import { keepNavigation, takeNavigation } from "./src/backdrop";
-import { takeQueuedShot } from "./src/demo/demo-mode";
+import { demoOn, demoReady, takeQueuedShot } from "./src/demo/demo-mode";
 import { FlareComposer } from "./src/screens/flare-composer";
 import { LocalScreen } from "./src/screens/local";
 import { NightMatchesScreen } from "./src/screens/night-matches";
@@ -1027,6 +1028,10 @@ function AppGates() {
           /* Demo mode's queued shot, development builds only: launch
              straight onto one screen of the shot list. */
           if (__DEV__) {
+            /* A shoot is filmed: no yellow warning box over the take. */
+            void demoReady().then(() => {
+              if (demoOn()) LogBox.ignoreAllLogs(true);
+            });
             void takeQueuedShot().then((index) => {
               const shot = index === null ? undefined : SHOTS[index];
               if (shot) setTimeout(() => shot.go(navigationRef as never), 600);

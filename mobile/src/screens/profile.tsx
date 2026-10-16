@@ -55,7 +55,7 @@ import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares, stillWanted } from "../profile-flares";
 import { HeaderButton } from "../header";
-import { clearLookMessage, usePendingLook, wearPending } from "../look-save";
+import { clearLookMessage, lookLanded, usePendingLook, wearPending } from "../look-save";
 import { ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { ProfileTour, useTourTarget } from "../tour";
 import { HuntsPanel } from "../hunts-panel";
@@ -324,15 +324,20 @@ export function ProfileScreen() {
     profileRef.current = profile;
   }, [profile]);
 
-  /* A look save settled: read the truth, and say so if it did not take. */
+  /* A look save settled: read the truth. The saved look stays on until
+     that read lands, so the old one never shows in between. */
   useEffect(() => {
     if (look.settled === 0) return;
-    void load();
-    if (look.failed) {
-      setMessage(look.failed);
-      clearLookMessage();
-    }
-  }, [look.settled, look.failed, load]);
+    const round = look.settled;
+    void load().then(() => lookLanded(round));
+  }, [look.settled, load]);
+
+  /* And say so if it did not take. */
+  useEffect(() => {
+    if (!look.failed) return;
+    setMessage(look.failed);
+    clearLookMessage();
+  }, [look.failed]);
 
   useFocusEffect(
     useCallback(() => {

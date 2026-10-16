@@ -38,7 +38,7 @@ export const SHOTS: Shot[] = [
   },
   {
     title: "2. You have this",
-    tip: "On Maya's Straw Hat Crew post, tap the Luffy (green ring).",
+    tip: "On Kaito's Base set grails post, tap the Umbreon (green ring).",
     go: (nav) => nav.navigate("Tabs", { screen: "Feed", params: { tab: "following" } }),
   },
   {
@@ -149,6 +149,26 @@ export const SHOTS: Shot[] = [
       void queueTours();
       nav.navigate("Tabs", { screen: "Profile" });
     },
+  },
+  {
+    title: "21. Your look",
+    tip: "Edit profile's Look tab: the preview wearing your ring, the chips, what you own. Tap a ring to show it changing.",
+    go: (nav) => nav.navigate("EditProfile", { tab: "look" }),
+  },
+  {
+    title: "22. Your showcase",
+    tip: "Edit profile's Showcase tab: your first card dressed in its border and holo.",
+    go: (nav) => nav.navigate("EditProfile", { tab: "showcase" }),
+  },
+  {
+    title: "23. The Embers shop",
+    tip: "The shop behind the storefront icon on your profile.",
+    go: (nav) => nav.navigate("Store"),
+  },
+  {
+    title: "24. Kaito's post",
+    tip: "Base set grails, opened: the Umbreon you have, ringed in green.",
+    go: (nav) => nav.navigate("FlarePost", { postId: postId("kaito-vintage") }),
   },
 ];
 
