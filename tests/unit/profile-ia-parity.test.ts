@@ -206,7 +206,7 @@ describe("the profile page, top to bottom, on both platforms", () => {
        a screen, not a section, so it is not a tab. */
     expect(web.ownProfile).toContain('title="Settings"');
     expect(web.ownProfile).toContain("<ShareProfileButton");
-    expect(web.ownProfile).toContain("<Wand2");
+    expect(web.ownProfile).toContain("<ProfileWandMenu");
     expect(app.ownProfile).toContain('"settings-outline"');
   });
 

@@ -56,7 +56,7 @@ import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares, stillWanted } from "../profile-flares";
 import { ActionSheet, type ActionItem } from "../action-menu";
 import { HeaderButton } from "../header";
-import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import { ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { ProfileTour, useTourTarget } from "../tour";
 import { HuntsPanel } from "../hunts-panel";
 import {
@@ -952,6 +952,20 @@ export function ProfileScreen() {
             label="Customize and Embers shop"
             onPress={() =>
               setWandMenu([
+                /*
+                 * Edit profile lives here now, first. The founder: "we can
+                 * move the large 'edit profile' button elsewhere. maybe
+                 * adding it into the wand icon ... it would be nice to have
+                 * a little more space on this screen considering not
+                 * everyone is going to use that edit profile button very
+                 * often." Your picture opens it too.
+                 */
+                {
+                  key: "edit",
+                  label: "Edit profile",
+                  icon: "person-circle-outline",
+                  onPress: () => navigation.navigate("EditProfile"),
+                },
                 {
                   key: "customize",
                   label: "Customize your look",
@@ -995,6 +1009,12 @@ export function ProfileScreen() {
         <View style={{ marginTop: HEADER_TOP, paddingHorizontal: PROFILE_INSET }}>
           <ProfileHeader
             avatar={
+              /* Your own picture opens Edit profile, the way Instagram's
+                 does - one of its two doors now (the wand is the other). */
+              <Tap
+                onPress={() => navigation.navigate("EditProfile")}
+                accessibilityLabel="Edit profile"
+              >
               <PlayerAvatar
                 displayName={profile.displayName}
                 seed={profile.playerId}
@@ -1006,6 +1026,7 @@ export function ProfileScreen() {
                 auraArt={profile.wear?.auraArt ?? null}
                 size={88}
               />
+              </Tap>
             }
             name={profile.displayName}
             handle={profile.handle}
@@ -1017,16 +1038,6 @@ export function ProfileScreen() {
             organizerAt={profile.organizerAt}
             onFollowers={() => setPeople("followers")}
             onFollowing={() => setPeople("following")}
-            actions={
-              <>
-                {/* Instagram's button, to Instagram's screen: picture,
-                    effects, name, username, pronouns and bio, in rows. */}
-                <ProfileActionButton
-                  label="Edit profile"
-                  onPress={() => navigation.navigate("EditProfile")}
-                />
-              </>
-            }
           />
         </View>
 
