@@ -131,6 +131,8 @@ export function PrintingSheet({
                   <img
                     src={printing.imageUrl}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     className="size-full object-contain"
                   />
                 )}

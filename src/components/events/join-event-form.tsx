@@ -13,7 +13,7 @@ import {
   DISPLAY_NAME_MAX,
   JOIN_PLAYER_IDLE,
   type JoinPlayerState,
-} from "@/lib/players/schema";
+} from "@/lib/players/name-rules";
 
 function SubmitButton({ label }: { label: string }) {
   const { pending } = useFormStatus();

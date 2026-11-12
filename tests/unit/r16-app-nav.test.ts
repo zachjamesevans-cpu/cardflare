@@ -101,11 +101,11 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     );
     /* Asked again on every tab change, foreground and arriving push. */
     expect(
-      app.match(/void refreshUnreadMessages\(\);/g)?.length,
+      app.match(/void refreshUnreadMessages\((\{ throttle: true \})?\);/g)?.length,
     ).toBeGreaterThanOrEqual(4);
     expect(messages).toContain("const { threads } = await listLocalThreads();");
     expect(messages).toContain("setUnreadMessages(totalUnread(threads))");
-    expect(messages).toContain("onSignedOut(() => setUnreadMessages(0));");
+    expect(messages).toContain("onSignedOut(() => {\n  setUnreadMessages(0);");
   });
 
   it("the Inbox is a stack screen, and every door to it and to Messages moved", () => {

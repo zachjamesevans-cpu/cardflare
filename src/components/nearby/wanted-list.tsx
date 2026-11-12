@@ -56,6 +56,8 @@ export function WantedGrid({
                     <img
                       src={group.card.imageUrl}
                       alt={cardImageAlt(group.card.cardName, group.card.cardNumber)}
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-contain"
                     />
                   )}

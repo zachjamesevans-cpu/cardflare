@@ -161,14 +161,14 @@ describe("Block sits behind the three dots on somebody else's post", () => {
     expect(confirm).toContain("`Block ${name}?`");
     expect(confirm).toContain(question);
     expect(confirm).toContain('text: "Keep", style: "cancel"');
-    expect(confirm).toContain('text: "Block", style: "destructive"');
+    expect(confirm).toMatch(/text: "Block",\s+style: "destructive"/);
   });
 
   it("blocks, drops their posts at once, and says so the way a take-down does", () => {
     const after = between(
       src.home,
-      "const blockNow = async (playerId: string) => {",
-      "};",
+      "const blockNow = useCallback(",
+      "const block = useCallback(",
     );
     expect(after).toContain("await blockPlayer(playerId);");
     expect(after).toContain('entry.kind === "hunt" && entry.playerId === playerId');

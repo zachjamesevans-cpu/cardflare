@@ -8,6 +8,7 @@ import type { Worn } from "@/components/players/worn";
 import { cn } from "@/lib/cn";
 import { formatHandle } from "@/lib/players/handle";
 import type { ProfileStats } from "@/lib/players/stats";
+import { tradePartnersLine } from "@/lib/trades/partner-rules";
 
 /**
  * The top of a profile, laid out the way Instagram lays one out.
@@ -88,6 +89,7 @@ export function ProfileHeader({
   /** The button row: follow and share. None draws no row at all. */
   actions?: ReactNode;
 }) {
+  const traded = tradePartnersLine(stats.tradePartners);
   const tile = (value: number, label: string) => (
     <span className={STACK}>
       <span className="text-lg font-bold text-text-primary tabular-nums">
@@ -158,6 +160,11 @@ export function ProfileHeader({
         {bio && (
           <p className="text-sm whitespace-pre-line text-text-secondary">{bio}</p>
         )}
+        {/* "Traded with 7 players": people, not trades, and only once
+            there is one. Under the bio, not a fourth number: the three
+            numbers are the founder's Instagram row. The app draws the
+            same line in the same place. */}
+        {traded && <p className="text-sm text-text-muted">{traded}</p>}
         {organizerAt.length > 0 && (
           <ul
             className="flex flex-wrap items-center gap-1.5 pt-1"

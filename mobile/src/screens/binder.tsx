@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -63,6 +63,7 @@ import { BinderAddSheet } from "../binder-add-sheet";
 import { BinderCover } from "../binder-cover";
 import { BINDER_COVERS, BINDER_LAYOUT } from "../binder-covers";
 import { BINDER_OFFER_COPY, binderOfferSentLine } from "../binder-offer-copy";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { nightSharedLine } from "../night-binder-copy";
 import { binderShareUrl } from "../config";
 import { inYourOfferLine } from "../offer-copy";
@@ -84,6 +85,7 @@ import {
   pocketLabel,
   type Geometry,
 } from "../pockets";
+import { sameShallow } from "../quiet-refresh";
 import { RemoteImage } from "../remote-image";
 import { CHECK_NOW, pagesWaitingLine } from "../scan-copy";
 import { colors, gutter, radius, spacing } from "../theme";
@@ -284,25 +286,78 @@ export function BinderScreen({
     setReviewing(false);
   }, [id]);
 
+  /*
+   * THE BINDER AS LAST SEEN, PAINTED AT ONCE (src/cache.ts).
+   *
+   * The screen opened on a spinner every time, for pages that are the
+   * same pages as the last visit nine times in ten. Now the last copy
+   * is drawn straight away and the fresh read lands over it, the way
+   * the Feed's does. Kept by the binder's id (and the night it was
+   * read through, which can show a binder its own switch would not),
+   * under the signed-in player's id, so the next account on this phone
+   * never reads it; sign-out sweeps the lot.
+   *
+   * A paint and nothing more: until the fresh read has landed
+   * (`confirmed`) no card can be picked up, so a move is never worked
+   * out from pockets that may have changed.
+   */
+  const cacheKey = id ? `${id}${nightId ? `.night.${nightId}` : ""}` : "";
+  /* The binder a fresh read has painted, so a slow disk read never
+     paints an older copy over it. */
+  const freshFor = useRef<string | null>(null);
+  const [confirmed, setConfirmed] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cacheKey) return;
+    let live = true;
+    void (async () => {
+      const viewer = await cachedPlayerId();
+      if (!viewer) return;
+      const cached = await readCache<Binder>("binder", viewer, cacheKey);
+      if (
+        live &&
+        cached &&
+        Array.isArray(cached.cards) &&
+        freshFor.current !== cacheKey
+      ) {
+        setBinder((current) => current ?? cached);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [cacheKey]);
+
   const load = useCallback(async () => {
     if (!id) return;
     try {
       const { binder: fresh } = nightId
         ? await getBroughtBinder(playerId, id, nightId)
         : await getBinder(playerId, id);
+      freshFor.current = cacheKey;
+      setConfirmed(cacheKey);
       setBinder(fresh);
       setError(null);
+      const viewer = await cachedPlayerId();
+      if (viewer) void writeCache("binder", viewer, fresh, cacheKey);
     } catch (caught) {
       /* By id alone (a share link) a binder that is not up for trade
          is a plain 404, which reads the same as "private" here. */
-      setError(
+      const closed =
         caught instanceof ApiError &&
-          (caught.code === "private" || caught.code === "not-found")
-          ? "private"
-          : friendlyError(caught),
-      );
+        (caught.code === "private" || caught.code === "not-found");
+      setError(closed ? "private" : friendlyError(caught));
+      if (closed) {
+        /* Not ours to look at any more: a copy that was only ever the
+           last visit's paint leaves the screen, and the phone forgets
+           it either way. A read that failed for any other reason keeps
+           what is on screen. */
+        if (freshFor.current !== cacheKey) setBinder(null);
+        const viewer = await cachedPlayerId();
+        if (viewer) void writeCache("binder", viewer, null, cacheKey);
+      }
     }
-  }, [id, playerId, nightId]);
+  }, [id, playerId, nightId, cacheKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -439,12 +494,17 @@ export function BinderScreen({
   );
   /* A visitor's "On your hunts" packs the matches page by page from
      the first pocket: gaps are the owner's, not a filter's. */
-  const cards =
-    filter === "hunts"
-      ? allCards
-          .filter((card) => card.onYourHunt)
-          .map((card, index) => ({ ...card, pocket: index }))
-      : allCards;
+  /* Memoised: the filtered list is new objects, and a page that is
+     handed the same cards does not draw again (see BinderPage). */
+  const cards = useMemo(
+    () =>
+      filter === "hunts"
+        ? allCards
+            .filter((card) => card.onYourHunt)
+            .map((card, index) => ({ ...card, pocket: index }))
+        : allCards,
+    [allCards, filter],
+  );
 
   const geometry = useMemo(() => geometryFor(pageWidth), [pageWidth]);
 
@@ -480,14 +540,41 @@ export function BinderScreen({
   const pageWidthRef = useRef(pageWidth);
   pageWidthRef.current = pageWidth;
 
+  /*
+   * WHICH PAGES ARE DRAWN. A binder holds up to two hundred cards, and
+   * every page of them was mounted the moment the screen opened: each
+   * pocket a picture and a layout animation, for pages nobody had
+   * turned to. Now a page is drawn when it is the one open or next to
+   * it, and stays drawn once it has been (so turning back is instant
+   * and nothing is thrown away); the rest hold their place in the pager
+   * as an empty box of the same width. `reach` is told by a turn and by
+   * the pager's own scroll, so the page coming in under a thumb is
+   * already there.
+   */
+  const opened = useRef<Set<number>>(new Set([0, 1]));
+  const [, setOpenedCount] = useState(2);
+  const reach = useCallback((index: number) => {
+    let grew = false;
+    for (const near of [index - 1, index, index + 1]) {
+      if (near >= 0 && !opened.current.has(near)) {
+        opened.current.add(near);
+        grew = true;
+      }
+    }
+    if (grew) setOpenedCount(opened.current.size);
+  }, []);
+
   const turnTo = (index: number) => {
     const next = clamp(index, 0, pageCountRef.current - 1);
     setPage(next);
+    reach(next);
     pager.current?.scrollTo({ x: next * pageWidthRef.current, animated: true });
   };
 
   const drag = useDragToPocket({
-    enabled: yours,
+    /* Only the owner, and only once the fresh read has landed: a card
+       is never moved on the strength of the last visit's paint. */
+    enabled: yours && confirmed === cacheKey,
     cards: allCards,
     geometry,
     page,
@@ -528,6 +615,22 @@ export function BinderScreen({
     if (pageWidth <= 0) return;
     const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
     setPage(clamp(index, 0, pageCount - 1));
+    reach(clamp(index, 0, pageCount - 1));
+    thumbOnPager.current = false;
+  };
+  /* While a thumb moves the pager: the page nearest it, and so the one
+     beyond it, is drawn before it can come into view. Not while the
+     screen is turning the pages itself (a jump to a far page after an
+     add): that would draw every page it passes in the middle of the
+     slide, and `turnTo` has already drawn where it is going. */
+  const thumbOnPager = useRef(false);
+  const onPagerDrag = () => {
+    thumbOnPager.current = true;
+  };
+  const onPagerScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (pageWidth <= 0 || !thumbOnPager.current) return;
+    const index = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    reach(clamp(index, 0, pageCount - 1));
   };
 
   /* Whole points: a fractional width would put a fraction of a point
@@ -539,6 +642,101 @@ export function BinderScreen({
     const width = Math.floor(event.nativeEvent.layout.width);
     if (width !== pageWidth) setPageWidth(width);
   };
+
+  /*
+   * The send, for the viewer and for the review under the pockets
+   * alike: every pick in one call, the entry standing where a Flare
+   * stands in the Flare viewer. It answers what the review expects of
+   * a Flare's door (everything taken, since the server takes all or
+   * nothing) and keeps the conversation for Open chat.
+   *
+   * These, the shelf and the offer are hooks, up here above the early
+   * return, so each is the same object from one render to the next
+   * unless what it is made of changed: a page handed the same shelf and
+   * the same offer does not draw again when a held card moves over
+   * another pocket (see BinderPage).
+   */
+  const ownerName = binder?.ownerName ?? "";
+  const ownId = binder?.id ?? "";
+  const sendOffer = useCallback(
+    async (items: OfferItem[], note: string): Promise<OfferOutcome> => {
+      const result = await offerOnBinder(
+        writeId,
+        items.map((item) => ({ entryId: item.flareId, quantity: item.quantity })),
+        note.trim() || null,
+        nightId ?? null,
+      );
+      lastSent.current = { threadId: result.threadId };
+      return { offered: items.length, refused: [] };
+    },
+    [writeId, nightId],
+  );
+  /* Once the send has landed and whatever it was sent from is gone:
+     the picks go, and the sentence the website says, with the way to
+     the conversation it went into. */
+  const afterSend = useCallback(() => {
+    setPicks({});
+    const threadId = lastSent.current?.threadId;
+    Alert.alert(binderOfferSentLine(ownerName), undefined, [
+      ...(threadId
+        ? [
+            {
+              text: "Open chat",
+              onPress: () => navigation.navigate("LocalThread", { threadId }),
+            },
+          ]
+        : []),
+      { text: "OK", style: "cancel" as const },
+    ]);
+  }, [ownerName, navigation]);
+  const haveOf = useCallback(
+    (card: BinderCard): ZoomHave | null =>
+      offering
+        ? {
+            postId: ownId,
+            posterName: ownerName,
+            flareId: card.entryId,
+            name: card.name,
+            state: "open",
+            youOffered: false,
+            remaining: card.quantity,
+            onOffer: sendOffer,
+            verb: "want",
+            failure: binderOfferError,
+            onSent: afterSend,
+          }
+        : null,
+    [offering, ownId, ownerName, sendOffer, afterSend],
+  );
+  const offer = useMemo(
+    () => (offering ? { picks, onPicks: setPicks, haveOf } : null),
+    [offering, picks, haveOf],
+  );
+
+  /* The whole binder is one shelf in the viewer, in pocket order, so a
+     swipe in the large view walks every card, not just this page's nine. */
+  const shelf: ZoomCard[] = useMemo(
+    () =>
+      cards.map((card) => ({
+        imageUrl: card.imageUrl,
+        name: card.name,
+        cardNumber: card.number,
+        caption: card.printingLabel,
+        note: card.note,
+        direction: "showcase",
+        have: haveOf(card),
+      })),
+    [cards, haveOf],
+  );
+  const shelfAt = useMemo(
+    () => new Map(cards.map((card, index) => [card.entryId, index])),
+    [cards],
+  );
+  /* The "+" in an empty pocket, the same door for every page. */
+  const onAdd = useCallback((pocket: number) => {
+    setNotice(null);
+    setAddAt(pocket);
+  }, []);
 
   if (!binder) {
     return (
@@ -587,72 +785,6 @@ export function BinderScreen({
     void Share.share({ message: url, url }).catch(() => {});
   };
 
-  /*
-   * The send, for the viewer and for the review under the pockets
-   * alike: every pick in one call, the entry standing where a Flare
-   * stands in the Flare viewer. It answers what the review expects of
-   * a Flare's door (everything taken, since the server takes all or
-   * nothing) and keeps the conversation for Open chat.
-   */
-  const ownerName = binder.ownerName;
-  const sendOffer = async (items: OfferItem[], note: string): Promise<OfferOutcome> => {
-    const result = await offerOnBinder(
-      writeId,
-      items.map((item) => ({ entryId: item.flareId, quantity: item.quantity })),
-      note.trim() || null,
-      nightId ?? null,
-    );
-    lastSent.current = { threadId: result.threadId };
-    return { offered: items.length, refused: [] };
-  };
-  /* Once the send has landed and whatever it was sent from is gone:
-     the picks go, and the sentence the website says, with the way to
-     the conversation it went into. */
-  const afterSend = () => {
-    setPicks({});
-    const threadId = lastSent.current?.threadId;
-    Alert.alert(binderOfferSentLine(ownerName), undefined, [
-      ...(threadId
-        ? [
-            {
-              text: "Open chat",
-              onPress: () => navigation.navigate("LocalThread", { threadId }),
-            },
-          ]
-        : []),
-      { text: "OK", style: "cancel" as const },
-    ]);
-  };
-  const haveOf = (card: BinderCard): ZoomHave | null =>
-    offering
-      ? {
-          postId: binder.id,
-          posterName: ownerName,
-          flareId: card.entryId,
-          name: card.name,
-          state: "open",
-          youOffered: false,
-          remaining: card.quantity,
-          onOffer: sendOffer,
-          verb: "want",
-          failure: binderOfferError,
-          onSent: afterSend,
-        }
-      : null;
-  const offer = offering ? { picks, onPicks: setPicks, haveOf } : null;
-
-  /* The whole binder is one shelf in the viewer, in pocket order, so a
-     swipe in the large view walks every card, not just this page's nine. */
-  const shelf: ZoomCard[] = cards.map((card) => ({
-    imageUrl: card.imageUrl,
-    name: card.name,
-    cardNumber: card.number,
-    caption: card.printingLabel,
-    note: card.note,
-    direction: "showcase",
-    have: haveOf(card),
-  }));
-  const shelfAt = new Map(cards.map((card, index) => [card.entryId, index]));
   const inOffer = Object.keys(picks).length;
 
   /* The held card rides with the gesture, not the list: after a drop
@@ -789,26 +921,39 @@ export function BinderScreen({
                 showsHorizontalScrollIndicator={false}
                 scrollEnabled={!drag.held}
                 onMomentumScrollEnd={onPagerEnd}
+                onScrollBeginDrag={onPagerDrag}
+                onScroll={onPagerScroll}
+                scrollEventThrottle={32}
                 style={{ width: pageWidth }}
               >
-                {Array.from({ length: pageCount }, (_, index) => (
-                  <BinderPage
-                    key={index}
-                    page={index}
-                    geometry={geometry}
-                    slots={pageOf(shown, index)}
-                    shelf={shelf}
-                    shelfAt={shelfAt}
-                    yours={yours}
-                    heldId={drag.held?.entryId ?? null}
-                    landing={drag.target !== null && !drag.overRemove}
-                    onAdd={(pocket) => {
-                      setNotice(null);
-                      setAddAt(pocket);
-                    }}
-                    offer={offer}
-                  />
-                ))}
+                {Array.from({ length: pageCount }, (_, index) => {
+                  /* Not turned to yet, and not beside the open page:
+                     its place in the pager, and nothing in it. */
+                  if (!opened.current.has(index) && Math.abs(index - at) > 1) {
+                    return <View key={index} style={{ width: geometry.pageWidth }} />;
+                  }
+                  const slots = pageOf(shown, index);
+                  /* Only the page the held card's outline is on is told
+                     about it, so the others are handed what they had. */
+                  const heldId = drag.held?.entryId ?? null;
+                  const holds =
+                    heldId !== null && slots.some((card) => card?.entryId === heldId);
+                  return (
+                    <BinderPage
+                      key={index}
+                      page={index}
+                      geometry={geometry}
+                      slots={slots}
+                      shelf={shelf}
+                      shelfAt={shelfAt}
+                      yours={yours}
+                      heldId={holds ? heldId : null}
+                      landing={holds && drag.target !== null && !drag.overRemove}
+                      onAdd={onAdd}
+                      offer={offer}
+                    />
+                  );
+                })}
               </ScrollView>
             ) : null}
 
@@ -1056,7 +1201,9 @@ function binderLine(binder: Binder): string {
   }
   /* Shown on the profile but not up for trade: a binder to look at. */
   if (binder.isPublic) {
-    return binder.yours ? "On your profile. Not up for trade." : `${binder.ownerName}'s binder.`;
+    return binder.yours
+      ? "On your profile. Not up for trade."
+      : `${binder.ownerName}'s binder.`;
   }
   /* A visitor sees a private binder only when its owner brought it to
      a night and showed it to that night's attendees. */
@@ -1432,7 +1579,7 @@ function useDragToPocket({
  * card makes the others make way. The frame and the pockets are the
  * shared ones in pockets.tsx; what is in each pocket is this screen's.
  */
-function BinderPage({
+const BinderPage = memo(function BinderPage({
   page,
   geometry,
   slots,
@@ -1501,6 +1648,44 @@ function BinderPage({
       })}
     </PageFrame>
   );
+}, samePage);
+
+/**
+ * Whether a page has anything new to draw. Its nine slots are a fresh
+ * array on every render of the screen, and while a card is held the
+ * ones that made way are fresh objects too, so they are compared by
+ * what they hold; everything else is the same object unless it changed.
+ * A held card moving from one pocket to the next used to draw every
+ * page of the binder again; now it draws the pages whose cards moved.
+ */
+function samePage(
+  before: {
+    page: number;
+    geometry: Geometry;
+    slots: (BinderCard | undefined)[];
+    shelf: ZoomCard[];
+    shelfAt: Map<string, number>;
+    yours: boolean;
+    heldId: string | null;
+    landing: boolean;
+    onAdd: (pocket: number) => void;
+    offer: BinderOffer | null;
+  },
+  after: typeof before,
+): boolean {
+  return (
+    before.page === after.page &&
+    before.geometry === after.geometry &&
+    before.shelf === after.shelf &&
+    before.shelfAt === after.shelfAt &&
+    before.yours === after.yours &&
+    before.heldId === after.heldId &&
+    before.landing === after.landing &&
+    before.onAdd === after.onAdd &&
+    before.offer === after.offer &&
+    before.slots.length === after.slots.length &&
+    before.slots.every((card, index) => sameShallow(card, after.slots[index]))
+  );
 }
 
 /**
@@ -1515,7 +1700,7 @@ function BinderPage({
  * The picture is told the width inside the ring and the pocket clips
  * the rest. A tap is the picture's own press: the card large.
  */
-function BinderPocket({
+const BinderPocket = memo(function BinderPocket({
   card,
   index,
   geometry,
@@ -1594,6 +1779,36 @@ function BinderPocket({
         onPicks={offer?.onPicks}
       />
     </Pocket>
+  );
+}, samePocket);
+
+/** A pocket draws again when its card says something new, not when
+    the same card arrives as a fresh object (a card that made way for a
+    held one is rebuilt on every hover). */
+function samePocket(
+  before: {
+    card: BinderCard;
+    index: number;
+    geometry: Geometry;
+    shelf: ZoomCard[];
+    position: number;
+    yours: boolean;
+    placeholder: boolean;
+    targeted: boolean;
+    offer: BinderOffer | null;
+  },
+  after: typeof before,
+): boolean {
+  return (
+    sameShallow(before.card, after.card) &&
+    before.index === after.index &&
+    before.geometry === after.geometry &&
+    before.shelf === after.shelf &&
+    before.position === after.position &&
+    before.yours === after.yours &&
+    before.placeholder === after.placeholder &&
+    before.targeted === after.targeted &&
+    before.offer === after.offer
   );
 }
 

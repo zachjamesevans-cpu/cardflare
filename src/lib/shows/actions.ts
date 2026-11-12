@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { searchCards } from "@/lib/cards/search";
-import { cardQuerySchema } from "@/lib/cards/schema";
+import { cardQuerySchema } from "@/lib/cards/query-schema";
 import { classifyCode, normalizeJoinCode } from "@/lib/events/join-code";
 import { findShowByJoinCode } from "@/lib/events/repository";
 import { getViewer } from "@/lib/auth/session";

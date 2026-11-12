@@ -121,11 +121,13 @@ describe("the rules", () => {
   });
 
   it("queue every tour for a new player when the intro ends, never for an update", () => {
-    expect(read("mobile/App.tsx")).toContain(
-      'if (end === "look" || end === "post") void queueTours();',
+    /* Every way out of the intro that lands in the app: the composer,
+       the Feed, and the binders. */
+    expect(read("mobile/App.tsx")).toMatch(
+      /if \(end === "look" \|\| end === "post" \|\| end === "binder"\)\s+void queueTours\(\);/,
     );
     const cards = read("src/components/onboarding/intro-cards.tsx");
-    expect(cards.match(/onClick=\{noteTours\}/g)).toHaveLength(3);
+    expect(cards.match(/onClick=\{noteTours\}/g)).toHaveLength(4);
   });
 
   it("pass over a stop with nothing on the screen, quickly", () => {

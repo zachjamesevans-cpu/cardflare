@@ -70,7 +70,7 @@ import {
 import { Pill, type PostTarget } from "../flare-bits";
 
 /**
- * The one composer: select cards, compose, preview, post.
+ * The one composer: select cards, compose, post.
  *
  * The old screen posted one card per press, which is why a deck of
  * fourteen was fourteen posts and the founder asked for "an option
@@ -86,6 +86,12 @@ import { Pill, type PostTarget } from "../flare-bits";
  *
  * The preview IS the Feed's post component with the draft poured in,
  * so what is shown before posting is what will be shown after.
+ *
+ * THE PREVIEW IS OPTIONAL. It used to be a step every post walked
+ * through; now the compose step posts on its own, and "Preview" under
+ * it opens the same look at the post for anyone who wants one. Both
+ * Post buttons run the one `post` below, which refuses to start while
+ * it is already running, so a tap on each cannot make two posts.
  */
 
 /** A card in the tray, with what the poster decided about it. */
@@ -93,7 +99,6 @@ type DraftItem = PickedLine;
 
 /** One line per printing: the picker's rule, src/card-select.tsx. */
 const keyOf = lineKey;
-
 
 /** What is saved between opens. Versioned so an older shape is dropped. */
 interface Draft {
@@ -158,7 +163,7 @@ export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem):
   };
 }
 
-type Step = "select" | "compose" | "preview";
+type Step = "select" | "compose";
 
 export function FlareComposer({
   target,
@@ -427,18 +432,28 @@ export function FlareComposer({
   const setItems = (items: DraftItem[]) => patch({ items });
 
   const copies = draft.items.reduce((sum, item) => sum + item.quantity, 0);
-  const step: Step = previewing
-    ? "preview"
-    : draft.items.length === 0
-      ? "select"
-      : "compose";
+  /* The preview is a look at the compose step, not a step of its own. */
+  const step: Step = draft.items.length === 0 ? "select" : "compose";
   const chosenHunt = draft.hunt;
   const huntName =
     chosenHunt?.kind === "existing"
       ? (hunts.find((hunt) => hunt.id === chosenHunt.id)?.name ?? null)
       : null;
 
+  /*
+   * ONE POST AT A TIME. There are two Post buttons now, the compose
+   * step's and the preview's, and each AsyncButton only knows about its
+   * own tap. The ref is what stops a tap on one, then Preview, then a
+   * tap on the other from sending the same Flare twice; the state is
+   * what holds Preview off while the post is in the air.
+   */
+  const postRunning = useRef(false);
+  const [posting, setPosting] = useState(false);
+
   const post = async () => {
+    if (postRunning.current || draft.items.length === 0) return;
+    postRunning.current = true;
+    setPosting(true);
     setError(null);
     try {
       /* The decided target, never a painted one. */
@@ -537,6 +552,9 @@ export function FlareComposer({
                 ? "Posting isn't switched on yet. The server needs its latest update."
                 : `Could not post the Flare. ${friendlyError(caught)}`,
       );
+    } finally {
+      postRunning.current = false;
+      setPosting(false);
     }
   };
 
@@ -606,6 +624,7 @@ export function FlareComposer({
               huntName={huntName}
               onBack={() => setPreviewing(false)}
               onPost={post}
+              posting={posting}
               error={error}
             />
           ) : (
@@ -643,7 +662,9 @@ export function FlareComposer({
                   accessibilityLabel="Paste a deck list"
                   onPress={() => navigation.navigate("DeckPaste")}
                 >
-                  <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 13 }}>
+                  <Text
+                    style={{ color: colors.accent, fontWeight: "600", fontSize: 13 }}
+                  >
                     Have a whole deck? Paste the list →
                   </Text>
                 </Tap>
@@ -696,7 +717,8 @@ export function FlareComposer({
                                a line already there folds the two into one. */
                             const target = keyOf(next);
                             const twin = draft.items.find(
-                              (entry) => keyOf(entry) === target && keyOf(entry) !== key,
+                              (entry) =>
+                                keyOf(entry) === target && keyOf(entry) !== key,
                             );
                             if (twin) {
                               setItems(
@@ -727,10 +749,15 @@ export function FlareComposer({
                             setEditing(target);
                           }}
                           onCover={() =>
-                            setItems([item, ...draft.items.filter((entry) => entry !== item)])
+                            setItems([
+                              item,
+                              ...draft.items.filter((entry) => entry !== item),
+                            ])
                           }
                           onRemove={() => {
-                            setItems(draft.items.filter((entry) => keyOf(entry) !== key));
+                            setItems(
+                              draft.items.filter((entry) => keyOf(entry) !== key),
+                            );
                             setEditing(null);
                           }}
                         />
@@ -755,16 +782,26 @@ export function FlareComposer({
               {LOCAL_ENABLED && draftKey && draftKey !== "guest" ? <NearbyRow /> : null}
 
               <ErrorLine message={error} />
+              {/* Post first, the one thing this screen is for; Preview
+                  second and optional. The website's compose step has
+                  the same two, in the same order, saying the same words. */}
+              <AsyncButton
+                label="Post flare"
+                pendingLabel="Posting…"
+                disabled={draft.items.length === 0 || posting}
+                onPress={post}
+              />
               <Button
                 label="Preview"
-                disabled={draft.items.length === 0}
+                variant="secondary"
+                disabled={draft.items.length === 0 || posting}
                 onPress={() => {
                   setEditing(null);
                   setPreviewing(true);
                 }}
               />
               {draft.items.length === 0 ? (
-                <Muted>Add at least one card to preview the post.</Muted>
+                <Muted>Add at least one card to post.</Muted>
               ) : null}
             </>
           )}
@@ -799,12 +836,15 @@ export function FlareComposer({
   );
 }
 
-/** Select cards, Compose, Preview: where you are in the three. */
+/**
+ * Select cards, Compose: where you are in the two. Preview used to be a
+ * third; it is an optional look now, reached from Compose, so it is not
+ * a place on the strip.
+ */
 function StepStrip({ step }: { step: Step }) {
   const steps: { key: Step; label: string }[] = [
     { key: "select", label: "Select cards" },
     { key: "compose", label: "Compose" },
-    { key: "preview", label: "Preview" },
   ];
   const at = steps.findIndex((entry) => entry.key === step);
   return (
@@ -942,7 +982,10 @@ function CardEditor({
       {item.printings.length > 0 ? (
         <PickerRow
           label="Printing"
-          value={options.find((option) => option.id === item.printingId)?.label ?? "Any printing"}
+          value={
+            options.find((option) => option.id === item.printingId)?.label ??
+            "Any printing"
+          }
           onPress={() => setChoosingPrinting(true)}
         />
       ) : null}
@@ -1085,7 +1128,13 @@ function CardPager({
  * inline above the caption. The website's composer does the same in
  * its sheet.
  */
-function CardOverlay({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+function CardOverlay({
+  onClose,
+  children,
+}: {
+  onClose: () => void;
+  children: ReactNode;
+}) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <SheetBackdrop />
@@ -1202,6 +1251,7 @@ export function FlareComposerPreview({
   huntName,
   onBack,
   onPost,
+  posting,
   error,
 }: {
   draft: Draft;
@@ -1209,6 +1259,8 @@ export function FlareComposerPreview({
   huntName: string | null;
   onBack: () => void;
   onPost: () => Promise<void>;
+  /** The post is in the air, whichever Post button sent it. */
+  posting: boolean;
   error: string | null;
 }) {
   const copies = draft.items.reduce((sum, item) => sum + item.quantity, 0);
@@ -1283,8 +1335,21 @@ export function FlareComposerPreview({
         onPicks={() => undefined}
       />
       <ErrorLine message={error} />
-      <AsyncButton label="Post flare" pendingLabel="Posting…" onPress={onPost} />
-      <Button label="Back to editing" variant="secondary" onPress={onBack} />
+      {/* Post first, then the way back: the order the compose step and
+          the website's preview both use. Both wait while a post is in
+          the air, as the website's do. */}
+      <AsyncButton
+        label="Post flare"
+        pendingLabel="Posting…"
+        disabled={posting}
+        onPress={onPost}
+      />
+      <Button
+        label="Back to editing"
+        variant="secondary"
+        disabled={posting}
+        onPress={onBack}
+      />
     </View>
   );
 }

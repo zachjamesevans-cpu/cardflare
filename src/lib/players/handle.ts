@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 /**
  * A handle: the name a player is FOUND by.
  *
@@ -110,18 +108,11 @@ export function handleWithSuffix(base: string, position: number): string {
   return `${base.slice(0, HANDLE_MAX - suffix.length).replace(/_+$/g, "")}${suffix}`;
 }
 
-export const handleSchema = z.object({
-  handle: z
-    .string()
-    .transform((value) => value.trim().toLowerCase())
-    .pipe(
-      z
-        .string()
-        .min(HANDLE_MIN, `Handles are at least ${HANDLE_MIN} characters.`)
-        .max(HANDLE_MAX, `Handles are at most ${HANDLE_MAX} characters.`)
-        .regex(HANDLE_PATTERN, "Letters, numbers and underscores only. No spaces."),
-    ),
-});
+/*
+ * `handleSchema` lives in handle-schema.ts. This file is read in the
+ * browser wherever a handle is shown or typed, and with the schema here
+ * every one of those pages downloaded the whole validation library.
+ */
 
 /** How a handle is written wherever a person reads one. */
 export function formatHandle(handle: string): string {

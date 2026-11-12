@@ -3,6 +3,7 @@ import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  INTRO_BINDER,
   INTRO_CARDS,
   INTRO_LOOK,
   INTRO_NEXT,
@@ -36,11 +37,14 @@ import { Button, Tap } from "./ui";
 export function Intro({
   onPost,
   onLook,
+  onBinder,
   game = "one-piece",
   handle = null,
 }: {
   onPost: () => void;
   onLook: () => void;
+  /** "Add a binder", beside Look around first. No handler draws no link. */
+  onBinder?: () => void;
   /** Whose art the scenes draw: introGame() of the games they play. */
   game?: IntroGame;
   /** Their handle, so the shared binder link reads as theirs. */
@@ -75,7 +79,9 @@ export function Intro({
         paddingBottom: insets.bottom + spacing(4),
       }}
     >
-      <View style={{ alignItems: "flex-end", minHeight: 32, paddingHorizontal: spacing(6) }}>
+      <View
+        style={{ alignItems: "flex-end", minHeight: 32, paddingHorizontal: spacing(6) }}
+      >
         {last ? null : (
           <Tap onPress={onLook} hitSlop={10} accessibilityLabel={INTRO_SKIP}>
             <Text style={{ color: colors.textMuted, fontSize: 15, fontWeight: "600" }}>
@@ -116,7 +122,9 @@ export function Intro({
           >
             {/* A fixed height, so the words do not jump when it draws. */}
             <View style={{ height: SCENE_HEIGHT, justifyContent: "center" }}>
-              {at < drawn ? <IntroScene card={card.key} game={game} handle={handle} /> : null}
+              {at < drawn ? (
+                <IntroScene card={card.key} game={game} handle={handle} />
+              ) : null}
             </View>
             <View style={{ alignItems: "center", gap: spacing(2) }}>
               <Text
@@ -187,7 +195,31 @@ export function Intro({
             label={last ? INTRO_POST : INTRO_NEXT}
             onPress={last ? onPost : () => go(index + 1)}
           />
-          <View style={{ height: LOOK_ROW, justifyContent: "center" }}>
+          {/* Two quiet ways out on the one line, so the row is the
+              height it always was: your binders, or the Feed. The
+              website draws the same pair. */}
+          <View
+            style={{
+              height: LOOK_ROW,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: spacing(6),
+            }}
+          >
+            {last && onBinder ? (
+              <Tap onPress={onBinder} hitSlop={8}>
+                <Text
+                  style={{
+                    color: colors.accent,
+                    fontWeight: "600",
+                    textAlign: "center",
+                  }}
+                >
+                  {INTRO_BINDER}
+                </Text>
+              </Tap>
+            ) : null}
             {last ? (
               <Tap onPress={onLook} hitSlop={8}>
                 <Text
@@ -219,7 +251,15 @@ const SCENE_HEIGHT = 300;
  * account plays, read once. One Piece until the answer lands, or if it
  * never does - the intro must not wait on the network to say hello.
  */
-export function ReplayIntro({ onPost, onLook }: { onPost: () => void; onLook: () => void }) {
+export function ReplayIntro({
+  onPost,
+  onLook,
+  onBinder,
+}: {
+  onPost: () => void;
+  onLook: () => void;
+  onBinder?: () => void;
+}) {
   const [game, setGame] = useState<IntroGame>("one-piece");
   const [handle, setHandle] = useState<string | null>(null);
   useEffect(() => {
@@ -238,5 +278,13 @@ export function ReplayIntro({ onPost, onLook }: { onPost: () => void; onLook: ()
       live = false;
     };
   }, []);
-  return <Intro game={game} handle={handle} onPost={onPost} onLook={onLook} />;
+  return (
+    <Intro
+      game={game}
+      handle={handle}
+      onPost={onPost}
+      onLook={onLook}
+      onBinder={onBinder}
+    />
+  );
 }

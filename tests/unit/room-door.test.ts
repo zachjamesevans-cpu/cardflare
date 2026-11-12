@@ -74,7 +74,11 @@ describe("the door card", () => {
 
   it("shows the remote only to the store's organizers, via the staff lookup", () => {
     expect(page).toContain('import { organizerStoresFor } from "@/lib/stores/staff"');
-    expect(page).toContain("await organizerStoresFor(accountPlayerId)");
+    /* Read beside the night's other reads now, not after them; still
+       only for an account with a seat. */
+    expect(page).toContain(
+      "inRoom && accountPlayerId ? organizerStoresFor(accountPlayerId) : []",
+    );
     expect(page).toContain(
       "organizerStores.some((store) => store.storeId === event.storeId)",
     );

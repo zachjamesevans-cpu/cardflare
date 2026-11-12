@@ -33,6 +33,7 @@ import {
 } from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { clearActiveThread, setActiveThread, threadIdFromPush } from "../active-thread";
+import { sameData } from "../quiet-refresh";
 import { refreshUnread } from "../unread";
 
 /** One read of a conversation, as the server sends it and the disk keeps it. */
@@ -53,6 +54,7 @@ import { RemoteImage } from "../remote-image";
 import { ReportSheet, type ReportTarget } from "../report-sheet";
 import { SharedPostBubble } from "../shared-post-bubble";
 import { Stepper } from "../stepper";
+import { WE_TRADED } from "../thread-trade-copy";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, gutter, radius, spacing } from "../theme";
 import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
@@ -75,8 +77,8 @@ import { AsyncButton, ErrorLine, Input, Loading, Muted, Tap } from "../ui";
  * holds back, src/active-thread.ts), and on a pull down. "Load older"
  * at the top reads the page before the oldest message shown.
  *
- * "We traded" lives here too, since round 8, opened from the "⋯" menu
- * since round 16. Either side says it, the other side is asked, and the
+ * "We traded" lives here too, since round 8: a pill under the composer
+ * and a row in the "⋯" menu. Either side says it, the other side is asked, and the
  * second tap pays both Embers under the room's rules. The website's
  * ThreadView draws the same three states in the same words: the form,
  * "You said you traded", and "<name> says you traded" with Yes and No.
@@ -212,6 +214,19 @@ export function ThreadScreen() {
   /* Set once a fresh read has painted, so a slow disk read never paints
      an older conversation over it. */
   const fresh = useRef(false);
+  /*
+   * The last answer drawn, and the last one put on disk. The poll asks
+   * every five seconds and nearly every answer is the one before it;
+   * drawing it again reset a dozen pieces of state and the header, and
+   * writing it again rewrote the whole conversation to storage, for
+   * nothing. A quiet poll that says the same thing now does neither.
+   * Everything this screen shows of a conversation comes through
+   * `apply`, so "the same as the last one applied" is "the same as what
+   * is on screen"; a read somebody asked for (a send, a pull, an
+   * action) is always drawn, whatever it says.
+   */
+  const applied = useRef<ThreadRead | null>(null);
+  const stored = useRef<ThreadRead | null>(null);
 
   /*
    * The conversation as last seen, painted at once. The founder:
@@ -225,7 +240,10 @@ export function ThreadScreen() {
       const playerId = await cachedPlayerId();
       if (!playerId) return;
       const cached = await readCache<ThreadRead>("thread", playerId, threadId);
-      if (live && cached?.ok && !fresh.current) apply(cached);
+      if (live && cached?.ok && !fresh.current) {
+        applied.current = cached;
+        apply(cached);
+      }
     })();
     return () => {
       live = false;
@@ -249,7 +267,11 @@ export function ThreadScreen() {
           return;
         }
         fresh.current = true;
-        apply(thread);
+        /* A quiet poll with nothing new draws nothing: see `applied`. */
+        if (!quiet || !sameData(applied.current, thread)) {
+          applied.current = thread;
+          apply(thread);
+        }
         if (!quiet) setError(null);
         /* Reading cleared this conversation's notice on the server, so
            the bell and the icon badge are asked again: on the first read
@@ -259,8 +281,14 @@ export function ThreadScreen() {
           newestRead.current = newest;
           void refreshUnread();
         }
-        const playerId = await cachedPlayerId();
-        if (playerId) void writeCache("thread", playerId, thread, threadId);
+        /* On disk only when it says something the disk does not. */
+        if (!sameData(stored.current, thread)) {
+          const playerId = await cachedPlayerId();
+          if (playerId) {
+            stored.current = thread;
+            void writeCache("thread", playerId, thread, threadId);
+          }
+        }
       } catch {
         if (isCurrent() && !quiet && seq === requestSeq.current) {
           setError("Could not load the conversation.");
@@ -301,58 +329,58 @@ export function ThreadScreen() {
   };
   /** Draws a conversation, fresh or from disk, the same way. */
   function apply(thread: ThreadRead) {
-        setMessages(thread.messages);
-        /* Only the newest page says whether there is more until
+    setMessages(thread.messages);
+    /* Only the newest page says whether there is more until
            "Load older" has run; then its own answer stands. */
-        if (!olderLoaded.current) setHasOlder(thread.hasOlder === true);
-        if (thread.threadId && thread.threadId !== conversationRef.current) {
-          conversationRef.current = thread.threadId;
-          if (focused.current) setActiveThread([threadId, thread.threadId]);
-        }
-        /* A new message at the bottom: follow it down again. */
-        const newest = thread.messages[thread.messages.length - 1]?.id ?? null;
-        if (newest !== newestSeen.current) {
-          newestSeen.current = newest;
-          holdPosition.current = false;
-        }
-        setWithName(thread.withName);
-        setCardName(thread.cardName);
-        setWithPlayerId(thread.withPlayerId ?? null);
-        setWithAvatarUrl(thread.withAvatarUrl ?? null);
-        /* An older server does not say what the thread is about; one
+    if (!olderLoaded.current) setHasOlder(thread.hasOlder === true);
+    if (thread.threadId && thread.threadId !== conversationRef.current) {
+      conversationRef.current = thread.threadId;
+      if (focused.current) setActiveThread([threadId, thread.threadId]);
+    }
+    /* A new message at the bottom: follow it down again. */
+    const newest = thread.messages[thread.messages.length - 1]?.id ?? null;
+    if (newest !== newestSeen.current) {
+      newestSeen.current = newest;
+      holdPosition.current = false;
+    }
+    setWithName(thread.withName);
+    setCardName(thread.cardName);
+    setWithPlayerId(thread.withPlayerId ?? null);
+    setWithAvatarUrl(thread.withAvatarUrl ?? null);
+    /* An older server does not say what the thread is about; one
            with a card name is read as a thread about that card. */
-        setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
-        setTrade(thread.trade ?? null);
-        setClosed(thread.blocked ?? false);
-        /* Instagram's header: their face, their name with the @handle
+    setKind(thread.kind ?? (thread.cardName ? "flare" : "direct"));
+    setTrade(thread.trade ?? null);
+    setClosed(thread.blocked ?? false);
+    /* Instagram's header: their face, their name with the @handle
            under it, all of it opening their profile; the conversation
            is the person. The "⋯" at the right holds the rest. */
-        const title = thread.withName ?? "Conversation";
-        const otherId = thread.withPlayerId ?? null;
-        const face = thread.withAvatarUrl ?? null;
-        navigation.setOptions({
-          title,
-          headerTitle: () => (
-            <ThreadHeader
-              name={title}
-              handle={thread.withHandle ?? null}
-              playerId={otherId}
-              avatarUrl={face}
-              onOpen={
-                otherId
-                  ? () => navigation.navigate("PlayerProfile", { playerId: otherId })
-                  : undefined
-              }
-            />
-          ),
-          headerRight: () => (
-            <HeaderButton
-              icon="ellipsis-horizontal"
-              label="More"
-              onPress={() => setMenuOpen(true)}
-            />
-          ),
-        });
+    const title = thread.withName ?? "Conversation";
+    const otherId = thread.withPlayerId ?? null;
+    const face = thread.withAvatarUrl ?? null;
+    navigation.setOptions({
+      title,
+      headerTitle: () => (
+        <ThreadHeader
+          name={title}
+          handle={thread.withHandle ?? null}
+          playerId={otherId}
+          avatarUrl={face}
+          onOpen={
+            otherId
+              ? () => navigation.navigate("PlayerProfile", { playerId: otherId })
+              : undefined
+          }
+        />
+      ),
+      headerRight: () => (
+        <HeaderButton
+          icon="ellipsis-horizontal"
+          label="More"
+          onPress={() => setMenuOpen(true)}
+        />
+      ),
+    });
   }
 
   /*
@@ -424,6 +452,9 @@ export function ThreadScreen() {
       /* A 409 "closed" is a block, either way round: say so plainly. */
       if (caught instanceof ApiError && caught.code === "closed") {
         setClosed(true);
+        /* Set here, not by a read: the next poll draws its answer over
+           it as it always did, even one that says nothing new. */
+        applied.current = null;
         return;
       }
       setError("Could not send that.");
@@ -509,6 +540,16 @@ export function ThreadScreen() {
   const settledLine =
     trade && !tradePending ? settledTradeLine(trade, otherName) : null;
 
+  /* "We traded" is offered while no claim is waiting and the form is
+     not already open: one trade at a time per conversation. The pill
+     under the composer and the row in the "⋯" share this and the
+     opener, so they cannot disagree. */
+  const canSayTraded = !blocked && !closed && !tradePending && !tradeOpen;
+  const openTradeForm = () => {
+    setTradeError(null);
+    setTradeOpen(true);
+  };
+
   /* The header's "⋯": View profile, We traded, Report, Block. We traded
      goes while a trade waits on an answer or the form is already open;
      Block goes once it has landed, and with it the chance to trade. */
@@ -524,16 +565,13 @@ export function ThreadScreen() {
           },
         ]
       : []),
-    ...(!blocked && !closed && !tradePending && !tradeOpen
+    ...(canSayTraded
       ? [
           {
             key: "traded",
-            label: "We traded",
+            label: WE_TRADED,
             icon: "swap-horizontal" as const,
-            onPress: () => {
-              setTradeError(null);
-              setTradeOpen(true);
-            },
+            onPress: openTradeForm,
           },
         ]
       : []),
@@ -611,9 +649,15 @@ export function ThreadScreen() {
             <Tap
               onPress={() => void loadOlder()}
               accessibilityLabel="Load older messages"
-              style={{ alignSelf: "center", paddingVertical: spacing(2), marginBottom: spacing(3) }}
+              style={{
+                alignSelf: "center",
+                paddingVertical: spacing(2),
+                marginBottom: spacing(3),
+              }}
             >
-              <Text style={{ color: colors.textSecondary, fontWeight: "600", fontSize: 13 }}>
+              <Text
+                style={{ color: colors.textSecondary, fontWeight: "600", fontSize: 13 }}
+              >
                 {loadingOlder ? "Loading older…" : "Load older"}
               </Text>
             </Tap>
@@ -726,7 +770,9 @@ export function ThreadScreen() {
                     >
                       <Text
                         style={{
-                          color: item.yours ? colors.accentContrast : colors.textPrimary,
+                          color: item.yours
+                            ? colors.accentContrast
+                            : colors.textPrimary,
                           fontSize: 15,
                         }}
                       >
@@ -842,8 +888,40 @@ export function ThreadScreen() {
             <ErrorLine message={error} />
             {/* The last trade this conversation settled, in one line. */}
             {settledLine ? <Muted>{settledLine}</Muted> : null}
-            {/* "We traded", opened from the "⋯" menu: the form sits
-                under the composer. A Flare or a want names its card; a
+            {/* "We traded", in plain sight under the composer. It lived
+                only in the "⋯" for a while, and the audit that put it
+                in conversations had already said what a hidden button
+                costs: "zero confirmed trades in 30 days suggests
+                confirming is too hard". A pill the size of a chip, not
+                a massive button; the "⋯" keeps its row too. The
+                website draws the same pill by its composer. */}
+            {canSayTraded ? (
+              <Tap
+                onPress={openTradeForm}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={WE_TRADED}
+                style={{
+                  alignSelf: "flex-start",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: spacing(1.5),
+                  minHeight: 36,
+                  paddingHorizontal: spacing(3.5),
+                  borderRadius: 18,
+                  borderWidth: 1,
+                  borderColor: colors.accentMuted,
+                  backgroundColor: colors.accentTint,
+                }}
+              >
+                <Ionicons name="swap-horizontal" size={16} color={colors.accent} />
+                <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 14 }}>
+                  {WE_TRADED}
+                </Text>
+              </Tap>
+            ) : null}
+            {/* The form the pill and the "⋯" both open: it sits under
+                the composer. A Flare or a want names its card; a
                 direct message asks for one, and which way it went. */}
             {tradeOpen ? (
               <View

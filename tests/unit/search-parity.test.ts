@@ -67,7 +67,11 @@ describe("search, from the Feed", () => {
   it("one field, the same placeholder, autofocused, after two characters, on both", () => {
     for (const source of [web.search, app.search]) {
       expect(source).toContain('placeholder="Search cards, players and stores"');
-      expect(source).toContain("Nothing for that yet.");
+      /* Nothing matched: both read the shared words, by the open tab
+         (tests/unit/empty-copy-parity.test.ts holds the words). */
+      expect(source).toContain("searchEmpty(shown, {");
+      expect(source).toContain('setTab("top")');
+      expect(source).not.toContain("Nothing for that yet.");
       expect(source).toMatch(/autoFocus/);
       /* Two characters before anything is asked, and a short pause. */
       expect(source).toMatch(/length < (2|MIN_CHARS|SEARCH_MIN_CHARS)/);

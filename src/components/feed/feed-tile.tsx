@@ -206,6 +206,8 @@ export function FeedTile({
           <img
             src={imageUrl}
             alt={cardImageAlt(name, cardNumber)}
+            loading="lazy"
+            decoding="async"
             className="size-full object-contain"
           />
         )}

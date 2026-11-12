@@ -21,7 +21,9 @@ describe("your own Flares reach your own Feed, wherever you posted them", () => 
     const repo = await read("src/lib/feed/repository.ts");
 
     expect(repo).toContain("async function ownRoomFlares(");
-    expect(repo).toContain("const mine = await ownRoomFlares(viewerId);");
+    /* Read alongside the area Flares, not after them. */
+    expect(repo).toMatch(/const \[first, mine\] = await Promise\.all\(\[/);
+    expect(repo).toMatch(/ownRoomFlares\(viewerId\),\s*\]\);/);
     /* Merged before grouping, or a batch posted in a room stops being
        one post and becomes one post per card. */
     expect(repo).toContain("const all = [...(flares ?? []), ...mine]");

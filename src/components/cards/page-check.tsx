@@ -433,7 +433,13 @@ function ChoiceFace({
   const src = imagesEnabled && isRenderableImageUrl(art) ? art : photo;
   return src ? (
     /* eslint-disable-next-line @next/next/no-img-element */
-    <img src={src} alt="" className="size-full object-cover" />
+    <img
+      src={src}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className="size-full object-cover"
+    />
   ) : (
     <span className="line-clamp-4 px-1 pt-1 text-[10px] font-semibold text-text-secondary">
       {card.exactName}

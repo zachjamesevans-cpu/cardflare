@@ -143,6 +143,8 @@ export function FlareProgressSheet({
                       <img
                         src={row.card.imageUrl}
                         alt=""
+                        loading="lazy"
+                        decoding="async"
                         className="size-full object-cover"
                       />
                     )}

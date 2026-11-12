@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,15 +23,12 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  OfferReview,
-  type OfferLine,
-  type OfferOutcome,
-} from "@/components/flares/offer-review";
+import type { OfferLine, OfferOutcome } from "@/components/flares/offer-review";
 import { Button, buttonStyles } from "@/components/ui/button";
 import { CardNoteField } from "@/components/flares/card-note-field";
 import { setCardNoteAction } from "@/lib/feed/post-actions";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { useOpened } from "@/components/ui/use-opened";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
@@ -39,6 +37,16 @@ import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { CardState } from "@/lib/feed/post-schema";
 import { offerTradeAction, withdrawOfferAction } from "@/lib/matching/actions";
 import { MAX_OFFER_MESSAGE, youHaveLabel, type MatchKind } from "@/lib/matching/schema";
+
+/*
+ * The review is only seen once "Review" is pressed, and every card
+ * tile on the site draws this file, so the review's own code is loaded
+ * on that press and not with each page of cards. Nothing is drawn in
+ * its place while it loads: a closed sheet looked like nothing too.
+ */
+const OfferReview = dynamic(() =>
+  import("@/components/flares/offer-review").then((m) => m.OfferReview),
+);
 
 /**
  * A thumbnail you can open at a readable size.
@@ -929,6 +937,8 @@ export function CardImageZoom({
       );
   const local = useOfferBuild(shared ? null : feedPostId, offerable);
   const offers = shared ?? local;
+  /* The review is drawn from its first opening on: see the top. */
+  const reviewOpened = useOpened(local.reviewOpen);
 
   /*
    * A swipe ends in a click, and a click anywhere on this dialog closes
@@ -1580,7 +1590,7 @@ export function CardImageZoom({
        * draws the review once for all its tiles (see `PostOffer`), so
        * this one is only for a viewer with no post around it.
        */}
-      {!shared && feedPostId && (
+      {!shared && feedPostId && reviewOpened && (
         <OfferReview
           open={local.reviewOpen}
           onClose={local.closeReview}

@@ -1041,6 +1041,14 @@ export type FeedEntry = FeedItem & {
  * the same posts, not a place they are moved to, so `belongsToTab`
  * reads the post's own `yours` rather than its `tab`. One item can sit
  * under two filters; nothing has to agree about which one owns it.
+ *
+ * AND THEN IT WENT AGAIN (2026-10-11), on the app first: the founder,
+ * "is my flares even useful anymore now that they're displaying in your
+ * own profile?" Nearby took the second slot in the tab bar the same
+ * day, so neither client draws a filter row now: the Feed tab is
+ * Following and the Nearby tab is Nearby, on the app and the website
+ * alike. `mine` stays a value here because an installed build or an old
+ * link may still name it; both clients land it on Following.
  */
 /**
  * The heading a section is drawn under, or null when it should not be
@@ -1703,20 +1711,26 @@ async function areaHuntsFor(
 ): Promise<HuntItem[]> {
   if (authors.size === 0) return [];
 
-  let { data: flares } = await getSupabaseAdmin()
-    .from("flares")
-    .select(AREA_FLARE_COLUMNS)
-    /* One query for everybody rather than one per person followed. */
-    .in("player_id", [...authors.keys()])
-    .eq("status", "open")
-    /* Both directions. An offering ("I have these") is a post like any
-       other; reading wants alone left every offer posted from the
-       composer nowhere at all. */
-    .in("intent", ["want", "showcase"])
-    .is("event_id", null)
-    .gte("created_at", since(FLARE_DAYS))
-    .order("created_at", { ascending: false })
-    .limit(RECENT_READ);
+  /* The viewer's own room Flares are read alongside, not after: see
+     ownRoomFlares below for why they are a second question. */
+  const [first, mine] = await Promise.all([
+    getSupabaseAdmin()
+      .from("flares")
+      .select(AREA_FLARE_COLUMNS)
+      /* One query for everybody rather than one per person followed. */
+      .in("player_id", [...authors.keys()])
+      .eq("status", "open")
+      /* Both directions. An offering ("I have these") is a post like any
+         other; reading wants alone left every offer posted from the
+         composer nowhere at all. */
+      .in("intent", ["want", "showcase"])
+      .is("event_id", null)
+      .gte("created_at", since(FLARE_DAYS))
+      .order("created_at", { ascending: false })
+      .limit(RECENT_READ),
+    ownRoomFlares(viewerId),
+  ]);
+  let flares = first.data;
 
   /*
    * A READ THAT HIT ITS LIMIT CAN CUT A POST IN HALF.
@@ -1771,7 +1785,6 @@ async function areaHuntsFor(
    * in the world", this one is "me, anywhere". Merged before grouping,
    * so a batch posted in a room still becomes one post.
    */
-  const mine = await ownRoomFlares(viewerId);
   /*
    * MERGED BY TIME, not by which query found them.
    *
@@ -3033,13 +3046,46 @@ export async function listFeed(
      never persisted - see originForPlayer. */
   device: Point | null = null,
 ): Promise<FeedEntry[]> {
-  const [locals, following, binder, wants, notices, balance] = await Promise.all([
+  /*
+   * FOUR STAGES, NOT FIFTEEN.
+   *
+   * This function used to await its reads one after another: about
+   * fifteen stops, each a round trip or several, and the Feed is the
+   * first screen of both clients. Nothing below changed in what it
+   * reads or what it returns. What changed is that every read now
+   * starts as soon as the things it depends on are known, so the wait
+   * is the longest read in each stage rather than the sum of them.
+   *
+   * Stage one: everything that needs only the viewer.
+   */
+  const [
+    locals,
+    following,
+    binder,
+    wants,
+    notices,
+    balance,
+    me,
+    originInfo,
+    reach,
+    blocked,
+    nearby,
+    storePosts,
+  ] = await Promise.all([
     listLocals(playerId),
     listFollowing(playerId),
     sessionId ? listBinder(sessionId) : Promise.resolve([]),
     listWants(playerId),
     showingAnnouncements(),
     embersBalance(playerId),
+    viewerAsAuthor(playerId),
+    originForPlayer(playerId, device),
+    feedRadiusFor(playerId),
+    /* Nothing from a blocked person, and nothing of yours to them: both
+       directions in one set, applied to every kind the same way. */
+    blockedSet(playerId),
+    nearbyMatchesForHolder(playerId).catch(() => []),
+    storePostItems(playerId, sessionId),
   ]);
 
   /* The want list as a set of cards, which is the question two of the item
@@ -3064,58 +3110,10 @@ export async function listFeed(
    * Only Flares are yours to see.
    */
   const authors = new Map(followed);
-  const me = await viewerAsAuthor(playerId);
   if (me) authors.set(playerId, me);
 
   /* Where the viewer is, once, for every "2 mi away" on the screen. */
-  const origin = (await originForPlayer(playerId, device)).point;
-
-  /* Flares with no board behind them - yours and your followed players'.
-     They belong to no store, so they are read once here rather than
-     per-local like everything else. */
-  const areaHunts = await areaHuntsFor(authors, playerId, held, origin);
-
-  /* And the posts of people near you whom you do not follow, for the
-     Nearby tab: the same builder, fed the authors found by distance. */
-  const reach = await feedRadiusFor(playerId);
-  const aroundHunts = (
-    await areaHuntsFor(
-      await nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach),
-      playerId,
-      held,
-      origin,
-    )
-  )
-    /* An author is found by one post near you, but the builder reads
-       all of theirs: only the posts inside the reach stay. */
-    .filter((hunt) => hunt.milesAway !== null && hunt.milesAway <= reach)
-    .map((hunt) => ({ ...hunt, around: true }));
-
-  /* A new player's first two weeks: real posts in their games, so the
-     Feed has something in it before they follow anybody. */
-  /* A suggestion never takes the Feed down: a failed read is no
-     suggestions, and the rest of the Feed draws as it always did. */
-  const popular = await popularAuthorsFor(playerId, new Set(followed.keys())).catch(
-    (caught) => {
-      console.error("Could not read the popular players", caught);
-      return { authors: new Map<string, FollowedPlayer>(), label: "" };
-    },
-  );
-  const popularHunts =
-    popular.authors.size > 0
-      ? (await areaHuntsFor(popular.authors, playerId, held, origin)).map((hunt) => ({
-          ...hunt,
-          suggested: popular.label,
-        }))
-      : [];
-
-  /* A Flare names the session that posted it; the follow list names accounts.
-     This is the bridge, and it is one query rather than one per person. */
-  const playerBySession = await sessionsForPlayers([...followed.keys()]);
-  /* Your own room identity too. Without it a Flare you posted on a
-     board mapped to nobody, and your own post at your own shop was the
-     one post the Feed would not show you. */
-  if (sessionId) playerBySession.set(sessionId, playerId);
+  const origin = originInfo.point;
 
   /*
    * A store earns a place only when there is somewhere to go: a room open
@@ -3128,26 +3126,83 @@ export async function listFeed(
     .slice(0, LOCALS_SHOWN);
 
   /*
-   * And then everywhere else. Nothing about this depends on the player,
-   * which is exactly the point: it is the item a brand-new account can
-   * still be shown. Their own stores are excluded so a local never
-   * appears twice under two headings.
+   * Stage two: everything that needed the follow list, the binder, the
+   * origin or the saved stores, and nothing from each other.
    */
-  const elsewhere = await listOpenStores(
-    locals.map((local) => local.storeId),
-    OPEN_ANYWHERE,
-  );
+  const [
+    areaHunts,
+    aroundHunts,
+    suggestedPosts,
+    playerBySession,
+    elsewhere,
+    traded,
+    matched,
+    pack,
+    shop,
+    nearbyStores,
+    wantedFromYou,
+  ] = await Promise.all([
+    /* Flares with no board behind them - yours and your followed players'.
+       They belong to no store, so they are read once here rather than
+       per-local like everything else. */
+    areaHuntsFor(authors, playerId, held, origin),
+    /* And the posts of people near you whom you do not follow, for the
+       Nearby tab: the same builder, fed the authors found by distance. */
+    nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)
+      .then((around) => areaHuntsFor(around, playerId, held, origin))
+      .then((hunts) =>
+        hunts
+          /* An author is found by one post near you, but the builder reads
+             all of theirs: only the posts inside the reach stay. */
+          .filter((hunt) => hunt.milesAway !== null && hunt.milesAway <= reach)
+          .map((hunt) => ({ ...hunt, around: true })),
+      ),
+    /* A new player's first two weeks: real posts in their games, so the
+       Feed has something in it before they follow anybody. */
+    /* A suggestion never takes the Feed down: a failed read is no
+       suggestions, and the rest of the Feed draws as it always did. */
+    popularAuthorsFor(playerId, new Set(followed.keys()))
+      .catch((caught) => {
+        console.error("Could not read the popular players", caught);
+        return { authors: new Map<string, FollowedPlayer>(), label: "" };
+      })
+      .then(async (popular) => ({
+        popular,
+        hunts:
+          popular.authors.size > 0
+            ? (await areaHuntsFor(popular.authors, playerId, held, origin)).map(
+                (hunt) => ({ ...hunt, suggested: popular.label }),
+              )
+            : [],
+      })),
+    /* A Flare names the session that posted it; the follow list names accounts.
+       This is the bridge, and it is one query rather than one per person. */
+    sessionsForPlayers([...followed.keys()]),
+    /*
+     * And then everywhere else. Nothing about this depends on the player,
+     * which is exactly the point: it is the item a brand-new account can
+     * still be shown. Their own stores are excluded so a local never
+     * appears twice under two headings.
+     */
+    listOpenStores(
+      locals.map((local) => local.storeId),
+      OPEN_ANYWHERE,
+    ),
+    tradedItems(locals.map((local) => local.storeId)),
+    suggestionItem(playerId, wanted, new Set(followed.keys())),
+    packItem(balance),
+    shopItem(playerId, balance),
+    nearbyStoreItems(playerId, locals, device),
+    /* The lead item, and the one that needs nothing from anybody else
+       having posted this week. See wantedItems. */
+    wantedItems(sessionId, playerId, held),
+  ]);
+  const { popular, hunts: popularHunts } = suggestedPosts;
 
-  const boards = (
-    await Promise.all([
-      ...live.map((local) =>
-        boardWithHunts(local, true, held, authors, playerBySession, playerId),
-      ),
-      ...elsewhere.map((local) =>
-        boardWithHunts(local, false, held, authors, playerBySession, playerId),
-      ),
-    ])
-  ).flat();
+  /* Your own room identity too. Without it a Flare you posted on a
+     board mapped to nobody, and your own post at your own shop was the
+     one post the Feed would not show you. */
+  if (sessionId) playerBySession.set(sessionId, playerId);
 
   /*
    * The two questions the Feed cannot answer on its own, asked only
@@ -3159,10 +3214,6 @@ export async function listFeed(
   if (locals.length === 0) starters.push({ kind: "start", topic: "store" });
   if (wanted.size === 0) starters.push({ kind: "start", topic: "deck" });
 
-  /*
-   * The three that do not depend on a board being open, fetched together
-   * because none of them needs anything the others produce.
-   */
   /*
    * Where every store on this screen is, so a recent Flare can say which
    * shop it was posted at. Locals and open-anywhere rooms both, because a
@@ -3179,17 +3230,24 @@ export async function listFeed(
      twice under two different headings. */
   const shown = new Set([...live, ...elsewhere].map((local) => local.storeId));
 
-  const [traded, added, matched, recent, pack, shop, nearbyStores, storePosts] =
-    await Promise.all([
-      tradedItems(locals.map((local) => local.storeId)),
-      addedItems(followed, playerBySession, wanted),
-      suggestionItem(playerId, wanted, new Set(followed.keys())),
-      recentItems(sessionId, held, stores, new Set(playerBySession.keys())),
-      packItem(balance),
-      shopItem(playerId, balance),
-      nearbyStoreItems(playerId, locals, device),
-      storePostItems(playerId, sessionId),
-    ]);
+  /*
+   * Stage three: the boards, and the three kinds that wait on the bridge
+   * from sessions to accounts or on the open rooms.
+   */
+  const [boardLists, added, recent, upcoming] = await Promise.all([
+    Promise.all([
+      ...live.map((local) =>
+        boardWithHunts(local, true, held, authors, playerBySession, playerId),
+      ),
+      ...elsewhere.map((local) =>
+        boardWithHunts(local, false, held, authors, playerBySession, playerId),
+      ),
+    ]),
+    addedItems(followed, playerBySession, wanted),
+    recentItems(sessionId, held, stores, new Set(playerBySession.keys())),
+    withGoing(upcomingItems(locals, shown, wanted.size), playerId),
+  ]);
+  const boards = boardLists.flat();
 
   /* Nobody answers their wants yet - a new player's usual case - so the
      players behind the suggested posts are offered to follow instead. */
@@ -3212,12 +3270,6 @@ export async function listFeed(
           },
         ];
 
-  /* The lead item, and the one that needs nothing from anybody else
-     having posted this week. See wantedItems. */
-  const [wantedFromYou, nearby] = await Promise.all([
-    wantedItems(sessionId, playerId, held),
-    nearbyMatchesForHolder(playerId).catch(() => []),
-  ]);
   const nearbyItems: NearbyMatchItem[] =
     nearby.length > 0
       ? [
@@ -3228,8 +3280,6 @@ export async function listFeed(
           },
         ]
       : [];
-
-  const upcoming = await withGoing(upcomingItems(locals, shown, wanted.size), playerId);
 
   /*
    * The order is an argument about what is worth a tap, and it runs from
@@ -3300,11 +3350,8 @@ export async function listFeed(
     ...shop,
   ];
 
+  /* Stage four: the one read that needs the finished list. */
   await decorateHunts(items, playerId, origin);
-
-  /* Nothing from a blocked person, and nothing of yours to them: both
-     directions in one set, applied to every kind the same way. */
-  const blocked = await blockedSet(playerId);
 
   /*
    * Every item leaves here knowing where it goes and why it is here.

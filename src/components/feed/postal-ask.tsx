@@ -42,16 +42,19 @@ export function PostalAsk({
    */
   allowClear = false,
   submitLabel = "Show stores",
+  /**
+   * The action that saves it. Nearby passes its own, which saves the
+   * same ZIP and then has the page rebuilt (src/app/nearby/actions.ts).
+   */
+  save = savePostalCodeAction,
 }: {
   defaultValue?: string;
   allowClear?: boolean;
   /** What the button promises: stores on the Feed, a plain save elsewhere. */
   submitLabel?: string;
+  save?: (previous: PostalState, formData: FormData) => Promise<PostalState>;
 }) {
-  const [state, action] = useActionState<PostalState, FormData>(
-    savePostalCodeAction,
-    POSTAL_IDLE,
-  );
+  const [state, action] = useActionState<PostalState, FormData>(save, POSTAL_IDLE);
 
   return (
     <form action={action} className="flex flex-col gap-2">

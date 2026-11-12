@@ -49,12 +49,14 @@ const web = {
 };
 
 describe("the tab bar", () => {
-  it("is Feed, Nights, Messages, Search, Profile, with no Inbox and no raised +", () => {
+  it("is Feed, Nearby, Messages, Search, Profile, with no Inbox and no raised +", () => {
     /* The founder: "Tabs should be in this order left to right. Feed -
        nights - messages - search - profile". */
+    /* Nearby took Nights' slot on 2026-10-11, on both platforms; the
+       Rooms page keeps its address with no slot of its own. */
     inOrder(web.tabs, [
       'label: "Feed"',
-      'label: "Rooms"',
+      'label: "Nearby"',
       'label: "Messages"',
       'label: "Search"',
       'label: "Profile"',
@@ -65,6 +67,7 @@ describe("the tab bar", () => {
     /* The founder: "Not a fan of the big plus." */
     expect(web.tabs).not.toContain('"raised" in tab');
     expect(web.tabs).not.toContain('href: "/flare"');
+    expect(web.tabs).not.toContain('label: "Rooms"');
     /* Local's switch is untouched. */
     expect(web.tabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });

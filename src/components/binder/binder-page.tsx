@@ -10,13 +10,12 @@ import {
 } from "react";
 import { Tour } from "@/components/onboarding/tour";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Share2 } from "lucide-react";
 
 import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
-import { AddBinderCard } from "@/components/binder/add-binder-card";
-import { BinderSettings } from "@/components/binder/binder-settings";
 import {
   QueueBanners,
   usePageQueues,
@@ -46,10 +45,10 @@ import {
   type ZoomAsk,
   type ZoomCard,
 } from "@/components/cards/card-image-zoom";
-import { QueueCheck } from "@/components/cards/queue-check";
 import { InYourOffer } from "@/components/feed/post-actions";
-import { OfferReview } from "@/components/flares/offer-review";
 import { Sheet } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
+import { useOpened } from "@/components/ui/use-opened";
 import {
   offerOnBinderAction,
   placeBinderCardAction,
@@ -72,6 +71,35 @@ import {
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import type { ScanRights } from "@/lib/cards/scan";
 import { cn } from "@/lib/cn";
+
+/*
+ * The four things on this page that are only seen after a tap, loaded
+ * when the tap happens and not with the binder: the Add cards sheet
+ * (the search, the pasted list and the scanner behind it), the check
+ * of a read page, the settings and the offer's review. Until one has
+ * loaded there is nothing of it on the page, which is what a closed
+ * sheet looked like anyway.
+ */
+const AddBinderCard = dynamic(() =>
+  import("@/components/binder/add-binder-card").then((m) => m.AddBinderCard),
+);
+const BinderSettings = dynamic(
+  () => import("@/components/binder/binder-settings").then((m) => m.BinderSettings),
+  {
+    /* Its sheet is already open around it: the ring, where the rows land. */
+    loading: () => (
+      <div className="flex min-h-40 items-center justify-center">
+        <Spinner />
+      </div>
+    ),
+  },
+);
+const QueueCheck = dynamic(() =>
+  import("@/components/cards/queue-check").then((m) => m.QueueCheck),
+);
+const OfferReview = dynamic(() =>
+  import("@/components/flares/offer-review").then((m) => m.OfferReview),
+);
 
 /**
  * The binder, open: the cards in pockets, a page at a time.
@@ -245,6 +273,8 @@ export function BinderView({
   );
   const queues = usePageQueues(binder.id, binder.yours, pageQueues);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /* The Add cards sheet is drawn from its first opening on: see the top. */
+  const addOpened = useOpened(adding !== null);
   const [error, setError] = useState<string | null>(null);
   /** What the last batch of adds said: "Added 3 cards." */
   const [added, setAdded] = useState<string | null>(null);
@@ -370,6 +400,8 @@ export function BinderView({
       build.toggle(key);
     },
   };
+  /* The review is drawn from its first opening on: see the top. */
+  const reviewOpened = useOpened(offers.reviewOpen);
   const chat = sent ? `/local?thread=${encodeURIComponent(sent.threadId)}` : null;
 
   const askFor = (card: BinderCard): ZoomAsk | null => {
@@ -744,52 +776,58 @@ export function BinderView({
         <>
           {/* The Add cards sheet, opened from the "+" pockets alone,
               each one opening it for its own pocket. */}
-          <AddBinderCard
-            binderId={binder.id}
-            imagesEnabled={imagesEnabled}
-            playerGames={playerGames}
-            open={adding !== null}
-            onOpenChange={(open) => {
-              if (open) return;
-              setAdding(null);
-              /* Pages may have gone to be read: their banner, at once. */
-              queues.refresh();
-            }}
-            pocket={adding?.pocket ?? null}
-            inBinder={cards}
-            rights={scanRights}
-            pagesLeft={queues.known ? queues.left : undefined}
-            retake={adding?.retake ?? null}
-            onAdded={(message, firstPocket) => {
-              setError(null);
-              setAdded(message);
-              if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
-            }}
-          />
-          <QueueCheck
-            key={checking ?? "none"}
-            batchId={checking}
-            imagesEnabled={imagesEnabled}
-            playerGames={playerGames}
-            taken={taken}
-            onClose={closeCheck}
-            onPlaced={(message, firstPocket) => {
-              setError(null);
-              setAdded(message);
-              if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
-              closeCheck();
-              router.refresh();
-            }}
-            onRetake={
-              scanRights?.pages === "on" && checking
-                ? (page) => {
-                    const batchId = checking;
-                    closeCheck();
-                    setAdding({ pocket: null, retake: { batchId, page } });
-                  }
-                : null
-            }
-          />
+          {addOpened && (
+            <AddBinderCard
+              binderId={binder.id}
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              open={adding !== null}
+              onOpenChange={(open) => {
+                if (open) return;
+                setAdding(null);
+                /* Pages may have gone to be read: their banner, at once. */
+                queues.refresh();
+              }}
+              pocket={adding?.pocket ?? null}
+              inBinder={cards}
+              rights={scanRights}
+              pagesLeft={queues.known ? queues.left : undefined}
+              retake={adding?.retake ?? null}
+              onAdded={(message, firstPocket) => {
+                setError(null);
+                setAdded(message);
+                if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
+              }}
+            />
+          )}
+          {/* A closed check drew an empty, closed sheet; now it draws
+              nothing, and each queue still gets a check of its own. */}
+          {checking && (
+            <QueueCheck
+              key={checking}
+              batchId={checking}
+              imagesEnabled={imagesEnabled}
+              playerGames={playerGames}
+              taken={taken}
+              onClose={closeCheck}
+              onPlaced={(message, firstPocket) => {
+                setError(null);
+                setAdded(message);
+                if (firstPocket !== null) setAt(Math.floor(firstPocket / perPage));
+                closeCheck();
+                router.refresh();
+              }}
+              onRetake={
+                scanRights?.pages === "on" && checking
+                  ? (page) => {
+                      const batchId = checking;
+                      closeCheck();
+                      setAdding({ pocket: null, retake: { batchId, page } });
+                    }
+                  : null
+              }
+            />
+          )}
           <Sheet
             open={settingsOpen}
             onClose={() => setSettingsOpen(false)}
@@ -813,7 +851,7 @@ export function BinderView({
       {/* The review, once for every pocket: the Flare's sheet, in the
           binder's words, closing on a send so the page can say where
           the offer went. */}
-      {picking && (
+      {picking && reviewOpened && (
         <OfferReview
           open={offers.reviewOpen}
           onClose={offers.closeReview}

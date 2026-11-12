@@ -1,7 +1,3 @@
-import { z } from "zod";
-
-import { UNSAFE_CHARACTERS } from "@/lib/players/schema";
-
 /**
  * The matching rules, free of server-only imports so they can be tested
  * without a database — the same discipline as `lists/schema.ts`.
@@ -118,36 +114,13 @@ export const MAX_OFFERS = 30;
 
 export const MAX_OFFER_MESSAGE = 80;
 
-/**
- * "Where can they find you?" — short free text, same character hygiene as
- * notes and display names, because it renders beside a name on somebody
- * else's screen.
+/*
+ * The two schemas that check an offer's message and count live in
+ * offer-schema.ts. They are the only part of matching that needs zod,
+ * and the card viewer reads this file in the browser on nearly every
+ * page: with them here, the Feed downloaded the whole validation
+ * library to learn a label and a length.
  */
-export const offerMessageSchema = z
-  .string()
-  .transform((value) => value.replace(/\s+/g, " ").trim())
-  .pipe(
-    z
-      .string()
-      .max(MAX_OFFER_MESSAGE, `Keep it under ${MAX_OFFER_MESSAGE} characters.`)
-      .refine((value) => !UNSAFE_CHARACTERS.test(value), {
-        message: "Please use ordinary characters.",
-      }),
-  )
-  .transform((value) => value || null);
-
-/**
- * "How many can you bring?" — clamped to the same 1..99 the Flare's own
- * quantity lives in. Anything unparseable is one copy, never a refusal:
- * the pledge is the thing that matters and the count is a refinement.
- */
-export const offerQuantitySchema = z.coerce
-  .number()
-  .int()
-  .min(1)
-  .max(99)
-  .catch(1)
-  .default(1);
 
 /** One offer, as the Flare's author sees it. */
 export interface Offer {

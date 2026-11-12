@@ -147,6 +147,19 @@ describe("demo mode looks activated", () => {
     expect(people.followers.length).toBeGreaterThanOrEqual(50);
   });
 
+  it("counts the Messages dot from its own conversations, not the real account's", () => {
+    /* The count's route sits under the conversations', where "unread"
+       would read as a conversation's id and the request would go out. */
+    const answer = demoAnswer("GET", "/api/v1/local/threads/unread", undefined);
+    expect(answer).not.toBeNull();
+    const list = demoAnswer("GET", "/api/v1/local/threads", undefined)?.value as {
+      threads: { unread: number }[];
+    };
+    expect((answer?.value as { unread: number }).unread).toBe(
+      list.threads.reduce((sum, thread) => sum + thread.unread, 0),
+    );
+  });
+
   it("lands a like, a message and a new post the way the real thing would", () => {
     const before = feed().find((p) => p.postId === "demo-post-leo-law");
     demoAnswer("POST", "/api/v1/posts/demo-post-leo-law", { action: "like" });

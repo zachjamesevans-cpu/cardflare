@@ -34,6 +34,39 @@ describe("JOIN_CODE_ALPHABET", () => {
   it("has no duplicates", () => {
     expect(new Set(JOIN_CODE_ALPHABET).size).toBe(JOIN_CODE_ALPHABET.length);
   });
+
+  /* The generator takes the low five bits of a random byte, which is
+     even only while there are exactly 32 characters to pick from. */
+  it("is exactly 32 characters, so five random bits pick one evenly", () => {
+    expect(JOIN_CODE_ALPHABET).toHaveLength(32);
+  });
+});
+
+describe("what a browser has to download to read a code's shape", () => {
+  /*
+   * Forms in the browser read this file's constants through
+   * events/schema.ts. One import of node:crypto here made every page
+   * with such a form ship a 121 KB polyfill of the whole module.
+   */
+  it("never imports node:crypto, in the file or in the schema that reads it", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    for (const file of ["src/lib/events/join-code.ts", "src/lib/events/schema.ts"]) {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source).not.toMatch(/from "(node:)?crypto"/);
+    }
+    expect(
+      readFileSync(join(process.cwd(), "src/lib/events/join-code.ts"), "utf8"),
+    ).toContain("globalThis.crypto.getRandomValues(");
+  });
+
+  it("uses every character of the alphabet, not a stuck subset", () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 400; i += 1) {
+      for (const character of generateJoinCode()) seen.add(character);
+    }
+    expect(seen.size).toBe(JOIN_CODE_ALPHABET.length);
+  });
 });
 
 describe("generateJoinCode", () => {

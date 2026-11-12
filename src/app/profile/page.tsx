@@ -124,23 +124,39 @@ export default async function ProfilePage({
   if (setupOwed) redirect("/welcome");
   if (!profile) redirect("/profile/settings");
 
-  /* The trade history rides on the profile again, in the Trades pane:
-     three recent rows and the totals. The rows never reach a free
-     player's page, because listTradeHistory withholds them. */
-  const [following, followers, stats, history, { tab }] = await Promise.all([
+  /*
+   * Everything else the page draws, read together now that the two
+   * guards have passed: none of these waits on another, except the
+   * dropped-in art, which starts the moment what is worn is known.
+   *
+   * The trade history rides on the profile again, in the Trades pane:
+   * three recent rows and the totals. The rows never reach a free
+   * player's page, because listTradeHistory withholds them.
+   *
+   * The wardrobe is back on this page even though the shop moved out:
+   * the dressing pickers (add flow and per-card editor) offer what is
+   * OWNED, and ownership lives in the same read the shop uses.
+   */
+  const dressedRead = dressedEquipsFor(playerId);
+  const [
+    following,
+    followers,
+    stats,
+    history,
+    { tab },
+    worn,
+    wardrobe,
+    areas,
+    dressed,
+    /* The dropped-in files behind whatever is worn, in one read. */
+    dressedArt,
+    games,
+  ] = await Promise.all([
     listFollowing(playerId),
     listFollowers(playerId),
     profileStats(playerId),
     listTradeHistory(playerId, profile.tier),
     searchParams,
-  ]);
-
-  /*
-   * The wardrobe is back on this page even though the shop moved out:
-   * the dressing pickers (add flow and per-card editor) offer what is
-   * OWNED, and ownership lives in the same read the shop uses.
-   */
-  const [worn, wardrobe, areas, dressed] = await Promise.all([
     resolveEquipped(profile.equipped),
     wardrobeFor(
       playerId,
@@ -148,11 +164,10 @@ export default async function ProfilePage({
       profile.equipped,
     ),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
-    dressedEquipsFor(playerId),
+    dressedRead,
+    dressedRead.then(wornArtFor),
+    listPlayerGames(playerId),
   ]);
-
-  /* The dropped-in files behind whatever is worn, in one read. */
-  const dressedArt = await wornArtFor(dressed);
 
   /* The showcase background, when one is worn. */
   const shelfBg = backgroundClass(dressed);
@@ -166,7 +181,6 @@ export default async function ProfilePage({
     .map(({ slug, name }) => ({ slug, name }));
 
   const imagesEnabled = cardImagesEnabled();
-  const games = await listPlayerGames(playerId);
 
   const currentArea = areas.some((area) => area.href === "/profile")
     ? "/profile"

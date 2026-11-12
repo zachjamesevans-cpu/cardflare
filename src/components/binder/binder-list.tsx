@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 
 import { BinderCover } from "@/components/binder/binder-cover";
+import { BINDERS_EMPTY, BINDERS_EMPTY_HINT } from "@/lib/copy/empty-copy";
 import type { BinderSummary } from "@/lib/binder/binder";
 import { EVENT_ONLY_TAG } from "@/lib/events/night-binder-rules";
 
@@ -41,6 +42,19 @@ export function BinderList({
   /** Binders shown by their owner's choice to one night only. */
   eventOnly?: ReadonlySet<string>;
 }) {
+  /* Your own list with nothing in it: what a binder is for and what
+     filling one takes, under the New binder button the page draws
+     above. The app says the same two lines. Somebody else's empty list
+     is said by the page that draws it. */
+  if (yours && binders.length === 0) {
+    return (
+      <div className="flex flex-col gap-1 text-sm text-text-muted">
+        <p>{BINDERS_EMPTY}</p>
+        <p>{BINDERS_EMPTY_HINT}</p>
+      </div>
+    );
+  }
+
   return (
     <ul className="flex flex-col gap-2">
       {binders.map((binder) => (

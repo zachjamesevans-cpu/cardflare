@@ -26,7 +26,7 @@ import { resolveEquipped } from "@/lib/players/cosmetics";
 import { dressedEquipsFor, wornArtFor } from "@/lib/players/equips";
 import { followState, listFollowers, listFollowing } from "@/lib/players/follows";
 import { huntLimitFor } from "@/lib/players/hunts";
-import { publicProfile } from "@/lib/players/profile";
+import { profileName, publicProfile } from "@/lib/players/profile";
 import { blockState } from "@/lib/players/safety";
 import { profileStats } from "@/lib/players/stats";
 import { siteUrl } from "@/lib/site";
@@ -48,14 +48,15 @@ export async function generateMetadata({
   params: Promise<{ playerId: string }>;
 }): Promise<Metadata> {
   const { playerId } = await params;
-  const profile = await publicProfile(playerId);
+  /* The name alone: the page below reads the rest once. */
+  const name = await profileName(playerId);
   const robots = { index: false, follow: false };
 
-  if (!profile) return { title: "Player", robots };
+  if (!name) return { title: "Player", robots };
 
   return {
-    title: profile.displayName,
-    description: `${profile.displayName} on cardflare`,
+    title: name,
+    description: `${name} on cardflare`,
     robots,
   };
 }
@@ -113,10 +114,13 @@ export default async function PublicProfilePage({
   /* A block hides the page both ways. Blocked BY them reads exactly as
      a missing player; the blocker sees the name, the Blocked chip and
      Unblock, and nothing else of theirs. The app does the same. */
-  const block = await blockState(me, playerId);
+  /* Read with the profile, not before it: neither needs the other, and
+     the block still decides first what is shown. */
+  const [block, profile] = await Promise.all([
+    blockState(me, playerId),
+    publicProfile(playerId, me),
+  ]);
   if (block.blockedBy && !block.blocked) notFound();
-
-  const profile = await publicProfile(playerId, me);
   if (!profile) notFound();
 
   if (block.blocked) {
@@ -134,9 +138,18 @@ export default async function PublicProfilePage({
     );
   }
 
-  const [worn, dressed] = await Promise.all([
+  /* Somebody else's page, seen by an account: the only case with a
+     Follow, a Message, a Report and a Block. */
+  const other = Boolean(me && me !== playerId);
+  const yours = me === playerId;
+  /* What they wear and who they know, asked for together. */
+  const [worn, dressed, follow, stats, followers, following] = await Promise.all([
     resolveEquipped(profile.equipped),
     dressedEquipsFor(playerId),
+    other ? followState(me as string, playerId) : null,
+    profileStats(playerId, me),
+    listFollowers(playerId, me),
+    listFollowing(playerId, me),
   ]);
   const dressedArt = await wornArtFor(dressed);
   const shelfBg = backgroundClass(dressed);
@@ -153,17 +166,6 @@ export default async function PublicProfilePage({
     note: entry.note,
     direction: "showcase",
   }));
-
-  /* Somebody else's page, seen by an account: the only case with a
-     Follow, a Message, a Report and a Block. */
-  const other = Boolean(me && me !== playerId);
-  const yours = me === playerId;
-  const [follow, stats, followers, following] = await Promise.all([
-    other ? followState(me as string, playerId) : null,
-    profileStats(playerId, me),
-    listFollowers(playerId, me),
-    listFollowing(playerId, me),
-  ]);
 
   /* The Feed's chrome, not the console's: the wordmark with the Feed
      behind it and the tab bar below. The name is drawn once, by

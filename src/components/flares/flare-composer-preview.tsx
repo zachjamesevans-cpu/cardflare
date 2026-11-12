@@ -10,9 +10,12 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
  * The post, before it is one.
  *
  * Built into the exact shape the Feed reads and drawn by the exact
- * component the Feed draws, so what is previewed is what goes up. Back
- * returns to the composer with the draft untouched; "Post flare" is
- * the one button that writes anything.
+ * component the Feed draws, so what is previewed is what goes up.
+ *
+ * Optional: the compose step posts without coming here. For whoever
+ * does look first, "Post flare" does exactly what the compose step's
+ * does (the same function, under the same pending flag), and "Back to
+ * editing" returns to the composer with the draft untouched.
  */
 export function FlareComposerPreview({
   draft,
@@ -91,7 +94,7 @@ export function FlareComposerPreview({
       <div className="flex flex-col gap-1">
         <h2 className="font-semibold text-text-primary">Preview</h2>
         <p className="text-sm text-text-secondary">
-          This is how it will read in the Feed.
+          This is how it will look in the Feed.
         </p>
       </div>
 
@@ -103,12 +106,14 @@ export function FlareComposerPreview({
         </p>
       )}
 
+      {/* Post first, then the way back: the order the compose step and
+          the app's preview both use. */}
       <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="secondary" onClick={onBack} disabled={pending}>
-          Back
-        </Button>
         <Button type="button" onClick={onPost} disabled={pending} className="flex-1">
           {pending ? "Posting…" : "Post flare"}
+        </Button>
+        <Button type="button" variant="secondary" onClick={onBack} disabled={pending}>
+          Back to editing
         </Button>
       </div>
     </div>

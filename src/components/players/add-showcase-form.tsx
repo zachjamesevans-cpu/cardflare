@@ -1,9 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Plus, X } from "lucide-react";
 
-import { CardSearch } from "@/components/cards/card-search";
 import { CosmeticCard } from "@/components/players/cosmetic-card";
 import {
   DressingPicker,
@@ -11,8 +11,26 @@ import {
 } from "@/components/players/dressing-picker";
 import { Button } from "@/components/ui/button";
 import { Sheet } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
 import { addShowcaseAction } from "@/lib/players/profile-actions";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
+
+/*
+ * The search is only drawn once "Add" has been pressed, and it is the
+ * largest thing this form holds, so it is loaded on that press and not
+ * with the profile. The form is already open around it by then: the
+ * ring stands where the field lands.
+ */
+const CardSearch = dynamic(
+  () => import("@/components/cards/card-search").then((m) => m.CardSearch),
+  {
+    loading: () => (
+      <div className="flex min-h-24 items-center justify-center">
+        <Spinner />
+      </div>
+    ),
+  },
+);
 
 /**
  * Putting a card on the shelf, dressed before it ever shows.

@@ -346,11 +346,7 @@ describe("Wants N until something is found", () => {
 
 describe("take down leaves the list at once", () => {
   it("hides the post by id the moment the server says ok, and undo unhides", () => {
-    const takeDown = between(
-      src.home,
-      "const takeDown = async (postId: string)",
-      "const follow",
-    );
+    const takeDown = between(src.home, "const takeDown = useCallback(", "const follow");
     expect(takeDown.length).toBeGreaterThan(0);
     expect(src.home).toContain("useState<ReadonlySet<string>>(() => new Set())");
     expect(src.home).toContain('!(item.kind === "hunt" && hidden.has(item.postId))');

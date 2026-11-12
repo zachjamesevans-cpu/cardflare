@@ -13,7 +13,7 @@ import {
   type CardResult,
 } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
-import { THREAD_TRADE_QUANTITY_MAX } from "@/lib/trades/thread-trade-copy";
+import { THREAD_TRADE_QUANTITY_MAX, WE_TRADED } from "@/lib/trades/thread-trade-copy";
 import type { ProposeInput, ThreadTrade } from "@/lib/trades/thread-trades";
 
 /**
@@ -69,9 +69,9 @@ export function ThreadTradeBlock({
   pending: boolean;
   error: string | null;
   /**
-   * Whether the form is open. The thread screen controls this so "We
-   * traded" can live in the chat header's ⋯ menu; left out, the block
-   * keeps the state itself and draws the trigger.
+   * Whether the form is open. The thread screen controls this so the
+   * chat header's ⋯ can open it too; left out, the block keeps the
+   * state itself. Either way the block draws the button.
    */
   composing?: boolean;
   onComposingChange?: (open: boolean) => void;
@@ -158,17 +158,23 @@ export function ThreadTradeBlock({
           error={error}
         />
       ) : (
-        !controlled && (
-          <TradeTrigger onClick={() => setOpen(true)} className="self-start" />
-        )
+        <TradeTrigger onClick={() => setOpen(true)} className="self-start" />
       )}
     </div>
   );
 }
 
 /**
- * The text button that opens the form, when the block keeps its own
- * state. The thread screen offers "We traded" from its ⋯ instead.
+ * The button that opens the form, in plain sight above the composer.
+ *
+ * It lived only in the chat header's ⋯ for a while, behind View
+ * profile, and the audit this block opens with had already said what
+ * that costs: "zero confirmed trades in 30 days suggests confirming is
+ * too hard". The one action a conversation exists to end in should not
+ * need a menu to find. Small on purpose: the founder did not want
+ * massive buttons in the chat, so it is a pill the size of a chip, and
+ * the ⋯ still has it for the thumb that learned it there. The app's
+ * thread draws the same pill in the same place.
  */
 export function TradeTrigger({
   onClick,
@@ -181,9 +187,13 @@ export function TradeTrigger({
     <button
       type="button"
       onClick={onClick}
-      className={cn("text-xs text-text-muted hover:text-text-secondary", className)}
+      className={cn(
+        "inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10 px-3.5 text-sm font-semibold text-accent hover:border-accent/70",
+        className,
+      )}
     >
-      We traded
+      <Handshake className="size-4" aria-hidden="true" />
+      {WE_TRADED}
     </button>
   );
 }

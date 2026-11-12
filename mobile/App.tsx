@@ -336,9 +336,10 @@ const TAB_ICONS: Partial<
   Search: { idle: "search-outline", focused: "search" },
   Local: { idle: "location-outline" },
   Nearby: { idle: "location-outline", focused: "location" },
-  /* Rooms, on the Nights route: the website's dock draws lucide Store,
-       and the storefront fills in when it is the open tab. The store is
-       the room (the founder, 2026-10-09). */
+  /* Rooms, on the Nights route: the website's dock drew lucide Store
+       while Rooms had a slot there, and the storefront fills in when
+       it is the open tab. The store is the room (the founder,
+       2026-10-09). */
   Nights: { idle: "storefront-outline", focused: "storefront" },
   /* The website's dock draws lucide MessageCircle for Messages. */
   Messages: { idle: "chatbubble-outline", focused: "chatbubble" },
@@ -442,7 +443,9 @@ function Tabs() {
            read the conversations twice on every visit. */
         focus: () => {
           void refreshUnread();
-          if (route.name !== "Messages") void refreshUnreadMessages();
+          /* Throttled: flicking between tabs inside a few seconds asks
+             once, not once per tab (src/unread-messages.ts). */
+          if (route.name !== "Messages") void refreshUnreadMessages({ throttle: true });
         },
       })}
       screenOptions={({ route }) => ({
@@ -581,8 +584,9 @@ function Tabs() {
           took the Room's slot on 2026-10-03, and on 2026-10-09 it was
           labelled Rooms: the store is the room and a day is the time.
           The route keeps its name so links and params hold. The
-          website's dock does the same (/nights, Store). See
-          src/local-enabled.ts for the Local call. */}
+          website's dock did the same (/nights, Store) until Nearby
+          took the slot on both, below. See src/local-enabled.ts for
+          the Local call. */}
       {LOCAL_ENABLED ? (
         <Tab.Screen name="Local" component={LocalScreen} options={{ title: "Local" }} />
       ) : null}
@@ -614,9 +618,11 @@ function Tabs() {
       >
         {() => <LocalScreen threadsOnly />}
       </Tab.Screen>
-      {/* Search, fourth: the founder's order is Feed, Nights, Messages,
-          Search, Profile, Messages dead centre. Same screen the Feed's
-          search icon used to open. */}
+      {/* Search, fourth: the founder's order was Feed, Nights, Messages,
+          Search, Profile, Messages dead centre, and it is Feed, Nearby,
+          Messages, Search, Profile since Nearby took Nights' slot
+          (2026-10-11). Same screen the Feed's search icon used to
+          open. */}
       <Tab.Screen
         name="Search"
         component={SearchScreen}
@@ -851,10 +857,10 @@ export default function App() {
  * welcome has no navigator yet, so its "post" and "scan" wait here for
  * onReady.
  */
-let afterWelcome: "post" | "scan" | null = null;
+let afterWelcome: "post" | "scan" | "binder" | null = null;
 
 function followWelcome(
-  end: "post" | "look" | "scan",
+  end: "post" | "look" | "scan" | "binder",
   navigation: { navigate: (...args: never[]) => void },
 ): void {
   const go = navigation.navigate as (name: string, params?: object) => void;
@@ -865,6 +871,13 @@ function followWelcome(
   /* The splash's guest door: "At a store? Scan the code". */
   if (end === "scan") {
     go("Scan");
+    return;
+  }
+  /* "Add a binder": the Feed underneath, their binders on top, so Back
+     lands somewhere and "New binder" is the first thing on screen. */
+  if (end === "binder") {
+    go("Tabs", { screen: "Feed" });
+    go("Binders");
     return;
   }
   void queueSpotlight();
@@ -997,8 +1010,9 @@ function AppGates() {
             /* The intro's last answer, acted on once the tabs exist. */
             if (end === "look") void queueSpotlight();
             /* A new player: the Profile's tour, on their first visit. */
-            if (end === "look" || end === "post") void queueTours();
-            afterWelcome = end === "post" || end === "scan" ? end : null;
+            if (end === "look" || end === "post" || end === "binder") void queueTours();
+            afterWelcome =
+              end === "post" || end === "scan" || end === "binder" ? end : null;
             setGate("open");
           }}
         />
@@ -1121,7 +1135,7 @@ function AppGates() {
               <WelcomeScreen
                 initialStep="account"
                 onDone={(end) => {
-                  if (end === "look" || end === "post") void queueTours();
+                  if (end === "look" || end === "post" || end === "binder") void queueTours();
                   if (end) followWelcome(end, navigation);
                   else navigation.goBack();
                 }}
@@ -1137,6 +1151,7 @@ function AppGates() {
               <ReplayIntro
                 onPost={() => followWelcome("post", navigation)}
                 onLook={() => followWelcome("look", navigation)}
+                onBinder={() => followWelcome("binder", navigation)}
               />
             )}
           </Stack.Screen>
@@ -1149,7 +1164,7 @@ function AppGates() {
                 <WelcomeScreen
                   preview
                   onDone={(end) => {
-                    if (end === "look" || end === "post") void queueTours();
+                    if (end === "look" || end === "post" || end === "binder") void queueTours();
                     if (end) followWelcome(end, navigation);
                     else navigation.goBack();
                   }}

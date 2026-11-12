@@ -4,6 +4,9 @@ import type { ThreadTradeFailure } from "./thread-trades";
     client bundle can read it without dragging the server in. */
 export const THREAD_TRADE_QUANTITY_MAX = 99;
 
+/** The button above the composer, and the row in the ⋯. One name for it. */
+export const WE_TRADED = "We traded";
+
 /**
  * What a refused "We traded" says, in words for the person. Free of
  * server-only imports (a type import carries nothing), so the website's

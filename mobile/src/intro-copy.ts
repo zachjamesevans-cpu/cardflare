@@ -59,6 +59,12 @@ export const INTRO_SKIP = "Skip";
 export const INTRO_POST = "Post your first Flare";
 /** The quieter way out: the Feed, with the + pointed at. */
 export const INTRO_LOOK = "Look around first";
+/**
+ * The other quiet way out, beside it: straight to the binders, so a new
+ * player can arrive with cards to trade and not only cards to find.
+ * The third and fourth cards have just shown what a binder is.
+ */
+export const INTRO_BINDER = "Add a binder";
 
 /** The one line beside the highlighted + on a first visit to the Feed. */
 export const SPOTLIGHT_LINE = "Tap here to post a Flare: the cards you’re hunting.";

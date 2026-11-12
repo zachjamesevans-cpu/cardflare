@@ -82,23 +82,13 @@ export const inventoryEntrySchema = z
 
 export type InventoryEntryInput = z.infer<typeof inventoryEntrySchema>;
 
-/**
- * "PSA 10", "BGS 9.5", "CGC Authentic", "Raw".
- *
- * The label an attendee reads next to a booth number, so it says what the
- * physical object is and nothing else.
+/*
+ * `slabLabel` lives in slab-label.ts, which has no zod in it: the room's
+ * show search reads it in the browser, and from this file it cost the
+ * event room the whole validation library. Re-exported so the server
+ * keeps one import.
  */
-export function slabLabel(
-  form: InventoryForm,
-  grader: string | null,
-  grade: number | null,
-): string {
-  if (form === "raw") return "Raw";
-  if (grade === null) return `${grader} Authentic`;
-
-  // 10, not 10.0 — but 9.5 stays 9.5. Number() drops the trailing zero.
-  return `${grader} ${Number(grade)}`;
-}
+export { slabLabel } from "./slab-label";
 
 /** "A12" on the back of an attendee's hand. Same hygiene as the database. */
 export const boothSchema = z

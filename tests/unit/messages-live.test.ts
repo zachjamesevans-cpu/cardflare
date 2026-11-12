@@ -111,6 +111,17 @@ describe("the Messages list", () => {
     expect(list).not.toContain(".limit(500)");
   });
 
+  it("reads a page's newest messages together, and one at a time only for what that missed", () => {
+    expect(list).toContain("const newest = await newestMessages(pageRows);");
+    expect(list).toContain(".limit(NEWEST_WINDOW);");
+    expect(list).toContain("if ((batch ?? []).length < NEWEST_WINDOW) return newest;");
+    expect(list).toContain("missed = missed.filter((row) => !newest.has(row.id));");
+    /* The one-at-a-time read comes after the rounds, never instead. */
+    expect(list.indexOf(".limit(NEWEST_WINDOW);")).toBeLessThan(
+      list.indexOf('.eq("thread_id", row.id)'),
+    );
+  });
+
   it("does not let empty conversations take a slot", () => {
     expect(list).toContain("if (!message || rows.length >= LIST_SIZE) return;");
     expect(list).toContain(
@@ -124,7 +135,7 @@ describe("the Messages list", () => {
 
   it("is read once on a visit to Messages, not twice", () => {
     expect(app).toContain(
-      'if (route.name !== "Messages") void refreshUnreadMessages();',
+      'if (route.name !== "Messages") void refreshUnreadMessages({ throttle: true });',
     );
     expect(local).toContain("setUnreadMessages(totalUnread(nextThreads.threads));");
   });

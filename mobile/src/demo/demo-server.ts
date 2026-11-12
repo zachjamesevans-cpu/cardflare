@@ -241,6 +241,20 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
     if (route === "/api/v1/notifications") return { value: demoNotifications() };
     if (route === "/api/v1/notifications/unread") return { value: demoUnread() };
     if (route === "/api/v1/local/threads") return { value: demoThreads() };
+    /* The Messages dot's count, from the same demo conversations the
+       list draws. Before the thread-by-id route below, which would
+       read "unread" as an id and let the request out to the real
+       server, where the answer is the real account's count. */
+    if (route === "/api/v1/local/threads/unread") {
+      return {
+        value: {
+          unread: demoThreads().threads.reduce(
+            (sum, thread) => sum + Math.max(0, thread.unread),
+            0,
+          ),
+        },
+      };
+    }
     if (route === "/api/v1/followers") return { value: { followers: [...named, ...crowd] } };
     if (route === "/api/v1/following") {
       return { value: { following: [...named, ...crowd.slice(0, FOLLOWING_CROWD)] } };

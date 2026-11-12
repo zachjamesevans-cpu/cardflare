@@ -1,6 +1,7 @@
 "use client";
 
 import { useContext, useMemo, useState, useTransition, type ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Ban, Flag, LayoutList, ListChecks, Trash2 } from "lucide-react";
 
@@ -10,22 +11,41 @@ import {
   type OfferableCard,
 } from "@/components/cards/card-image-zoom";
 import { FlareCardsSheet } from "@/components/feed/flare-cards-sheet";
-import { FlareProgressSheet } from "@/components/feed/flare-progress-sheet";
 import {
   hideAuthor,
   useAuthorHidden,
   usePostHidden,
 } from "@/components/feed/hidden-posts";
 import { showUndoToast, useTakeDown } from "@/components/feed/undo-toast";
-import { OfferReview } from "@/components/flares/offer-review";
-import { ReportSheet } from "@/components/players/report-sheet";
 import { Button } from "@/components/ui/button";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
 import { Sheet } from "@/components/ui/sheet";
+import { useOpened } from "@/components/ui/use-opened";
 import { inYourOfferLine } from "@/lib/feed/offer-copy";
 import type { FeedCard } from "@/lib/feed/repository";
 import { takeDownPostAction } from "@/lib/flares/withdraw-actions";
 import { blockPlayerAction } from "@/lib/players/safety-actions";
+
+/*
+ * Sheets nobody sees until they ask: the review of an offer, the
+ * progress ticks and the report. Every post in the Feed draws this
+ * file, so their code is loaded on the press that opens them and not
+ * with the Feed, and nothing stands in for a sheet while it loads.
+ *
+ * The list of cards (FlareCardsSheet) is NOT one of them, on purpose.
+ * Closed, it is already listening for an offer sent from a card's
+ * viewer, so the card reads OFFERED the moment the list opens; drawn
+ * late, it would have missed that.
+ */
+const OfferReview = dynamic(() =>
+  import("@/components/flares/offer-review").then((m) => m.OfferReview),
+);
+const FlareProgressSheet = dynamic(() =>
+  import("@/components/feed/flare-progress-sheet").then((m) => m.FlareProgressSheet),
+);
+const ReportSheet = dynamic(() =>
+  import("@/components/players/report-sheet").then((m) => m.ReportSheet),
+);
 
 /**
  * What you can do to a post, behind the three dots.
@@ -112,21 +132,25 @@ export function PostOffer({
     [offerable, post.cards],
   );
   const build = useOfferBuild(post.postId, cards);
+  /* The review is drawn from its first opening on: see the top. */
+  const reviewOpened = useOpened(build.reviewOpen);
 
   if (cards.length === 0) return <>{children}</>;
 
   return (
     <OfferPicksContext.Provider value={build}>
       {children}
-      <OfferReview
-        open={build.reviewOpen}
-        onClose={build.closeReview}
-        lines={build.lines}
-        onQuantity={build.setQuantity}
-        onRemove={build.remove}
-        onSubmit={build.submit}
-        onSent={build.clear}
-      />
+      {reviewOpened && (
+        <OfferReview
+          open={build.reviewOpen}
+          onClose={build.closeReview}
+          lines={build.lines}
+          onQuantity={build.setQuantity}
+          onRemove={build.remove}
+          onSubmit={build.submit}
+          onSent={build.clear}
+        />
+      )}
     </OfferPicksContext.Provider>
   );
 }
@@ -269,6 +293,9 @@ export function PostMenu({ post }: { post: PostShape }) {
     null,
   );
   const { takeDown } = useTakeDown();
+  /* Each drawn from its first opening on: see the top. */
+  const progressOpened = useOpened(sheet === "progress");
+  const reportOpened = useOpened(sheet === "report");
 
   const items: MenuItem[] = [];
   if (post.total > 1) {
@@ -331,14 +358,14 @@ export function PostMenu({ post }: { post: PostShape }) {
         yours={post.yours}
         completed={post.completed}
       />
-      {post.yours && post.direction === "want" && (
+      {post.yours && post.direction === "want" && progressOpened && (
         <FlareProgressSheet
           open={sheet === "progress"}
           onClose={() => setSheet(null)}
           cards={post.cards}
         />
       )}
-      {!post.yours && (
+      {!post.yours && reportOpened && (
         <ReportSheet
           open={sheet === "report"}
           onClose={() => setSheet(null)}

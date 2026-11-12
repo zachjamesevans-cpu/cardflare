@@ -1,8 +1,9 @@
 import { Image as ExpoImage } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Easing,
   cancelAnimation,
+  runOnUI,
   useDerivedValue,
   useSharedValue,
   withDelay,
@@ -10,6 +11,8 @@ import {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
+
+import { useAwake, useLoop } from "./awake";
 
 /**
  * The Skia kit: real holofoil, travelling frames, and the orbit ring.
@@ -188,7 +191,9 @@ const evenly = (count: number) =>
   Array.from({ length: count }, (_, i) => i / (count - 1));
 
 type SkiaModule = typeof import("@shopify/react-native-skia");
-type SkImage = NonNullable<ReturnType<SkiaModule["Skia"]["Image"]["MakeImageFromEncoded"]>>;
+type SkImage = NonNullable<
+  ReturnType<SkiaModule["Skia"]["Image"]["MakeImageFromEncoded"]>
+>;
 
 /** Decoded card art by URL, newest last; the oldest go past the cap. */
 const decoded = new Map<string, SkImage>();
@@ -214,7 +219,11 @@ function loadDecoded(S: SkiaModule, url: string): Promise<SkImage | null> {
         await ExpoImage.prefetch(url, "disk").catch(() => false);
         path = await ExpoImage.getCachePathAsync(url).catch(() => null);
       }
-      const source = path ? (path.startsWith("file://") ? path : `file://${path}`) : url;
+      const source = path
+        ? path.startsWith("file://")
+          ? path
+          : `file://${path}`
+        : url;
       const data = await S.Skia.Data.fromURI(source);
       const image = S.Skia.Image.MakeImageFromEncoded(data);
       if (!image) return null;
@@ -283,21 +292,13 @@ function makeKit(S: SkiaModule) {
   }
 
   /** 0 -> 1 forever. Linear unless told otherwise; loops seamlessly
-      because every gradient it drives repeats with a one-period tile. */
+      because every gradient it drives repeats with a one-period tile.
+      Held still while nobody can see it (src/awake.ts): a Feed of
+      foils under another screen was drawing every frame for no one. */
   function usePhase(duration: number, easeInOut = false, bounce = false) {
     const phase = useSharedValue(0);
-    useEffect(() => {
-      phase.value = 0;
-      phase.value = withRepeat(
-        withTiming(1, {
-          duration,
-          easing: easeInOut ? Easing.inOut(Easing.ease) : Easing.linear,
-        }),
-        -1,
-        bounce,
-      );
-      return () => cancelAnimation(phase);
-    }, [duration, easeInOut, bounce, phase]);
+    const awake = useAwake();
+    useLoop(phase, awake, duration, easeInOut, bounce);
     return phase;
   }
 
@@ -320,20 +321,76 @@ function makeKit(S: SkiaModule) {
     const drift = usePhase(holo === "galaxy-holo" ? 13000 : 11000);
     const cross = usePhase(10000, true, true);
 
-    /* cf-foil-sweep: across in the first 45%, then a long hold. */
+    /* cf-foil-sweep: across in the first 45%, then a long hold. Held
+       still while nobody can see it, like every phase here; a return
+       finishes the crossing it stopped in, holds, and loops as before. */
     const sweepPhase = useSharedValue(0);
+    const sweepAwake = useAwake();
+    const sweepSlept = useRef(false);
     useEffect(() => {
-      sweepPhase.value = 0;
-      sweepPhase.value = withRepeat(
-        withSequence(
-          withTiming(1, { duration: 3600, easing: Easing.inOut(Easing.ease) }),
-          withDelay(4400, withTiming(0, { duration: 0 })),
-        ),
-        -1,
-        false,
-      );
+      if (!sweepAwake) {
+        sweepSlept.current = true;
+        return;
+      }
+      const resume = sweepSlept.current;
+      sweepSlept.current = false;
+      const ease = Easing.inOut(Easing.ease);
+      const linear = Easing.linear;
+
+      if (!resume) {
+        sweepPhase.value = 0;
+        sweepPhase.value = withRepeat(
+          withSequence(
+            withTiming(1, { duration: 3600, easing: ease }),
+            withDelay(4400, withTiming(0, { duration: 0 })),
+          ),
+          -1,
+          false,
+        );
+      } else {
+        runOnUI(() => {
+          "worklet";
+          const at = sweepPhase.value;
+          if (!(at > 0 && at < 1)) {
+            /* Stopped in the hold, the band off the card: start over. */
+            sweepPhase.value = 0;
+            sweepPhase.value = withRepeat(
+              withSequence(
+                withTiming(1, { duration: 3600, easing: ease }),
+                withDelay(4400, withTiming(0, { duration: 0 })),
+              ),
+              -1,
+              false,
+            );
+            return;
+          }
+          sweepPhase.value = withTiming(
+            1,
+            { duration: 3600 * (1 - at), easing: linear },
+            (crossed) => {
+              "worklet";
+              if (!crossed) return;
+              sweepPhase.value = withDelay(
+                4400,
+                withTiming(0, { duration: 0 }, (held) => {
+                  "worklet";
+                  if (!held) return;
+                  sweepPhase.value = withRepeat(
+                    withSequence(
+                      withTiming(1, { duration: 3600, easing: ease }),
+                      withDelay(4400, withTiming(0, { duration: 0 })),
+                    ),
+                    -1,
+                    false,
+                  );
+                }),
+              );
+            },
+          );
+        })();
+      }
       return () => cancelAnimation(sweepPhase);
-    }, [sweepPhase]);
+    }, [sweepPhase, sweepAwake]);
 
     /* cf-star-breathe: 6s ease, opacity 0.55 <-> 1. */
     const breathe = usePhase(3000, true, true);

@@ -11,7 +11,7 @@ import { Rail } from "@/components/lists/rail";
 import { ProMark } from "@/components/stores/ultra-mark";
 import { buyCosmeticAction } from "@/lib/players/profile-actions";
 import type { CosmeticItem, EquipSlot } from "@/lib/players/cosmetics";
-import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
+import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-state";
 
 /**
  * The shop and the wardrobe, which are the same shelf.

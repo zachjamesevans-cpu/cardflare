@@ -2,9 +2,9 @@
 
 import { useActionState, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
+import dynamic from "next/dynamic";
 import { ImageIcon, Loader2 } from "lucide-react";
 
-import { ImageCropper } from "@/components/players/image-cropper";
 import { setCoverAction } from "@/lib/players/profile-actions";
 import {
   AVATAR_MAX_BYTES,
@@ -12,7 +12,14 @@ import {
   COVER_HEIGHT,
   COVER_WIDTH,
 } from "@/lib/players/profile-image";
-import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
+import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-state";
+
+/* The cropper is only drawn once a picture has been chosen, so it and
+   the image pipeline behind it are loaded then and not with the page.
+   Nothing stands in for it while it loads; it lands where it always did. */
+const ImageCropper = dynamic(() =>
+  import("@/components/players/image-cropper").then((m) => m.ImageCropper),
+);
 
 /**
  * Choosing a cover banner.

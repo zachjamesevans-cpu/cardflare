@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 
 import type { StackParams } from "../../App";
@@ -13,11 +13,22 @@ import {
   type CardPage,
   type CardPagePlayer,
 } from "../api";
+import { demandLine } from "../demand-copy";
+import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { displayCardName } from "../card-name";
 import { gameShortName } from "../games";
 import { PlayerAvatar } from "../player-avatar";
 import { colors, gutter, radius, spacing } from "../theme";
-import { AsyncButton, Button, CardImage, ErrorLine, Loading, Muted, Tap, Title } from "../ui";
+import {
+  AsyncButton,
+  Button,
+  CardImage,
+  ErrorLine,
+  Loading,
+  Muted,
+  Tap,
+  Title,
+} from "../ui";
 
 /**
  * One card, whole: the website's /cards/[cardId], reached from a
@@ -42,14 +53,49 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
+  /* The card a fresh read has painted, so a slow disk read never
+     paints an older page over it. */
+  const freshFor = useRef<string | null>(null);
+
+  /*
+   * The page as last seen, painted at once: the screen opened on a
+   * spinner every time, for art and a name that never change. Kept by
+   * card under the signed-in player's id (the page says what YOU have
+   * to do with it), so a guest has none and the next account on this
+   * phone never reads it. The fresh read below lands over it.
+   */
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      const viewer = await cachedPlayerId();
+      if (!viewer) return;
+      const cached = await readCache<CardPage>("card", viewer, cardId);
+      if (live && cached?.card && freshFor.current !== cardId) {
+        setPage((current) => current ?? cached);
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [cardId]);
+
   const load = useCallback(async () => {
     try {
       const { page: fresh } = await getCardPage(cardId);
+      freshFor.current = cardId;
       setPage(fresh);
       setError(null);
+      const viewer = await cachedPlayerId();
+      if (viewer) void writeCache("card", viewer, fresh, cardId);
     } catch (caught) {
-      if (caught instanceof ApiError && caught.status === 404) setMissing(true);
-      else setError(friendlyError(caught));
+      if (caught instanceof ApiError && caught.status === 404) {
+        /* Gone: the last look goes too, from the screen and the phone. */
+        freshFor.current = cardId;
+        setPage(null);
+        setMissing(true);
+        const viewer = await cachedPlayerId();
+        if (viewer) void writeCache("card", viewer, null, cardId);
+      } else setError(friendlyError(caught));
     }
   }, [cardId]);
 
@@ -88,6 +134,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
   }
 
   const { card, you, located, holders, hunters, stores } = page;
+  const standing = demandLine(page.demand);
   /* The provider's name, without a bracketed number printed below it. */
   const name = displayCardName(card.name, card.number);
   /* Large, but never wider than a card reads comfortably. */
@@ -117,6 +164,16 @@ export function CardScreen({ cardId }: { cardId: string }) {
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
             {`${card.number} · ${gameShortName(card.game)}`}
           </Text>
+          {/* "12 hunting · 3 have it for trade": the two lists below,
+              counted. What a price would say, without one. Same line
+              on the website's card page. */}
+          {standing ? (
+            <Text
+              style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}
+            >
+              {standing}
+            </Text>
+          ) : null}
         </View>
       </View>
 

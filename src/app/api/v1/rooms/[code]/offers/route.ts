@@ -8,7 +8,7 @@ import { findParticipation } from "@/lib/events/participants";
 import { resolveCode } from "@/lib/events/rooms";
 import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { offerTrade, withdrawOffer } from "@/lib/matching/repository";
-import { offerMessageSchema, offerQuantitySchema } from "@/lib/matching/schema";
+import { offerMessageSchema, offerQuantitySchema } from "@/lib/matching/offer-schema";
 import { notifyOfferReceived } from "@/lib/notifications/notify";
 
 export const dynamic = "force-dynamic";

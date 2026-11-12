@@ -52,7 +52,7 @@ describe("the doors that put something on", () => {
   });
 
   it("both clients say why", () => {
-    expect(read("src/lib/players/profile-schema.ts")).toContain(
+    expect(read("src/lib/players/profile-state.ts")).toContain(
       '"not-pro": "Wearing cosmetics is a cardflare Pro feature."',
     );
     expect(read("mobile/src/screens/store.tsx")).toContain(

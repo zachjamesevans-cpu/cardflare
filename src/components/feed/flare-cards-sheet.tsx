@@ -225,6 +225,8 @@ export function FlareCardsSheet({
                     <img
                       src={card.imageUrl}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-cover"
                     />
                   )}

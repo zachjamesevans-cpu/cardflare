@@ -3,9 +3,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { grantRefusal } from "@/lib/auth/grant-refusal";
-import { emailsMatch as webEmailsMatch } from "@/lib/auth/signup-schema";
+import {
+  emailsMatch as webEmailsMatch,
+  emailTypoPrompt as webEmailTypoPrompt,
+} from "@/lib/auth/signup-schema";
 import { playersLine as webPlayersLine } from "@/lib/players/games-catalog";
-import { emailsMatch as appEmailsMatch } from "../../mobile/src/email-confirm";
 import { playersLine as appPlayersLine } from "../../mobile/src/games";
 import { CLAIMED_MESSAGE, renewalLine } from "../../mobile/src/pro-copy";
 
@@ -94,29 +96,42 @@ describe("signing out takes everything the account left on the phone", () => {
 });
 
 describe("sign-up", () => {
-  it("asks for the email twice, with the same rule on both platforms", () => {
-    const cases: [string, string][] = [
-      ["zach@x.com", "zach@x.com"],
-      ["Zach@X.com ", "zach@x.com"],
-      ["zach@x.com", "zack@x.com"],
-      ["", ""],
-    ];
-    for (const [email, confirm] of cases) {
-      expect(appEmailsMatch(email, confirm)).toBe(webEmailsMatch(email, confirm));
-    }
-    expect(webEmailsMatch("Zach@X.com ", "zach@x.com")).toBe(true);
-    expect(webEmailsMatch("", "")).toBe(false);
-
+  it("asks for the email once, and offers a fix for a mistyped domain", () => {
+    /* The second field is gone from both forms... */
     const welcome = read("mobile/src/screens/welcome.tsx");
-    expect(welcome).toContain('placeholder="Confirm email"');
-    expect(welcome).toContain("disabled={!emailsAgree}");
+    expect(welcome).not.toContain("Confirm email");
+    expect(welcome).not.toContain("confirmEmail");
+    expect(welcome).not.toContain("emailsAgree");
 
     const form = read("src/components/auth/signup-form.tsx");
-    expect(form).toContain('name="confirmEmail"');
-    expect(form).toContain("<SubmitButton blocked={!emailsAgree} />");
-    /* And the server says it too: a Server Action is a public endpoint. */
-    expect(read("src/lib/auth/actions.ts")).toContain(
-      'emailsMatch(email, text(formData, "confirmEmail"))',
+    expect(form).not.toContain("Confirm email");
+    expect(form).not.toContain("confirmEmail");
+    expect(form).toContain("<SubmitButton />");
+
+    /* ...and in its place one line, a button, that puts the fix in the
+       field. It offers; it never holds the submit button. */
+    expect(welcome).toContain("const emailSuggestion = emailTypoSuggestion(email);");
+    expect(welcome).toContain("<Tap onPress={() => setEmail(emailSuggestion)}");
+    expect(welcome).toContain("{emailTypoPrompt(emailSuggestion)}");
+
+    expect(form).toContain("const emailSuggestion = emailTypoSuggestion(email);");
+    expect(form).toContain("onClick={() => setEmail(emailSuggestion)}");
+    expect(form).toContain("{emailTypoPrompt(emailSuggestion)}");
+    expect(webEmailTypoPrompt("zach@gmail.com")).toBe("Did you mean zach@gmail.com?");
+  });
+
+  it("still refuses a second address that is sent and does not match", () => {
+    expect(webEmailsMatch("Zach@X.com ", "zach@x.com")).toBe(true);
+    expect(webEmailsMatch("zach@x.com", "zack@x.com")).toBe(false);
+    expect(webEmailsMatch("", "")).toBe(false);
+
+    /* Not required any more, so absent is fine. Sent and different is
+       refused as before: a Server Action is a public endpoint, and a
+       form from before the change may still be open in a tab. */
+    const action = read("src/lib/auth/actions.ts");
+    expect(action).toContain('const confirmEmail = text(formData, "confirmEmail");');
+    expect(action).toContain(
+      'if (confirmEmail !== "" && !emailsMatch(email, confirmEmail))',
     );
   });
 

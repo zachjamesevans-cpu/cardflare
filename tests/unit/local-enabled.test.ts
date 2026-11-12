@@ -51,6 +51,7 @@ describe("the Local switch", () => {
       "src/app/api/v1/local/route.ts",
       "src/app/api/v1/local/flares/route.ts",
       "src/app/api/v1/local/threads/route.ts",
+      "src/app/api/v1/local/threads/unread/route.ts",
     ]) {
       expect(read(route)).not.toContain("LOCAL_ENABLED");
     }

@@ -23,8 +23,9 @@ describe("a heart belongs to its post", () => {
   });
 
   it("the website keys post rows by the post", () => {
-    const page = read("src/app/feed/page.tsx");
-    expect(page).toContain('item.kind === "hunt" ? `hunt-${item.postId}`');
+    /* The list the Feed page and the Nearby page both draw. */
+    const list = read("src/components/feed/feed-list.tsx");
+    expect(list).toContain('item.kind === "hunt" ? `hunt-${item.postId}`');
   });
 
   it("both hearts follow the server's word when it changes", () => {

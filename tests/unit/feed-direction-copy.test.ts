@@ -155,15 +155,25 @@ describe("which way a Flare points", () => {
 
 describe("the Feed page", () => {
   const page = read("src/app/feed/page.tsx");
+  const nearby = read("src/app/nearby/page.tsx");
+  const list = read("src/components/feed/feed-list.tsx");
   const items = read("src/components/feed/feed-items.tsx");
 
-  it("has one empty state per tab and no unreachable fourth", () => {
-    expect(page.match(/shown\.length === 0/g)).toHaveLength(3);
-    expect(page).not.toContain("No Flares of yours yet");
+  it("has one empty state per tab and no unreachable extra", () => {
+    /* A page per tab now: Following's on the Feed, the empty room on
+       Nearby. My Flares went with its tab, and so did its empty state. */
+    expect(page.match(/shown\.length === 0/g)).toHaveLength(1);
+    expect(page).toContain("Nothing from people yet");
+    expect(nearby.match(/plan\.posts === 0/g)).toHaveLength(1);
+    expect(nearby).toContain("No Flares near you yet");
+    for (const source of [page, nearby]) {
+      expect(source).not.toContain("No Flares of yours yet");
+      expect(source).not.toContain("You have not posted yet");
+    }
   });
 
   it("draws no reason line under a post, a store's included", () => {
-    expect(page).toContain('item.kind !== "hunt" && item.kind !== "storePost"');
+    expect(list).toContain('item.kind !== "hunt" && item.kind !== "storePost"');
   });
 
   it("defines agoFrom once, on the post, and the row borrows it", () => {
@@ -187,9 +197,12 @@ describe("the Feed page", () => {
   });
 
   it("offers a guest the account first, and a way in second", () => {
-    expect(page).toContain("Create account");
-    expect(page).toMatch(/>\s*Sign in\s*</);
-    expect(page).not.toContain("Join free");
+    /* One door for both tabs, each coming back to itself. */
+    expect(list).toContain("Create account");
+    expect(list).toMatch(/>\s*Sign in\s*</);
+    expect(list).not.toContain("Join free");
+    expect(page).toContain('<GuestDoor next="/feed" />');
+    expect(nearby).toContain('<GuestDoor next="/nearby" />');
     expect(read("src/components/players/account-pitch.tsx")).toContain(
       "Create account",
     );
@@ -210,7 +223,7 @@ describe("the chrome of a tab-bar page", () => {
     /* The name is ProfileHeader's alone: no console title above it. */
     const profile = read("src/app/p/[playerId]/page.tsx");
     expect(profile).not.toContain("What this player has traded for");
-    expect(profile).toContain("description: `${profile.displayName} on cardflare`");
+    expect(profile).toContain("description: `${name} on cardflare`");
   });
 
   it("sends a hunt page's logo to the Feed too", () => {

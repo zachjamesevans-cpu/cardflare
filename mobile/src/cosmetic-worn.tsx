@@ -1,14 +1,7 @@
-import { useEffect } from "react";
 import { View } from "react-native";
-import {
-  Easing,
-  cancelAnimation,
-  useDerivedValue,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import { useDerivedValue, useSharedValue } from "react-native-reanimated";
 
+import { useAwake, useLoop } from "./awake";
 import { auraClearance, auraLayer, ringGlow, ringLayer } from "./avatar-geometry";
 import {
   AURA_ART,
@@ -127,7 +120,11 @@ const SHAPES: Record<
 function particlePaths(S: Skia) {
   const out = {} as Record<
     AuraShape,
-    { path: ReturnType<typeof S.Skia.Path.Make>; stroke?: number; inner?: ReturnType<typeof S.Skia.Path.Make> }
+    {
+      path: ReturnType<typeof S.Skia.Path.Make>;
+      stroke?: number;
+      inner?: ReturnType<typeof S.Skia.Path.Make>;
+    }
   >;
 
   for (const key of Object.keys(SHAPES) as AuraShape[]) {
@@ -182,23 +179,13 @@ function makeKit(S: Skia) {
   function Ring({ art, size }: { art: RingArt; size: number }) {
     const turn = useSharedValue(0);
 
-    useEffect(() => {
-      if (art.spinSeconds === null) return;
-
-      turn.value = 0;
-      turn.value = withRepeat(
-        withTiming(1, {
-          duration: art.spinSeconds * 1000,
-          easing: Easing.linear,
-        }),
-        -1,
-        false,
-      );
-
-      /* Cancelled on the way out. A roster that scrolls would otherwise
-         leave an animation running per avatar it has passed. */
-      return () => cancelAnimation(turn);
-    }, [art.spinSeconds, turn]);
+    /* One linear lap per `spinSeconds`, forever; none for a ring that
+       does not turn. Cancelled on the way out (a roster that scrolls
+       would otherwise leave an animation running per avatar it has
+       passed) and held still while the screen it is on is not the one
+       in front: see src/awake.ts. */
+    const awake = useAwake();
+    useLoop(turn, awake, art.spinSeconds === null ? null : art.spinSeconds * 1000);
 
     const spin = useDerivedValue(() => [{ rotate: turn.value * Math.PI * 2 }]);
 
@@ -276,16 +263,9 @@ function makeKit(S: Skia) {
   function Aura({ art, size }: { art: AuraArt; size: number }) {
     const clock = useSharedValue(0);
 
-    useEffect(() => {
-      clock.value = 0;
-      clock.value = withRepeat(
-        withTiming(1, { duration: art.seconds * 1000, easing: Easing.linear }),
-        -1,
-        false,
-      );
-
-      return () => cancelAnimation(clock);
-    }, [art.seconds, clock]);
+    /* Held still while nobody can see it, like the ring. */
+    const awake = useAwake();
+    useLoop(clock, awake, art.seconds * 1000);
 
     const { box, centre, offset, orbit } = auraLayer(size);
     const dot = Math.max(1.5, size * art.scale);
@@ -366,9 +346,7 @@ function makeKit(S: Skia) {
           const push = blocked > 0 ? Math.sqrt(blocked) : 0;
 
           return {
-            x:
-              centre +
-              (Math.abs(lane) < push ? (lane < 0 ? -push : push) : lane),
+            x: centre + (Math.abs(lane) < push ? (lane < 0 ? -push : push) : lane),
             y,
           };
         }

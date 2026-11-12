@@ -33,7 +33,9 @@ describe("the cache's account pointer", () => {
 
   it("is set from the signed-in player's own /me", () => {
     const home = read("mobile/src/screens/home.tsx");
-    const me = home.slice(home.indexOf("const fresh = await getMe();"));
+    /* /me is asked for alongside the feed, and awaited here. */
+    expect(home).toContain("const meRequest = getMe();");
+    const me = home.slice(home.indexOf("const fresh = await meRequest;"));
     expect(me.slice(0, 400)).toContain("void rememberAccount(fresh.player.id);");
   });
 });

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/card";
 import { buttonStyles } from "@/components/ui/button";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import type { CardPage, CardPagePlayer } from "@/lib/cards/card-page";
+import { demandLine } from "@/lib/cards/demand-copy";
 import { gameShortName } from "@/lib/players/games-catalog";
 
 /**
@@ -36,6 +37,7 @@ export function CardPageView({
   imagesEnabled: boolean;
 }) {
   const { card, you, located, holders, hunters, stores } = page;
+  const standing = demandLine(page.demand);
   const href = `/cards/${card.cardId}`;
   const art =
     imagesEnabled && isRenderableImageUrl(card.imageUrl) ? card.imageUrl : null;
@@ -57,6 +59,11 @@ export function CardPageView({
           </h1>
           <p className="text-sm text-text-secondary">{card.number}</p>
           <p className="text-sm text-text-muted">{gameShortName(card.game)}</p>
+          {/* "12 hunting · 3 have it for trade": the two lists below,
+              counted. What a price would say, without one. */}
+          {standing && (
+            <p className="text-sm font-semibold text-text-secondary">{standing}</p>
+          )}
         </div>
       </div>
 

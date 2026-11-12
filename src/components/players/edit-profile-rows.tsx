@@ -17,7 +17,7 @@ import {
   PRONOUNS_MAX,
   PROFILE_IDLE,
   type ProfileState,
-} from "@/lib/players/profile-schema";
+} from "@/lib/players/profile-state";
 
 /**
  * The list on Edit profile: Name, Username, Pronouns, Bio.

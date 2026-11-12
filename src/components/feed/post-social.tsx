@@ -3,10 +3,12 @@
 import { useState, useTransition } from "react";
 import { Heart, MessageCircle, PackageCheck } from "lucide-react";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Spinner } from "@/components/ui/spinner";
+import { useOpened } from "@/components/ui/use-opened";
 import { cn } from "@/lib/cn";
 import {
   addPostCommentAction,
@@ -14,9 +16,14 @@ import {
   loadPostThreadAction,
   togglePostLikeAction,
 } from "@/lib/feed/post-actions";
-import { ReportSheet } from "@/components/players/report-sheet";
 import { FlareMessage, type MessageTarget } from "@/components/feed/flare-message";
 import { POST_COMMENT_MAX, type ViewerComment } from "@/lib/feed/post-schema";
+
+/* The report sheet is only seen after "Report" is pressed, so its code
+   is loaded on that press and not under every post in the Feed. */
+const ReportSheet = dynamic(() =>
+  import("@/components/players/report-sheet").then((m) => m.ReportSheet),
+);
 
 /**
  * The row under a Flare post: a heart with its count, a bubble with its
@@ -66,6 +73,8 @@ export function PostSocial({
   /* A comment's Report and Delete, the app's "⋯" menu as two quiet
      words at the line's end. Report opens the one report sheet. */
   const [reporting, setReporting] = useState<string | null>(null);
+  /* Drawn from its first opening on: see the top. */
+  const reportOpened = useOpened(reporting !== null);
   const [deleting, startDeleting] = useTransition();
 
   const removeComment = (commentId: string) => {
@@ -255,12 +264,14 @@ export function PostSocial({
             </ul>
           )}
 
-          <ReportSheet
-            open={reporting !== null}
-            onClose={() => setReporting(null)}
-            kind="comment"
-            targetId={reporting ?? ""}
-          />
+          {reportOpened && (
+            <ReportSheet
+              open={reporting !== null}
+              onClose={() => setReporting(null)}
+              kind="comment"
+              targetId={reporting ?? ""}
+            />
+          )}
 
           <form
             onSubmit={(event) => {

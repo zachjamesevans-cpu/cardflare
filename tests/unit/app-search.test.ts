@@ -168,10 +168,17 @@ describe("the Search tab", () => {
     );
   });
 
-  it("says Nothing for that yet. only once every search has answered empty", () => {
-    expect(src.search).toContain(
-      "{nothing ? <Muted>Nothing for that yet.</Muted> : null}",
+  it("says nothing matched only once every search has answered empty", () => {
+    /* The words are src/empty-copy.ts's, by the tab that is open. */
+    expect(src.search).toContain('import { searchEmpty } from "../empty-copy";');
+    expect(src.search).toMatch(
+      /const empty =\s*nothing && found\s*\? searchEmpty\(shown, \{/,
     );
+    expect(src.search).toContain("<Body>{empty.line}</Body>");
+    expect(src.search).toContain("<Muted>{empty.hint}</Muted>");
+    /* One button, only when another kind matched: back to Top. */
+    expect(src.search).toContain("{empty.action ? (");
+    expect(src.search).toContain('onPress={() => setTab("top")}');
     expect(src.search).toContain("found.pending === 0 &&");
     /* Before typing, nothing: the state is null until a search runs. */
     expect(src.search).toContain("useState<Results | null>(null)");

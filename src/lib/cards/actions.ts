@@ -3,7 +3,8 @@
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { parseCardQuery } from "./query";
-import { cardQuerySchema, floatAskedVariants, type CardResult } from "./schema";
+import { cardQuerySchema } from "./query-schema";
+import { floatAskedVariants, type CardResult } from "./schema";
 import { catalogueIsEmpty, searchCards, type CardSearchFilters } from "./search";
 import { isGameSlug } from "@/lib/players/games-catalog";
 

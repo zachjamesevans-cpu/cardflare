@@ -22,7 +22,7 @@ import {
 } from "../api";
 import { HeaderButton } from "../header";
 import { API_BASE } from "../config";
-import { EMAIL_MISMATCH, emailsMatch } from "../email-confirm";
+import { emailTypoPrompt, emailTypoSuggestion } from "../email-typo";
 import { formatHandle, HANDLE_MAX, HANDLE_MIN, handleWhileTyping } from "../handle";
 import { TCG_GAMES, type GameSlug } from "../games";
 import { registerForPush } from "../push";
@@ -110,10 +110,11 @@ type Step = "splash" | "account" | "games" | "where" | "intro" | "signin";
 /**
  * How a welcome ended: "post" from the intro's last button (open the
  * composer), "look" from its quieter one or Skip (the Feed, with the +
- * pointed at), "scan" from the splash's guest door (the scanner, no
+ * pointed at), "binder" from the link beside it (your binders, to add
+ * the first one), "scan" from the splash's guest door (the scanner, no
  * account), or nothing - signed in, where no intro is shown.
  */
-export type WelcomeEnd = "post" | "look" | "scan" | undefined;
+export type WelcomeEnd = "post" | "look" | "binder" | "scan" | undefined;
 
 export function WelcomeScreen({
   onDone,
@@ -198,6 +199,7 @@ export function WelcomeScreen({
           handle={handle}
           onPost={() => done("post")}
           onLook={() => done("look")}
+          onBinder={() => done("binder")}
         />
       )}
       {step === "signin" && (
@@ -323,7 +325,9 @@ function Splash({
       {/* The actions, low, where a thumb already is. */}
       <View style={{ gap: spacing(3) }}>
         <Button label="Create account" onPress={onCreate} />
-        <Text style={{ color: colors.textSecondary, fontSize: 15, textAlign: "center" }}>
+        <Text
+          style={{ color: colors.textSecondary, fontSize: 15, textAlign: "center" }}
+        >
           Have an account?{" "}
           <Text
             style={{ color: colors.accent, fontWeight: "700" }}
@@ -498,10 +502,11 @@ function AccountStep({
   preview: boolean;
 }) {
   const [email, setEmail] = useState("");
-  /* The address twice, as on the website: a typo here is an account
-     whose password reset goes to somebody else, or nowhere. */
-  const [confirmEmail, setConfirmEmail] = useState("");
-  const emailsAgree = emailsMatch(email, confirmEmail);
+  /* The address once, as on the website. A typo here is an account
+     whose password reset goes to somebody else, or nowhere, so a
+     mistyped well-known domain gets one line under the field offering
+     the fix. An offer only: it never holds the button. */
+  const emailSuggestion = emailTypoSuggestion(email);
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
@@ -511,8 +516,8 @@ function AccountStep({
   return (
     <Card>
       <Body>
-        Your email and a password, then who you are to other players. After this,
-        which games you play and roughly where.
+        Your email and a password, then who you are to other players. After this, which
+        games you play and roughly where.
       </Body>
       <Input
         value={email}
@@ -523,18 +528,12 @@ function AccountStep({
         keyboardType="email-address"
         autoComplete="email"
       />
-      <Input
-        value={confirmEmail}
-        onChangeText={setConfirmEmail}
-        placeholder="Confirm email"
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="email-address"
-        autoComplete="off"
-        accessibilityLabel="Confirm email"
-      />
-      {confirmEmail.trim() !== "" && !emailsAgree ? (
-        <Text style={{ color: colors.danger, fontSize: 14 }}>{EMAIL_MISMATCH}</Text>
+      {emailSuggestion ? (
+        <Tap onPress={() => setEmail(emailSuggestion)} hitSlop={8}>
+          <Text style={{ color: colors.accent, fontSize: 14 }}>
+            {emailTypoPrompt(emailSuggestion)}
+          </Text>
+        </Tap>
       ) : null}
       <Input
         value={password}
@@ -587,11 +586,13 @@ function AccountStep({
       <AsyncButton
         label="Create account"
         pendingLabel="Creating…"
-        disabled={!emailsAgree}
         onPress={async () => {
           setError(null);
-          if (!emailsAgree) {
-            setError(EMAIL_MISMATCH);
+          /* The button used to stay off until two addresses agreed,
+             which also kept an empty one from being sent. This keeps
+             that, in the words the website's form uses. */
+          if (email.trim() === "") {
+            setError("That email address does not look right.");
             return;
           }
           if (password.length < 8) {

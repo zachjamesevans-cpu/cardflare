@@ -99,6 +99,50 @@ export async function requestCoords(): Promise<LocationOutcome> {
   }
 }
 
+/** How old a last known fix may be and still be worth asking with. */
+const LAST_KNOWN_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The last place the phone already knows, at once, without waking
+ * anything: no dialog, no wait for a fix.
+ *
+ * `silentCoords` below takes a fix only when it is under two minutes
+ * old and otherwise waits for a new one, which is right for a tap that
+ * asked "where am I" and wrong for opening the Feed: the list for a
+ * place a few hours stale is almost always the same list, and it can
+ * be on screen seconds sooner. The Feed asks with this, then lets a
+ * fresh fix correct it behind the scenes if the phone has really moved
+ * (src/quiet-refresh.ts `movedEnough`).
+ *
+ * `permitted` says whether a position may be read at all, so a caller
+ * with no coordinate can tell "not allowed" from "allowed, but the
+ * phone has no fix to hand". Like everything here: nothing stored,
+ * never throws.
+ */
+export async function lastKnownCoords(): Promise<{
+  permitted: boolean;
+  coords: Coords | null;
+}> {
+  if (!(await haveLocationPermission())) return { permitted: false, coords: null };
+
+  try {
+    const position = await Location.getLastKnownPositionAsync({
+      maxAge: LAST_KNOWN_MAX_AGE_MS,
+    });
+    return {
+      permitted: true,
+      coords: position
+        ? {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }
+        : null,
+    };
+  } catch {
+    return { permitted: true, coords: null };
+  }
+}
+
 /**
  * The position we already have permission for, or null.
  *

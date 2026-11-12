@@ -10,7 +10,6 @@ import {
 import {
   formatHandle,
   handleFrom,
-  handleSchema,
   handleSeedFrom,
   handleWhileTyping,
   handleWithSuffix,
@@ -18,6 +17,7 @@ import {
   HANDLE_MAX,
   HANDLE_MIN,
 } from "@/lib/players/handle";
+import { handleSchema } from "@/lib/players/handle-schema";
 
 /**
  * A handle is stated three times: here, in the app's own copy, and in

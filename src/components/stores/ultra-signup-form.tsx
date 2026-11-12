@@ -7,7 +7,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { Field, describedBy, fieldIds } from "@/components/ui/field";
-import { PASSWORD_MIN } from "@/lib/auth/signup-schema";
+import { PASSWORD_MIN } from "@/lib/auth/signup-rules";
 import { startStoreTrialAction } from "@/lib/stores/ultra-actions";
 import {
   ULTRA_SIGNUP_IDLE,
