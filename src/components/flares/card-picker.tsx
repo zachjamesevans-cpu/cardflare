@@ -145,6 +145,8 @@ export function CardPicker(props: PickMany | PickOne) {
                     <img
                       src={printing.imageUrl}
                       alt={item.card.exactName}
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-cover"
                     />
                   )}

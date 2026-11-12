@@ -12,7 +12,7 @@ import { LIMITS } from "@/lib/api/throttle";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { clientKey } from "@/lib/request-context";
 import { offerTrade, withdrawOffer } from "./repository";
-import { offerMessageSchema, offerQuantitySchema } from "./schema";
+import { offerMessageSchema, offerQuantitySchema } from "./offer-schema";
 
 /**
  * Offering to answer a Flare, and taking the offer back.

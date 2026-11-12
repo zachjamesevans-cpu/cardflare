@@ -8,7 +8,7 @@ import { newPasswordSchema } from "@/lib/auth/schema";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { text } from "@/lib/form-value";
 import { accountIdentity } from "./account-identity";
-import { handleSchema } from "./handle";
+import { handleSchema } from "./handle-schema";
 import { isHandleFree, markOnboarded, setIdentity } from "./profile";
 import { displayNameSchema, type SetupState } from "./profile-schema";
 

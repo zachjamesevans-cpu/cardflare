@@ -38,8 +38,6 @@ const web = {
   embersStore: read("src/app/profile/store/page.tsx"),
   adminReports: read("src/app/admin/reports/page.tsx"),
   reportQueue: read("src/components/admin/report-queue.tsx"),
-  tabs: read("src/components/feed/feed-filter-tabs.tsx"),
-  tabFace: read("src/components/feed/feed-tab-face.tsx"),
   feedTile: read("src/components/feed/feed-tile.tsx"),
   safety: read("src/lib/players/safety-reasons.ts"),
   posters: [
@@ -203,17 +201,20 @@ describe("the admin queue, website only", () => {
   });
 });
 
-describe("the Feed tab answers the tap at once, website only", () => {
-  it("draws the pending tab lit, with the ring in the icon's place", () => {
-    /* The tab list stays on the server, where its titles live; the
-       face of each Link is the client child that watches the status. */
-    expect(web.tabs).toContain("<FeedTabFace");
-    expect(web.tabs).toContain('aria-current={on ? "page" : undefined}');
-    expect(web.tabs).not.toContain("prefetch={false}");
-    expect(web.tabFace).toContain('import { useLinkStatus } from "next/link"');
-    expect(web.tabFace).toContain("const { pending } = useLinkStatus();");
-    expect(web.tabFace).toContain("const lit = on || pending;");
-    expect(web.tabFace).toContain('{pending ? <Spinner size="sm" /> : icon}');
+describe("the Feed has no filter row left to wait on, website only", () => {
+  it("is Following alone, so the pending tab face went with the tabs", () => {
+    /* There were three filter tabs under the wordmark, each a Link with
+       a client face that lit up while the server answered. Nearby is a
+       tab in the bar now and My Flares is gone, on both platforms, so
+       the row and its face are deleted, not kept unused. The bar's own
+       tabs are covered by each route's loading.tsx. */
+    for (const gone of ["feed-filter-tabs.tsx", "feed-tab-face.tsx"]) {
+      expect(read(`src/components/feed/${gone}`), gone).toBe("");
+    }
+    expect(read("src/app/feed/page.tsx")).not.toContain("FeedFilterTabs");
+    expect(read("src/app/nearby/loading.tsx")).toContain(
+      '<TabPageShell title="Nearby">',
+    );
   });
 });
 
@@ -259,7 +260,11 @@ describe("a store page shows its upcoming nights", () => {
   it("on the website, inside the player chrome for a player", () => {
     expect(web.storePage).toContain("Upcoming nights");
     expect(web.storePage).toContain("Join the room");
-    expect(web.storePage).toContain("Nothing scheduled yet.");
+    /* The words live in the shared empty copy, with the line that
+       points at Follow (tests/unit/empty-copy-parity.test.ts). */
+    expect(web.storePage).toContain("{STORE_NIGHTS_EMPTY}");
+    expect(web.storePage).toContain("storeNightsEmptyHint(following)");
+    expect(read("src/lib/copy/empty-copy.ts")).toContain('"Nothing scheduled yet."');
     expect(web.storePage).toContain("store.upcoming.map(");
     expect(web.storePage).toContain("href={`/e/${night.joinCode}`}");
     /* The empty state only for a claimed store. */
@@ -274,7 +279,9 @@ describe("a store page shows its upcoming nights", () => {
   it("in the app", () => {
     expect(app.storePage).toContain("Upcoming nights");
     expect(app.storePage).toContain("Join the room");
-    expect(app.storePage).toContain("Nothing scheduled yet.");
+    expect(app.storePage).toContain("{STORE_NIGHTS_EMPTY}");
+    expect(app.storePage).toContain("storeNightsEmptyHint(store.following === true)");
+    expect(read("mobile/src/empty-copy.ts")).toContain('"Nothing scheduled yet."');
     expect(app.storePage).toContain("upcoming");
   });
 });

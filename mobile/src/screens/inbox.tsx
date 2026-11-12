@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { RefreshControl, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
+import { INBOX_EMPTY, INBOX_EMPTY_ACTION, INBOX_EMPTY_HINT } from "../empty-copy";
 import { followHref } from "../follow-href";
-import { openRoom } from "../open-room";
 import {
   friendlyError,
   getNotifications,
@@ -16,6 +16,7 @@ import {
 } from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { syncBadge } from "../push";
+import { refreshTick } from "../refresh-tick";
 import { setUnread } from "../unread";
 import { PlayerAvatar } from "../player-avatar";
 import { Button, Card, Loading, Muted, Tap } from "../ui";
@@ -42,6 +43,10 @@ import { useTabBarInset } from "../glass";
  * not every mount: a tab stays mounted, and a notice that landed while
  * you were on the Feed has to be here when you come back.
  * The website draws the same row in `src/components/inbox/inbox-list.tsx`.
+ *
+ * Pulling down asks again, and an empty inbox says what lands here
+ * with one door, to the composer (src/empty-copy.ts, the website's
+ * words).
  */
 export function InboxScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -85,43 +90,65 @@ export function InboxScreen() {
     };
   }, []);
 
+  /*
+   * THE ASK: this visit's notices, and the unread ones marked read.
+   * One function, for arriving on the screen and for a pulled refresh.
+   */
+  const load = useCallback(async (alive: () => boolean) => {
+    try {
+      const { notifications } = await getNotifications();
+      if (!alive()) return;
+      freshRef.current = true;
+      setLoadError(null);
+      setItems(notifications);
+      setFresh(true);
+
+      /* Remembered for the next open's paint, under this account. */
+      const id = await cachedPlayerId();
+      if (id) void writeCache("inbox", id, notifications);
+
+      const unread = notifications.filter((n) => !n.readAt).map((n) => n.id);
+      /* The icon's badge says what the list says: this many, then
+         none once the server has them marked read. Every push
+         carries the count, so the icon is right the moment a
+         notice lands; this is what makes it right afterwards. */
+      await syncBadge(unread.length);
+      if (unread.length > 0) {
+        await markRead(unread);
+        await syncBadge(0);
+        /* And the dot on the tab goes with the badge. */
+        setUnread(0);
+      }
+    } catch (caught) {
+      if (alive()) setLoadError(friendlyError(caught));
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       let live = true;
-      void (async () => {
-        try {
-          const { notifications } = await getNotifications();
-          if (!live) return;
-          freshRef.current = true;
-          setLoadError(null);
-          setItems(notifications);
-          setFresh(true);
-
-          /* Remembered for the next open's paint, under this account. */
-          const id = await cachedPlayerId();
-          if (id) void writeCache("inbox", id, notifications);
-
-          const unread = notifications.filter((n) => !n.readAt).map((n) => n.id);
-          /* The icon's badge says what the list says: this many, then
-             none once the server has them marked read. Every push
-             carries the count, so the icon is right the moment a
-             notice lands; this is what makes it right afterwards. */
-          await syncBadge(unread.length);
-          if (unread.length > 0) {
-            await markRead(unread);
-            await syncBadge(0);
-            /* And the dot on the tab goes with the badge. */
-            setUnread(0);
-          }
-        } catch (caught) {
-          if (live) setLoadError(friendlyError(caught));
-        }
-      })();
+      void load(() => live);
       return () => {
         live = false;
       };
-    }, [attempt]),
+    }, [load, attempt]),
   );
+
+  /*
+   * PULL TO REFRESH: the same ask, again. What was unread when the
+   * screen opened has been marked read by then, so its dot goes and
+   * only what landed since is drawn as new.
+   */
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    refreshTick();
+    setRefreshing(true);
+    try {
+      await load(() => true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const openProfile = (playerId: string) =>
     navigation.navigate("PlayerProfile", { playerId });
@@ -149,6 +176,13 @@ export function InboxScreen() {
         /* Clear of the floating tab bar. */
         paddingBottom: spacing(4) + tabInset,
       }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={colors.accent}
+          onRefresh={() => void refresh()}
+        />
+      }
     >
       {/* No heading here: the navigation bar above already says
           "Inbox", and printing it twice on one screen reads as a
@@ -201,19 +235,29 @@ export function InboxScreen() {
             <Ionicons name="notifications-outline" size={24} color={colors.textMuted} />
             <Text
               style={{
+                color: colors.textPrimary,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              {INBOX_EMPTY}
+            </Text>
+            <Text
+              style={{
                 color: colors.textSecondary,
                 textAlign: "center",
                 maxWidth: 280,
                 lineHeight: 21,
               }}
             >
-              Nothing yet. When somebody offers on one of your Flares, or a board opens
-              early at a store you follow, it lands here.
+              {INBOX_EMPTY_HINT}
             </Text>
+            {/* Offers and comments answer a Flare, so the one door is
+                the composer: the Feed's own, the Flare tab. */}
             <Button
-              label="Open the room"
+              label={INBOX_EMPTY_ACTION}
               variant="secondary"
-              onPress={() => openRoom(navigation)}
+              onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
             />
           </View>
         </Card>
@@ -243,9 +287,12 @@ export function InboxScreen() {
                 }}
               >
                 {actor ? (
+                  /* A 40pt face: two points of slop each side makes the
+                     target 44. */
                   <Tap
                     accessibilityLabel={`Open ${actor.displayName}'s profile`}
                     onPress={() => openProfile(actor.playerId)}
+                    hitSlop={2}
                   >
                     <PlayerAvatar
                       displayName={actor.displayName}

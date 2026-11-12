@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MapPin, MessageCircle, Search, Store, UserCircle2 } from "lucide-react";
+import { Home, MapPin, MessageCircle, Search, UserCircle2 } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { LOCAL_ENABLED } from "@/lib/local/enabled";
@@ -12,8 +12,14 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
  *
  * The founder's parity call: somebody who uses the app on Wednesday and
  * the site on Thursday should not have to learn two products. Same five
- * places, same order: Feed, Rooms, Messages, Search, Profile, so a
+ * places, same order: Feed, Nearby, Messages, Search, Profile, so a
  * thumb that knows one knows the other.
+ *
+ * Nearby is the second place since 2026-10-11, when it took the Rooms
+ * slot in the app. The founder: "i really dont think the nights tab
+ * will be used as much, and this nearby feature, if it works, could be
+ * extremely helpful for people looking for cards." The website had kept
+ * Rooms there after the app moved on; it matches again now.
  *
  * Round 16 reshaped it the way Instagram's is. Messages took the
  * Inbox's slot, because conversations are where people come back to;
@@ -34,20 +40,21 @@ import { LOCAL_ENABLED } from "@/lib/local/enabled";
 
 const TABS = [
   /* Feed, not Join. Join was a tab used four times a month, on the days
-     somebody stands in a shop; scanning is a button on the Feed now, which
-     is fewer taps than the tab it replaced. See PRODUCT.md. */
+     somebody stands in a shop; scanning was a button on the Feed after
+     that, and is the QR at Nearby's top left now. See PRODUCT.md. */
   { href: "/feed", label: "Feed", icon: Home },
-  /* Room's slot. Local took it for a while; with Local switched off
-     (src/lib/local/enabled.ts) the slot is Nights: rooms open the
-     moment a store posts a night, so the tab is the calendar of them.
-     The founder: "Trying to keep our tabs to our 'hero's'." The code
-     door (/room) is a button on the Nights page, not a tab. Then
-     (2026-10-09) the store became the room and the day its time, so
-     the tab is Rooms with a storefront, still at /nights so every link
-     to it keeps working. */
-  ...(LOCAL_ENABLED
-    ? [{ href: "/local", label: "Local", icon: MapPin } as const]
-    : [{ href: "/nights", label: "Rooms", icon: Store } as const]),
+  /* Local, while it is switched on (src/lib/local/enabled.ts), sits
+     ahead of Nearby, as it does in the app's bar. It is off. */
+  ...(LOCAL_ENABLED ? [{ href: "/local", label: "Local", icon: MapPin } as const] : []),
+  /* Room's slot, which has had three tenants. Nights held it first:
+     the founder, "Trying to keep our tabs to our 'hero's'." Then
+     (2026-10-09) the store became the room and the tab was Rooms, at
+     /nights. Now it is Nearby: Flares near you, with the way into a
+     store's room (scan or enter a code) at the page's top left, where
+     the Feed has its +. The pin is the app's location glyph. The Rooms
+     page keeps its address, /nights, so every link to it still lands;
+     it has no slot in the bar, on either platform. */
+  { href: "/nearby", label: "Nearby", icon: MapPin },
   /* The conversations list. With Local off, /local is the Messages
      page; with it on, the same page leads with them. In the middle. */
   { href: "/local", label: "Messages", icon: MessageCircle },
@@ -60,11 +67,15 @@ const TABS = [
 function isActive(label: string, href: string, pathname: string): boolean {
   /*
    * The room lives at /e/CODE once you are in one, and the code door at
-   * /room, so the Rooms tab has to own both paths too or the bar goes
-   * blank exactly when a player is deepest in the product.
+   * /room. Nearby owns both: its top left is the door (scan or enter a
+   * code), which is how the app gets you into a room too, pushed over
+   * the tab you opened it from. Somebody has to own them, or the bar
+   * goes blank exactly when a player is deepest in the product.
+   *
+   * /nights is nobody's. The app keeps Rooms as a screen with no slot
+   * in the bar, and no tab is lit while you are on it; the same here.
    */
-  const roomOwner = LOCAL_ENABLED ? "/feed" : "/nights";
-  if (href === roomOwner && (pathname.startsWith("/e/") || pathname === "/room"))
+  if (label === "Nearby" && (pathname.startsWith("/e/") || pathname === "/room"))
     return true;
 
   /* The notifications are opened from the Feed's bell, so the Feed

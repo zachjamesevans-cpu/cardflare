@@ -49,17 +49,25 @@ describe("the chat header", () => {
     expect(thread).toContain("headerRight: () => (");
     expect(thread).toMatch(/<HeaderButton\s+icon="ellipsis-horizontal"\s+label="More"/);
     expect(thread).toContain("<ActionSheet");
-    const order = ["View profile", "We traded", "Report", "Block"].map((label) =>
-      thread.indexOf(`label: "${label}"`),
-    );
+    /* We traded is named once, in thread-trade-copy.ts, so the row
+       reads the constant where the others spell their label out. */
+    const order = [
+      'label: "View profile"',
+      "label: WE_TRADED",
+      'label: "Report"',
+      'label: "Block"',
+    ].map((row) => thread.indexOf(row));
     for (const at of order) expect(at).toBeGreaterThan(-1);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
 
-  it("no longer draws Block, Report or We traded as buttons in the body", () => {
+  it("no longer draws Block or Report as buttons in the body, and We traded only as a small pill", () => {
     expect(thread).not.toMatch(/<Button\s+label="Block"/);
     expect(thread).not.toMatch(/<Button\s+label="Report"/);
-    expect(thread).not.toMatch(/<Button\s+label="We traded"/);
+    /* Never the full-width Button: a chip-sized pill under the composer
+       (tests/unit/we-traded-visible.test.ts has the rest). */
+    expect(thread).not.toMatch(/<Button\s+label=(\{WE_TRADED\}|"We traded")/);
+    expect(thread).toMatch(/\{canSayTraded \? \(\s*<Tap\s+onPress=\{openTradeForm\}/);
     /* The flows behind them are unchanged. */
     expect(thread).toContain("blockPlayer(withPlayerId)");
     expect(thread).toContain('setReport({ kind: "thread", targetId: threadId })');

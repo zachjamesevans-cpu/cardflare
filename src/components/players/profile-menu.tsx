@@ -1,13 +1,20 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Ban, Flag, UserRoundCheck } from "lucide-react";
 
 import { BlockConfirmSheet, useBlockState } from "@/components/players/block-controls";
-import { ReportSheet } from "@/components/players/report-sheet";
 import { DotsMenu, type MenuItem } from "@/components/ui/menu";
+import { useOpened } from "@/components/ui/use-opened";
 import { unblockPlayerAction } from "@/lib/players/safety-actions";
+
+/* The report sheet is only seen after "Report" is pressed, so its code
+   is loaded on that press and not with every profile. */
+const ReportSheet = dynamic(() =>
+  import("@/components/players/report-sheet").then((m) => m.ReportSheet),
+);
 
 /**
  * The three dots beside Share on somebody else's profile.
@@ -22,6 +29,8 @@ export function ProfileMenu({ playerId, name }: { playerId: string; name: string
   const router = useRouter();
   const { blocked, setBlocked } = useBlockState();
   const [sheet, setSheet] = useState<"report" | "block" | null>(null);
+  /* Drawn from its first opening on: see the top. */
+  const reportOpened = useOpened(sheet === "report");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -76,12 +85,14 @@ export function ProfileMenu({ playerId, name }: { playerId: string; name: string
           {error}
         </span>
       )}
-      <ReportSheet
-        open={sheet === "report"}
-        onClose={() => setSheet(null)}
-        kind="player"
-        targetId={playerId}
-      />
+      {reportOpened && (
+        <ReportSheet
+          open={sheet === "report"}
+          onClose={() => setSheet(null)}
+          kind="player"
+          targetId={playerId}
+        />
+      )}
       <BlockConfirmSheet
         open={sheet === "block"}
         onClose={() => setSheet(null)}

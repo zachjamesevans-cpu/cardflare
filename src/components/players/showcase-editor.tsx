@@ -16,7 +16,7 @@ import {
   setShowcaseNoteAction,
 } from "@/lib/players/profile-actions";
 import { SHOWCASE_NOTE_MAX } from "@/lib/players/showcase-note";
-import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-schema";
+import { SHOP_IDLE, type ShopState } from "@/lib/players/profile-state";
 
 /**
  * Tapping a card on your own shelf opens its dressing room.

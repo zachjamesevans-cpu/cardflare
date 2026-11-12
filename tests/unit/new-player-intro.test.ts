@@ -90,8 +90,37 @@ describe("the app's sign-up", () => {
     expect(app).toMatch(
       /void queueSpotlight\(\);\s*go\("Tabs", \{ screen: "Feed" \}\);/,
     );
-    expect(app).toContain(
-      'afterWelcome = end === "post" || end === "scan" ? end : null;',
+    expect(app).toMatch(
+      /afterWelcome =\s+end === "post" \|\| end === "scan" \|\| end === "binder" \? end : null;/,
+    );
+  });
+
+  it("offers the binders beside Look around first, with the same words on both", () => {
+    const web = read("src/lib/onboarding/intro.ts");
+    const mobile = read("mobile/src/intro-copy.ts");
+    expect(web).toContain('export const INTRO_BINDER = "Add a binder";');
+    expect(mobile).toContain('export const INTRO_BINDER = "Add a binder";');
+
+    /* The website: a link to your binders, in the row the other link has. */
+    const cards = read("src/components/onboarding/intro-cards.tsx");
+    expect(cards).toContain('const BINDER_HREF = "/profile/binders";');
+    expect(cards).toMatch(
+      /href=\{BINDER_HREF\}[\s\S]*?\{INTRO_BINDER\}[\s\S]*?\{INTRO_LOOK\}/,
+    );
+    expect(cards).toContain(
+      '<div className="flex h-9 items-center justify-center gap-6">',
+    );
+
+    /* The app: the same pair, and the row keeps its height. */
+    const intro = read("mobile/src/intro.tsx");
+    expect(intro).toMatch(/\{INTRO_BINDER\}[\s\S]*?\{INTRO_LOOK\}/);
+    expect(intro).toContain("height: LOOK_ROW,");
+    expect(read("mobile/src/screens/welcome.tsx")).toContain(
+      'onBinder={() => done("binder")}',
+    );
+    const app = read("mobile/App.tsx");
+    expect(app).toMatch(
+      /if \(end === "binder"\) \{\s*go\("Tabs", \{ screen: "Feed" \}\);\s*go\("Binders"\);/,
     );
   });
 });

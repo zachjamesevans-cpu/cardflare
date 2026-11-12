@@ -25,7 +25,7 @@ import {
   setHandle,
   setShowcaseNote,
 } from "./profile";
-import { handleSchema } from "./handle";
+import { handleSchema } from "./handle-schema";
 import {
   ANIMATED_AVATAR_MAX_BYTES,
   ANIMATED_AVATAR_MIME_TYPES,

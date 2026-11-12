@@ -165,6 +165,8 @@ export function BinderTray({
                     <img
                       src={printing?.imageUrl ?? ""}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-cover"
                     />
                   ) : (

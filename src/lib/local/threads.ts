@@ -574,11 +574,41 @@ const LIST_SIZE = 50;
 const LIST_PAGE = 50;
 const LIST_MAX_PAGES = 4;
 
+/**
+ * How many messages the list reads at once to find each conversation's
+ * newest, and how many times it reads before asking one conversation
+ * at a time. The window is well under what one read may return, so a
+ * short answer means every message in those conversations was seen.
+ */
+const NEWEST_WINDOW = 200;
+const NEWEST_ROUNDS = 3;
+
 interface ThreadRow {
   id: string;
   author_player_id: string;
   responder_player_id: string;
   last_message_at: string;
+}
+
+/** The columns of a message the list draws a row's preview from. */
+type NewestMessageRow = Pick<
+  FlareMessageRow,
+  "thread_id" | "sender_player_id" | "body"
+>;
+
+/**
+ * The first message met for each conversation. Handed messages newest
+ * first, that is each conversation's newest: the picking half of the
+ * list's one read, kept pure so it can be tested without a database.
+ */
+export function newestPerThread<Row extends { thread_id: string }>(
+  messages: readonly Row[],
+): Map<string, Row> {
+  const newest = new Map<string, Row>();
+  for (const message of messages) {
+    if (!newest.has(message.thread_id)) newest.set(message.thread_id, message);
+  }
+  return newest;
 }
 
 /**
@@ -591,7 +621,19 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   if (!isSupabaseConfigured()) return [];
 
   const admin = getSupabaseAdmin();
-  const blocked = await blockedSet(playerId);
+
+  const threadPage = (page: number) =>
+    admin
+      .from("flare_threads")
+      .select("id, author_player_id, responder_player_id, last_message_at")
+      .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
+      .is("flare_id", null)
+      .is("want_id", null)
+      .order("last_message_at", { ascending: false })
+      .range(page * LIST_PAGE, page * LIST_PAGE + LIST_PAGE - 1);
+
+  /* The block list and the first page do not wait on each other. */
+  const [blocked, firstPage] = await Promise.all([blockedSet(playerId), threadPage(0)]);
 
   /*
    * Walked a page at a time, newest talk first, until the list is full.
@@ -603,14 +645,7 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
   const rows: ThreadRow[] = [];
   const latest = new Map<string, { body: string; fromYou: boolean }>();
   for (let page = 0; page < LIST_MAX_PAGES && rows.length < LIST_SIZE; page += 1) {
-    const { data: threads, error } = await admin
-      .from("flare_threads")
-      .select("id, author_player_id, responder_player_id, last_message_at")
-      .or(`author_player_id.eq.${playerId},responder_player_id.eq.${playerId}`)
-      .is("flare_id", null)
-      .is("want_id", null)
-      .order("last_message_at", { ascending: false })
-      .range(page * LIST_PAGE, page * LIST_PAGE + LIST_PAGE - 1);
+    const { data: threads, error } = page === 0 ? firstPage : await threadPage(page);
 
     if (error) {
       console.error("Could not list the threads", error);
@@ -624,25 +659,9 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
         !blocked.has(row.author_player_id) && !blocked.has(row.responder_player_id),
     );
 
-    /*
-     * Each conversation's own newest message, looked up by the
-     * (thread_id, created_at) index, rather than the newest few hundred
-     * across every conversation: one busy chat used to fill that window
-     * and leave quieter ones with no preview, so they vanished.
-     */
-    const newest = await Promise.all(
-      pageRows.map((row) =>
-        admin
-          .from("flare_messages")
-          .select("thread_id, sender_player_id, body")
-          .eq("thread_id", row.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
-      ),
-    );
-    newest.forEach(({ data: message }, index) => {
-      const row = pageRows[index];
+    const newest = await newestMessages(pageRows);
+    pageRows.forEach((row) => {
+      const message = newest.get(row.id);
       if (!message || rows.length >= LIST_SIZE) return;
       latest.set(row.id, {
         body: message.body,
@@ -721,6 +740,67 @@ export async function listThreads(playerId: string): Promise<ThreadSummary[]> {
       },
     ];
   });
+}
+
+/**
+ * Each conversation's own newest message, for one page of the list.
+ *
+ * One read for the whole page: the newest messages across its
+ * conversations, newest first, and the first one met for each is that
+ * conversation's newest. The read is a window, and one busy chat can
+ * fill it: read once and trusted, that used to leave quieter
+ * conversations with no preview, so they vanished. So a window that
+ * comes back full is read again for the conversations it did not
+ * reach, which leaves the busy one out, and whatever is still not
+ * reached after a few rounds is asked for by itself, by the
+ * (thread_id, created_at) index, exactly as every conversation used
+ * to be. A window that came back short of full held every message
+ * there was, so a conversation it did not reach was never written in
+ * and there is nothing to ask.
+ */
+async function newestMessages(
+  pageRows: ThreadRow[],
+): Promise<Map<string, NewestMessageRow>> {
+  const admin = getSupabaseAdmin();
+  const newest = new Map<string, NewestMessageRow>();
+
+  let missed = pageRows;
+  for (let round = 0; round < NEWEST_ROUNDS && missed.length > 0; round += 1) {
+    const { data: batch, error } = await admin
+      .from("flare_messages")
+      .select("thread_id, sender_player_id, body")
+      .in(
+        "thread_id",
+        missed.map((row) => row.id),
+      )
+      .order("created_at", { ascending: false })
+      .limit(NEWEST_WINDOW);
+
+    /* A failed read reached nothing: ask each one, as before. */
+    if (error) break;
+
+    for (const [threadId, message] of newestPerThread<NewestMessageRow>(batch ?? [])) {
+      newest.set(threadId, message);
+    }
+    if ((batch ?? []).length < NEWEST_WINDOW) return newest;
+    missed = missed.filter((row) => !newest.has(row.id));
+  }
+
+  const asked = await Promise.all(
+    missed.map((row) =>
+      admin
+        .from("flare_messages")
+        .select("thread_id, sender_player_id, body")
+        .eq("thread_id", row.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ),
+  );
+  asked.forEach(({ data: message }, index) => {
+    if (message) newest.set(missed[index].id, message);
+  });
+  return newest;
 }
 
 /**

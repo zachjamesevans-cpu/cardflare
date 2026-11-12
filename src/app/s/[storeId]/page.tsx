@@ -11,9 +11,11 @@ import { TabPageShell } from "@/components/players/tab-page-shell";
 import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { StorePageHeader } from "@/components/stores/store-page-header";
 import { buttonStyles } from "@/components/ui/button";
+import { ahead } from "@/lib/ahead";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
 import { cardImagesEnabled } from "@/lib/cards/images";
+import { STORE_NIGHTS_EMPTY, storeNightsEmptyHint } from "@/lib/copy/empty-copy";
 import { goingLine } from "@/lib/events/going-copy";
 import { PLAN_VISIT } from "@/lib/events/store-day-rules";
 import { gameShortName } from "@/lib/players/games-catalog";
@@ -79,6 +81,15 @@ export default async function StoreProfilePage({
   const { storeId } = await params;
 
   /*
+   * The store's board asks nothing of the viewer, so it is read while
+   * the viewer is worked out, and whether they follow the shop is read
+   * beside the store itself. Both are waited for below the 404
+   * (`ahead`): for a store that is not there, or not published, the
+   * page is still the 404 and nothing of either is drawn.
+   */
+  const boardRead = ahead(storeBoard(storeId));
+
+  /*
    * The optional account, never required. The same rule as the room
    * page: a player viewer carries its id, and an admin or owner who
    * also holds a player row follows as that player. Resolved before
@@ -93,13 +104,23 @@ export default async function StoreProfilePage({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
+  const followingRead = ahead(
+    playerId ? hasLocal(playerId, storeId) : Promise.resolve(false),
+  );
   const store = await publicStore(storeId, playerId);
 
   if (!store) notFound();
 
+  /*
+   * The two reads above asked by the id in the address, which is the
+   * store's own id letter for letter unless the address spells it
+   * another way (in capitals, say). Then they are asked again by the
+   * id the store came back with, the way they always were.
+   */
+  const sameId = store.storeId === storeId;
   const [following, board] = await Promise.all([
-    playerId ? hasLocal(playerId, store.storeId) : Promise.resolve(false),
-    storeBoard(store.storeId),
+    sameId ? followingRead : playerId ? hasLocal(playerId, store.storeId) : false,
+    sameId ? boardRead : storeBoard(store.storeId),
   ]);
 
   const nextEvent =
@@ -217,7 +238,9 @@ export default async function StoreProfilePage({
           {/* The next nights, soonest first, for a player deciding
               whether to walk in. A night running now is a door; the
               rest are dates. Only a claimed store is told it has
-              nothing scheduled, since an unclaimed one never could. */}
+              nothing scheduled, since an unclaimed one never could;
+              the line under it points at the Follow button above,
+              which is how its next night reaches the Feed. */}
           {(store.upcoming.length > 0 || !store.unclaimed) && (
             <div className="flex flex-col gap-2 rounded-[var(--radius-control)] border border-border bg-elevated/40 p-3">
               <p className="flex items-center gap-2 font-semibold text-text-primary">
@@ -225,7 +248,10 @@ export default async function StoreProfilePage({
                 Upcoming nights
               </p>
               {store.upcoming.length === 0 ? (
-                <p className="text-text-muted">Nothing scheduled yet.</p>
+                <div className="flex flex-col gap-0.5 text-text-muted">
+                  <p>{STORE_NIGHTS_EMPTY}</p>
+                  <p>{storeNightsEmptyHint(following)}</p>
+                </div>
               ) : (
                 <ul className="flex flex-col gap-2">
                   {store.upcoming.map((night) => (

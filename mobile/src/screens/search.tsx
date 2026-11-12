@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
@@ -14,12 +14,14 @@ import {
   type FoundStore,
 } from "../api";
 import { displayCardName } from "../card-name";
+import { searchEmpty } from "../empty-copy";
 import { gameShortName } from "../games";
 import { useTabBarInset } from "../glass";
 import { formatHandle } from "../handle";
 import { PlayerAvatar } from "../player-avatar";
 import { withRecent } from "../recent-search-list";
 import { readRecent, writeRecent } from "../recent-searches";
+import { refreshTick } from "../refresh-tick";
 import { RemoteImage } from "../remote-image";
 import {
   SEARCH_TABS,
@@ -31,7 +33,7 @@ import {
   type SearchTab,
   type TopSection,
 } from "../search-rank";
-import { Input, Muted, Tap } from "../ui";
+import { Body, Input, Muted, Tap } from "../ui";
 import { colors, gutter, radius, spacing } from "../theme";
 import { VerifiedMark } from "../verified-mark";
 
@@ -66,6 +68,11 @@ import { VerifiedMark } from "../verified-mark";
  * back: a section lands as its answer does. Debounced, and guarded
  * against answers landing out of order, because shop wifi is slow
  * enough that the third keystroke can beat the first.
+ *
+ * When nothing matched, the screen says so and says what to try
+ * (src/empty-copy.ts, the website's words): on a kind's tab with other
+ * kinds matched it names them, with one button back to Top. Pulling
+ * down asks the same search again and never touches the field.
  */
 
 /** How long typing must pause before the search goes, in milliseconds. */
@@ -80,7 +87,7 @@ interface Results {
   cards: CardHit[];
   players: FoundPlayer[];
   stores: FoundStore[];
-  /** Searches still out. "Nothing for that yet." waits for zero. */
+  /** Searches still out. The "nothing matched" lines wait for zero. */
   pending: number;
   /** Which search these answers belong to. */
   request: number;
@@ -151,40 +158,49 @@ export function SearchScreen() {
 
     const request = ++latest.current;
     timer.current = setTimeout(() => {
-      /* Each section lands as its answer does, ranked as it lands; a
-         failed one is an empty one. The "nothing" line waits until all
-         three are in, so a fast empty answer never says nothing while
-         a slow full one is still coming. Until a section's new answer
-         lands, the last search's rows stay up: typing one more letter
-         never blanks the list and redraws it. */
-      const settle = <K extends "cards" | "players" | "stores">(
-        key: K,
-        rows: Promise<Results[K]>,
-      ) => {
-        rows
-          .catch(() => [] as Results[K])
-          .then((value) => {
-            if (latest.current !== request) return;
-            setFound((current) => {
-              const base =
-                current?.request === request
-                  ? current
-                  : {
-                      ...NOTHING_YET,
-                      ...(current
-                        ? {
-                            cards: current.cards,
-                            players: current.players,
-                            stores: current.stores,
-                          }
-                        : {}),
-                      text: trimmed,
-                      request,
-                    };
-              return { ...base, [key]: value, pending: base.pending - 1 };
-            });
+      void ask(trimmed, onlyPlayers, request);
+    }, SEARCH_DEBOUNCE_MS);
+  };
+
+  /*
+   * One search, asked now: the three asks go out at once. Each section
+   * lands as its answer does, ranked as it lands; a failed one is an
+   * empty one. The "nothing" lines wait until all three are in, so a
+   * fast empty answer never says nothing while a slow full one is
+   * still coming. Until a section's new answer lands, the last
+   * search's rows stay up: typing one more letter never blanks the
+   * list and redraws it. Resolves once all three have answered, which
+   * is what a pulled refresh waits for.
+   */
+  const ask = (trimmed: string, onlyPlayers: boolean, request: number) => {
+    const settle = <K extends "cards" | "players" | "stores">(
+      key: K,
+      rows: Promise<Results[K]>,
+    ) =>
+      rows
+        .catch(() => [] as Results[K])
+        .then((value) => {
+          if (latest.current !== request) return;
+          setFound((current) => {
+            const base =
+              current?.request === request
+                ? current
+                : {
+                    ...NOTHING_YET,
+                    ...(current
+                      ? {
+                          cards: current.cards,
+                          players: current.players,
+                          stores: current.stores,
+                        }
+                      : {}),
+                    text: trimmed,
+                    request,
+                  };
+            return { ...base, [key]: value, pending: base.pending - 1 };
           });
-      };
+        });
+    return Promise.all([
       settle(
         "cards",
         onlyPlayers
@@ -192,13 +208,13 @@ export function SearchScreen() {
           : searchCards(trimmed).then((result) =>
               rankBy(result.cards, cardScore(trimmed)),
             ),
-      );
+      ),
       settle(
         "players",
         searchPlayersByName(trimmed).then((result) =>
           rankBy(result.players, playerScore(trimmed)),
         ),
-      );
+      ),
       settle(
         "stores",
         onlyPlayers
@@ -206,8 +222,31 @@ export function SearchScreen() {
           : searchStores(trimmed).then((result) =>
               rankBy(result.stores, storeScore(trimmed)),
             ),
-      );
-    }, SEARCH_DEBOUNCE_MS);
+      ),
+    ]);
+  };
+
+  /*
+   * PULL TO REFRESH: the search that is on screen, asked again, with no
+   * pause. The field is never touched, so what was typed stays typed,
+   * and the rows stay up until their new answers land. With nothing
+   * searched yet, the pull re-reads this phone's recent searches.
+   */
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    refreshTick();
+    setRefreshing(true);
+    try {
+      const { text: trimmed, playersOnly: onlyPlayers } = readQuery(query);
+      if (trimmed.length < SEARCH_MIN_CHARS) {
+        setRecent(await readRecent());
+        return;
+      }
+      if (timer.current) clearTimeout(timer.current);
+      await ask(trimmed, onlyPlayers, ++latest.current);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   const type = (text: string) => {
@@ -243,6 +282,17 @@ export function SearchScreen() {
     /* The last search said nothing, but a newer one is still out. */
     found.text === readQuery(query).text &&
     sections.every(({ kind }) => found[kind].length === 0);
+
+  /* What to say when nothing matched: the line, what to try, and the
+     way back to Top when another kind has rows (src/empty-copy.ts). */
+  const empty =
+    nothing && found
+      ? searchEmpty(shown, {
+          players: found.players.length,
+          cards: found.cards.length,
+          stores: found.stores.length,
+        })
+      : null;
 
   const typing = query.trim() !== "";
 
@@ -408,6 +458,13 @@ export function SearchScreen() {
       }}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={colors.accent}
+          onRefresh={() => void refresh()}
+        />
+      }
     >
       {/* No heading: the navigation bar above already says "Search",
           and saying it twice is how a screen looks unfinished. */}
@@ -495,7 +552,29 @@ export function SearchScreen() {
         </View>
       ) : null}
 
-      {nothing ? <Muted>Nothing for that yet.</Muted> : null}
+      {/* Nothing matched: what is true, what to try, and one way on
+          when there is one. */}
+      {empty ? (
+        <View style={{ gap: spacing(1) }}>
+          <Body>{empty.line}</Body>
+          <Muted>{empty.hint}</Muted>
+          {empty.action ? (
+            <Tap
+              onPress={() => setTab("top")}
+              accessibilityLabel={empty.action}
+              style={{
+                alignSelf: "flex-start",
+                minHeight: 44,
+                justifyContent: "center",
+              }}
+            >
+              <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
+                {empty.action}
+              </Text>
+            </Tap>
+          ) : null}
+        </View>
+      ) : null}
 
       {sections.map(({ kind, limit }) => section(kind, limit))}
     </ScrollView>

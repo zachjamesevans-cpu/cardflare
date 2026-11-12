@@ -7,7 +7,8 @@ import { TextInput } from "@/components/ui/controls";
 import { Badge, Card } from "@/components/ui/card";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { searchShowCardsAction } from "@/lib/shows/actions";
-import { slabLabel, type VendorAvailability } from "@/lib/shows/schema";
+import type { VendorAvailability } from "@/lib/shows/schema";
+import { slabLabel } from "@/lib/shows/slab-label";
 import {
   MAX_QUERY_LENGTH,
   MIN_QUERY_LENGTH,

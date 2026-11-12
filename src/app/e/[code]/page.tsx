@@ -45,11 +45,12 @@ import { cardImagesEnabled } from "@/lib/cards/images";
 import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
+import { ahead } from "@/lib/ahead";
 import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
 import { MAX_FLARES } from "@/lib/lists/schema";
-import { linkSessionToPlayer, playerForUser } from "@/lib/players/accounts";
+import { linkSessionToPlayer } from "@/lib/players/accounts";
 import { hasLocal, saveLocal } from "@/lib/players/locals";
 import { huntsFor } from "@/lib/players/hunts";
 import { collectionAvailability } from "@/lib/players/collection";
@@ -163,10 +164,6 @@ async function RoomBody({
    * to the player's own games rather than an empty search.
    */
   const scannedGame = gameProfile(params_.g ?? "")?.id ?? null;
-  const playerGames = await viewerGames();
-  const games = scannedGame
-    ? [scannedGame, ...playerGames.filter((game) => game !== scannedGame)]
-    : playerGames;
 
   /*
    * A well-formed code that cannot be looked up is not the same as one that
@@ -175,15 +172,32 @@ async function RoomBody({
    */
   if (!isSupabaseConfigured()) return <Unavailable />;
 
-  const resolved = await resolveCode(normalized);
+  /*
+   * Who is looking, what they play and what the code opens: three reads
+   * that do not wait on each other, started together. The account is
+   * waited for below the 404, where it has always been asked (`ahead`),
+   * so a code that opens nothing is still a 404 whatever else failed.
+   */
+  const accountRead = ahead(getViewer().then(accountIdentity));
+  const [playerGames, resolved] = await Promise.all([
+    viewerGames(),
+    resolveCode(normalized),
+  ]);
+  const games = scannedGame
+    ? [scannedGame, ...playerGames.filter((game) => game !== scannedGame)]
+    : playerGames;
+
   if (resolved.outcome === "not-found") notFound();
 
   /*
    * A signed-in player joins as themselves rather than filling in a name.
    * Resolved once here because both doors into a room, the walk-in lobby
-   * and the open board, ask the same question.
+   * and the open board, ask the same question; and it is the same
+   * lookup that says whose wants and whose seat these are further
+   * down, so the page asks it once.
    */
-  const accountName = (await accountIdentity(await getViewer()))?.displayName;
+  const account = await accountRead;
+  const accountName = account?.displayName;
 
   /*
    * A card show: search-only, sessionless on purpose. An attendee in a
@@ -199,13 +213,7 @@ async function RoomBody({
      * moment they scan in: no search, no asking every vendor. Guests get
      * the same search box as always; this panel simply never renders.
      */
-    const showViewer = await getViewer();
-    const showPlayerId =
-      showViewer.kind === "player"
-        ? showViewer.playerId
-        : showViewer.kind === "anonymous"
-          ? null
-          : ((await playerForUser(showViewer.user.id))?.id ?? null);
+    const showPlayerId = account?.playerId ?? null;
 
     const showWants = showPlayerId ? await listWants(showPlayerId) : [];
     const wantHits = showPlayerId
@@ -348,51 +356,53 @@ async function RoomBody({
   const scheduled = event.kind !== "walk_in";
 
   /*
+   * The optional account, resolved without ever being required: a guest
+   * has no account and everything below stays exactly as it was. A
+   * signed-in player gets their session claimed by their account and an
+   * offer to re-post whatever they are still hunting from last time.
+   */
+  const accountPlayerId = account?.playerId ?? null;
+
+  /*
    * The lists are read for a player in the room, and the board alone
    * for somebody browsing. A visitor looking at a join form on a night
    * that never opened has no business causing a read of anybody's lists.
+   *
+   * Read together: nothing here waits on anything but the board, and
+   * the two checks made against the board (the counter's in this group,
+   * the collection's in the next) start the moment the board is in.
    */
-  const [participants, flares, binder, roomOffers, myTrades] = inRoom
-    ? await Promise.all([
-        listParticipants(event.id),
-        listRoomFlares(event.id),
-        listBinder(session!.id),
-        listRoomOffers(event.id),
-        listMyTrades(event.id, session!.id),
-      ])
-    : [[], browsing ? await listRoomFlares(event.id) : [], [], [], []];
-
-  /* The tournament clocks, for anyone who cannot see the wall from
-     their seat, or stepped outside with the room in their pocket. */
-  const roomTimers = inRoom ? await roomTimersForStore(event.storeId) : [];
-
-  /*
-   * The counter check: which of the board's cards the store's synced
-   * singles cover. Empty when the store has never synced, so the line
-   * simply never appears: no store setting, no toggle, no dead UI.
-   */
-  const counterHas = inRoom
-    ? await counterAvailability(
-        event.storeId,
-        flares.map((entry) => entry.cardId),
-      )
-    : new Set<string>();
-
-  /*
-   * The optional account, resolved without ever being required: a guest
-   * has viewer "anonymous" and everything below stays exactly as it was.
-   * A signed-in player gets their session claimed by their account and an
-   * offer to re-post whatever they are still hunting from last time.
-   */
-  const viewer = await getViewer();
-  const accountPlayerId =
-    viewer.kind === "player"
-      ? viewer.playerId
-      : viewer.kind === "anonymous"
-        ? null
-        : ((await playerForUser(viewer.user.id))?.id ?? null);
+  const flaresRead: Promise<ListEntry[]> =
+    inRoom || browsing ? listRoomFlares(event.id) : Promise.resolve([]);
+  const boardCardIds = ahead(
+    flaresRead.then((entries) => entries.map((entry) => entry.cardId)),
+  );
+  const roomReads = ahead(
+    Promise.all([
+      inRoom ? listParticipants(event.id) : [],
+      flaresRead,
+      inRoom ? listBinder(session!.id) : [],
+      inRoom ? listRoomOffers(event.id) : [],
+      inRoom ? listMyTrades(event.id, session!.id) : [],
+      /* The tournament clocks, for anyone who cannot see the wall from
+         their seat, or stepped outside with the room in their pocket. */
+      inRoom ? roomTimersForStore(event.storeId) : [],
+      /*
+       * The counter check: which of the board's cards the store's synced
+       * singles cover. Empty when the store has never synced, so the line
+       * simply never appears: no store setting, no toggle, no dead UI.
+       */
+      inRoom
+        ? boardCardIds.then((cardIds) => counterAvailability(event.storeId, cardIds))
+        : new Set<string>(),
+    ]),
+  );
 
   if (inRoom && session && accountPlayerId && session.player_id === null) {
+    /* The one render that writes. Everything above is read as the room
+       stood before the link, and everything below after it, the order
+       these have always had. */
+    await roomReads;
     await linkSessionToPlayer(session.id, accountPlayerId);
     /*
      * Being in a room signed in is what makes a store a local. The join
@@ -416,11 +426,14 @@ async function RoomBody({
    * wants and binder, and a finished night matches nobody. The
    * binders an account is bringing are read once the roster says it
    * is going, and only then.
+   *
+   * On every other render nothing was written, so this group does not
+   * wait for the lists above: the two are read side by side.
    */
   const goingRead = readable
     ? goingState(event.id, accountPlayerId)
     : Promise.resolve(null);
-  const [night, rawRoster, matches, store, binderState] = await Promise.all([
+  const nightReads = Promise.all([
     goingRead,
     readable || finished ? nightRoster(event.id, accountPlayerId) : Promise.resolve([]),
     readable && accountPlayerId
@@ -432,7 +445,50 @@ async function RoomBody({
           going?.youGoing ? nightBinderState(event.id, accountPlayerId) : null,
         )
       : Promise.resolve(null),
+    /* The hunts a post from this room can join (the composer, below). */
+    inRoom && accountPlayerId ? huntsFor(accountPlayerId, accountPlayerId) : [],
+    /*
+     * The store is linked from the room, with Follow beside it. The
+     * founder: "if a player is in a room for that store, the store is
+     * linked in there for them to quickly follow that store's page and
+     * stay updated." Read after the join above has had its chance to
+     * write the row, so the button's first word is the truth.
+     */
+    accountPlayerId ? hasLocal(accountPlayerId, event.storeId) : false,
+    /*
+     * The timer remote, as a small icon on the door for the people who
+     * can use it: the store's organizers. The same lookup the TO badge
+     * uses, so whoever the owner named sees the stopwatch and nobody else
+     * does. The console's own gate decides again on the far side.
+     */
+    inRoom && accountPlayerId ? organizerStoresFor(accountPlayerId) : [],
+    /*
+     * The imported collection joins the cross-reference the quiet way:
+     * checked against the board rather than loaded whole. A card arrives
+     * with exactly the printings the import proved from the file's own
+     * names: a proven alternate art matches a Flare for that alt art
+     * exactly; an unproven one stays a key with no printings, which
+     * `matchFor` honestly downgrades when a Flare names one.
+     */
+    accountPlayerId
+      ? boardCardIds.then((cardIds) => collectionAvailability(accountPlayerId, cardIds))
+      : new Map<string, Set<string>>(),
   ]);
+
+  const [
+    [participants, flares, binder, roomOffers, myTrades, roomTimers, counterHas],
+    [
+      night,
+      rawRoster,
+      matches,
+      store,
+      binderState,
+      hunts,
+      followingStore,
+      organizerStores,
+      collectionHas,
+    ],
+  ] = await Promise.all([roomReads, nightReads]);
   const roster = dedupeRoster(rawRoster);
 
   /*
@@ -441,8 +497,6 @@ async function RoomBody({
    * The face comes off the participant list already in hand, so posting
    * from a room costs no query the Flare tab does not also make.
    */
-  const hunts =
-    inRoom && accountPlayerId ? await huntsFor(accountPlayerId, accountPlayerId) : [];
   const me = participants.find(
     (participant) => participant.playerSessionId === session?.id,
   );
@@ -455,25 +509,7 @@ async function RoomBody({
         }
       : null;
 
-  /*
-   * The store is linked from the room, with Follow beside it. The
-   * founder: "if a player is in a room for that store, the store is
-   * linked in there for them to quickly follow that store's page and
-   * stay updated." Read after the join above has had its chance to
-   * write the row, so the button's first word is the truth.
-   */
-  const followingStore = accountPlayerId
-    ? await hasLocal(accountPlayerId, event.storeId)
-    : false;
-
-  /*
-   * The timer remote, as a small icon on the door for the people who
-   * can use it: the store's organizers. The same lookup the TO badge
-   * uses, so whoever the owner named sees the stopwatch and nobody else
-   * does. The console's own gate decides again on the far side.
-   */
-  const organizerStores =
-    inRoom && accountPlayerId ? await organizerStoresFor(accountPlayerId) : [];
+  /* The stopwatch on the door, for this store's organizers alone. */
   const remoteHref = organizerStores.some((store) => store.storeId === event.storeId)
     ? "/store/event-hub"
     : null;
@@ -490,21 +526,7 @@ async function RoomBody({
      The binder alone: the collection below proves printings, not counts. */
   const heldCounts = heldCountByCard(binder);
 
-  /*
-   * The imported collection joins the cross-reference the quiet way:
-   * checked against the board rather than loaded whole. A card arrives
-   * with exactly the printings the import proved from the file's own
-   * names: a proven alternate art matches a Flare for that alt art
-   * exactly; an unproven one stays a key with no printings, which
-   * `matchFor` honestly downgrades when a Flare names one.
-   */
-  const collectionHas = accountPlayerId
-    ? await collectionAvailability(
-        accountPlayerId,
-        flares.map((entry) => entry.cardId),
-      )
-    : new Map<string, Set<string>>();
-
+  /* The imported collection's proven printings join the binder's. */
   for (const [cardId, printings] of collectionHas) {
     const proven = held.get(cardId) ?? new Set<string>();
     for (const printingId of printings) proven.add(printingId);

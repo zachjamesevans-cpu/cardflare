@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { z } from "zod";
 
 import { PublicBinder } from "@/components/binder/public-binder";
-import { publicProfile } from "@/lib/players/profile";
+import { profileName } from "@/lib/players/profile";
 
 export async function generateMetadata({
   params,
@@ -10,12 +10,13 @@ export async function generateMetadata({
   params: Promise<{ playerId: string }>;
 }): Promise<Metadata> {
   const { playerId } = await params;
-  const profile = await publicProfile(playerId);
+  /* The name alone: the page below reads the rest once. */
+  const name = await profileName(playerId);
   const robots = { index: false, follow: false };
 
-  if (!profile) return { title: "Binder", robots };
+  if (!name) return { title: "Binder", robots };
 
-  return { title: `${profile.displayName}'s binder`, robots };
+  return { title: `${name}'s binder`, robots };
 }
 
 export const dynamic = "force-dynamic";

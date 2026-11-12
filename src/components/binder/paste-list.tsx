@@ -125,6 +125,8 @@ export function PasteList({
                     <img
                       src={entry.imageUrl ?? ""}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-cover"
                     />
                   ) : (

@@ -41,9 +41,12 @@ describe("the spinner", () => {
 describe("every tab-bar route has a loading state in its own chrome", () => {
   const routes = [
     "src/app/feed/loading.tsx",
+    "src/app/nearby/loading.tsx",
     "src/app/room/loading.tsx",
     "src/app/flare/loading.tsx",
     "src/app/inbox/loading.tsx",
+    "src/app/local/loading.tsx",
+    "src/app/search/loading.tsx",
     "src/app/hunts/[huntId]/loading.tsx",
     "src/app/p/[playerId]/loading.tsx",
     "src/app/s/[storeId]/loading.tsx",

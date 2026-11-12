@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { Linking, ScrollView, Text, View } from "react-native";
+import { Linking, RefreshControl, ScrollView, Text, View } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
@@ -17,6 +17,7 @@ import {
   type ClaimFields,
   type PublicStore,
 } from "../api";
+import { STORE_NIGHTS_EMPTY, storeNightsEmptyHint } from "../empty-copy";
 import { FollowStoreButton } from "../follow-store-button";
 import { gameShortName } from "../games";
 import { GoingButton } from "../going-button";
@@ -25,6 +26,7 @@ import { CoverBanner } from "../showcase-zoom";
 import { openRoom } from "../open-room";
 import { openPlanVisit } from "../plan-visit-sheet";
 import { PLAN_VISIT } from "../store-day-copy";
+import { refreshTick } from "../refresh-tick";
 import { hoursLines } from "../store-hours";
 import { colors, gutter, radius, spacing } from "../theme";
 import { validateClaimFields, type ClaimErrors } from "../claim-validation";
@@ -77,6 +79,8 @@ const LOGO = 64;
  * found the shop before they walked in. A guest's button is the same
  * word, Follow, and it starts sign-up: one look for Follow, whoever is
  * being followed, the website's rule.
+ *
+ * Pulling down reads the store again.
  */
 export function StoreProfileScreen({ storeId }: { storeId: string }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -127,7 +131,8 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
       openRoom(navigation);
     } catch (caught) {
       setJoinError(
-        caught instanceof ApiError && (caught.code === "not-open" || caught.status === 404)
+        caught instanceof ApiError &&
+          (caught.code === "not-open" || caught.status === 404)
           ? "That room is not open any more."
           : `Could not join the room. Try again. (${describeError(caught)})`,
       );
@@ -166,6 +171,18 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
     }, [load]),
   );
 
+  /* PULL TO REFRESH: the same read the screen makes on arriving. */
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = async () => {
+    refreshTick();
+    setRefreshing(true);
+    try {
+      await load(() => true);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (failed) {
     return (
       <ScrollView
@@ -199,6 +216,13 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
         paddingVertical: spacing(4),
         gap: spacing(4),
       }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={colors.accent}
+          onRefresh={() => void refresh()}
+        />
+      }
     >
       <Card style={{ paddingTop: spacing(6), overflow: "hidden" }}>
         {/* The banner carries down behind the logo and the name, then
@@ -393,9 +417,11 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
             deciding whether to walk in can see when. A night running
             now opens its room; the rest are dated. An older server sends
             no list and gets no section; a claimed store with nothing
-            booked says so, and an unclaimed listing (which cannot book
-            anything) says nothing. The website's "Upcoming nights"
-            card, after its hours. */}
+            booked says so and points at the Follow button above, which
+            is how its next night reaches the Feed (src/empty-copy.ts),
+            and an unclaimed listing (which cannot book anything) says
+            nothing. The website's "Upcoming nights" card, after its
+            hours. */}
         {store.upcoming ? (
           <View style={{ gap: spacing(1.5) }}>
             <Text
@@ -405,7 +431,10 @@ export function StoreProfileScreen({ storeId }: { storeId: string }) {
             </Text>
             {store.upcoming.length === 0 ? (
               store.unclaimed ? null : (
-                <Muted>Nothing scheduled yet.</Muted>
+                <View style={{ gap: spacing(0.5) }}>
+                  <Muted>{STORE_NIGHTS_EMPTY}</Muted>
+                  <Muted>{storeNightsEmptyHint(store.following === true)}</Muted>
+                </View>
               )
             ) : (
               store.upcoming.map((night) => (

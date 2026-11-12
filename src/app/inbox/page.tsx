@@ -10,6 +10,11 @@ import { BackLink } from "@/components/ui/back-link";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
+import {
+  INBOX_EMPTY,
+  INBOX_EMPTY_ACTION,
+  INBOX_EMPTY_HINT,
+} from "@/lib/copy/empty-copy";
 import { markInboxReadAction } from "@/lib/notifications/inbox-actions";
 import { listInbox, type InboxItem } from "@/lib/notifications/inbox";
 import { playerForUser } from "@/lib/players/accounts";
@@ -90,12 +95,12 @@ export default async function InboxPage() {
           ) : items.length === 0 ? (
             <Card className="flex flex-col items-center gap-3 py-12 text-center">
               <Bell className="size-6 text-text-muted" aria-hidden="true" />
-              <p className="max-w-sm text-text-secondary">
-                Nothing yet. When somebody offers on one of your Flares, or a board
-                opens early at a store you follow, it lands here.
-              </p>
-              <ButtonLink href="/room" variant="secondary">
-                Open the room
+              <p className="font-semibold text-text-primary">{INBOX_EMPTY}</p>
+              <p className="max-w-sm text-text-secondary">{INBOX_EMPTY_HINT}</p>
+              {/* Offers and comments answer a Flare, so the one door is
+                  the composer. The app's Inbox says the same. */}
+              <ButtonLink href="/flare" variant="secondary">
+                {INBOX_EMPTY_ACTION}
               </ButtonLink>
             </Card>
           ) : (

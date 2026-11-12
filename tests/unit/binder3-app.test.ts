@@ -155,7 +155,8 @@ describe("real pockets", () => {
     expect(src.binder).toContain(
       'import { POCKETS_PER_PAGE, pageOf, pagesFor, placeInPockets } from "../pocket-math";',
     );
-    expect(src.binder).toContain("slots={pageOf(shown, index)}");
+    expect(src.binder).toContain("const slots = pageOf(shown, index);");
+    expect(src.binder).toContain("slots={slots}");
     expect(src.binder).toContain("const pocket = page * POCKETS_PER_PAGE + index;");
     expect(src.binder).not.toContain("cards.slice(index * per");
     /* Every count in a pocket is the quantity tag. */

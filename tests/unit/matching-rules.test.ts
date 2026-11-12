@@ -6,13 +6,12 @@ import {
   inRailOrder,
   matchFor,
   youHaveLabel,
-  offerMessageSchema,
-  offerQuantitySchema,
   offersByFlare,
   pledgeTally,
   MAX_OFFER_MESSAGE,
   type Offer,
 } from "@/lib/matching/schema";
+import { offerMessageSchema, offerQuantitySchema } from "@/lib/matching/offer-schema";
 
 /**
  * The matching rules, and the promise Milestone 6 left for this one:

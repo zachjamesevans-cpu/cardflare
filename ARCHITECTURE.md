@@ -80,6 +80,40 @@ only Client Components are:
 All routes prerender as static content. The waitlist submits through a Server
 Action, so no API route is needed and no Supabase credentials reach the browser.
 
+### What a page downloads, and the three rules that keep it small
+
+Measured per route from the production build (client script on top of the
+shared runtime, gzip). The 2026-11-12 round took the Feed from 124 KB to 61 KB
+and sign-up from 88 KB to 25 KB, and each rule below is pinned by
+`tests/unit/first-load-weight.test.ts` so it cannot come undone quietly.
+
+1. **A file the browser reads holds no zod schema.** A Client Component that
+   imports one constant from a file with a schema in it takes the whole
+   validation library with it (62 KB). So limits, labels and idle states live
+   in zod-free files (`cards/schema.ts`, `matching/schema.ts`,
+   `players/name-rules.ts`, `players/profile-state.ts`, `players/handle.ts`,
+   `auth/signup-rules.ts`, `auth/password-rules.ts`, `shows/slab-label.ts`) and
+   the schemas in files only the server imports (`cards/query-schema.ts`,
+   `matching/offer-schema.ts`, `players/handle-schema.ts`, and the `*-schema.ts`
+   files, which re-export their plain half so server imports did not move).
+   The store and admin forms still import from schema files; they are the long
+   tail, not the pages players open.
+2. **A sheet that only appears after a tap is loaded by that tap**
+   (`next/dynamic` from the component that opens it, gated by
+   `ui/use-opened.ts` so it stays mounted after its first opening).
+3. **Card art in a list, rail or grid is `loading="lazy"`.** A hero image, a
+   header logo and anything first on screen stays eager.
+
+### Loaders run in stages
+
+A page's reads start as soon as what they depend on is known, in `Promise.all`
+stages, not one after another. `listFeed` is four stages
+(`tests/unit/feed-stages.test.ts` fails on a fifth top-level wait). Where a
+page makes decisions in order (a 404, a redirect), `lib/ahead.ts` starts the
+reads behind those decisions early and silences a rejection nobody went on to
+await. Reads only: a write started ahead would happen on pages that used to
+return before reaching it.
+
 ### Analytics without client boundaries
 
 `AnalyticsTracker` attaches one delegated click listener keyed off a
@@ -495,7 +529,11 @@ creates one, so a migration that assumes the default silently produces
 Crockford's base32 — digits, minus the letters that collide with them (I, L, O,
 U). Keeping the digit and dropping the letter is what makes correction
 possible: a player who reads a printed `1` as `I` still lands in the right room.
-Generated with `randomInt`, since a guessable code is a way into an event.
+Generated with the platform's Web Crypto (`globalThis.crypto.getRandomValues`),
+since a guessable code is a way into an event; the alphabet is exactly 32
+characters, so five random bits pick one evenly. Not `node:crypto`: forms in
+the browser read this file's constants, and that one import shipped a 121 KB
+polyfill to every page with such a form.
 
 `normalizeJoinCode` is pure and shared by the URL route and the typed-code
 form, so `/e/k3m-9pz` and a hand-typed `K3M 9PZ` resolve identically.

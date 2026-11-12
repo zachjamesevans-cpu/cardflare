@@ -1,14 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Check, PenLine, Search, X } from "lucide-react";
 
-import { CardSearch } from "@/components/cards/card-search";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
 import { TextInput, Textarea } from "@/components/ui/controls";
 import { Sheet } from "@/components/ui/sheet";
+import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
 import {
   pickBasePrinting,
@@ -26,6 +27,22 @@ import {
   LOGGED_QUANTITY_MAX,
   todayISO,
 } from "@/lib/trades/logged-schema";
+
+/*
+ * The search is only drawn inside the open sheet, and it is the largest
+ * thing the sheet holds, so it is loaded when the sheet opens and not
+ * with the page. The ring stands where the field lands.
+ */
+const CardSearch = dynamic(
+  () => import("@/components/cards/card-search").then((m) => m.CardSearch),
+  {
+    loading: () => (
+      <div className="flex min-h-24 items-center justify-center">
+        <Spinner />
+      </div>
+    ),
+  },
+);
 
 /**
  * "Log a trade": the founder's ask, "allow me to enter my own trades.
@@ -418,7 +435,13 @@ function ChosenCard({
       <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[6px] border border-border bg-surface">
         {imagesEnabled && art?.imageUrl && (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={art.imageUrl} alt="" className="size-full object-cover" />
+          <img
+            src={art.imageUrl}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover"
+          />
         )}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">

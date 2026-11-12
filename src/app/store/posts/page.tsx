@@ -136,6 +136,7 @@ export default async function StorePostsPage({
                   <img
                     src={post.imageUrl}
                     alt=""
+                    decoding="async"
                     className="aspect-video w-full shrink-0 rounded-[10px] border border-border object-cover sm:w-40"
                     loading="lazy"
                   />

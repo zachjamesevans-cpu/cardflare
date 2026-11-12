@@ -135,7 +135,13 @@ export function TradeHistoryRow({
         <span className="block aspect-[60/84] w-full">
           {trade.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={trade.imageUrl} alt="" className="size-full object-cover" />
+            <img
+              src={trade.imageUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover"
+            />
           )}
         </span>
         {/* How many changed hands: the binder's tag, on the card's

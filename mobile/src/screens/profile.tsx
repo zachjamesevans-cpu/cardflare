@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
+import { BINDERS_EMPTY, BINDERS_EMPTY_HINT } from "../empty-copy";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { handleSeedFrom } from "../handle";
 import {
@@ -55,7 +56,12 @@ import { PlayerAvatar } from "../player-avatar";
 import { PeopleSheet } from "../people-sheet";
 import { ProfileFlares, stillWanted } from "../profile-flares";
 import { HeaderButton } from "../header";
-import { clearLookMessage, lookLanded, usePendingLook, wearPending } from "../look-save";
+import {
+  clearLookMessage,
+  lookLanded,
+  usePendingLook,
+  wearPending,
+} from "../look-save";
 import { ProfileHeader, ShareProfileIcon } from "../profile-header";
 import { ProfileTour, useTourTarget } from "../tour";
 import { HuntsPanel } from "../hunts-panel";
@@ -370,9 +376,7 @@ export function ProfileScreen() {
       setMessage(said);
       return true;
     } catch (caught) {
-      setMessage(
-        `That did not go through. ${friendlyError(caught)}`,
-      );
+      setMessage(`That did not go through. ${friendlyError(caught)}`);
       return false;
     } finally {
       setBusy(null);
@@ -560,7 +564,9 @@ export function ProfileScreen() {
         {profile.showcase.length > 0 ? (
           <Tap
             onPress={() => setEditingShowcase((on) => !on)}
-            accessibilityLabel={editingShowcase ? "Done editing the showcase" : "Edit the showcase"}
+            accessibilityLabel={
+              editingShowcase ? "Done editing the showcase" : "Edit the showcase"
+            }
             style={{
               marginLeft: "auto",
               minHeight: 44,
@@ -782,8 +788,8 @@ export function ProfileScreen() {
               to spend come from. The ledger's sources, every one of
               them (src/lib/players/ember-rules.ts, packs/repository.ts). */}
           <Muted>
-            Embers to spend come from trades, turning up at your stores, duplicate
-            pack pulls and gifts.
+            Embers to spend come from trades, turning up at your stores, duplicate pack
+            pulls and gifts.
           </Muted>
         </View>
         <View
@@ -857,7 +863,13 @@ export function ProfileScreen() {
             <View style={{ gap: spacing(3) }}>
               <Button label="New binder" onPress={() => setCreatingBinder(true)} />
               {(profile.binders ?? []).length === 0 ? (
-                <Muted>No binders yet.</Muted>
+                /* What a binder is for and what filling one takes, under
+                   the button that starts one. Same two lines on the
+                   Binders screen and on the website. */
+                <View style={{ gap: spacing(1) }}>
+                  <Muted>{BINDERS_EMPTY}</Muted>
+                  <Muted>{BINDERS_EMPTY_HINT}</Muted>
+                </View>
               ) : (
                 <BinderList
                   binders={profile.binders ?? []}
@@ -1017,17 +1029,17 @@ export function ProfileScreen() {
                 onPress={() => navigation.navigate("EditProfile")}
                 accessibilityLabel="Edit profile"
               >
-              <PlayerAvatar
-                displayName={profile.displayName}
-                seed={profile.playerId}
-                avatarUrl={profile.avatarUrl}
-                frame={profile.equipped.avatarFrame}
-                ring={profile.wear?.ring ?? null}
-                aura={profile.wear?.aura ?? null}
-                ringArt={profile.wear?.ringArt ?? null}
-                auraArt={profile.wear?.auraArt ?? null}
-                size={88}
-              />
+                <PlayerAvatar
+                  displayName={profile.displayName}
+                  seed={profile.playerId}
+                  avatarUrl={profile.avatarUrl}
+                  frame={profile.equipped.avatarFrame}
+                  ring={profile.wear?.ring ?? null}
+                  aura={profile.wear?.aura ?? null}
+                  ringArt={profile.wear?.ringArt ?? null}
+                  auraArt={profile.wear?.auraArt ?? null}
+                  size={88}
+                />
               </Tap>
             }
             name={profile.displayName}

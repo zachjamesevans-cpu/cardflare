@@ -2,10 +2,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState } from "react";
+import { Image as ExpoImage } from "expo-image";
 import {
   ActivityIndicator,
   Animated,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -38,7 +38,11 @@ import { HuntsPanel } from "../hunts-panel";
 import { PeopleSheet } from "../people-sheet";
 import { PlayerAvatar } from "../player-avatar";
 import { ProfileFlares, stillWanted } from "../profile-flares";
-import { ProfileActionButton, ProfileHeader, ShareProfileIcon } from "../profile-header";
+import {
+  ProfileActionButton,
+  ProfileHeader,
+  ShareProfileIcon,
+} from "../profile-header";
 import {
   PROFILE_INSET,
   ProfileTabs,
@@ -239,10 +243,15 @@ export function PlayerProfileScreen() {
         void writeCache("peek", playerId, result);
 
         /* Warm the shelf's art so the cards land together, but only
-           briefly: cached art is instant, and the rest fades in. */
+           briefly: cached art is instant, and the rest fades in. Into
+           expo-image's cache, the one the cards are drawn from
+           (remote-image.tsx); React Native's own prefetch filled a
+           cache nothing here reads, so the wait warmed nothing. */
         const warm = Promise.all(
           result.showcase.map((entry) =>
-            entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
+            entry.imageUrl
+              ? ExpoImage.prefetch(entry.imageUrl, "memory-disk").catch(() => false)
+              : null,
           ),
         );
         await Promise.race([warm, new Promise((done) => setTimeout(done, WARM_MS))]);
@@ -278,7 +287,11 @@ export function PlayerProfileScreen() {
           </Body>
         </Card>
         {hidden === "blocked" ? (
-          <Button label="Unblock" variant="secondary" onPress={() => void setBlock(false)} />
+          <Button
+            label="Unblock"
+            variant="secondary"
+            onPress={() => void setBlock(false)}
+          />
         ) : null}
         <ErrorLine message={blockError} />
       </ScrollView>
@@ -429,7 +442,11 @@ export function PlayerProfileScreen() {
               onAsk={() => void message("What are you hunting for right now?")}
               followButton={
                 profile.follow ? (
-                  <FollowButton playerId={profile.playerId} initial={profile.follow} fill />
+                  <FollowButton
+                    playerId={profile.playerId}
+                    initial={profile.follow}
+                    fill
+                  />
                 ) : undefined
               }
             />

@@ -235,7 +235,13 @@ export function OtherMatch({
       >
         {imagesEnabled && isRenderableImageUrl(art) ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={art} alt="" className="size-full object-cover" />
+          <img
+            src={art}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="size-full object-cover"
+          />
         ) : (
           <span className="line-clamp-4 px-0.5 text-[8px] font-semibold text-text-secondary">
             {card.exactName}

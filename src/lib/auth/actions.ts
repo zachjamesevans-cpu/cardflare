@@ -237,9 +237,12 @@ export async function signUpWithPassword(
     };
   }
 
-  /* The form blocks a mismatch already; this is the server's own word,
-     because a Server Action is a public endpoint. */
-  if (!emailsMatch(email, text(formData, "confirmEmail"))) {
+  /* The form asks for the address once now (see emailTypoSuggestion),
+     so a second copy is no longer required. A form that still sends one,
+     a page from before the change left open in a tab, is held to it as
+     it always was: sent and different is still refused. */
+  const confirmEmail = text(formData, "confirmEmail");
+  if (confirmEmail !== "" && !emailsMatch(email, confirmEmail)) {
     return { status: "error", message: EMAIL_MISMATCH, fieldErrors: {}, email };
   }
 

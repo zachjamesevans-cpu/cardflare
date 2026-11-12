@@ -10,7 +10,11 @@ import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { checkSignupHandleAction, signUpWithPassword } from "@/lib/auth/actions";
 import { PASSWORD_SIGN_IN_IDLE } from "@/lib/auth/state";
-import { EMAIL_MISMATCH, emailsMatch, PASSWORD_MIN } from "@/lib/auth/signup-schema";
+import {
+  emailTypoPrompt,
+  emailTypoSuggestion,
+  PASSWORD_MIN,
+} from "@/lib/auth/signup-rules";
 import {
   formatHandle,
   HANDLE_MAX,
@@ -19,11 +23,11 @@ import {
   type HandleAvailability,
 } from "@/lib/players/handle";
 
-function SubmitButton({ blocked }: { blocked: boolean }) {
+function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button type="submit" size="lg" disabled={pending || blocked} className="w-full">
+    <Button type="submit" size="lg" disabled={pending} className="w-full">
       {pending && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
       {pending ? "Creating your account…" : "Create account"}
     </Button>
@@ -90,13 +94,11 @@ export function SignupForm({ next }: { next?: string }) {
 
   const [handle, setHandle] = useState("");
   const availability = useHandleAvailability(handle);
-  /* The address twice: see emailsMatch. The button stays off until the
-     two agree, and the mismatch is said only once the second field has
-     something in it, so nobody is scolded before they have typed. */
+  /* The address once. It used to be asked twice; now a mistyped
+     well-known domain gets one line under the field offering the fix
+     (see emailTypoSuggestion). An offer only: it never holds the button. */
   const [email, setEmail] = useState(state.status === "error" ? state.email : "");
-  const [confirmEmail, setConfirmEmail] = useState("");
-  const emailsAgree = emailsMatch(email, confirmEmail);
-  const showMismatch = confirmEmail.trim() !== "" && !emailsAgree;
+  const emailSuggestion = emailTypoSuggestion(email);
 
   const availabilityLine =
     availability === "checking"
@@ -138,26 +140,18 @@ export function SignupForm({ next }: { next?: string }) {
           autoFocus
           required
         />
-      </Field>
-
-      <Field name="confirmEmail" label="Confirm email">
-        <TextInput
-          {...fieldIds("confirmEmail")}
-          name="confirmEmail"
-          type="email"
-          inputMode="email"
-          autoComplete="off"
-          value={confirmEmail}
-          onChange={(event) => setConfirmEmail(event.target.value)}
-          aria-describedby={describedBy("confirmEmail", false, false)}
-          aria-invalid={showMismatch || undefined}
-          required
-        />
-        <p
-          aria-live="polite"
-          className={`text-sm ${showMismatch ? "text-danger" : "sr-only"}`}
-        >
-          {showMismatch ? EMAIL_MISMATCH : ""}
+        {/* Polite, so the offer is heard without cutting off the typing.
+            The whole line is the button: one tap puts the fix in the field. */}
+        <p aria-live="polite" className={emailSuggestion ? "text-sm" : "sr-only"}>
+          {emailSuggestion && (
+            <button
+              type="button"
+              onClick={() => setEmail(emailSuggestion)}
+              className="cursor-pointer text-left break-all text-accent hover:underline"
+            >
+              {emailTypoPrompt(emailSuggestion)}
+            </button>
+          )}
         </p>
       </Field>
 
@@ -248,7 +242,7 @@ export function SignupForm({ next }: { next?: string }) {
         , including zero tolerance for abusive content.
       </p>
 
-      <SubmitButton blocked={!emailsAgree} />
+      <SubmitButton />
 
       <p className="text-center text-sm text-text-muted">
         Already have an account?{" "}

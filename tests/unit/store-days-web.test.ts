@@ -50,11 +50,14 @@ function expectInOrder(source: string, markers: string[], label: string) {
 }
 
 describe("the Rooms tab", () => {
-  it("is labelled Rooms with a storefront, still at /nights", () => {
-    expect(web.tabs).toContain('{ href: "/nights", label: "Rooms", icon: Store }');
-    expect(web.tabs).toMatch(/import \{[^}]*\bStore\b[^}]*\} from "lucide-react"/);
+  it("has no slot in the bar since Nearby took it, and still answers at /nights", () => {
+    /* The app's Nights route is the same: kept, labelled Rooms, with no
+       slot (tests/unit/store-days-app.test.ts). */
+    expect(web.tabs).toContain('{ href: "/nearby", label: "Nearby", icon: MapPin }');
+    expect(web.tabs).not.toContain('label: "Rooms"');
     expect(web.tabs).not.toContain('label: "Nights"');
     expect(web.tabs).not.toContain("CalendarDays");
+    expect(web.page).toContain("export default async function NightsPage");
   });
 
   it("is headed Rooms, with Plan a visit at the top above the strip", () => {

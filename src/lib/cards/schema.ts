@@ -1,6 +1,13 @@
-import { z } from "zod";
-
 import type { VariantAsk } from "./query";
+
+/*
+ * NO ZOD IN THIS FILE, on purpose. Card search, the composer and the
+ * card viewer read its labels and limits in the browser, and one schema
+ * here made every page that draws a card download the whole validation
+ * library (62 KB) to learn that a query is 2 to 60 characters. The one
+ * schema lives in query-schema.ts, which only the server reads, and
+ * tests/unit/first-load-weight.test.ts keeps it that way.
+ */
 
 /**
  * Shortest query worth running. One character matches most of the pool and
@@ -8,16 +15,6 @@ import type { VariantAsk } from "./query";
  */
 export const MIN_QUERY_LENGTH = 2;
 export const MAX_QUERY_LENGTH = 60;
-
-export const cardQuerySchema = z
-  .string()
-  .transform((value) => value.replace(/\s+/g, " ").trim())
-  .pipe(
-    z
-      .string()
-      .min(MIN_QUERY_LENGTH, `Type at least ${MIN_QUERY_LENGTH} characters.`)
-      .max(MAX_QUERY_LENGTH, "That search is too long."),
-  );
 
 export interface CardPrinting {
   /** Needed to name a specific printing on a Flare. */

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { handleSchema } from "@/lib/players/handle";
+import { handleSchema } from "@/lib/players/handle-schema";
 import { displayNameSchema } from "@/lib/players/schema";
 
 /**
@@ -12,7 +12,14 @@ import { displayNameSchema } from "@/lib/players/schema";
  * invited-player flow has always enforced.
  */
 
-export const PASSWORD_MIN = 8;
+import { PASSWORD_MIN } from "./signup-rules";
+
+/*
+ * The password floor, the email typo guard and the form's idle state
+ * live in signup-rules.ts, which has no zod in it, and are re-exported
+ * here so the server keeps one import.
+ */
+export * from "./signup-rules";
 
 /**
  * Everything an account is made of, asked once.
@@ -42,37 +49,3 @@ export const signupSchema = z.object({
   displayName: displayNameSchema,
   handle: handleSchema.shape.handle,
 });
-
-/**
- * The address, typed twice.
- *
- * A typo in the email at sign-up is an account nobody can ever reset the
- * password of: the reset goes to the typo. Typing it twice catches the
- * slip before the account is made. Compared the way the account is
- * stored (trimmed, lowercase), so "Zach@x.com" matches "zach@x.com ".
- * Kept here, free of server imports, so the form and the action share it.
- */
-export function emailsMatch(email: string, confirm: string): boolean {
-  const shape = (value: string) => value.trim().toLowerCase();
-  return shape(email) !== "" && shape(email) === shape(confirm);
-}
-
-export const EMAIL_MISMATCH = "The two email addresses do not match.";
-
-export type SignupState = { status: "idle" } | { status: "error"; message: string };
-
-export const SIGNUP_IDLE: SignupState = { status: "idle" };
-
-/**
- * A display name derived from the address.
- *
- * Sign-up asks for a real one now, so this is only used where there is
- * nobody to ask: an account created by an admin invitation, before its
- * owner has ever opened it. It must satisfy the players table (2 to 40
- * characters) whatever the address looks like.
- */
-export function starterNameFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? "";
-  const cleaned = local.replace(/[^a-zA-Z0-9 _-]/g, "").trim();
-  return cleaned.length >= 2 ? cleaned.slice(0, 40) : "New Player";
-}

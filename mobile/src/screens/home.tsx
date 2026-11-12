@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Animated, {
   interpolate,
   runOnJS,
@@ -78,7 +78,8 @@ import {
   type ZoomPicks,
   type ZoomCard,
 } from "../ui";
-import { silentCoords } from "../location";
+import { lastKnownCoords, silentCoords, type Coords } from "../location";
+import { keepSame, movedEnough } from "../quiet-refresh";
 import { FeedPerson } from "../feed-person";
 import { agoFrom } from "../ago";
 import { cachedPlayerId, readCache, rememberAccount, writeCache } from "../cache";
@@ -380,6 +381,237 @@ interface CachedFeed {
   items: FeedEntry[];
 }
 
+/**
+ * How long a load waits for a first fix when the phone has no last
+ * known place at all. With one, the Feed never waits (see `feedPlace`).
+ * Without one, asking with no place can come back as the "tell us
+ * where you are" card for somebody who already said yes, so the load
+ * gives the fix this long, and no longer, before it goes without.
+ */
+const FIX_WAIT_MS = 2_500;
+
+/*
+ * WHERE THE FEED IS ASKED FROM, WITHOUT WAITING ON GPS.
+ *
+ * This used to be `await silentCoords()`, which takes a fix only when
+ * it is under two minutes old and otherwise waits for a new one: the
+ * whole Feed waited on the GPS for however long that took. Now a load
+ * asks with the last place the phone already knows (up to a day old,
+ * location.ts `lastKnownCoords`), at once, and a fresh fix is read
+ * behind it; the load asks again only if the phone has really moved
+ * (quiet-refresh.ts `movedEnough`).
+ *
+ * Still silent, as it always was: this reads a position we already
+ * have permission for and shows no dialog to anybody who has not
+ * granted one. The prompt belongs to a tap on the Nearby card, where
+ * the words beside it say what it is for - iOS gives one chance at
+ * that dialog forever, and spending it on a cold start spends it
+ * badly. A null simply sends no coordinates, and the server falls
+ * back to the player's ZIP.
+ */
+/* One fresh fix at a time, shared by whichever loads want it: the Feed
+   and Nearby are two of this screen, and a pull can overlap a focus.
+   Nothing is kept once it has answered. */
+let fixing: Promise<Coords | null> | null = null;
+function freshFix(): Promise<Coords | null> {
+  if (!fixing) {
+    fixing = silentCoords()
+      .catch(() => null)
+      .finally(() => {
+        fixing = null;
+      });
+  }
+  return fixing;
+}
+
+/** The place a load asks with, and whether a position may be read at all. */
+async function feedPlace(): Promise<{ permitted: boolean; coords: Coords | null }> {
+  const known = await lastKnownCoords();
+  if (known.coords || !known.permitted) return known;
+  /* Allowed, but the phone has no fix to hand (a restart, a long
+     sleep). Rare; and the one case worth a short wait, because asking
+     with no place can answer with the "tell us where you are" card. */
+  const coords = await Promise.race([
+    freshFix(),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), FIX_WAIT_MS)),
+  ]);
+  return { permitted: true, coords };
+}
+
+/**
+ * A post's name for itself, so a re-read can hand a row the object it
+ * already drew (`keepSame`). Posts are what the list is made of and
+ * what arrives above one another; every other kind is matched by where
+ * it sits.
+ */
+const feedRowKey = (entry: unknown): string | null => {
+  const item = entry as { kind?: unknown; postId?: unknown } | null;
+  if (!item || typeof item.postId !== "string") return null;
+  return item.kind === "hunt" || item.kind === "storePost"
+    ? `${item.kind}:${item.postId}`
+    : null;
+};
+
+/** A Feed post, in the shape both sheets read. */
+const sheetPost = (item: Extract<FeedEntry, { kind: "hunt" }>): FlareSheetPost => ({
+  postId: item.postId,
+  posterName: item.displayName,
+  direction: item.direction ?? "want",
+  yours: item.yours,
+  completed: item.completed ?? false,
+  cards: item.cards,
+  total: item.total,
+});
+
+/**
+ * Everything a post on the Feed can ask the screen to do. One object,
+ * the same one on every render (each door is a stable callback), so a
+ * post's row is handed the props it already has and does not draw
+ * again when something else on the screen changes.
+ */
+interface PostDoors {
+  postRef: (item: { postId: string; yours: boolean; displayName: string }) => PostRef;
+  toSignUp: () => void;
+  setSharing: (post: SharedPost | null) => void;
+  setCardsSheet: (post: (FlareSheetPost & { mode: "view" | "offer" }) | null) => void;
+  setProgressSheet: (post: FlareSheetPost | null) => void;
+  setReport: (target: ReportTarget | null) => void;
+  takeDown: (postId: string) => Promise<void>;
+  block: (playerId: string, name: string) => void;
+  setPicksFor: (postId: string, next: ZoomPicks) => void;
+}
+
+/**
+ * One post on the Feed, in whichever of the three ways this viewer
+ * reads it: a guest's read-only card, the compact view, or the card.
+ *
+ * MEMOISED, AND THAT IS THE POINT OF IT BEING ITS OWN COMPONENT. The
+ * Feed holds up to 120 of these, and they were drawn inline in the
+ * screen's own render: opening a sheet, ticking a card on one post, the
+ * bell's dot changing, a pull starting and ending each drew all 120
+ * again. Here a post draws again only when its own item, its own picks
+ * or its own "5m ago" changes. `ago` is not drawn from: the card works
+ * the label out itself, and this prop is how a post that has not
+ * changed still gets its label moved on.
+ */
+const FeedPost = memo(function FeedPost({
+  item,
+  guest,
+  view,
+  picks,
+  doors,
+}: {
+  item: Extract<FeedEntry, { kind: "hunt" }>;
+  guest: boolean;
+  view: ReturnType<typeof feedViewFrom>;
+  picks: ZoomPicks;
+  doors: PostDoors;
+  /** The post's age as it reads now: see above. */
+  ago: string;
+}) {
+  const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const {
+    postRef,
+    toSignUp,
+    setSharing,
+    setCardsSheet,
+    setProgressSheet,
+    setReport,
+    takeDown,
+    block,
+    setPicksFor,
+  } = doors;
+
+  return guest ? (
+    /*
+     * The guest's read-only post. `post.yours` is set so the
+     * card offers no "I have this" anywhere inside it (see
+     * haveFor), and every door it does draw - heart, comments,
+     * message, the face, Report - goes to sign-up rather than
+     * to a call that would only answer 401. The heart's
+     * promise rejects so it springs back unliked.
+     */
+    <FlareFeedCard
+      item={item}
+      post={{ ...postRef(item), yours: true }}
+      onOpenProfile={toSignUp}
+      onLike={async () => {
+        toSignUp();
+        throw new Error("guest");
+      }}
+      onOpenThread={toSignUp}
+      onShare={toSignUp}
+      onReport={toSignUp}
+      picks={NO_PICKS}
+      onPicks={() => {}}
+    />
+  ) : view === "compact" ? (
+    /* The founder's compact view: art and a needed-count,
+       everything else a tap away. See flare-feed-card-compact. */
+    <FlareFeedCardCompact
+      item={item}
+      post={postRef(item)}
+      onOpenProfile={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+      onLike={(liked) => likePost(item.postId, liked)}
+      onOpenThread={() => navigation.navigate("FlarePost", { postId: item.postId })}
+      onShare={() =>
+        setSharing({
+          postId: item.postId,
+          posterName: item.displayName,
+          subject: postSubject(item),
+        })
+      }
+      /* The same two doors the classic card keeps behind its
+         three dots, so the menu is one menu in both views. */
+      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+      onProgress={item.yours ? () => setProgressSheet(sheetPost(item)) : undefined}
+      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+      onReport={
+        item.yours
+          ? undefined
+          : () => setReport({ kind: "post", targetId: item.postId })
+      }
+      onBlock={
+        item.yours || !item.playerId
+          ? undefined
+          : () => block(item.playerId, item.displayName)
+      }
+    />
+  ) : (
+    <FlareFeedCard
+      item={item}
+      post={postRef(item)}
+      onOpenProfile={(id) => navigation.navigate("PlayerProfile", { playerId: id })}
+      onLike={(liked) => likePost(item.postId, liked)}
+      onOpenThread={() => navigation.navigate("FlarePost", { postId: item.postId })}
+      onShare={() =>
+        setSharing({
+          postId: item.postId,
+          posterName: item.displayName,
+          subject: postSubject(item),
+        })
+      }
+      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
+      onProgress={item.yours ? () => setProgressSheet(sheetPost(item)) : undefined}
+      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
+      onReport={
+        item.yours
+          ? undefined
+          : () => setReport({ kind: "post", targetId: item.postId })
+      }
+      /* Only a post with a player behind it: a store's has nobody to block. */
+      onBlock={
+        item.yours || !item.playerId
+          ? undefined
+          : () => block(item.playerId, item.displayName)
+      }
+      onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
+      picks={picks}
+      onPicks={(next) => setPicksFor(item.postId, next)}
+    />
+  );
+});
+
 export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
@@ -428,7 +660,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
             !(item.kind === "hunt" && hidden.has(item.postId)),
         );
   const shown = shownFor(tab);
-  const toSignUp = () => navigation.navigate("CreateAccount");
+  const toSignUp = useCallback(
+    () => navigation.navigate("CreateAccount"),
+    [navigation],
+  );
   /* The Flare being messaged from its paper plane, or null. */
   const [sharing, setSharing] = useState<SharedPost | null>(null);
   /* The post whose cards are open in the sheet, to read or to offer on. */
@@ -445,8 +680,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    */
   const [picksByPost, setPicksByPost] = useState<Record<string, ZoomPicks>>({});
   const picksFor = (postId: string): ZoomPicks => picksByPost[postId] ?? NO_PICKS;
-  const setPicksFor = (postId: string, next: ZoomPicks) =>
-    setPicksByPost((current) => ({ ...current, [postId]: next }));
+  const setPicksFor = useCallback(
+    (postId: string, next: ZoomPicks) =>
+      setPicksByPost((current) => ({ ...current, [postId]: next })),
+    [],
+  );
   /* Your own post, with its copies-found stepper open. */
   const [progressSheet, setProgressSheet] = useState<FlareSheetPost | null>(null);
   /* "Report" behind the three dots on somebody else's post. */
@@ -634,7 +872,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       /* The public sample, never cached: it is nobody's feed, and the
          cache is keyed to an account a guest does not have. */
       try {
-        const fresh = await getFeed(await silentCoords());
+        const fresh = await getFeed((await feedPlace()).coords);
         if (alive()) setFeed(fresh.items);
       } catch {
         if (alive()) setFeed([]);
@@ -642,6 +880,18 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       return;
     }
     if (alive()) setGuest(false);
+
+    /*
+     * The account and the feed are asked for TOGETHER. They were one
+     * after the other, so the Feed's own request did not leave until
+     * /me had come back; neither needs the other's answer to be asked.
+     */
+    const meRequest = getMe();
+    const placeRequest = feedPlace();
+    const feedRequest = placeRequest.then((place) => getFeed(place.coords));
+    /* Awaited in its own try below. This only stops a feed that failed
+       while /me was still out from being reported as unhandled. */
+    feedRequest.catch(() => {});
 
     /*
      * Last open's feed, painted before this one has loaded.
@@ -655,49 +905,75 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
      * never replace what somebody is looking at with an older copy of
      * it, and neither must returning to the tab.
      */
-    let cachedFor: string | null = null;
-
-    try {
-      const fresh = await getMe();
-      if (alive()) setMe(fresh);
-      cachedFor = fresh.player.id;
-      /* The signed-in account's own id: the one place the cache's
-         pointer is set (cache.ts). */
-      void rememberAccount(fresh.player.id);
-    } catch {
-      /* Offline or mid-refresh. The cache still knows who it belongs
-         to, so a feed can be painted from it even when `me` failed —
-         which is the case where painting matters most. */
-      if (alive()) setMe(null);
-    }
+    const account = (async (): Promise<Me | null> => {
+      try {
+        const fresh = await meRequest;
+        if (alive()) setMe(fresh);
+        /* The signed-in account's own id: the one place the cache's
+           pointer is set (cache.ts). */
+        void rememberAccount(fresh.player.id);
+        return fresh;
+      } catch {
+        /* Offline or mid-refresh. The cache still knows who it belongs
+           to, so a feed can be painted from it even when `me` failed —
+           which is the case where painting matters most. */
+        if (alive()) setMe(null);
+        return null;
+      }
+    })();
 
     /* Its own try: the feed is the screen's headline, but a feed that
        failed must not take the locals list down with it. */
     try {
-      /*
-       * Silent: this reads a position we already have permission for
-       * and shows no dialog to anybody who has not granted one. The
-       * prompt belongs to a tap on the Nearby card, where the words
-       * beside it say what it is for - iOS gives one chance at that
-       * dialog forever, and spending it on a cold start spends it
-       * badly. A null simply sends no coordinates, and the server
-       * falls back to the player's ZIP.
-       */
-      const coords = await silentCoords();
-      const fresh = await getFeed(coords);
+      const place = await placeRequest;
+      const fresh = await feedRequest;
+      /* With no account on screen yet (a first run, nothing cached) the
+         Feed waits for /me as it always did: the view it is drawn in is
+         the player's own setting, and drawing first and switching after
+         is the pop-in this screen exists to avoid. */
+      if (!meRef.current) await account;
       if (alive()) {
-        setFeed(fresh.items);
+        /* Rows that say what they said keep the object they were drawn
+           from, so only what changed draws again (see FeedPost). */
+        setFeed((current) => keepSame(current, fresh.items, feedRowKey));
         setFeedFailed(false);
         if (typeof fresh.radius === "number") setNearbyMiles(fresh.radius);
       }
 
       /* Written after a load that worked, so the cache can only ever
          hold a feed that was real. */
-      if (cachedFor)
-        void writeCache("feed", cachedFor, {
-          me: meRef.current,
+      const mine = await account;
+      if (mine)
+        void writeCache("feed", mine.player.id, {
+          me: mine,
           items: fresh.items,
         } satisfies CachedFeed);
+
+      /*
+       * The fresh fix, behind what is already on screen. Asked again
+       * once, and only when the phone is more than about a mile from
+       * where the request above said it was; under that the answer is
+       * the same list. Not a pull, so no spinner, and dropped if a
+       * newer load has started (that one asks with the newer place).
+       */
+      if (place.permitted) {
+        void freshFix().then(async (fix) => {
+          if (!alive() || !movedEnough(place.coords, fix)) return;
+          try {
+            const again = await getFeed(fix);
+            if (!alive()) return;
+            setFeed((current) => keepSame(current, again.items, feedRowKey));
+            if (typeof again.radius === "number") setNearbyMiles(again.radius);
+            if (mine)
+              void writeCache("feed", mine.player.id, {
+                me: mine,
+                items: again.items,
+              } satisfies CachedFeed);
+          } catch {
+            /* What is on screen is a real feed; it stays. */
+          }
+        });
+      }
     } catch {
       /*
        * A failed feed no longer empties the screen when there is
@@ -708,6 +984,8 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       if (alive() && feedRef.current.length === 0) setFeed([]);
       if (alive()) setFeedFailed(feedRef.current.length === 0);
     }
+    /* Both answers are in before the load is called done, as before. */
+    await account;
   }, []);
 
   /* Every load goes through here: newest wins, and the first answer,
@@ -786,55 +1064,45 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * reload only repaints the carousel later so the card reads OFFERED
    * and the count under it moves without a pull.
    */
-  const postRef = (item: {
-    postId: string;
-    yours: boolean;
-    displayName: string;
-  }): PostRef => ({
-    postId: item.postId,
-    yours: item.yours,
-    posterName: item.displayName,
-    offer: async (items, message) => {
-      const result = await offerItemsOnPost(item.postId, items, message);
-      /* OFFERED at once. The founder: "immediately visually show that
+  const postRef = useCallback(
+    (item: { postId: string; yours: boolean; displayName: string }): PostRef => ({
+      postId: item.postId,
+      yours: item.yours,
+      posterName: item.displayName,
+      offer: async (items, message) => {
+        const result = await offerItemsOnPost(item.postId, items, message);
+        /* OFFERED at once. The founder: "immediately visually show that
          I've made an offer on it without having to refresh the feed."
          The cards the server took are patched on this post here, so the
          carousel's badge, the line under the card and the viewer's strip
          all read offered before the reload confirms it. */
-      const taken = new Set(
-        items.map((line) => line.flareId).filter((id) => !result.refused.includes(id)),
-      );
-      if (taken.size > 0) {
-        setFeed((current) =>
-          current.map((entry) =>
-            entry.kind === "hunt" && entry.postId === item.postId
-              ? {
-                  ...entry,
-                  cards: entry.cards.map((card) =>
-                    card.flareId && taken.has(card.flareId)
-                      ? { ...card, state: "offered", youOffered: true }
-                      : card,
-                  ),
-                }
-              : entry,
-          ),
+        const taken = new Set(
+          items
+            .map((line) => line.flareId)
+            .filter((id) => !result.refused.includes(id)),
         );
-      }
-      void load(() => true);
-      return result;
-    },
-  });
-
-  /** A Feed post, in the shape both sheets read. */
-  const sheetPost = (item: Extract<FeedEntry, { kind: "hunt" }>): FlareSheetPost => ({
-    postId: item.postId,
-    posterName: item.displayName,
-    direction: item.direction ?? "want",
-    yours: item.yours,
-    completed: item.completed ?? false,
-    cards: item.cards,
-    total: item.total,
-  });
+        if (taken.size > 0) {
+          setFeed((current) =>
+            current.map((entry) =>
+              entry.kind === "hunt" && entry.postId === item.postId
+                ? {
+                    ...entry,
+                    cards: entry.cards.map((card) =>
+                      card.flareId && taken.has(card.flareId)
+                        ? { ...card, state: "offered", youOffered: true }
+                        : card,
+                    ),
+                  }
+                : entry,
+            ),
+          );
+        }
+        void load(() => true);
+        return result;
+      },
+    }),
+    [load],
+  );
 
   const enter = async (raw: string) => {
     await rememberRoom(raw.trim().toUpperCase());
@@ -849,33 +1117,38 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * and the toast holds the undo for a minute. Undo unhides, puts the
    * same rows back and reloads.
    */
-  const takeDown = async (postId: string) => {
-    try {
-      const result = await takeDownPost(postId);
-      if (!result.ok) return;
-      setHidden((current) => new Set(current).add(postId));
-      setFeed((current) =>
-        current.filter((entry) => !(entry.kind === "hunt" && entry.postId === postId)),
-      );
-      markFeedStale();
-      if (result.flareIds.length === 0) return;
-      setUndo({
-        key: `${postId}:${Date.now()}`,
-        message: "Taken down.",
-        onUndo: async () => {
-          setHidden((current) => {
-            const next = new Set(current);
-            next.delete(postId);
-            return next;
-          });
-          await restorePost(postId, result.flareIds).catch(() => undefined);
-          await load(() => true);
-        },
-      });
-    } catch {
-      /* The next load shows the honest state either way. */
-    }
-  };
+  const takeDown = useCallback(
+    async (postId: string) => {
+      try {
+        const result = await takeDownPost(postId);
+        if (!result.ok) return;
+        setHidden((current) => new Set(current).add(postId));
+        setFeed((current) =>
+          current.filter(
+            (entry) => !(entry.kind === "hunt" && entry.postId === postId),
+          ),
+        );
+        markFeedStale();
+        if (result.flareIds.length === 0) return;
+        setUndo({
+          key: `${postId}:${Date.now()}`,
+          message: "Taken down.",
+          onUndo: async () => {
+            setHidden((current) => {
+              const next = new Set(current);
+              next.delete(postId);
+              return next;
+            });
+            await restorePost(postId, result.flareIds).catch(() => undefined);
+            await load(() => true);
+          },
+        });
+      } catch {
+        /* The next load shows the honest state either way. */
+      }
+    },
+    [load],
+  );
 
   /**
    * "Block" on somebody else's post: the profile's question in the
@@ -885,37 +1158,64 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * block from a menu is one tap from a slip and Unblock is otherwise
    * a trip to Settings.
    */
-  const block = (playerId: string, name: string) => {
-    Alert.alert(
-      `Block ${name}?`,
-      "You will not see their posts, and neither of you can message the other. They are not told.",
-      [
-        { text: "Keep", style: "cancel" },
-        { text: "Block", style: "destructive", onPress: () => void blockNow(playerId) },
-      ],
-    );
-  };
-  const blockNow = async (playerId: string) => {
-    try {
-      await blockPlayer(playerId);
-      setFeed((current) =>
-        current.filter(
-          (entry) => !(entry.kind === "hunt" && entry.playerId === playerId),
-        ),
+  const blockNow = useCallback(
+    async (playerId: string) => {
+      try {
+        await blockPlayer(playerId);
+        setFeed((current) =>
+          current.filter(
+            (entry) => !(entry.kind === "hunt" && entry.playerId === playerId),
+          ),
+        );
+        markFeedStale();
+        setUndo({
+          key: `block:${playerId}:${Date.now()}`,
+          message: BLOCKED_LINE,
+          onUndo: async () => {
+            await unblockPlayer(playerId).catch(() => undefined);
+            await load(() => true);
+          },
+        });
+      } catch {
+        /* The next load shows the honest state either way. */
+      }
+    },
+    [load],
+  );
+  const block = useCallback(
+    (playerId: string, name: string) => {
+      Alert.alert(
+        `Block ${name}?`,
+        "You will not see their posts, and neither of you can message the other. They are not told.",
+        [
+          { text: "Keep", style: "cancel" },
+          {
+            text: "Block",
+            style: "destructive",
+            onPress: () => void blockNow(playerId),
+          },
+        ],
       );
-      markFeedStale();
-      setUndo({
-        key: `block:${playerId}:${Date.now()}`,
-        message: BLOCKED_LINE,
-        onUndo: async () => {
-          await unblockPlayer(playerId).catch(() => undefined);
-          await load(() => true);
-        },
-      });
-    } catch {
-      /* The next load shows the honest state either way. */
-    }
-  };
+    },
+    [blockNow],
+  );
+
+  /* The doors every post is handed: see PostDoors. Each one is stable,
+     so this object is the same one for the screen's life. */
+  const doors = useMemo<PostDoors>(
+    () => ({
+      postRef,
+      toSignUp,
+      setSharing,
+      setCardsSheet,
+      setProgressSheet,
+      setReport,
+      takeDown,
+      block,
+      setPicksFor,
+    }),
+    [postRef, toSignUp, takeDown, block, setPicksFor],
+  );
 
   /*
    * Where a notice's button goes on a phone.
@@ -1305,109 +1605,18 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                     ))}
                   </Card>
                 ) : item.kind === "hunt" ? (
-                  guest ? (
-                    /*
-                     * The guest's read-only post. `post.yours` is set so the
-                     * card offers no "I have this" anywhere inside it (see
-                     * haveFor), and every door it does draw - heart, comments,
-                     * message, the face, Report - goes to sign-up rather than
-                     * to a call that would only answer 401. The heart's
-                     * promise rejects so it springs back unliked.
-                     */
-                    <FlareFeedCard
-                      key={`hunt-${item.postId}`}
-                      item={item}
-                      post={{ ...postRef(item), yours: true }}
-                      onOpenProfile={toSignUp}
-                      onLike={async () => {
-                        toSignUp();
-                        throw new Error("guest");
-                      }}
-                      onOpenThread={toSignUp}
-                      onShare={toSignUp}
-                      onReport={toSignUp}
-                      picks={NO_PICKS}
-                      onPicks={() => {}}
-                    />
-                  ) : view === "compact" ? (
-                    /* The founder's compact view: art and a needed-count,
-                       everything else a tap away. See flare-feed-card-compact. */
-                    <FlareFeedCardCompact
-                      key={`hunt-${item.postId}`}
-                      item={item}
-                      post={postRef(item)}
-                      onOpenProfile={(id) =>
-                        navigation.navigate("PlayerProfile", { playerId: id })
-                      }
-                      onLike={(liked) => likePost(item.postId, liked)}
-                      onOpenThread={() =>
-                        navigation.navigate("FlarePost", { postId: item.postId })
-                      }
-                      onShare={() =>
-                        setSharing({
-                          postId: item.postId,
-                          posterName: item.displayName,
-                          subject: postSubject(item),
-                        })
-                      }
-                      /* The same two doors the classic card keeps behind its
-                         three dots, so the menu is one menu in both views. */
-                      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
-                      onProgress={
-                        item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
-                      }
-                      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
-                      onReport={
-                        item.yours
-                          ? undefined
-                          : () => setReport({ kind: "post", targetId: item.postId })
-                      }
-                      onBlock={
-                        item.yours || !item.playerId
-                          ? undefined
-                          : () => block(item.playerId, item.displayName)
-                      }
-                    />
-                  ) : (
-                    <FlareFeedCard
-                      key={`hunt-${item.postId}`}
-                      item={item}
-                      post={postRef(item)}
-                      onOpenProfile={(id) =>
-                        navigation.navigate("PlayerProfile", { playerId: id })
-                      }
-                      onLike={(liked) => likePost(item.postId, liked)}
-                      onOpenThread={() =>
-                        navigation.navigate("FlarePost", { postId: item.postId })
-                      }
-                      onShare={() =>
-                        setSharing({
-                          postId: item.postId,
-                          posterName: item.displayName,
-                          subject: postSubject(item),
-                        })
-                      }
-                      onViewAll={() => setCardsSheet({ ...sheetPost(item), mode: "view" })}
-                      onProgress={
-                        item.yours ? () => setProgressSheet(sheetPost(item)) : undefined
-                      }
-                      onTakeDown={item.yours ? () => void takeDown(item.postId) : undefined}
-                      onReport={
-                        item.yours
-                          ? undefined
-                          : () => setReport({ kind: "post", targetId: item.postId })
-                      }
-                      /* Only a post with a player behind it: a store's has nobody to block. */
-                      onBlock={
-                        item.yours || !item.playerId
-                          ? undefined
-                          : () => block(item.playerId, item.displayName)
-                      }
-                      onOpenHunt={(huntId) => navigation.navigate("Hunt", { huntId })}
-                      picks={picksFor(item.postId)}
-                      onPicks={(next) => setPicksFor(item.postId, next)}
-                    />
-                  )
+                  /* One post, drawn by its own memoised row (FeedPost,
+                     above): the guest's read-only card, the compact
+                     view, or the card. */
+                  <FeedPost
+                    key={`hunt-${item.postId}`}
+                    item={item}
+                    guest={guest}
+                    view={view}
+                    picks={picksFor(item.postId)}
+                    doors={doors}
+                    ago={agoFrom(item.postedAt)}
+                  />
                 ) : item.kind === "upcoming" ? (
                   <Card key={`upcoming-${index}`}>
                     <Muted>

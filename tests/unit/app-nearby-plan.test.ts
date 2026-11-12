@@ -75,7 +75,7 @@ describe("Flares near you, from the server", () => {
     expect(repo).toContain('item.around\n          ? "around"');
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(
-      "await nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",
+      "nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",
     );
   });
 

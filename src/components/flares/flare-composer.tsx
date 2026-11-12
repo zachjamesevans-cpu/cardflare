@@ -49,7 +49,7 @@ import { publishPostAction } from "@/lib/flares/publish-actions";
 import { postSummary } from "@/lib/flares/post-summary";
 
 /**
- * One composer: select cards, compose one Flare, preview, post.
+ * One composer: select cards, compose one Flare, post.
  *
  * The founder's model: a Flare is one social post of one or many
  * cards, pointing one way, with one caption, optionally into a hunt.
@@ -60,6 +60,12 @@ import { postSummary } from "@/lib/flares/post-summary";
  * The draft lives in this browser until it is posted, so a reload, a
  * phone call or a wrong tab does not lose three minutes of picking.
  * Posting is the one write, and it is guarded against a second tap.
+ *
+ * THE PREVIEW IS OPTIONAL. It used to be a step every post walked
+ * through; now the compose step posts on its own, and "Preview" beside
+ * it opens the same look at the post for anyone who wants one. Both
+ * buttons run the one `post` below, under the one `pending`, so a tap
+ * on each cannot make two posts.
  */
 
 export interface ComposerViewer {
@@ -555,15 +561,26 @@ function ComposerBody({
         </p>
       )}
 
+      {/* Post first, the one thing this screen is for; Preview second
+          and optional. The app's compose step has the same two, in the
+          same order, saying the same words. */}
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
+          onClick={post}
+          disabled={pending || draft.cards.length === 0}
+          className="flex-1"
+        >
+          {pending ? "Posting…" : "Post flare"}
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
           onClick={() => {
             setError(null);
             setStep("preview");
           }}
-          disabled={draft.cards.length === 0}
-          className="flex-1"
+          disabled={pending || draft.cards.length === 0}
         >
           Preview
         </Button>
@@ -572,6 +589,7 @@ function ComposerBody({
             type="button"
             variant="ghost"
             size="sm"
+            disabled={pending}
             onClick={() => {
               clearDraft();
               setDraft(EMPTY_DRAFT);
@@ -583,6 +601,9 @@ function ComposerBody({
           </Button>
         )}
       </div>
+      {draft.cards.length === 0 && (
+        <p className="text-sm text-text-muted">Add at least one card to post.</p>
+      )}
 
       {footer}
     </Card>

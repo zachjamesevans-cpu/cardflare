@@ -10,7 +10,8 @@ import { SCAN_OR_CODE } from "@/lib/events/going-copy";
 import { ENTER_CODE } from "@/lib/events/night-copy";
 
 /**
- * The small QR icon at the top right of Nights, and the sheet behind it.
+ * The small QR icon at the top right of Nights and, since Nearby took
+ * the second tab, at the top left of Nearby: the sheet behind it.
  *
  * The founder (2026-10-03): "a small QR/code icon button top-right. Do
  * NOT use a giant 'Scan or enter a code' button. Tapping the QR icon

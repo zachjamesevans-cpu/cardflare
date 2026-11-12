@@ -1,5 +1,3 @@
-import { randomInt } from "node:crypto";
-
 /**
  * Alphabet for join codes — Crockford's base32.
  *
@@ -55,14 +53,25 @@ export type CodeKind = "event" | "store" | "show";
 /**
  * Generates a join code.
  *
- * `randomInt` rather than `Math.random`: a guessable code is a way into an
- * event room, and `randomInt` also rejects modulo bias, which matters because
- * 32 does not divide 256 evenly for every rejection scheme.
+ * The platform's own cryptographic source rather than `Math.random`: a
+ * guessable code is a way into an event room. And no modulo bias: the
+ * alphabet is exactly 32 characters, so the low five bits of a random
+ * byte pick one evenly. JOIN_CODE_ALPHABET's length is held at 32 by
+ * tests/unit/join-code.test.ts for this reason.
+ *
+ * WEB CRYPTO, NOT `node:crypto`, and that is about weight, not taste.
+ * This file's constants and patterns are read by forms that run in the
+ * browser (through events/schema.ts), and an import of `node:crypto`
+ * anywhere in a file a browser reads makes the bundler ship a 121 KB
+ * polyfill of the whole module to every page that draws one of those
+ * forms. `globalThis.crypto` is the same generator on the server and
+ * needs no import at all.
  */
 export function generateJoinCode(length: number = JOIN_CODE_LENGTH): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(length));
   let code = "";
-  for (let i = 0; i < length; i += 1) {
-    code += JOIN_CODE_ALPHABET[randomInt(JOIN_CODE_ALPHABET.length)];
+  for (const byte of bytes) {
+    code += JOIN_CODE_ALPHABET[byte & (JOIN_CODE_ALPHABET.length - 1)];
   }
   return code;
 }

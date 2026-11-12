@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { describedBy, Field, fieldIds } from "@/components/ui/field";
 import { updatePassword } from "@/lib/auth/actions";
-import { PASSWORD_MIN } from "@/lib/auth/schema";
+import { PASSWORD_MIN } from "@/lib/auth/password-rules";
 import { NEW_PASSWORD_IDLE } from "@/lib/auth/state";
 
 function SubmitButton({ label }: { label: string }) {

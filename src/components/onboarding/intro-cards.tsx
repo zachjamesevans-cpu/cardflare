@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 
 import { Button, buttonStyles } from "@/components/ui/button";
 import {
+  INTRO_BINDER,
   INTRO_CARDS,
   INTRO_LOOK,
   INTRO_NEXT,
@@ -25,6 +26,8 @@ import { cn } from "@/lib/cn";
  */
 
 const LOOK_HREF = "/feed?tour=post";
+/** Your binders, where "New binder" and the page scanner are. */
+const BINDER_HREF = "/profile/binders";
 
 export function IntroCards({
   game,
@@ -145,15 +148,26 @@ export function IntroCards({
             {INTRO_NEXT}
           </Button>
         )}
-        <div className="flex h-9 items-center justify-center">
+        {/* Two quiet ways out on the one line, so the row is the height
+            it always was: your binders, or the Feed. */}
+        <div className="flex h-9 items-center justify-center gap-6">
           {last && (
-            <Link
-              href={LOOK_HREF}
-              onClick={noteTours}
-              className="font-semibold text-accent hover:underline"
-            >
-              {INTRO_LOOK}
-            </Link>
+            <>
+              <Link
+                href={BINDER_HREF}
+                onClick={noteTours}
+                className="font-semibold text-accent hover:underline"
+              >
+                {INTRO_BINDER}
+              </Link>
+              <Link
+                href={LOOK_HREF}
+                onClick={noteTours}
+                className="font-semibold text-accent hover:underline"
+              >
+                {INTRO_LOOK}
+              </Link>
+            </>
           )}
         </div>
       </div>

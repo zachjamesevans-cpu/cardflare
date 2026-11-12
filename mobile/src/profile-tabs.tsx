@@ -137,6 +137,24 @@ export function ProfileTabs({
   /* Each pane's own height, so the track can be exactly as tall as
      the one in front and no taller. */
   const [heights, setHeights] = useState<Record<number, number>>({});
+  /*
+   * WHICH PANES HAVE BEEN DRAWN. Every pane was mounted with the
+   * profile, so opening it drew the hunts and the trades of somebody
+   * who had come to look at Flares. Now a pane is drawn the first time
+   * it is turned to, and kept from then on, so coming back to it is
+   * instant and nothing in it is thrown away.
+   *
+   * "Turned to" is told as early as it can be known, so the pane is
+   * there before it has slid into view: a tap draws its pane (and any
+   * it passes on the way) as the slide starts, and a swipe draws the
+   * pane coming in on its first frame. The pane in front at the start
+   * is always drawn. Kept by the tab's key, not its place, so a list
+   * that changes under it keeps what was drawn.
+   */
+  const [drawn, setDrawn] = useState<ReadonlySet<ProfileTab>>(() => {
+    const first = panes[active];
+    return new Set(first ? [first.key] : []);
+  });
 
   const pager = useRef<Animated.ScrollView>(null);
   /* The pager's scroll offset, which the underline divides by the
@@ -148,6 +166,9 @@ export function ProfileTabs({
   /* A tap is scrolling the pager: ignore the pages it passes. */
   const driving = useSharedValue(false);
   const target = useSharedValue(0);
+  /* The two panes the scroll last sat between, so the pane coming in
+     is asked for once, not on every frame of the swipe. */
+  const between = useSharedValue(active * 10000 + active);
   /* The track's height, animated to the active pane's. */
   const height = useSharedValue(0);
 
@@ -158,17 +179,43 @@ export function ProfileTabs({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const land = useCallback((index: number) => {
-    setActive(index);
-    const pane = panesRef.current[index];
-    if (pane) onChangeRef.current?.(pane.key);
+  /** Draw every pane from `low` to `high`, if any of them is not yet. */
+  const reveal = useCallback((low: number, high: number) => {
+    setDrawn((current) => {
+      let next: Set<ProfileTab> | null = null;
+      for (let index = Math.max(0, low); index <= high; index += 1) {
+        const pane = panesRef.current[index];
+        if (!pane || current.has(pane.key)) continue;
+        next = next ?? new Set(current);
+        next.add(pane.key);
+      }
+      return next ?? current;
+    });
   }, []);
+
+  /* The pane in front is in the set as soon as there is one, however
+     late the list arrived. */
+  useEffect(() => {
+    reveal(active, active);
+  }, [active, count, reveal]);
+
+  const land = useCallback(
+    (index: number) => {
+      setActive(index);
+      reveal(index, index);
+      const pane = panesRef.current[index];
+      if (pane) onChangeRef.current?.(pane.key);
+    },
+    [reveal],
+  );
 
   const go = (index: number) => {
     if (index === active && !driving.value) return;
     driving.value = true;
     target.value = index * width;
     settled.value = index;
+    /* The pane tapped and the ones the slide passes, drawn as it starts. */
+    reveal(Math.min(active, index), Math.max(active, index));
     land(index);
     /* The underline slides on its own clock; the scroll frames that
        follow write the same places over it. */
@@ -181,6 +228,17 @@ export function ProfileTabs({
       onScroll: (event) => {
         const x = event.contentOffset.x;
         offset.value = x;
+        if (width > 0) {
+          /* The panes on either side of where the scroll is: both are
+             on screen, so both are drawn. */
+          const low = Math.min(count - 1, Math.max(0, Math.floor(x / width)));
+          const high = Math.min(count - 1, Math.max(0, Math.ceil(x / width)));
+          const span = low * 10000 + high;
+          if (span !== between.value) {
+            between.value = span;
+            runOnJS(reveal)(low, high);
+          }
+        }
         if (driving.value) {
           if (Math.abs(x - target.value) < 1) driving.value = false;
           return;
@@ -193,7 +251,7 @@ export function ProfileTabs({
         }
       },
     },
-    [width, count, land],
+    [width, count, land, reveal],
   );
 
   /* The settled truth, after a swipe's momentum or a tap's scroll. */
@@ -354,7 +412,9 @@ export function ProfileTabs({
                   );
                 }}
               >
-                {pane.content}
+                {/* The pane in front is drawn whatever the set says, so
+                    a list that arrives late can never open on nothing. */}
+                {index === active || drawn.has(pane.key) ? pane.content : null}
               </View>
             ))}
           </Animated.ScrollView>

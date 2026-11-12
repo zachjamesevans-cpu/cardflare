@@ -110,6 +110,15 @@ export const CACHE_TTL = {
      open; a new message lands over the top within a second. */
   threads: 7 * 24 * 60 * 60 * 1000,
   thread: 7 * 24 * 60 * 60 * 1000,
+  /* A binder's pages and somebody's list of binders, each kept by the
+     id it belongs to. Both opened on a spinner every time. A week, the
+     same as a profile, because pockets change when their owner changes
+     them and the fresh read lands over the paint on every open. */
+  binder: 7 * 24 * 60 * 60 * 1000,
+  binders: 7 * 24 * 60 * 60 * 1000,
+  /* One card's page, kept by card. The art and the name never move,
+     but who has it near you and who is hunting it do. A day. */
+  card: 24 * 60 * 60 * 1000,
 } as const;
 
 export type CacheKind = keyof typeof CACHE_TTL;

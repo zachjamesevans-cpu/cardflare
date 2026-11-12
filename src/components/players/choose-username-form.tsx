@@ -12,14 +12,14 @@ import {
   chooseUsernameAction,
   finishSetupAction,
 } from "@/lib/players/setup-actions";
-import { PASSWORD_MIN } from "@/lib/auth/schema";
+import { PASSWORD_MIN } from "@/lib/auth/password-rules";
 import {
   HANDLE_MAX,
   handleFrom,
   handleSeedFrom,
   handleWhileTyping,
 } from "@/lib/players/handle";
-import { SETUP_IDLE, type SetupState } from "@/lib/players/profile-schema";
+import { SETUP_IDLE, type SetupState } from "@/lib/players/profile-state";
 
 /** Below this there is nothing worth asking the server about. */
 const MIN_TO_CHECK = 3;

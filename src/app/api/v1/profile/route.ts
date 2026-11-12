@@ -22,7 +22,8 @@ import {
   setShowcaseNote,
   SHOWCASE_NOTE_MAX,
 } from "@/lib/players/profile";
-import { handleSchema, handleSeedFrom } from "@/lib/players/handle";
+import { handleSeedFrom } from "@/lib/players/handle";
+import { handleSchema } from "@/lib/players/handle-schema";
 import { buyCosmetic } from "@/lib/players/cosmetics";
 import { avatarWearFor, dressedEquipsFor } from "@/lib/players/equips";
 import type { CosmeticArtFile } from "@/lib/players/art-files";

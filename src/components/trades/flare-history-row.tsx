@@ -51,7 +51,13 @@ export function FlareHistoryRow({ flare }: { flare: FlareHistoryEntry }) {
         <span className="block aspect-[60/84] w-full">
           {flare.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={flare.imageUrl} alt="" className="size-full object-cover" />
+            <img
+              src={flare.imageUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover"
+            />
           )}
         </span>
         <QuantityBadge

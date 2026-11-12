@@ -1,8 +1,11 @@
+import { Suspense } from "react";
+
 import { UndoToastHost } from "@/components/feed/undo-toast";
 import { getViewer } from "@/lib/auth/session";
 import { unreadMessages } from "@/lib/local/threads";
 import { playerForUser } from "@/lib/players/accounts";
 import { getPlayerSession } from "@/lib/players/session";
+import { TabsWhileCounting, TabsWithCount } from "./counted-tabs";
 import { PlayerTabs } from "./player-tabs";
 
 /**
@@ -13,10 +16,14 @@ import { PlayerTabs } from "./player-tabs";
  * marketing visitor reading the homepage gets no bottom bar, and a
  * store owner in the dashboard has their own navigation.
  *
- * The unread dot is resolved here rather than in the client bar so
- * the count arrives with the page instead of after it. It is the
- * unread MESSAGES now, on the Messages tab; the notifications' dot
- * rides the Feed's bell.
+ * The unread dot is resolved here, on the server, rather than fetched
+ * by the client bar. It no longer holds the page back while it is
+ * counted: the bar is drawn at once, and the same bar with the count
+ * streams in behind it, so no tab waits on Messages to finish. Until
+ * it lands the bar has no dot on a first load, and on every page after
+ * that it wears the count the last page had (counted-tabs.tsx), so the
+ * dot does not blink between tabs. It is the unread MESSAGES, on the
+ * Messages tab; the notifications' dot rides the Feed's bell.
  *
  * The take-down toast's host rides with the bar. A post that is taken
  * down leaves the page on the refresh, and the toast that offers to
@@ -41,10 +48,21 @@ export async function PlayerTabBar() {
 
   return (
     <>
-      <PlayerTabs unread={playerId ? await unreadMessages(playerId) : 0} />
+      {playerId ? (
+        <Suspense fallback={<TabsWhileCounting />}>
+          <CountedTabs playerId={playerId} />
+        </Suspense>
+      ) : (
+        <PlayerTabs unread={0} />
+      )}
       <UndoToastHost />
     </>
   );
+}
+
+/** The bar once the count is in: the same bar, with its dot. */
+async function CountedTabs({ playerId }: { playerId: string }) {
+  return <TabsWithCount unread={await unreadMessages(playerId)} />;
 }
 
 /**

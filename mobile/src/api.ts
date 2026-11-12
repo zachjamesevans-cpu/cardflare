@@ -48,6 +48,46 @@ const SESSION_KEY = "cf_room_session";
 
 const PUSH_KEY = "cf_push_token";
 
+/*
+ * THE TWO TOKENS, KEPT IN MEMORY ONCE THEY HAVE BEEN READ.
+ *
+ * Every request read the keychain twice before it left, once for each
+ * identity, and a screen that opens on four requests paid for eight
+ * keychain round trips before the first byte. The keychain is still
+ * the only place a token is STORED; this is the copy of what it last
+ * said, so the second request does not ask it again.
+ *
+ * The rules that keep the copy honest:
+ *
+ * - Only a token is remembered, never its absence. "No token" is read
+ *   from the keychain every time, exactly as before, so a phone whose
+ *   keychain was not ready at launch is not signed out for the rest of
+ *   the run, and a guest's path is unchanged.
+ * - Every write and every delete of a token in this file goes through
+ *   the helpers below, which change the copy with it: sign-in, sign-up
+ *   and a refreshed token set it (storeAuth), sign-out and a refused
+ *   refresh drop it (forgetAuth), a join sets the room's, and
+ *   forgetting the account's locals drops it.
+ * - A read that was already on its way to the keychain when a write
+ *   landed does not put the older answer back: each write moves a
+ *   counter, and a read only keeps what it found if the counter has
+ *   not moved since it left.
+ */
+let accessMemo: string | null = null;
+let accessWrites = 0;
+let sessionMemo: string | null = null;
+let sessionWrites = 0;
+
+function rememberAccess(token: string | null): void {
+  accessWrites += 1;
+  accessMemo = token;
+}
+
+function rememberSession(token: string | null): void {
+  sessionWrites += 1;
+  sessionMemo = token;
+}
+
 /**
  * Never throws. The keychain is unavailable for a moment after a
  * restart before the first unlock, and a throw here left the front
@@ -55,8 +95,12 @@ const PUSH_KEY = "cf_push_token";
  * No token is the honest answer until the keychain is back.
  */
 export async function storedAccessToken(): Promise<string | null> {
+  if (accessMemo !== null) return accessMemo;
+  const writes = accessWrites;
   try {
-    return await SecureStore.getItemAsync(ACCESS_KEY);
+    const read = await SecureStore.getItemAsync(ACCESS_KEY);
+    if (read && writes === accessWrites) accessMemo = read;
+    return read;
   } catch {
     return null;
   }
@@ -68,11 +112,18 @@ export async function rememberPushToken(token: string): Promise<void> {
 }
 
 export async function storedSessionToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(SESSION_KEY);
+  if (sessionMemo !== null) return sessionMemo;
+  const writes = sessionWrites;
+  const read = await SecureStore.getItemAsync(SESSION_KEY);
+  if (read && writes === sessionWrites) sessionMemo = read;
+  return read;
 }
 
 async function storeAuth(access: string, refresh: string): Promise<void> {
   await SecureStore.setItemAsync(ACCESS_KEY, access);
+  /* In memory the moment it is in the keychain: sign-in, sign-up and a
+     refreshed token all come through here. */
+  rememberAccess(access);
   await SecureStore.setItemAsync(REFRESH_KEY, refresh);
 }
 
@@ -112,8 +163,12 @@ export async function signOut(): Promise<void> {
  */
 async function forgetAccountLocals(): Promise<void> {
   /* The guest room identity goes too: it was joined under this
-     account's name and would follow the next sign-in into the room. */
+     account's name and would follow the next sign-in into the room.
+     Dropped from memory before the delete and again after it, so a
+     read that crossed the delete cannot put it back. */
+  rememberSession(null);
   await SecureStore.deleteItemAsync(SESSION_KEY).catch(() => {});
+  rememberSession(null);
 
   /*
    * The last room, its game scope and the search game chip. Small
@@ -154,7 +209,12 @@ async function forgetDevice(): Promise<void> {
 
 /** Drops the account tokens. The keychain is the only place they live. */
 async function forgetAuth(): Promise<void> {
+  /* Out of memory first, so nothing signs a request with it while the
+     keychain is still being asked to forget; and again after, so a
+     read that crossed the delete cannot put it back. */
+  rememberAccess(null);
   await SecureStore.deleteItemAsync(ACCESS_KEY).catch(() => {});
+  rememberAccess(null);
   await SecureStore.deleteItemAsync(REFRESH_KEY).catch(() => {});
 }
 
@@ -1330,6 +1390,7 @@ export async function setGoing(eventId: string, going: boolean): Promise<GoingAn
    */
   if (result.sessionToken) {
     await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+    rememberSession(result.sessionToken);
   }
 
   const { sessionToken: _token, ...answer } = result;
@@ -1377,6 +1438,7 @@ export async function joinRoom(
   // Handed out exactly once; keep it or the membership is lost.
   if (result.sessionToken) {
     await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+    rememberSession(result.sessionToken);
   }
 
   return result;
@@ -1628,6 +1690,11 @@ export interface CardPage {
   } | null;
   /** The viewer has a postal code, so distances exist. */
   located: boolean;
+  /**
+   * How many are on each side in all, before the lists below are cut
+   * to what a page shows. Absent from a server that predates it.
+   */
+  demand?: { hunters: number; holders: number };
   /** Players with it in a binder up for trade, nearest first. */
   holders: { player: CardPagePlayer; milesLabel: string | null }[];
   /** Players after it: an open Flare, or a card on a public hunt. */
@@ -1997,6 +2064,11 @@ export interface ProfileStats {
   flares: number;
   followers: number;
   following: number;
+  /**
+   * Different players they have completed a trade with: the line under
+   * the bio, not a fourth number. Absent from a server that predates it.
+   */
+  tradePartners?: number;
 }
 
 export interface Wardrobe {
@@ -2345,10 +2417,7 @@ export interface WantedPage {
 
 /** A page of "Wanted near you", read live. */
 export const getWantedNearYou = (sort: WantedSort, offset = 0) =>
-  call<WantedPage>(
-    "GET",
-    `/api/v1/nearby/wanted?sort=${sort}&offset=${offset}`,
-  );
+  call<WantedPage>("GET", `/api/v1/nearby/wanted?sort=${sort}&offset=${offset}`);
 
 /**
  * A reply from "Wanted near you": the holder's draft, sent now, on an
@@ -4643,6 +4712,7 @@ export async function planVisit(
   /* Kept exactly as Going keeps it: see setGoing. */
   if (result.sessionToken) {
     await SecureStore.setItemAsync(SESSION_KEY, result.sessionToken);
+    rememberSession(result.sessionToken);
   }
 
   const { sessionToken: _token, ...answer } = result;
@@ -4835,6 +4905,16 @@ export interface LocalThreadMessage {
 
 export const listLocalThreads = () =>
   call<{ threads: LocalThread[] }>("GET", "/api/v1/local/threads");
+
+/**
+ * How many messages are waiting, across every conversation, for the dot
+ * on the Messages tab. A number and nothing else, so the bar does not
+ * download every conversation to count them (src/unread-messages.ts).
+ * A server older than the route answers 404 or 400 for this path, and
+ * the dot falls back to counting the list.
+ */
+export const getUnreadMessageCount = () =>
+  call<{ unread: number }>("GET", "/api/v1/local/threads/unread");
 
 /** "I have this": opens the Flare's thread with a first message. */
 export const openLocalThread = (flareId: string, body: string) =>

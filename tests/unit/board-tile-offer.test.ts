@@ -61,10 +61,20 @@ describe("the board tile", () => {
 
 describe("the Following tab", () => {
   it("draws no section headings, whatever the server sends", () => {
+    /* The Feed page is Following alone now and never asks the shared
+       list for headings; only Nearby does, and only past one section. */
     const page = read("src/app/feed/page.tsx");
-    expect(page).toContain(
-      'tab === "following" ? 0 : new Set(shown.map((item) => item.section)).size',
+    const list = read("src/components/feed/feed-list.tsx");
+    expect(page).toContain("<FeedList shown={shown} view={view} />");
+    expect(page).not.toMatch(/<FeedList[^>]*headings/);
+    expect(page).not.toContain("sectionHeading");
+    expect(list).toContain("headings = false,");
+    expect(list).toContain(
+      "headings ? new Set(shown.map((item) => item.section)).size : 0",
     );
-    expect(page).toContain("sectionsShown > 1 &&");
+    expect(list).toContain("sectionsShown > 1 &&");
+    expect(read("src/app/nearby/page.tsx")).toContain(
+      "<FeedList shown={plan.items} view={view} headings />",
+    );
   });
 });

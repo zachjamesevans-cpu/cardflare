@@ -17,6 +17,7 @@ import { searchCardsAction } from "@/lib/cards/actions";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import { pickBasePrinting, type CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
+import { searchEmpty } from "@/lib/copy/empty-copy";
 import { gameShortName } from "@/lib/players/games-catalog";
 import { formatHandle } from "@/lib/players/handle";
 import {
@@ -55,6 +56,10 @@ import type { FoundStore } from "@/lib/stores/search";
  * fails is an empty section, not a broken page. The profile keeps its
  * own player search (player-search.tsx); the app's Search screen is
  * this component, drawn the same.
+ *
+ * When nothing matched, it says so and says what to try
+ * (src/lib/copy/empty-copy.ts, the app's words): on a kind's tab with
+ * other kinds matched it names them, with one button back to Top.
  */
 
 /** The player search's row, as the API serves it. */
@@ -191,6 +196,17 @@ export function EverythingSearch({ account = null }: { account?: string | null }
   const nothing =
     found !== null && sections.every(({ kind }) => found[kind].length === 0);
 
+  /* What to say when nothing matched: the line, what to try, and the
+     way back to Top when another kind has rows. */
+  const empty =
+    nothing && found
+      ? searchEmpty(shown, {
+          players: found.players.length,
+          cards: found.cards.length,
+          stores: found.stores.length,
+        })
+      : null;
+
   const typing = query.trim() !== "";
 
   /** One section, or nothing when it has no rows. */
@@ -222,7 +238,13 @@ export function EverythingSearch({ account = null }: { account?: string | null }
                       <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
                         {isRenderableImageUrl(art) && (
                           /* eslint-disable-next-line @next/next/no-img-element */
-                          <img src={art} alt="" className="size-full object-cover" />
+                          <img
+                            src={art}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="size-full object-cover"
+                          />
                         )}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">
@@ -416,7 +438,23 @@ export function EverythingSearch({ account = null }: { account?: string | null }
         </div>
       )}
 
-      {nothing && <p className="text-sm text-text-muted">Nothing for that yet.</p>}
+      {/* Nothing matched: what is true, what to try, and one way on
+          when there is one. */}
+      {empty && (
+        <div className="flex flex-col items-start gap-1">
+          <p className="text-text-secondary">{empty.line}</p>
+          <p className="text-sm text-text-muted">{empty.hint}</p>
+          {empty.action && (
+            <button
+              type="button"
+              onClick={() => setTab("top")}
+              className="py-2 text-sm font-semibold text-accent hover:text-accent-hover"
+            >
+              {empty.action}
+            </button>
+          )}
+        </div>
+      )}
 
       {sections.map(({ kind, limit }) => section(kind, limit))}
     </div>

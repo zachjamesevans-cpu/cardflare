@@ -66,6 +66,8 @@ export function PocketTile({
           <img
             src={card.imageUrl ?? ""}
             alt=""
+            loading="lazy"
+            decoding="async"
             draggable={false}
             className="size-full object-cover"
           />

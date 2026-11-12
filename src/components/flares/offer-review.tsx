@@ -240,6 +240,8 @@ export function OfferReview({
                     <img
                       src={line.imageUrl}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
                       className="size-full object-cover"
                     />
                   )}

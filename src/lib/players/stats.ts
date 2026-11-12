@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { tradePartnerCount } from "@/lib/trades/partners";
 import { followCounts } from "./follows";
 import { doneWantKeys, wantKey } from "./wants";
 
@@ -15,6 +16,11 @@ export interface ProfileStats {
   flares: number;
   followers: number;
   following: number;
+  /**
+   * Different players they have completed a trade with: the line under
+   * the name, not a fourth number. See trades/partner-rules.ts.
+   */
+  tradePartners: number;
 }
 
 export async function profileStats(
@@ -22,19 +28,21 @@ export async function profileStats(
   /** Who is looking; the follow counts leave out anyone blocked with them. */
   viewerId: string | null = playerId,
 ): Promise<ProfileStats> {
-  if (!isSupabaseConfigured()) return { flares: 0, followers: 0, following: 0 };
+  if (!isSupabaseConfigured())
+    return { flares: 0, followers: 0, following: 0, tradePartners: 0 };
 
   /* Exactly what the profile's Flares grid draws, so the number over
      the grid and the grid agree (the second audit read 9 over a grid
      of 13). The grid is the cards still looked for and nothing else
      now - offers are the TRADES binder's - so this is wants alone. */
-  const [wants, counts, done] = await Promise.all([
+  const [wants, counts, done, tradePartners] = await Promise.all([
     getSupabaseAdmin()
       .from("player_wants")
       .select("card_id, printing_id")
       .eq("player_id", playerId),
     followCounts(playerId, viewerId),
     doneWantKeys(playerId),
+    tradePartnerCount(playerId),
   ]);
 
   if (wants.error) console.error("Could not count Flares", wants.error);
@@ -45,5 +53,5 @@ export async function profileStats(
     (row) => !done.has(wantKey(row.card_id, row.printing_id)),
   ).length;
 
-  return { flares: open, ...counts };
+  return { flares: open, ...counts, tradePartners };
 }

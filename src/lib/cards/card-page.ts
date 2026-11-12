@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { CardDemand } from "@/lib/cards/demand-copy";
 import { printingLabel } from "@/lib/cards/schema";
 import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
 import { PRINTING_COLUMNS, toPrinting, type PrintingRow } from "@/lib/lists/repository";
@@ -49,6 +50,11 @@ export interface CardPage {
   } | null;
   /** The viewer has a postal code, so distances exist. */
   located: boolean;
+  /**
+   * How many are on each side in all, before the lists below are cut
+   * to what a page shows: the one-line summary under the card's name.
+   */
+  demand: CardDemand;
   /** Players with it in a binder up for trade, nearest first. */
   holders: { player: CardPagePlayer; milesLabel: string | null }[];
   /** Players after it: an open Flare, or a card on a public hunt. */
@@ -273,28 +279,28 @@ export async function cardPage(
 
   const people = await peopleFor([...holderIds, ...hunterRows.keys()]);
 
-  const holders = nearestFirst(
+  const everyHolder = nearestFirst(
     holderIds.flatMap((playerId) => {
       const player = people.identity.get(playerId);
       if (!player) return [];
       const miles = distanceFrom(viewerPoint, people.place.get(playerId));
       return [{ player, miles, name: player.displayName }];
     }),
-  )
-    .slice(0, HOLDERS_SHOWN)
-    .map(({ player, miles }) => ({
-      player,
-      milesLabel: miles === null ? null : milesLabel(miles),
-    }));
+  );
+  const holders = everyHolder.slice(0, HOLDERS_SHOWN).map(({ player, miles }) => ({
+    player,
+    milesLabel: miles === null ? null : milesLabel(miles),
+  }));
 
-  const hunters = nearestFirst(
+  const everyHunter = nearestFirst(
     [...hunterRows].flatMap(([playerId, row]) => {
       const player = people.identity.get(playerId);
       if (!player) return [];
       const miles = distanceFrom(viewerPoint, people.place.get(playerId));
       return [{ player, miles, name: player.displayName, ...row }];
     }),
-  )
+  );
+  const hunters = everyHunter
     .slice(0, HUNTERS_SHOWN)
     .map(({ player, miles, postId, huntId, printingId, quantity }) => ({
       player,
@@ -383,6 +389,7 @@ export async function cardPage(
     },
     you,
     located: viewerPoint !== null,
+    demand: { hunters: everyHunter.length, holders: everyHolder.length },
     holders,
     hunters,
     stores,

@@ -14,7 +14,7 @@ import {
 import {
   ADMIN_ACCOUNT_IDLE,
   type AdminAccountState,
-} from "@/lib/players/profile-schema";
+} from "@/lib/players/profile-state";
 import { HANDLE_MAX, handleSeedFrom, handleWhileTyping } from "@/lib/players/handle";
 
 /**

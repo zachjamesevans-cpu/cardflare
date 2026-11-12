@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   LayoutAnimation,
   RefreshControl,
   ScrollView,
@@ -16,6 +17,7 @@ import {
 import { Tour, useTourTarget } from "../tour";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { sameData } from "../quiet-refresh";
 import { RemoteImage } from "../remote-image";
 import { DoorIconButton, RemoteEntry } from "../remote-entry";
 import { dedupeParticipants } from "../room-people";
@@ -505,6 +507,9 @@ function RoomScreen({
    */
   const inFlight = useRef(0);
   const latestRead = useRef(0);
+  /* The last read said this viewer has a seat here, so the next read
+     can ask for their trades alongside the room instead of after it. */
+  const seated = useRef(false);
 
   /* What an action said when it failed: a strip over the board, so a
      tap that did nothing says why instead of looking ignored. */
@@ -559,9 +564,32 @@ function RoomScreen({
       inFlight.current += 1;
 
       try {
+        /*
+         * THE READS THAT DO NOT NEED EACH OTHER GO OUT TOGETHER. They
+         * ran one after another: the room, then the matches, then the
+         * trades, each waiting on the one before, every twelve seconds.
+         * The trades need only the code once a seat is known, so they
+         * leave with the room; the matches need the night's id from the
+         * room's answer, so they leave the moment it lands, alongside
+         * whatever is left.
+         */
+        const tradesEarly = seated.current
+          ? getTrades(code).then(
+              (read) => read.trades,
+              () => null,
+            )
+          : null;
+
         const fresh = await getRoom(code);
         if (!current()) return;
-        setState(fresh);
+        /*
+         * A poll that says what the last one said changes nothing: the
+         * same object goes back, so React draws nothing. The board was
+         * drawn again every twelve seconds whether or not anybody had
+         * moved. Compared against what is on screen now, so an answer
+         * that differs from it in any way still lands.
+         */
+        setState((shown) => (sameData(shown, fresh) ? shown : fresh));
         setError(null);
 
         /*
@@ -573,15 +601,17 @@ function RoomScreen({
         const eventId = fresh.room?.eventId ?? fresh.eventId ?? null;
         const wanted =
           options?.matches || Date.now() - matchesAt.current >= MATCHES_REFRESH_MS;
-        if (eventId && wanted && (await storedAccessToken())) {
+        const matchesRead = (async () => {
+          if (!(eventId && wanted && (await storedAccessToken()))) return;
           matchesAt.current = Date.now();
           try {
             const read = await getNightMatches(eventId);
-            if (current()) setMatches(read);
+            if (current())
+              setMatches((shown) => (sameData(shown, read) ? shown : read));
           } catch {
             /* Garnish on the room; the room must not fail over it. */
           }
-        }
+        })();
 
         /*
          * ALREADY IN, WITH NOTHING TO PROVE IT.
@@ -607,12 +637,20 @@ function RoomScreen({
 
         if (fresh.joined) {
           try {
-            const read = (await getTrades(code)).trades;
-            if (current()) setTrades(read);
+            /* The read that left with the room, or, on the first read
+               with a seat, one made now. A failed one leaves the list. */
+            const read = tradesEarly
+              ? await tradesEarly
+              : (await getTrades(code)).trades;
+            if (read && current()) {
+              setTrades((shown) => (sameData(shown, read) ? shown : read));
+            }
           } catch {
             /* The list is garnish; the room must not fail over it. */
           }
         }
+        seated.current = Boolean(fresh.joined);
+        await matchesRead;
       } catch (caught) {
         if (!current()) return;
         const missing = caught instanceof ApiError && caught.status === 404;
@@ -636,6 +674,7 @@ function RoomScreen({
     setExpandedGroups({});
     setMatches(null);
     matchesAt.current = 0;
+    seated.current = false;
     void refresh();
   }, [refresh]);
 
@@ -643,11 +682,60 @@ function RoomScreen({
      board that goes live speeds up without a visit. */
   const phase = state ? roomPhaseOf(state) : null;
   const pollMs = pollMsFor(phase);
-  useEffect(() => {
-    if (pollMs === null) return;
-    const timer = setInterval(() => void refresh({ poll: true }), pollMs);
-    return () => clearInterval(timer);
-  }, [refresh, pollMs]);
+  /*
+   * Only while somebody is looking. The timer used to run for as long
+   * as the screen was mounted, which for a tab is the app's whole life:
+   * a room left open polled every twelve seconds under the Feed, under
+   * a profile, and with the phone in a pocket. Now it runs while this
+   * screen is the one in front and the app is too; coming back to
+   * either reads once at once, so the board is never older than it
+   * would have been, and then the timer carries on. The conversation
+   * screen keeps the same rule (screens/thread.tsx).
+   */
+  const away = useRef(false);
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        away.current = true;
+      },
+      [],
+    ),
+  );
+  useFocusEffect(
+    useCallback(() => {
+      if (pollMs === null) return;
+      /* Back from another screen: the read the timer would have made. */
+      if (away.current) {
+        away.current = false;
+        void refresh({ poll: true });
+      }
+
+      let timer: ReturnType<typeof setInterval> | null = null;
+      const start = () => {
+        if (timer) return;
+        timer = setInterval(() => void refresh({ poll: true }), pollMs);
+      };
+      const stop = () => {
+        if (timer) clearInterval(timer);
+        timer = null;
+      };
+      if (AppState.currentState === "active") start();
+
+      const appState = AppState.addEventListener("change", (next) => {
+        if (next === "active") {
+          void refresh({ poll: true });
+          start();
+        } else {
+          stop();
+        }
+      });
+
+      return () => {
+        stop();
+        appState.remove();
+      };
+    }, [refresh, pollMs]),
+  );
 
   const join = async () => {
     setBusy(true);

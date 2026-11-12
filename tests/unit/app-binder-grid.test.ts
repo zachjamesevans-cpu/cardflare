@@ -123,7 +123,9 @@ describe("hold and drag on the phone, in one touch", () => {
     expect(page).toContain("Gesture.Pan()");
     expect(page).toContain(".activateAfterLongPress(HOLD_MS)");
     expect(page).toContain(".enabled(enabled)");
-    expect(page).toContain("enabled: yours,");
+    /* The owner alone, and only once the fresh read has landed over
+       the cached paint: a card is never moved from the last visit's copy. */
+    expect(page).toContain("enabled: yours && confirmed === cacheKey,");
     expect(page).toMatch(
       /<GestureDetector gesture=\{drag\.gesture\}>\s*<View\s+onLayout=\{onFrameLayout\}/,
     );
@@ -159,7 +161,8 @@ describe("hold and drag on the phone, in one touch", () => {
     expect(page).toContain(
       "? placeInPockets(allCards, drag.held.entryId, drag.target)",
     );
-    expect(page).toContain("slots={pageOf(shown, index)}");
+    expect(page).toContain("const slots = pageOf(shown, index);");
+    expect(page).toContain("slots={slots}");
     expect(page).toContain("const SLIDE = LinearTransition.duration(DROP.duration);");
     expect(page).toContain("layout={SLIDE}");
     /* The held card's place is the dashed outline, ringed where it lands. */

@@ -77,6 +77,8 @@ export function StorePostCard({ item }: { item: StorePostItem }) {
               <img
                 src={item.logoUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 className="size-full object-cover"
                 width={44}
                 height={44}
@@ -113,6 +115,7 @@ export function StorePostCard({ item }: { item: StorePostItem }) {
         <img
           src={item.imageUrl}
           alt=""
+          decoding="async"
           className="aspect-video w-full rounded-[14px] border border-border object-cover"
           loading="lazy"
         />

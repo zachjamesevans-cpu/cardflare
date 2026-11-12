@@ -118,19 +118,25 @@ describe("the words around Going", () => {
 });
 
 describe("the dock", () => {
-  it("gives Room's slot to Rooms on the website, a storefront at /nights", () => {
-    /* Store days (2026-10-09): the store is the room, so the tab is
-       Rooms with a store glyph; the address stays so links keep working. */
-    expect(webDock).toContain('{ href: "/nights", label: "Rooms", icon: Store }');
+  it("gives Rooms' slot to Nearby on the website, as the app did", () => {
+    /* 2026-10-11: Nearby took the second slot; the founder, "i really
+       dont think the nights tab will be used as much". The Rooms page
+       stays at /nights so links keep working, with no slot in the bar. */
+    expect(webDock).toContain('{ href: "/nearby", label: "Nearby", icon: MapPin }');
+    expect(webDock).not.toContain('label: "Rooms"');
     expect(webDock).not.toContain('label: "Room"');
     expect(webDock).not.toContain('label: "Nights"');
-    expect(webDock).toMatch(/import \{[^}]*\bStore\b[^}]*\} from "lucide-react"/);
+    expect(webDock).not.toContain('href: "/nights"');
+    expect(appRoot).toContain('tabBarLabel: "Nearby"');
   });
 
-  it("keeps Nights lit on /nights, /room and /e/ on the website", () => {
-    expect(webDock).toContain('LOCAL_ENABLED ? "/feed" : "/nights"');
-    expect(webDock).toContain('pathname.startsWith("/e/")');
-    expect(webDock).toContain('pathname === "/room"');
+  it("keeps Nearby lit in a room and at the code door, and nothing lit on /nights", () => {
+    /* Nearby's top left is the door into a room on both platforms. The
+       app's Rooms screen has no slot, so no tab is lit there either. */
+    expect(webDock).toContain(
+      'label === "Nearby" && (pathname.startsWith("/e/") || pathname === "/room")',
+    );
+    expect(webDock).not.toMatch(/pathname[^\n]*\/nights/);
   });
 
   it("gives Room's slot to Nights in the app, calendar idle and filled focused", () => {
@@ -179,8 +185,12 @@ describe("the Nights screen", () => {
   it("says the same thing when there is nothing to show", () => {
     expect(webNights).toContain("NO_NIGHTS");
     expect(appNights).toContain("NO_NIGHTS");
-    /* With a way to the Feed, where following a store happens. */
+    /* With a way to Nearby. The link is the old filter's address, which
+       the Feed page sends on to /nearby. */
     expect(webNights).toContain('href="/feed?tab=nearby"');
+    expect(read("src/app/feed/page.tsx")).toContain(
+      'if (tab === "nearby") redirect("/nearby");',
+    );
   });
 
   it("counts the roster through playersLine on both", () => {

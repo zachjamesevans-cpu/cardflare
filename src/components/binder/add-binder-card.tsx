@@ -102,8 +102,10 @@ export function AddBinderCard({
   const router = useRouter();
   /* The search, or the pasted list it links to. */
   const [view, setView] = useState<"search" | "paste">("search");
-  /* The scanner, open over the sheet. */
-  const [scanning, setScanning] = useState(false);
+  /* The scanner, open over the sheet. The binder page loads this sheet
+     on its first opening, so a first opening that is a retake starts
+     in the scanner, the same as every later one (below). */
+  const [scanning, setScanning] = useState(open && Boolean(retake));
   /* Pages went to be read from this sheet: it says so. */
   const [pagesWent, setPagesWent] = useState(false);
   const [picks, setPicks] = useState<DraftCard[]>([]);

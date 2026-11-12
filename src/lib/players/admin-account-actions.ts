@@ -7,7 +7,7 @@ import { passwordResetEmail } from "@/lib/email/store-invite";
 import { text } from "@/lib/form-value";
 import { updateSignInEmail, userIdForPlayer } from "@/lib/admin/records";
 import { siteUrl } from "@/lib/site";
-import { handleSchema } from "./handle";
+import { handleSchema } from "./handle-schema";
 import { setIdentity } from "./profile";
 import { displayNameSchema, type AdminAccountState } from "./profile-schema";
 

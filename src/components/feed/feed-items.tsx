@@ -187,6 +187,8 @@ export function Item({
           <img
             src={item.imageUrl}
             alt=""
+            loading="lazy"
+            decoding="async"
             className="w-9 shrink-0 rounded-[4px] border border-border"
           />
         )}
@@ -238,7 +240,13 @@ export function Item({
               <span className="block aspect-[60/84] w-full">
                 {card.imageUrl && (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={card.imageUrl} alt="" className="size-full object-cover" />
+                  <img
+                    src={card.imageUrl}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    className="size-full object-cover"
+                  />
                 )}
               </span>
             </span>

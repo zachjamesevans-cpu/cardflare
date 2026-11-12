@@ -1,7 +1,7 @@
+import { Image as ExpoImage } from "expo-image";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Image,
   Modal,
   Pressable,
   Text,
@@ -81,12 +81,16 @@ export function PlayerPeekModal({
         void writeCache("peek", playerId, result);
 
         /* Prefetch the five shelf images, but only briefly: cached art
-           is instant and the rest fades in. */
+           is instant and the rest fades in. Into expo-image's cache,
+           the one the shelf is drawn from (remote-image.tsx); React
+           Native's own prefetch filled a cache nothing here reads. */
         const warm = Promise.all(
           stillWanted(result.flares)
             .slice(0, PEEK_SHELF)
             .map((entry) =>
-              entry.imageUrl ? Image.prefetch(entry.imageUrl).catch(() => false) : null,
+              entry.imageUrl
+                ? ExpoImage.prefetch(entry.imageUrl, "memory-disk").catch(() => false)
+                : null,
             ),
         );
         await Promise.race([warm, new Promise((done) => setTimeout(done, 700))]);
@@ -162,7 +166,9 @@ export function PlayerPeekModal({
             <CoverBanner coverUrl={profile.coverUrl} height={86} />
           ) : null}
           {unavailable ? (
-            <Text style={{ color: colors.textMuted }}>This profile is unavailable.</Text>
+            <Text style={{ color: colors.textMuted }}>
+              This profile is unavailable.
+            </Text>
           ) : failed ? (
             <Text style={{ color: colors.textMuted }}>
               Could not load their profile right now. Try again in a moment.

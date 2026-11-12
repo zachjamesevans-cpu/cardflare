@@ -204,7 +204,16 @@ async function loadProfile(
      * saved but could not be loaded", which is the worst state the
      * profile has: a message with nothing anybody can do about it.
      */
-    verifiedAvatar(playerId, avatarPathFor(player)),
+    /*
+     * Verified for the owner only, as the note on verifiedAvatar always
+     * said. It ran for every visitor too: a Storage listing on each
+     * profile view, to repair a row only its owner can do anything
+     * about. A visitor is handed the src, and a picture that fails to
+     * load falls back to initials in the browser, as it does in a room.
+     */
+    viewerId === playerId
+      ? verifiedAvatar(playerId, avatarPathFor(player))
+      : avatarSrc(avatarPathFor(player)),
     listShowcase(playerId),
     organizerStoresFor(playerId),
     listBinders(playerId, viewerId),
@@ -376,6 +385,26 @@ async function verifiedAvatar(
     .eq("id", playerId);
 
   return null;
+}
+
+/**
+ * A player's name and nothing else: what a page's title needs.
+ *
+ * The public profile page read the whole profile twice, once for the
+ * browser tab's title and once for the page, about a dozen reads to
+ * learn a name the second pass was about to read anyway.
+ */
+export async function profileName(playerId: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("players")
+    .select("display_name")
+    .eq("id", playerId)
+    .maybeSingle();
+
+  if (error) console.error("Could not read the player's name", error);
+  return data?.display_name ?? null;
 }
 
 /**

@@ -17,6 +17,7 @@ import { OrganizerChips } from "./remote-entry";
 import { Tap } from "./ui";
 import { HEADER } from "./header-metrics";
 import { colors, radius, spacing } from "./theme";
+import { tradePartnersLine } from "./trade-partners";
 import { WornBadge, WornName, WornTitle } from "./worn-name";
 
 /**
@@ -76,6 +77,7 @@ export function ProfileHeader({
   /** The row of buttons under the name; none draws no row at all. */
   actions?: ReactNode;
 }) {
+  const traded = tradePartnersLine(stats?.tradePartners);
   return (
     <View style={{ gap: spacing(2.5) }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(4) }}>
@@ -146,6 +148,14 @@ export function ProfileHeader({
             style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 19 }}
           >
             {bio}
+          </Text>
+        ) : null}
+        {/* "Traded with 7 players": people, not trades, and only once
+            there is one. Under the bio, not a fourth number. Same line,
+            same place on the website. */}
+        {traded ? (
+          <Text style={{ color: colors.textMuted, fontSize: 14, lineHeight: 18 }}>
+            {traded}
           </Text>
         ) : null}
         {/* The TO badge, part of the header so both profile screens get

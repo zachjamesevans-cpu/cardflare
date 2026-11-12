@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -29,6 +29,8 @@ const web = read("src/app/feed/page.tsx");
 const app = read("mobile/src/screens/home.tsx");
 const items = read("src/components/feed/feed-items.tsx");
 const webPage = read("src/app/feed/page.tsx");
+/* The list both the Feed page and the Nearby page draw. */
+const webList = read("src/components/feed/feed-list.tsx");
 const appRoot = read("mobile/App.tsx");
 
 /** Every item kind the server can produce, from the union itself. */
@@ -141,10 +143,15 @@ describe("the home screen's furniture", () => {
        title for. Reading the record straight into the markup is what
        put an empty <Text> on the app, and an empty Text still takes a
        line box - 43 points of black above the first card. */
-    expect(webPage).toContain("sectionHeading(item.section)");
+    expect(webList).toContain("sectionHeading(item.section)");
     expect(app).toContain("sectionHeading(item.section)");
-    expect(webPage).toContain("{item.reason}");
+    expect(webList).toContain("{item.reason}");
     expect(app).toContain("{item.reason}");
+    /* One list for both tabs on the website, as the app's one screen is. */
+    expect(webPage).toContain("<FeedList shown={shown} view={view} />");
+    expect(read("src/app/nearby/page.tsx")).toContain(
+      "<FeedList shown={plan.items} view={view} headings />",
+    );
   });
 
   it("makes every picture in the answer absolute for a phone", () => {
@@ -238,11 +245,15 @@ describe("the home screen's furniture", () => {
     expect(appRoot).not.toContain('<Tab.Screen name="Room"');
     expect(appRoot).toMatch(/LOCAL_ENABLED \? \(\s*<Tab\.Screen name="Local"/);
 
+    /* Then (2026-10-11) Nearby took that slot on both, and the Nights
+       route kept its name with no slot in the bar. */
+    expect(appRoot).toContain('tabBarLabel: "Nearby"');
+
     const webTabs = read("src/components/players/player-tabs.tsx");
     expect(webTabs).toContain('label: "Feed"');
     expect(webTabs).toContain('label: "Local"');
-    /* Store days (2026-10-09): the slot is labelled Rooms, at /nights. */
-    expect(webTabs).toContain('label: "Rooms"');
+    expect(webTabs).toContain('label: "Nearby"');
+    expect(webTabs).not.toContain('label: "Rooms"');
     expect(webTabs).not.toContain('label: "Room"');
     expect(webTabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
@@ -358,8 +369,8 @@ describe("the home screen's furniture", () => {
   it("puts finding a player one tap from the feed, on both", () => {
     /* "Let's make a search icon in the top right of the main feed" was
        the first answer; Search is a tab of its own now, on both bars
-       (Feed, Nights, Messages, Search, Profile), and the Feed's empty
-       Following list sends people there. */
+       (Feed, Nearby, Messages, Search, Profile), and the Feed's empty
+       Following list sends people there, with the same button on both. */
     expect(read("src/components/players/player-tabs.tsx")).toContain(
       '{ href: "/search", label: "Search", icon: Search }',
     );
@@ -370,6 +381,8 @@ describe("the home screen's furniture", () => {
       'navigation.navigate("Tabs", { screen: "Search" })',
     );
     expect(read("mobile/src/screens/home.tsx")).not.toContain("FindPlayer");
+    expect(read("mobile/src/screens/home.tsx")).toContain('label="Find a player"');
+    expect(webPage).toMatch(/<Link href="\/search"[^>]*>\s*Find a player\s*<\/Link>/);
   });
 
   it("keeps one wants list, and lets it say which state a card is in", () => {
@@ -495,7 +508,7 @@ describe("posting a Flare wakes the Feed", () => {
   });
 });
 
-describe("the Feed has three filters, and your own Flares are in the main one", () => {
+describe("the Feed is Following, Nearby is its own tab, and your own Flares are in the main one", () => {
   /*
    * The founder cut My Flares as "a second door" and then asked for it
    * back: "bring back the my flares tab so everything is equally split
@@ -507,28 +520,68 @@ describe("the Feed has three filters, and your own Flares are in the main one", 
    * really about - so the filter reads a post's own `yours` rather than
    * its `tab`. Both halves are pinned, because losing either quietly
    * undoes a round of work.
+   *
+   * Then it went for good (2026-10-11). The founder: "is my flares even
+   * useful anymore now that they're displaying in your own profile?"
+   * The same day Nearby took the Rooms slot in the bar, so the Feed has
+   * no filter row at all: the Feed tab is Following and the Nearby tab
+   * is Nearby, on both platforms. The server still names all three, for
+   * the builds and the links that came before.
    */
   const repo = read("src/lib/feed/repository.ts");
   const appApi = read("mobile/src/api.ts");
+  const webNearby = read("src/app/nearby/page.tsx");
 
-  it("offers Following, Nearby and My Flares, in that order", () => {
+  it("still knows Following, Nearby and My Flares on the server, in that order", () => {
     expect(repo).toContain('export type FeedTab = "following" | "nearby" | "mine";');
     expect(repo).toContain('mine: "My Flares"');
-
-    /* Both clients draw the same three from the same list, not from two
-       copies that can be edited apart. */
-    for (const source of [
-      read("src/components/feed/feed-filter-tabs.tsx"),
-      read("mobile/src/feed-filter-tabs.tsx"),
-    ]) {
-      expect(source).toContain("FEED_TABS: FeedTab[] = FEED_TAB_VALUES");
-      expect(source).toContain("mine:");
-    }
     for (const source of [repo, appApi]) {
       expect(source).toContain(
         'FEED_TAB_VALUES: FeedTab[] = ["following", "nearby", "mine"]',
       );
     }
+  });
+
+  it("draws no filter row on either Feed: one tab, one half of the list", () => {
+    /* The app: one screen, told which half to draw by the tab it is on. */
+    expect(app).toContain(
+      'export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" })',
+    );
+    expect(app).toContain("const tab: FeedTab = mode;");
+    expect(app).not.toContain("<FeedFilterTabs");
+    expect(appRoot).toContain('{() => <HomeScreen mode="nearby" />}');
+
+    /* The website: a page per tab, over the same remembered list. */
+    expect(webPage).not.toContain("FeedFilterTabs");
+    expect(webPage).toContain(
+      'items.filter((item) => belongsToTab(item, "following"))',
+    );
+    expect(webNearby).toContain(
+      'planNearby(items.filter((item) => belongsToTab(item, "nearby")))',
+    );
+    for (const source of [webPage, webNearby]) {
+      expect(source).toContain(
+        "rememberFeed(playerId, () => listFeed(playerId, session?.id ?? null))",
+      );
+    }
+    expect(
+      existsSync(
+        resolve(
+          import.meta.dirname,
+          "../..",
+          "src/components/feed/feed-filter-tabs.tsx",
+        ),
+      ),
+    ).toBe(false);
+  });
+
+  it("keeps the old filter links alive on the website", () => {
+    /* `/feed?tab=nearby` is still written by the Rooms page, and
+       `/feed?tab=mine` by the composer's "see it" button: the first is
+       sent on to Nearby, the second is the plain Feed. Neither is a 404. */
+    expect(webPage).toContain('if (tab === "nearby") redirect("/nearby");');
+    expect(webPage).not.toContain("notFound");
+    expect(webPage).not.toContain('"mine"');
   });
 
   it("files your own Flares into the main feed, not behind the new tab", () => {

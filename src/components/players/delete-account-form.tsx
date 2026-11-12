@@ -6,7 +6,7 @@ import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { TextInput } from "@/components/ui/controls";
 import { deleteAccountAction } from "@/lib/players/profile-actions";
-import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-schema";
+import { PROFILE_IDLE, type ProfileState } from "@/lib/players/profile-state";
 
 /**
  * Deleting your own account.
