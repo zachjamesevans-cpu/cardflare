@@ -89,7 +89,9 @@ describe("the games catalogue", () => {
     /* The LATEST check wins: the table was created with five and a
        later migration replaced the constraint with six. */
     const matches = [
-      ...sql.matchAll(/player_games[\s\S]*?check \(game in \(([^)]+)\)\)/g),
+      ...sql.matchAll(
+        /(?:create table public\.player_games \(|add constraint player_games_game_check)[\s\S]*?check \(game in \(([^)]+)\)\)/g,
+      ),
     ];
     const last = matches.at(-1);
     expect(last, "player_games migration not found").toBeTruthy();

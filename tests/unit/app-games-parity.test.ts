@@ -1,13 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { GAME_IDS } from "@/lib/event-hub/game-profiles";
+import { FLARECAST_ONLY, GAME_IDS } from "@/lib/event-hub/game-profiles";
 import {
   ALL_GAMES as WEB_ALL,
   resolveGameScope as webScope,
   searchPlaceholder as webPlaceholder,
   splitGames as webSplit,
 } from "@/lib/cards/game-scope";
-import { GAME_SLUGS, TCG_GAMES as WEB_GAMES } from "@/lib/players/games-catalog";
+import {
+  GAME_SLUGS,
+  isGameSlug,
+  TCG_GAMES as WEB_GAMES,
+} from "@/lib/players/games-catalog";
 import {
   ALL_GAMES as APP_ALL,
   resolveGameScope as appScope,
@@ -27,8 +31,12 @@ describe("the games list", () => {
     expect(APP_GAMES).toEqual(WEB_GAMES);
   });
 
-  it("is the same six the Event Hub runs timers for", () => {
-    expect([...GAME_IDS].sort()).toEqual([...GAME_SLUGS].sort());
+  it("is the six the Event Hub runs timers for, plus FlareCast's own four", () => {
+    /* Every catalogue game has a clock; the games with a clock and no
+       cards are named, so a fifth cannot slip in unnoticed. */
+    const catalogue = GAME_IDS.filter((id) => !FLARECAST_ONLY.includes(id));
+    expect([...catalogue].sort()).toEqual([...GAME_SLUGS].sort());
+    for (const id of FLARECAST_ONLY) expect(isGameSlug(id)).toBe(false);
   });
 });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   allProfiles,
+  FLARECAST_ONLY,
   GAME_IDS,
   GAME_PROFILES,
   gameProfile,
@@ -28,6 +29,8 @@ import { overtimeSecondsFor } from "@/lib/event-hub/schema";
  * periodically. That is what `rulesLastVerified` is for.
  */
 
+const FOUR: GameId[] = ["yugioh", "gundam", "cyberpunk", "sorcery"];
+
 const SIX: GameId[] = [
   "one-piece",
   "pokemon",
@@ -37,21 +40,25 @@ const SIX: GameId[] = [
   "mtg",
 ];
 
-describe("the six games", () => {
-  it("is exactly the six, and no more", () => {
+const ALL: GameId[] = [...SIX, ...FOUR];
+
+describe("the games", () => {
+  it("is the six of the catalogue, then the four FlareCast runs alone", () => {
     /* Version one supported five; Magic arrived with the card catalogue
-       round. Yu-Gi-Oh and the rest arrive by adding a profile, which is
-       deliberately a code change. */
-    expect([...GAME_IDS]).toEqual(SIX);
-    expect(allProfiles()).toHaveLength(6);
+       round; Yu-Gi-Oh!, Gundam, Cyberpunk and Sorcery arrived for
+       FlareCast alone (2026-11-12). Another arrives by adding a
+       profile, which is deliberately a code change. */
+    expect([...GAME_IDS]).toEqual([...SIX, ...FOUR]);
+    expect([...FLARECAST_ONLY]).toEqual(FOUR);
+    expect(allProfiles()).toHaveLength(10);
   });
 
   it("refuses a game it does not carry", () => {
-    expect(gameProfile("yugioh")).toBeNull();
+    expect(gameProfile("digimon")).toBeNull();
     expect(gameProfile("")).toBeNull();
   });
 
-  it.each(SIX)("%s carries everything a rules update needs", (id) => {
+  it.each(ALL)("%s carries everything a rules update needs", (id) => {
     const profile = GAME_PROFILES[id];
 
     expect(profile.officialRulesUrl).toMatch(/^https:\/\//);
@@ -63,7 +70,7 @@ describe("the six games", () => {
     expect(timerPreset(id, profile.defaultPresetId)).not.toBeNull();
   });
 
-  it.each(SIX)("%s keeps both procedures readable across a room", (id) => {
+  it.each(ALL)("%s keeps both procedures readable across a room", (id) => {
     for (const bracket of ["swiss", "elimination"] as const) {
       const procedure = procedureFor(GAME_PROFILES[id], bracket);
 
@@ -79,7 +86,7 @@ describe("the six games", () => {
     }
   });
 
-  it.each(SIX)("%s only claims a countdown when it has one", (id) => {
+  it.each(ALL)("%s only claims a countdown when it has one", (id) => {
     for (const bracket of ["swiss", "elimination"] as const) {
       const procedure = procedureFor(GAME_PROFILES[id], bracket);
 
@@ -92,8 +99,8 @@ describe("the six games", () => {
   });
 
   it("gives every game a distinct accent token", () => {
-    const tokens = SIX.map((id) => GAME_PROFILES[id].accentToken);
-    expect(new Set(tokens).size).toBe(6);
+    const tokens = ALL.map((id) => GAME_PROFILES[id].accentToken);
+    expect(new Set(tokens).size).toBe(ALL.length);
     /* A token name, never a literal — brand colour lives in globals.css. */
     for (const token of tokens) expect(token).toMatch(/^--color-game-/);
   });
@@ -101,6 +108,116 @@ describe("the six games", () => {
   it("says out loud that it is not the rules authority", () => {
     expect(RULES_DISCLAIMER).toContain("Quick reference only");
     expect(RULES_DISCLAIMER).toContain("judges");
+  });
+});
+
+/*
+ * The four FlareCast runs without cards. Each fact below is quoted from
+ * the publisher's own document named in the profile's officialRulesUrl;
+ * these hold the screen to it.
+ */
+describe("Yu-Gi-Oh!", () => {
+  const profile = GAME_PROFILES.yugioh;
+
+  it("runs 50-minute rounds, with the final match untimed", () => {
+    expect(timerPreset("yugioh", "swiss")?.durationSeconds).toBe(50 * 60);
+    expect(timerPreset("yugioh", "top-cut")?.durationSeconds).toBe(50 * 60);
+    expect(timerPreset("yugioh", "final")?.durationSeconds).toBeNull();
+  });
+
+  it("ends the match at time, with no extra turns and no tiebreaks", () => {
+    for (const bracket of ["swiss", "elimination"] as const) {
+      const procedure = procedureFor(profile, bracket);
+      expect(procedure.additionalTurns).toBe(0);
+      expect(procedure.timed).toBe(false);
+      expect(procedure.tiebreak).toBeUndefined();
+      expect(procedure.steps.join(" ")).toContain("double loss");
+    }
+    expect(profile.swiss.steps.join(" ")).toContain("Play a 4th duel");
+  });
+
+  it("points at KDE-US Tournament Policy v2.5", () => {
+    expect(profile.officialRulesUrl).toContain("Tournament_Policy_v_2_5");
+  });
+});
+
+describe("Gundam", () => {
+  const profile = GAME_PROFILES.gundam;
+
+  it("runs 30:00 Standard and 60:00 Top Cut Finals, with an untimed Championship", () => {
+    expect(timerPreset("gundam", "standard")?.durationSeconds).toBe(30 * 60);
+    expect(timerPreset("gundam", "standard")?.overtimeSeconds).toBe(5 * 60);
+    expect(timerPreset("gundam", "top-cut")?.durationSeconds).toBe(60 * 60);
+    expect(timerPreset("gundam", "top-cut")?.overtimeSeconds).toBe(10 * 60);
+    expect(timerPreset("gundam", "championship")?.durationSeconds).toBeNull();
+  });
+
+  it("plays 3 more turns after the first player's turn and 2 after the second's", () => {
+    expect(profile.swiss.steps.join(" ")).toContain("play 3 more turns");
+    expect(profile.swiss.steps.join(" ")).toContain("play 2 more");
+    expect(profile.swiss.timed).toBe(true);
+    expect(profile.swiss.overtimeSeconds).toBe(5 * 60);
+  });
+
+  it("compares Shields, then deck, and in playoffs Units, then the last Shield taken", () => {
+    expect(profile.swiss.tiebreak).toEqual([
+      "Most cards in the Shield Area (Base and Shields)",
+      "Most cards remaining in deck",
+    ]);
+    expect(profile.elimination.tiebreak).toHaveLength(4);
+    expect(profile.elimination.steps[0]).toContain("Draws are not permitted");
+    expect(profile.swiss.steps.at(-1)).toContain("Both players lose");
+  });
+});
+
+describe("Cyberpunk", () => {
+  const profile = GAME_PROFILES.cyberpunk;
+
+  it("runs the four official round lengths", () => {
+    expect(timerPreset("cyberpunk", "swiss-bo3")?.durationSeconds).toBe(50 * 60);
+    expect(timerPreset("cyberpunk", "swiss-bo1")?.durationSeconds).toBe(30 * 60);
+    expect(timerPreset("cyberpunk", "top-cut-bo3")?.durationSeconds).toBe(75 * 60);
+    expect(timerPreset("cyberpunk", "top-cut-bo1")?.durationSeconds).toBe(55 * 60);
+  });
+
+  it("finishes the turn, gives each player one more, and 7 Gig dice wins", () => {
+    expect(profile.swiss.additionalTurns).toBe(2);
+    expect(profile.swiss.steps.join(" ")).toContain("7 or more Gig dice");
+    expect(profile.swiss.steps.join(" ")).toContain("Otherwise the game is a draw");
+    expect(profile.elimination.steps.join(" ")).toContain("more Gigs than the other");
+  });
+
+  it("puts no single countdown on the wall for two 5:00 turns", () => {
+    for (const bracket of ["swiss", "elimination"] as const) {
+      expect(procedureFor(profile, bracket).timed).toBe(false);
+      expect(procedureFor(profile, bracket).overtimeSeconds).toBeNull();
+    }
+  });
+});
+
+describe("Sorcery", () => {
+  const profile = GAME_PROFILES.sorcery;
+
+  it("invents no round length: the organizer types one", () => {
+    expect(profile.presets).toHaveLength(1);
+    expect(profile.presets[0].durationSeconds).toBeNull();
+    expect(profile.presets[0].note).toContain("custom length");
+  });
+
+  it("invents no end-of-round procedure either", () => {
+    for (const bracket of ["swiss", "elimination"] as const) {
+      const procedure = procedureFor(profile, bracket);
+      expect(procedure.additionalTurns).toBe(0);
+      expect(procedure.timed).toBe(false);
+      expect(procedure.tiebreak).toBeUndefined();
+      expect(procedure.steps[0]).toBe(
+        "Sorcery's publisher sets no end-of-round procedure.",
+      );
+    }
+  });
+
+  it("points at the Codex's Tournament Rules entry", () => {
+    expect(profile.officialRulesUrl).toContain("sorcerytcg.com/codex/");
   });
 });
 
@@ -306,5 +423,23 @@ describe("a tournament name that repeats its game", () => {
     ["Store Championship", "lorcana"],
   ])("leaves %j alone under %s", (name, id) => {
     expect(nameRepeatsGame(GAME_PROFILES[id as GameId], name)).toBe(false);
+  });
+});
+
+/*
+ * A tournament's QR carries its game, and the room uses it to open the
+ * card search on that game. The four FlareCast-only games have no
+ * cards, so their QR must leave the search on the player's own games
+ * rather than narrowing it to nothing.
+ */
+describe("a FlareCast-only game's QR in the room", () => {
+  it("scopes the room's card search by the catalogue, not by FlareCast", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const room = readFileSync(join(process.cwd(), "src/app/e/[code]/page.tsx"), "utf8");
+    expect(room).toContain(
+      'const scannedGame = isGameSlug(params_.g ?? "") ? (params_.g as GameSlug) : null;',
+    );
+    expect(room).not.toContain("gameProfile(params_.g");
   });
 });

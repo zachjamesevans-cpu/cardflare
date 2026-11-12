@@ -876,6 +876,19 @@ store account into a browser that lives on a shelf, and if they did, that
 browser would hold an account that can rewrite the store's inventory. The
 token reaches exactly one read-only payload and no Server Action accepts it.
 
+**FlareCast runs clocks for more games than the catalogue has cards for.**
+`GAME_IDS` in `event-hub/game-profiles.ts` is the six catalogue games, then
+Yu-Gi-Oh!, Gundam, Cyberpunk and Sorcery (`FLARECAST_ONLY`, added 2026-11-12,
+"FlareCast only"). Those four widen `event_hub_timers.game` and nothing else:
+not `cards`, `player_games`, `events` or `store_games`. A tournament QR for one
+of them leaves the room's card search on the player's own games, because the
+room scopes by `isGameSlug`, not by FlareCast's list. Where a publisher writes
+no procedure the profile says so rather than borrowing one: Sorcery's preset is
+untimed until the store types its own minutes, and its end-of-round card says
+the organizer decides. Yu-Gi-Oh! has no extra turns at all: under KDE-US
+Tournament Policy v2.5 time ends the match, and an unfinished one is a double
+loss.
+
 **A display belongs to a store, not to an event.** A shop runs One Piece and
 Flesh and Blood at neighbouring tables on one night, in one physical room,
 which in CardFlare is one room. So the game lives on the TIMER — `events.game`

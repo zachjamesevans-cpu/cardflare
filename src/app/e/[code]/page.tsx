@@ -46,6 +46,7 @@ import { listBinder, listRoomFlares } from "@/lib/lists/repository";
 import { showAvailability } from "@/lib/shows/repository";
 import { counterAvailability } from "@/lib/singles/repository";
 import { ahead } from "@/lib/ahead";
+import { isGameSlug, type GameSlug } from "@/lib/players/games-catalog";
 import { getViewer } from "@/lib/auth/session";
 import { accountIdentity } from "@/lib/players/account-identity";
 import { postFlaresOnJoin } from "@/lib/events/auto-post";
@@ -66,7 +67,6 @@ import { boardReadable, boardWritable, roomPhase } from "@/lib/events/schema";
 import { goingState, nightRoster } from "@/lib/events/going";
 import { EMPTY_MATCHES, nightMatches } from "@/lib/events/night-matches";
 import { nightBinderState } from "@/lib/events/night-binders";
-import { gameProfile } from "@/lib/event-hub/game-profiles";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import { organizerStoresFor } from "@/lib/stores/staff";
@@ -160,10 +160,13 @@ async function RoomBody({
    * `?g=one-piece` puts that TCG first for this room's card search, so
    * it is the game the composer opens on: the counter code stays
    * universal, and the per-tournament QR is where the scope comes from.
-   * Validated against the five real profiles, so a crafted URL degrades
-   * to the player's own games rather than an empty search.
+   * Validated against the card catalogue, not just FlareCast: a
+   * Yu-Gi-Oh!, Gundam, Cyberpunk or Sorcery tournament has a clock and
+   * no cards, so its QR leaves the search on the player's own games
+   * rather than narrowing it to a game with nothing to find. A crafted
+   * URL degrades the same way.
    */
-  const scannedGame = gameProfile(params_.g ?? "")?.id ?? null;
+  const scannedGame = isGameSlug(params_.g ?? "") ? (params_.g as GameSlug) : null;
 
   /*
    * A well-formed code that cannot be looked up is not the same as one that

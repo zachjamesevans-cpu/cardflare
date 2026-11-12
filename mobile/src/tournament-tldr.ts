@@ -84,4 +84,44 @@ export const GAME_TLDRS: readonly GameTldr[] = [
       "Friday Night Magic is the beginner event. Say it is your first one and your opponent will walk you through it.",
     ],
   },
+  {
+    id: "yugioh",
+    name: "Yu-Gi-Oh! TCG",
+    lines: [
+      "Bring a Main Deck of 40 to 60 cards and a Side Deck of up to 15, no more than 3 copies of a card. Sleeves are worth it.",
+      "Matches are best-of-three duels on a 50-minute clock.",
+      "When time is called the match simply ends, and an unfinished match is a loss for both players, so keep a steady pace.",
+      "Locals expect nothing from you except your deck. Tell your opponent it is your first event.",
+    ],
+  },
+  {
+    id: "gundam",
+    name: "Gundam Card Game",
+    lines: [
+      "Bring a 50-card deck and a 10-card Resource Deck, plus any tokens your deck makes.",
+      "Store tournaments are usually one game on a 30-minute clock.",
+      "When time is called you finish the turn plus 2 or 3 more, then Shields and deck size decide.",
+      "Store events are the place to learn. Ask your opponent anything mid-game.",
+    ],
+  },
+  {
+    id: "cyberpunk",
+    name: "Cyberpunk TCG",
+    lines: [
+      "Bring a 40 to 50 card deck, exactly 3 Legends and your Gig dice. A sealed event hands you the cards.",
+      "Locals are best-of-three at 50 minutes, or best-of-one at 30.",
+      "When time is called you finish the turn, each player takes one more, and 7 Gig dice wins.",
+      "Night City Gauntlet events are casual by design: judges there are told to teach, not punish.",
+    ],
+  },
+  {
+    id: "sorcery",
+    name: "Sorcery: Contested Realm",
+    lines: [
+      "Bring your Avatar, your Spellbook and your Atlas.",
+      "Your organizer sets the round length and what happens when time is called. Ask at the counter.",
+      "Organizers may adjust the setup or ban cards for their event, so read the event post or ask.",
+      "The publisher's own advice: play Sorcery in whatever way you and your friends find most enjoyable.",
+    ],
+  },
 ];
