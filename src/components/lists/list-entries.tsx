@@ -26,6 +26,7 @@ import {
   PledgeSummary,
 } from "@/components/matching/offer-controls";
 import { GroupView } from "@/components/lists/group-view";
+import { YourFlaresFold } from "@/components/lists/your-flares-fold";
 import { inRailOrder, pledgeTally } from "@/lib/matching/schema";
 import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -589,6 +590,7 @@ export function FlareBoard({
   counterName,
   heldCounts,
   early = false,
+  yourFold = null,
 }: {
   entries: ListEntry[];
   code: string;
@@ -642,6 +644,12 @@ export function FlareBoard({
   heldCounts?: Map<string, number>;
   /** Early board: offers read as pledges to bring the card. */
   early?: boolean;
+  /**
+   * The room folds the viewer's own group to one line (YourFlaresFold),
+   * open on arrival when somebody has offered on one of their Flares.
+   * Null draws the group open, as every other board does.
+   */
+  yourFold?: { open: boolean } | null;
 }) {
   const openIds = new Set(openToTrades.map((player) => player.playerSessionId));
   const groups = groupByPlayer(entries);
@@ -936,6 +944,206 @@ export function FlareBoard({
         const foldRow = (entry: ListEntry) =>
           pastFold(stackedAt.get(entry.id) ?? 0, entry.id, renderRow(entry));
 
+        /*
+         * The founder's synthesis, replacing the page-wide toggle:
+         * the rail is every player's default face, and the chevron
+         * on their header unfolds THEM into the full stacked view.
+         */
+        const groupView = (
+          <GroupView
+            identity={
+              /*
+               * Picture on the left, name and status stacked beside
+               * it. Inline they competed for one line and a real
+               * username lost - the founder: "can't even see a full
+               * username anymore". Stacked, the name gets the width.
+               */
+              <span id={headingId} className="flex min-w-0 flex-1 items-center gap-3">
+                {/*
+                 * An account opens the profile popup right here on the
+                 * board — the founder's ask: finding somebody's name
+                 * under "who's here" was the only way in, and the
+                 * board is where their name actually comes up. Guests
+                 * stay plain: no profile, no dead button.
+                 */}
+                {identities?.get(group.playerSessionId)?.playerId ? (
+                  <PlayerPeek
+                    playerId={identities.get(group.playerSessionId)!.playerId!}
+                    displayName={group.displayName ?? "A player"}
+                    seed={group.playerSessionId}
+                    avatarUrl={identities.get(group.playerSessionId)?.avatarUrl ?? null}
+                    frame={identities.get(group.playerSessionId)?.frame ?? null}
+                    ring={identities.get(group.playerSessionId)?.ring ?? null}
+                    aura={identities.get(group.playerSessionId)?.aura ?? null}
+                    ringArt={identities.get(group.playerSessionId)?.ringArt ?? null}
+                    auraArt={identities.get(group.playerSessionId)?.auraArt ?? null}
+                    isYou={isYou}
+                    imagesEnabled={imagesEnabled}
+                    nameClassName="text-base font-semibold"
+                    size="md"
+                    className="min-w-0 flex-1"
+                    /* Under the NAME, in the column beside the picture. */
+                    below={alsoOpen ? <OpenToTradesTag /> : null}
+                  />
+                ) : (
+                  <>
+                    <PlayerAvatar
+                      displayName={group.displayName ?? "?"}
+                      seed={group.playerSessionId}
+                      avatarUrl={
+                        identities?.get(group.playerSessionId)?.avatarUrl ?? null
+                      }
+                      frame={identities?.get(group.playerSessionId)?.frame ?? null}
+                      ring={identities?.get(group.playerSessionId)?.ring ?? null}
+                      aura={identities?.get(group.playerSessionId)?.aura ?? null}
+                      ringArt={identities?.get(group.playerSessionId)?.ringArt ?? null}
+                      auraArt={identities?.get(group.playerSessionId)?.auraArt ?? null}
+                      /*
+                       * lg, and the third size this component has had
+                       * on this one row. The founder's mockup settles
+                       * it: the picture anchors the header, and a
+                       * worn ring is most of why anybody bought one.
+                       */
+                      size="md"
+                    />
+                    {/* The same column a peekable player gets, by hand,
+                          because a guest has no profile to open. */}
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span className="max-w-full truncate text-base font-semibold text-text-primary">
+                        {group.displayName ?? "A player"}
+                      </span>
+                      {alsoOpen && <OpenToTradesTag />}
+                    </span>
+                  </>
+                )}
+                {/*
+                 * "Open to trades" is on the name, not in the list. It
+                 * is a fact about the person, and as a row it cost this
+                 * player's whole section to say one short sentence.
+                 *
+                 * It sits UNDER the name and left-aligned with it,
+                 * which took three reports to get right: it is passed
+                 * into the identity block rather than placed after it,
+                 * because anything placed after the block wraps beneath
+                 * the PICTURE and reads as a caption on the avatar.
+                 */}
+                {/* No Ember badge on board headers - in the room,
+                      Embers live inside the popup and profile only. */}
+              </span>
+            }
+            meta={
+              <>
+                <span className="text-sm whitespace-nowrap text-text-muted tabular-nums">
+                  {entries.length} {entries.length === 1 ? "card" : "cards"}
+                </span>
+              </>
+            }
+            rail={
+              /*
+               * One rail per player, whatever they are doing. Wants
+               * lead, and anything on offer sits past the divider at
+               * the far end — the founder's revision: nearly all of a
+               * board is wants, and a labelled shelf for one showcase
+               * cluttered every section that had one.
+               */
+              <Rail labelledBy={headingId}>
+                <SectionFold variant="rail" hidden={hidden}>
+                  {shelfEntries.map((entry, index) => (
+                    <Fragment key={entry.id}>
+                      {/* The seam sits before the first showcase, and
+                            folds with it: past the fold it would label
+                            cards nobody can see. */}
+                      {entry.intent === "showcase" &&
+                        index === wantEntries.length &&
+                        pastFold(index, "divider", <RailDivider key="divider" />)}
+                      {pastFold(index, entry.id, renderTile(entry))}
+                    </Fragment>
+                  ))}
+                </SectionFold>
+              </Rail>
+            }
+            stacked={
+              <div className="flex flex-col gap-3 pt-1">
+                <SectionFold variant="stacked" hidden={hidden}>
+                  {/*
+                   * Cards on offer, which the first cut left out of this
+                   * view entirely — unfolding a player hid the very
+                   * cards they were trying to move.
+                   */}
+                  {showcases.length > 0 && (
+                    <div className="flex flex-col gap-1.5">
+                      <DirectionHeading direction="showcase" count={showcases.length} />
+                      <ul
+                        aria-label="Cards this player is offering"
+                        className="flex flex-col"
+                      >
+                        {showcases.map(foldRow)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {labelled &&
+                    wantEntries.length > 0 &&
+                    pastFold(
+                      showcases.length,
+                      "want-heading",
+                      <DirectionHeading
+                        key="want-heading"
+                        direction="want"
+                        count={wantEntries.length}
+                      />,
+                    )}
+
+                  {/* A folder past the fold goes whole, heading and all;
+                        one straddling it keeps its heading and shows the
+                        cards within the fold. */}
+                  {folders.map((folder) =>
+                    pastFold(
+                      stackedAt.get(folder.entries[0].id) ?? 0,
+                      folder.label.toLowerCase(),
+                      <div
+                        key={folder.label.toLowerCase()}
+                        className="flex flex-col gap-1.5"
+                      >
+                        <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                          <Folder
+                            className="size-4 shrink-0 text-accent"
+                            aria-hidden="true"
+                          />
+                          <span className="min-w-0 truncate">{folder.label}</span>
+                          <span className="shrink-0 font-normal text-text-muted tabular-nums">
+                            · {folder.entries.length}{" "}
+                            {folder.entries.length === 1 ? "card" : "cards"}
+                          </span>
+                        </p>
+                        <ul
+                          aria-label={`Deck: ${folder.label}`}
+                          className="flex flex-col"
+                        >
+                          {folder.entries.map(foldRow)}
+                        </ul>
+                      </div>,
+                    ),
+                  )}
+
+                  {loose.length > 0 &&
+                    pastFold(
+                      stackedAt.get(loose[0].id) ?? 0,
+                      "loose",
+                      <ul
+                        key="loose"
+                        aria-labelledby={headingId}
+                        className="flex flex-col"
+                      >
+                        {loose.map(foldRow)}
+                      </ul>,
+                    )}
+                </SectionFold>
+              </div>
+            }
+          />
+        );
+
         return (
           <Card
             as="li"
@@ -944,211 +1152,22 @@ export function FlareBoard({
             className="flex flex-col gap-1.5 px-3 pt-2.5 pb-2"
           >
             {/*
-             * The founder's synthesis, replacing the page-wide toggle:
-             * the rail is every player's default face, and the chevron
-             * on their header unfolds THEM into the full stacked view.
+             * Your own group, in the room, is one line until you open it
+             * (the founder, 2026-11-15: "When someone scans into a room
+             * I feel like it should be dead simple imo"). It stays in
+             * its place on the board, folded or not.
              */}
-            <GroupView
-              identity={
-                /*
-                 * Picture on the left, name and status stacked beside
-                 * it. Inline they competed for one line and a real
-                 * username lost - the founder: "can't even see a full
-                 * username anymore". Stacked, the name gets the width.
-                 */
-                <span id={headingId} className="flex min-w-0 flex-1 items-center gap-3">
-                  {/*
-                   * An account opens the profile popup right here on the
-                   * board — the founder's ask: finding somebody's name
-                   * under "who's here" was the only way in, and the
-                   * board is where their name actually comes up. Guests
-                   * stay plain: no profile, no dead button.
-                   */}
-                  {identities?.get(group.playerSessionId)?.playerId ? (
-                    <PlayerPeek
-                      playerId={identities.get(group.playerSessionId)!.playerId!}
-                      displayName={group.displayName ?? "A player"}
-                      seed={group.playerSessionId}
-                      avatarUrl={
-                        identities.get(group.playerSessionId)?.avatarUrl ?? null
-                      }
-                      frame={identities.get(group.playerSessionId)?.frame ?? null}
-                      ring={identities.get(group.playerSessionId)?.ring ?? null}
-                      aura={identities.get(group.playerSessionId)?.aura ?? null}
-                      ringArt={identities.get(group.playerSessionId)?.ringArt ?? null}
-                      auraArt={identities.get(group.playerSessionId)?.auraArt ?? null}
-                      isYou={isYou}
-                      imagesEnabled={imagesEnabled}
-                      nameClassName="text-base font-semibold"
-                      size="md"
-                      className="min-w-0 flex-1"
-                      /* Under the NAME, in the column beside the picture. */
-                      below={alsoOpen ? <OpenToTradesTag /> : null}
-                    />
-                  ) : (
-                    <>
-                      <PlayerAvatar
-                        displayName={group.displayName ?? "?"}
-                        seed={group.playerSessionId}
-                        avatarUrl={
-                          identities?.get(group.playerSessionId)?.avatarUrl ?? null
-                        }
-                        frame={identities?.get(group.playerSessionId)?.frame ?? null}
-                        ring={identities?.get(group.playerSessionId)?.ring ?? null}
-                        aura={identities?.get(group.playerSessionId)?.aura ?? null}
-                        ringArt={
-                          identities?.get(group.playerSessionId)?.ringArt ?? null
-                        }
-                        auraArt={
-                          identities?.get(group.playerSessionId)?.auraArt ?? null
-                        }
-                        /*
-                         * lg, and the third size this component has had
-                         * on this one row. The founder's mockup settles
-                         * it: the picture anchors the header, and a
-                         * worn ring is most of why anybody bought one.
-                         */
-                        size="md"
-                      />
-                      {/* The same column a peekable player gets, by hand,
-                          because a guest has no profile to open. */}
-                      <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                        <span className="max-w-full truncate text-base font-semibold text-text-primary">
-                          {group.displayName ?? "A player"}
-                        </span>
-                        {alsoOpen && <OpenToTradesTag />}
-                      </span>
-                    </>
-                  )}
-                  {/*
-                   * "Open to trades" is on the name, not in the list. It
-                   * is a fact about the person, and as a row it cost this
-                   * player's whole section to say one short sentence.
-                   *
-                   * It sits UNDER the name and left-aligned with it,
-                   * which took three reports to get right: it is passed
-                   * into the identity block rather than placed after it,
-                   * because anything placed after the block wraps beneath
-                   * the PICTURE and reads as a caption on the avatar.
-                   */}
-                  {/* No Ember badge on board headers - in the room,
-                      Embers live inside the popup and profile only. */}
-                </span>
-              }
-              meta={
-                <>
-                  <span className="text-sm whitespace-nowrap text-text-muted tabular-nums">
-                    {entries.length} {entries.length === 1 ? "card" : "cards"}
-                  </span>
-                </>
-              }
-              rail={
-                /*
-                 * One rail per player, whatever they are doing. Wants
-                 * lead, and anything on offer sits past the divider at
-                 * the far end — the founder's revision: nearly all of a
-                 * board is wants, and a labelled shelf for one showcase
-                 * cluttered every section that had one.
-                 */
-                <Rail labelledBy={headingId}>
-                  <SectionFold variant="rail" hidden={hidden}>
-                    {shelfEntries.map((entry, index) => (
-                      <Fragment key={entry.id}>
-                        {/* The seam sits before the first showcase, and
-                            folds with it: past the fold it would label
-                            cards nobody can see. */}
-                        {entry.intent === "showcase" &&
-                          index === wantEntries.length &&
-                          pastFold(index, "divider", <RailDivider key="divider" />)}
-                        {pastFold(index, entry.id, renderTile(entry))}
-                      </Fragment>
-                    ))}
-                  </SectionFold>
-                </Rail>
-              }
-              stacked={
-                <div className="flex flex-col gap-3 pt-1">
-                  <SectionFold variant="stacked" hidden={hidden}>
-                    {/*
-                     * Cards on offer, which the first cut left out of this
-                     * view entirely — unfolding a player hid the very
-                     * cards they were trying to move.
-                     */}
-                    {showcases.length > 0 && (
-                      <div className="flex flex-col gap-1.5">
-                        <DirectionHeading
-                          direction="showcase"
-                          count={showcases.length}
-                        />
-                        <ul
-                          aria-label="Cards this player is offering"
-                          className="flex flex-col"
-                        >
-                          {showcases.map(foldRow)}
-                        </ul>
-                      </div>
-                    )}
-
-                    {labelled &&
-                      wantEntries.length > 0 &&
-                      pastFold(
-                        showcases.length,
-                        "want-heading",
-                        <DirectionHeading
-                          key="want-heading"
-                          direction="want"
-                          count={wantEntries.length}
-                        />,
-                      )}
-
-                    {/* A folder past the fold goes whole, heading and all;
-                        one straddling it keeps its heading and shows the
-                        cards within the fold. */}
-                    {folders.map((folder) =>
-                      pastFold(
-                        stackedAt.get(folder.entries[0].id) ?? 0,
-                        folder.label.toLowerCase(),
-                        <div
-                          key={folder.label.toLowerCase()}
-                          className="flex flex-col gap-1.5"
-                        >
-                          <p className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-                            <Folder
-                              className="size-4 shrink-0 text-accent"
-                              aria-hidden="true"
-                            />
-                            <span className="min-w-0 truncate">{folder.label}</span>
-                            <span className="shrink-0 font-normal text-text-muted tabular-nums">
-                              · {folder.entries.length}{" "}
-                              {folder.entries.length === 1 ? "card" : "cards"}
-                            </span>
-                          </p>
-                          <ul
-                            aria-label={`Deck: ${folder.label}`}
-                            className="flex flex-col"
-                          >
-                            {folder.entries.map(foldRow)}
-                          </ul>
-                        </div>,
-                      ),
-                    )}
-
-                    {loose.length > 0 &&
-                      pastFold(
-                        stackedAt.get(loose[0].id) ?? 0,
-                        "loose",
-                        <ul
-                          key="loose"
-                          aria-labelledby={headingId}
-                          className="flex flex-col"
-                        >
-                          {loose.map(foldRow)}
-                        </ul>,
-                      )}
-                  </SectionFold>
-                </div>
-              }
-            />
+            {isYou && yourFold ? (
+              <YourFlaresFold
+                count={entries.length}
+                initialOpen={yourFold.open}
+                anchorId={headingId}
+              >
+                {groupView}
+              </YourFlaresFold>
+            ) : (
+              groupView
+            )}
           </Card>
         );
       })}

@@ -99,29 +99,38 @@ describe("the door card", () => {
     expect(page).not.toContain("<Badge");
   });
 
-  it("keeps the date and the place under the night's name", () => {
+  it("keeps the place under the night's name, and the date only outside the room", () => {
     expect(door).toContain('<dt className="sr-only">When</dt>');
     expect(door).toContain('<dt className="sr-only">Where</dt>');
-    expect(page).toContain('? "Trading now"');
+    /* 2026-11-15: in the room the door draws no "when", and a closed
+       walk-in room no longer claims "Trading now": its own "This room
+       has closed" line says what is true. */
+    expect(door).toContain("when: string | null;");
+    expect(door).toContain("{when && (");
+    expect(page).toMatch(
+      /when=\{\s*roomView\s*\? null\s*: event\.kind === "walk_in"\s*\? (\/\*[\s\S]*?\*\/\s*)?finished\s*\? null\s*: "Trading now"/,
+    );
   });
 
-  it("makes the meta line one button named Who's here, with faces and two counts", () => {
+  it("makes the meta line one button named Who's here, with faces and how many players", () => {
     expect(lobby).toContain('"use client"');
     expect(lobby).toContain('aria-label="Who\'s here"');
     expect(lobby).toContain('aria-haspopup="dialog"');
     /* Store days (2026-10-09): no "here now" count on player screens. */
     expect(lobby).not.toContain("{present} here now");
-    expect(lobby).toContain("{participants.length} coming");
-    expect(lobby).toContain('{flareCount === 1 ? "Flare" : "Flares"}');
+    /* 2026-11-15: "N coming · N Flares" became the room's one
+       attendance line; the board below counts its own Flares. */
+    expect(lobby).toContain("{roomPlayersLine(participants.length)}");
+    expect(lobby).not.toContain("{participants.length} coming");
+    expect(lobby).not.toContain("flareCount");
     /* Up to three faces, present ones first, 22px. */
     expect(lobby).toContain("const FACES = 3;");
     expect(lobby).toContain("size-[22px]");
     expect(lobby).toMatch(
       /\.\.\.participants\.filter\(\(participant\) => participant\.present\),\s*\.\.\.participants\.filter\(\(participant\) => !participant\.present\)/,
     );
-    /* Bold secondary for the count that matters, muted for the rest. */
+    /* Bold secondary for the count. */
     expect(lobby).toContain("font-semibold text-text-secondary");
-    expect(lobby).toContain("text-text-muted tabular-nums");
     expect(door).toContain("<EventLobby");
   });
 
@@ -146,8 +155,9 @@ describe("the board", () => {
       'import { RoomBoardCard } from "@/components/events/room-board-card"',
     );
     expect(board).not.toContain('"use client"');
-    /* Nights round 2: no card and no heading of its own; the label and
-       the All | Hunting | Offering filter belong to the section. */
+    /* Nights round 2: no card and no heading of its own; the label
+       belongs to the section (the All | Hunting | Offering filter beside
+       it went on 2026-11-15). */
     expect(board).not.toContain("Flares in the room");
     expect(board).not.toContain('from "@/components/ui/card"');
     expect(board).not.toContain("Newest first");

@@ -17,9 +17,18 @@ import { cn } from "@/lib/cn";
  * flow better." So the store's name and the Follow chip are the first
  * line, the night's name is the second with the room's two small
  * controls at its right end, and the third is the room's pulse: who is
- * here, how many tonight, how many Flares. That third line is the
+ * here and how many (it counted Flares too, until 2026-11-15, below).
+ * That third line is the
  * button that opens the people list, which used to be a card of its
  * own at the foot of the page.
+ *
+ * A walk-in room is always on, and the founder (2026-11-15), after
+ * scanning in: "When someone scans into a room I feel like it should
+ * be dead simple imo. This is so much info." So in the room the door
+ * draws no "when" ("Trading now" said what the room already shows),
+ * and the pulse is how many players, `roomPlayersLine`, the same line
+ * a scheduled night's header says. Never "here now": the founder took
+ * that off on 2026-10-09, it counted people looking from home.
  *
  * Plain props on purpose: everything is a string, a number or a list,
  * so the door can be drawn on a page with no database behind it.
@@ -83,8 +92,11 @@ export function RoomDoor({
   code: string;
   /** The night's name. */
   name: string;
-  /** "Trading now", or the formatted window of a scheduled event. */
-  when: string;
+  /**
+   * The formatted window of the event; null draws no line, which is
+   * what the room passes while it is on.
+   */
+  when: string | null;
   /** "City, Region", or empty. */
   location: string;
   /**
@@ -103,7 +115,6 @@ export function RoomDoor({
     participants: Participant[];
     youId: string;
     imagesEnabled: boolean;
-    flareCount: number;
   } | null;
 }) {
   return (
@@ -146,20 +157,24 @@ export function RoomDoor({
         </div>
       </div>
 
-      <dl className="flex flex-col gap-2 text-sm text-text-secondary">
-        <div className="flex items-center gap-2">
-          <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
-          <dt className="sr-only">When</dt>
-          <dd>{when}</dd>
-        </div>
-        {location && (
-          <div className="flex items-center gap-2">
-            <MapPin className="size-4 shrink-0 text-text-muted" aria-hidden />
-            <dt className="sr-only">Where</dt>
-            <dd>{location}</dd>
-          </div>
-        )}
-      </dl>
+      {(when || location) && (
+        <dl className="flex flex-col gap-2 text-sm text-text-secondary">
+          {when && (
+            <div className="flex items-center gap-2">
+              <CalendarClock className="size-4 shrink-0 text-text-muted" aria-hidden />
+              <dt className="sr-only">When</dt>
+              <dd>{when}</dd>
+            </div>
+          )}
+          {location && (
+            <div className="flex items-center gap-2">
+              <MapPin className="size-4 shrink-0 text-text-muted" aria-hidden />
+              <dt className="sr-only">Where</dt>
+              <dd>{location}</dd>
+            </div>
+          )}
+        </dl>
+      )}
 
       {people && (
         <EventLobby
@@ -167,7 +182,6 @@ export function RoomDoor({
           participants={dedupeParticipants(people.participants, people.youId)}
           youId={people.youId}
           imagesEnabled={people.imagesEnabled}
-          flareCount={people.flareCount}
         />
       )}
     </Card>

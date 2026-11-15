@@ -9,6 +9,7 @@ import { OpenToTradesTag } from "@/components/players/open-to-trades-tag";
 import { Sheet } from "@/components/ui/sheet";
 import { leaveEventAction } from "@/lib/events/join-event-actions";
 import type { Participant } from "@/lib/events/participants";
+import { roomPlayersLine } from "@/lib/events/room-view";
 
 /** How many faces the meta line shows before it stops at the number. */
 const FACES = 3;
@@ -16,11 +17,16 @@ const FACES = 3;
 /**
  * Who is here: the door card's meta line, and the dialog behind it.
  *
- * The line reads "10 coming · 3 Flares" with up to three faces in
- * front of it, the present ones first, and the whole line is one
- * button named "Who's here". It led with "2 here now" until the
- * founder (2026-10-09) took the count off player screens: it counted
- * people looking at the room from home. The names themselves are reference
+ * The line reads "10 players" with up to three faces in front of it,
+ * the present ones first, and the whole line is one button named
+ * "Who's here". It led with "2 here now" until the founder
+ * (2026-10-09) took the count off player screens: it counted people
+ * looking at the room from home. It read "10 coming · 3 Flares" until
+ * the founder (2026-11-15), on the room after a scan: "When someone
+ * scans into a room I feel like it should be dead simple imo. This is
+ * so much info." Now it is `roomPlayersLine`, the attendance a
+ * scheduled night's header says in the room, and the board under the
+ * door counts its own Flares. The names themselves are reference
  * material, not a decision anyone makes on arrival, so they live in a
  * sheet over the room rather than in a card of their own: the
  * founder's call, after a roster that pushed the board below the fold
@@ -36,7 +42,6 @@ export function EventLobby({
   participants,
   youId,
   imagesEnabled,
-  flareCount,
 }: {
   code: string;
   participants: Participant[];
@@ -44,8 +49,6 @@ export function EventLobby({
   youId: string;
   /** For the card images inside a profile popup's showcase. */
   imagesEnabled: boolean;
-  /** Open Flares on the board, for the line's last number. */
-  flareCount: number;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -87,10 +90,7 @@ export function EventLobby({
           </span>
         )}
         <span className="font-semibold text-text-secondary tabular-nums">
-          {participants.length} coming
-        </span>
-        <span className="text-text-muted tabular-nums">
-          · {flareCount} {flareCount === 1 ? "Flare" : "Flares"}
+          {roomPlayersLine(participants.length)}
         </span>
       </button>
 

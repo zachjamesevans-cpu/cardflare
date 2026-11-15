@@ -55,8 +55,9 @@ describe("the Feed and the room say what the audit asked", () => {
     expect(titles).not.toContain('"Tonight"');
   });
 
-  it('counts the lobby as "coming"', () => {
-    expect(src.people).toContain("`${people.length} coming`");
+  it("counts the lobby in players, the room's one count since 2026-11-15", () => {
+    expect(src.people).toContain("{roomPlayersLine(people.length)}");
+    expect(src.people).not.toContain("`${people.length} coming`");
     expect(src.people).not.toContain("} here now");
     expect(src.people).not.toContain("${people.length} tonight");
   });

@@ -5,12 +5,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 
 import type { StackParams } from "../App";
+import { playersLine } from "./night-copy";
 import { ApiError, setGoing, type RoomPhase } from "./api";
 import { markFeedStale } from "./feed-refresh";
 import { FollowStoreButton } from "./follow-store-button";
 import { GoingButton } from "./going-button";
 import { GOING } from "./going-copy";
-import { playersLine } from "./night-copy";
 import { colors, spacing } from "./theme";
 import { Muted, Tap } from "./ui";
 import { VerifiedMark } from "./verified-mark";
@@ -46,6 +46,8 @@ export function NightHeader({
   playersCount,
   onSettled,
   right,
+  inRoom = false,
+  youreIn = false,
 }: {
   name: string;
   storeName: string;
@@ -64,9 +66,21 @@ export function NightHeader({
   onSettled: () => void;
   /** The small round buttons at the end of the name's line. */
   right?: ReactNode;
+  /**
+   * The night is on: the room, not the dashboard (room-view.ts). No
+   * date line, and once the viewer is in, no Going chip either: the
+   * line is just how many players. The founder (2026-11-15): "When
+   * someone scans into a room I feel like it should be dead simple."
+   */
+  inRoom?: boolean;
+  /** The viewer has a seat or is going: the chip has nothing to ask. */
+  youreIn?: boolean;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const canGo = Boolean(eventId && going) && phase !== "finished";
+  /* In the room, the chip stays only as the way in for somebody who
+     is not in yet; for everyone else the line is just the count. */
+  const canGo =
+    Boolean(eventId && going) && phase !== "finished" && !(inRoom && youreIn);
 
   return (
     <View style={{ gap: spacing(1.5) }}>
@@ -128,7 +142,7 @@ export function NightHeader({
         ) : null}
       </View>
 
-      {startsAt ? (
+      {startsAt && !inRoom ? (
         <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
           {whenLine(startsAt, endsAt)}
         </Text>

@@ -60,12 +60,6 @@ import {
 import { EarlyBanner } from "../early-banner";
 import { EventDetails } from "../event-details";
 import { FAB_HEIGHT, FlareFab } from "../flare-fab";
-import {
-  FlareFilterRow,
-  emptyFilterLine,
-  filterFlares,
-  type FlareFilter,
-} from "../flares-at-night";
 import { MatchesForYou } from "../matches-for-you";
 import { FLARES_AT_THIS_NIGHT } from "../night-copy";
 import { NightHeader } from "../night-header";
@@ -98,6 +92,13 @@ import { QuantityBadge } from "../quantity-badge";
 import { useTabBarInset } from "../glass";
 import { colors, gutter, radius, spacing, accentGlow } from "../theme";
 import { refreshTick } from "../refresh-tick";
+import {
+  HIDE_YOUR_FLARES,
+  roomMatchLine,
+  roomViewFor,
+  SHOW_YOUR_FLARES,
+  yourFlaresLine,
+} from "../room-view";
 
 /*
  * How often the room re-reads, by phase: the website's RoomTicker
@@ -149,10 +150,22 @@ const MATCHES_REFRESH_MS = 60_000;
  * Top to bottom, the website's hierarchy: the compact header (venue,
  * name, when, one line of RSVP and attendance), the early banner,
  * Matches for you with the mutual match blocks, What to bring, Flares
- * at this Night (the board grouped under whoever posted, with the
- * All / Hunting / Offering filter), Players going, Event details
- * folded shut, and the floating "+ Flare" button in place of the lime
- * action bar. The lobby for a counter code is unchanged.
+ * at this Night (the board grouped under whoever posted), Players
+ * going, Event details folded shut, and the floating "+ Flare" button
+ * in place of the lime action bar. The lobby for a counter code is
+ * unchanged.
+ *
+ * WHILE THE NIGHT IS ON IT IS THE ROOM, NOT THE DASHBOARD. The
+ * founder (2026-11-15), after scanning into a walk-in room: "When
+ * someone scans into a room I feel like it should be dead simple imo.
+ * This is so much info." So a live room draws the header (no date, and
+ * no Going chip once you are in), the clocks, one match line when
+ * somebody here matters to you, the board with your own Flares folded
+ * to a line, and + Flare. The binders you are bringing, What to bring,
+ * Players going and Event details are for planning and stay on the
+ * night before it starts (room-view.ts). The All / Hunting / Offering
+ * filter is gone in both: Offering went on 2026-10-15, and Hunting
+ * alone is the whole board.
  */
 export function RoomTab() {
   const [code, setCode] = useState<string | null>(null);
@@ -469,7 +482,6 @@ function RoomScreen({
   const matchesAt = useRef(0);
 
   /* All, Hunting or Offering, over Flares at this Night. Per visit. */
-  const [filter, setFilter] = useState<FlareFilter>("all");
 
   /*
    * The founder's synthesis, replacing the stacked/carousel toggle: the
@@ -485,6 +497,9 @@ function RoomScreen({
    * is not a setting.
    */
   const [foldOpen, setFoldOpen] = useState<Record<string, boolean>>({});
+  /* Your own Flares on the board: null follows the default (open only
+     while somebody has offered on one), a tap decides from then on. */
+  const [yoursOpen, setYoursOpen] = useState<boolean | null>(null);
 
   /*
    * Which player's rail has nothing further to scroll, so the trailing
@@ -1009,6 +1024,8 @@ function RoomScreen({
       : phase === "live" || phase === "early";
   const finished = phase === "finished" || (phase === null && room.status === "closed");
   const shut = finished || phase === "pending";
+  /* The room while the night is on, the dashboard before it. */
+  const inRoom = roomViewFor(phase) === "in-room";
 
   /*
    * THE WAY IN, for whoever still needs one. A signed-in viewer says
@@ -1028,8 +1045,8 @@ function RoomScreen({
   const playerBySession = new Map(
     participants.map((p) => [p.playerSessionId, p.playerId ?? null]),
   );
-  /* All, Hunting or Offering: the filter runs before the board groups. */
-  const flares = filterFlares(state.flares ?? [], filter);
+  /* The whole board: no filter since Offering went (2026-10-15). */
+  const flares = state.flares ?? [];
   const youOpen = participants.some(
     (p) => p.playerSessionId === youId && p.openToTrades,
   );
@@ -1152,6 +1169,8 @@ function RoomScreen({
           eventId={eventId}
           going={going}
           playersCount={playersCount}
+          inRoom={inRoom}
+          youreIn={joined || Boolean(going?.youGoing)}
           onSettled={() => void refresh({ matches: true })}
           right={
             <>
@@ -1231,7 +1250,7 @@ function RoomScreen({
          * changes. A save re-reads the matches, which take the
          * binders in.
          */}
-        {!guest && eventId && going?.youGoing && !finished ? (
+        {!guest && eventId && going?.youGoing && !finished && !inRoom ? (
           <YourBinders
             eventId={eventId}
             reloadOn={matches}
@@ -1250,15 +1269,25 @@ function RoomScreen({
             <AccountPitch variant={joined ? "room" : "join"} />
           )
         ) : eventId && !finished ? (
-          <MatchesForYou
-            matches={matches}
-            onSeeAll={() => navigation.navigate("NightMatches", { code })}
-            onPlayer={openPlayer}
-          />
+          inRoom ? (
+            /* In the room: one line, and only when somebody here
+               matters to you. Still first, directly under the header,
+               where the founder put matches (2026-10-03). */
+            <RoomMatchLine
+              line={roomMatchLine(matches?.summary)}
+              onPress={() => navigation.navigate("NightMatches", { code })}
+            />
+          ) : (
+            <MatchesForYou
+              matches={matches}
+              onSeeAll={() => navigation.navigate("NightMatches", { code })}
+              onPlayer={openPlayer}
+            />
+          )
         ) : null}
 
         {/* What to bring, only when there is something to pack. */}
-        {!guest && eventId && !finished && bring.length > 0 ? (
+        {!guest && eventId && !finished && !inRoom && bring.length > 0 ? (
           <WhatToBring eventId={eventId} bring={bring} />
         ) : null}
 
@@ -1294,20 +1323,60 @@ function RoomScreen({
           <View ref={tourBoard} collapsable={false}>
           <NightSection
             label={FLARES_AT_THIS_NIGHT}
-            right={<FlareFilterRow value={filter} onChange={setFilter} />}
           >
             {joined ? (
               <>
                 {groups.size === 0 && (
                   <Body>
-                    {filter === "all"
-                      ? "Nothing posted yet. Yours would be the first one on the board tonight."
-                      : emptyFilterLine(filter)}
+                    Nothing posted yet. Yours would be the first one on the board tonight.
                   </Body>
                 )}
 
                 {[...groups.entries()].map(([sessionId, group], index) => {
                   const mine = sessionId === youId;
+
+                  /*
+                   * YOUR OWN FLARES, FOLDED TO ONE LINE. They were drawn
+                   * open with "Found it" and "Take down" under every card,
+                   * a dozen buttons about cards you already know you
+                   * want, above the cards you came to see. The founder
+                   * (2026-11-15): "When someone scans into a room I feel
+                   * like it should be dead simple." Open on their own
+                   * while somebody has offered on one: that is when you
+                   * need them. Both views, both platforms (room-view.ts).
+                   */
+                  const yoursShown =
+                    mine &&
+                    (yoursOpen ??
+                      group.flares.some((flare) => flare.offers.length > 0));
+                  const yoursRow = mine ? (
+                    <YourFlaresRow
+                      count={group.flares.length}
+                      open={yoursShown}
+                      onToggle={() => {
+                        LayoutAnimation.configureNext(
+                          LayoutAnimation.Presets.easeInEaseOut,
+                        );
+                        setYoursOpen(!yoursShown);
+                      }}
+                    />
+                  ) : null;
+                  if (mine && !yoursShown) {
+                    return (
+                      <View
+                        key={sessionId}
+                        ref={tourYours}
+                        collapsable={false}
+                        style={{
+                          paddingTop: index === 0 ? 0 : spacing(2),
+                          borderTopWidth: index === 0 ? 0 : 1,
+                          borderTopColor: colors.border,
+                        }}
+                      >
+                        {yoursRow}
+                      </View>
+                    );
+                  }
 
                   /*
                    * A player's section splits into deck folders and loose cards,
@@ -1546,6 +1615,7 @@ function RoomScreen({
                         borderTopColor: colors.border,
                       }}
                     >
+                      {yoursRow}
                       {/*
                        * The founder's synthesis, replacing the page-wide toggle:
                        * the rail is every player's default face, and the chevron
@@ -1827,7 +1897,7 @@ function RoomScreen({
                 )}
               </>
             ) : (
-              <ReadOnlyBoard flares={flares} filter={filter} />
+              <ReadOnlyBoard flares={flares} />
             )}
           </NightSection>
           </View>
@@ -1835,25 +1905,32 @@ function RoomScreen({
 
         {/* PLAYERS GOING: low on the page, and each row says why the
             person matters. A tap opens their event-facing profile. */}
-        <PlayersGoing
-          roster={roster}
-          matchesByPlayer={matchesByPlayer}
-          live={phase === "live"}
-          onPlayer={openPlayer}
-        />
+        {/* Planning, not the room: the board already groups the
+            players who are here, and the store's details are a tap on
+            its name in the header. */}
+        {inRoom ? null : (
+          <>
+            <PlayersGoing
+              roster={roster}
+              matchesByPlayer={matchesByPlayer}
+              live={phase === "live"}
+              onPlayer={openPlayer}
+            />
 
-        {/* EVENT DETAILS, folded shut: venue, address, organizer, code. */}
-        <EventDetails
-          storeName={room.storeName}
-          verified={room.verified}
-          address={room.store?.address ?? null}
-          code={code}
-          onStore={
-            room.storeId
-              ? () => navigation.navigate("StoreProfile", { storeId: room.storeId! })
-              : undefined
-          }
-        />
+            {/* EVENT DETAILS, folded shut: venue, address, organizer, code. */}
+            <EventDetails
+              storeName={room.storeName}
+              verified={room.verified}
+              address={room.store?.address ?? null}
+              code={code}
+              onStore={
+                room.storeId
+                  ? () => navigation.navigate("StoreProfile", { storeId: room.storeId! })
+                  : undefined
+              }
+            />
+          </>
+        )}
 
         {trades.length > 0 && (
           <NightSection label="Traded tonight" last>
@@ -2915,13 +2992,93 @@ function rosterOf(state: RoomState): RosterPlayer[] {
  * player's rail. The filter has already run; it only decides the
  * empty line.
  */
-function ReadOnlyBoard({
-  flares,
-  filter,
+/**
+ * The room's one match line, a door to every match. Nothing at all when
+ * there is nothing to say: in the room an empty block saying so took a
+ * quarter of the screen. The website draws the same line.
+ */
+function RoomMatchLine({
+  line,
+  onPress,
 }: {
-  flares: RoomFlare[];
-  filter: FlareFilter;
+  line: string | null;
+  onPress: () => void;
 }) {
+  if (!line) return null;
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={line}
+      style={{
+        minHeight: 48,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(2),
+        paddingHorizontal: spacing(3),
+        paddingVertical: spacing(2),
+        borderRadius: radius.card,
+        borderWidth: 1,
+        borderColor: colors.accentMuted,
+        backgroundColor: colors.accentTint,
+      }}
+    >
+      <MaterialCommunityIcons name="fire" size={20} color={colors.accent} />
+      <Text
+        style={{ flex: 1, color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}
+      >
+        {line}
+      </Text>
+      <MaterialCommunityIcons name="chevron-right" size={20} color={colors.accent} />
+    </Tap>
+  );
+}
+
+/**
+ * "Your 16 Flares are up", with Show or Hide: your own place on the
+ * board, folded to one line (room-view.ts says why). The website draws
+ * the same row with the same words.
+ */
+function YourFlaresRow({
+  count,
+  open,
+  onToggle,
+}: {
+  count: number;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <Tap
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityLabel={`${yourFlaresLine(count)}. ${open ? HIDE_YOUR_FLARES : SHOW_YOUR_FLARES}`}
+      style={{
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: spacing(2),
+      }}
+    >
+      <Text style={{ color: colors.textSecondary, fontSize: 15, fontWeight: "600" }}>
+        {yourFlaresLine(count)}
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}>
+        <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
+          {open ? HIDE_YOUR_FLARES : SHOW_YOUR_FLARES}
+        </Text>
+        <MaterialCommunityIcons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={18}
+          color={colors.accent}
+        />
+      </View>
+    </Tap>
+  );
+}
+
+function ReadOnlyBoard({ flares }: { flares: RoomFlare[] }) {
   const groups = new Map<string, { name: string | null; flares: RoomFlare[] }>();
   for (const flare of flares) {
     const group = groups.get(flare.playerSessionId) ?? {
@@ -2934,11 +3091,7 @@ function ReadOnlyBoard({
 
   if (groups.size === 0) {
     return (
-      <Muted>
-        {filter === "all"
-          ? "Nothing posted yet. Say you're going and yours go up first."
-          : emptyFilterLine(filter)}
-      </Muted>
+      <Muted>Nothing posted yet. Say you're going and yours go up first.</Muted>
     );
   }
 

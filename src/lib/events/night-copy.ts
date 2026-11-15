@@ -48,11 +48,6 @@ export const WHAT_TO_BRING = "What to bring";
 export const PACKED = "Packed";
 export const VIEW_LIST = "View list";
 export const FLARES_AT_THIS_NIGHT = "Flares at this night";
-export const FLARE_FILTERS = {
-  all: "All",
-  hunting: "Hunting",
-  offering: "Offering",
-} as const;
 export const PLAYERS_GOING = "Players going";
 export const EVENT_DETAILS = "Event details";
 export const POST_A_FLARE = "Post a Flare";

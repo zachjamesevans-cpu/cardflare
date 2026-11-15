@@ -1,99 +1,57 @@
-"use client";
-
-import { useId, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 
-import { cn } from "@/lib/cn";
-import { FLARE_FILTERS, FLARES_AT_THIS_NIGHT } from "@/lib/events/night-copy";
-
-export type FlareFilter = keyof typeof FLARE_FILTERS;
-
-/** The three filters, in the order they are drawn. */
-export const FLARE_FILTER_ORDER: FlareFilter[] = ["all", "hunting", "offering"];
-
-/** What a filter with nothing behind it says. */
-export const FILTER_EMPTY = "Nothing here yet.";
+import { FLARES_AT_THIS_NIGHT } from "@/lib/events/night-copy";
 
 /**
- * Flares at this Night: the wider board, with All | Hunting | Offering.
+ * Flares at this Night: the wider board, under its label.
  *
  * The founder (2026-10-03): "After personalized matches: 'Flares at
  * this Night', the wider event trading board. Show attendee Flares.
  * Keep the existing card-focused visual style. Filtering: All /
- * Hunting / Offering." Hunting is a Flare with intent "want";
- * Offering is one with intent "showcase".
+ * Hunting / Offering." Hunting was a Flare with intent "want";
+ * Offering one with intent "showcase".
  *
- * The tiles and the offer flow are exactly the board's own: the page
- * renders the board three times on the server, once per filter, with
- * every Server Action form intact, and this island only chooses which
- * of the three is on screen. No tile is re-rendered on the client and
- * no filter costs a round trip. The one-line note above the board is
- * where the offers on your own Flares are counted now, instead of a
- * card of their own. The app's flares-at-night.tsx draws the same
- * filter with the same words; tests/unit/nights2-parity.test.ts holds
- * the two together.
+ * The filter is gone now. The founder took offering out of CardFlare
+ * (2026-10-15): "delete the offering thing altogether... just having a
+ * binder is more than enough for trades." After that Offering could
+ * only ever be empty and Hunting was All, so the row was two buttons
+ * that changed nothing. And on the room itself (2026-11-15): "When
+ * someone scans into a room I feel like it should be dead simple imo.
+ * This is so much info." So the section is the label, the one-line
+ * note about offers on your own Flares, and the board, drawn once.
+ *
+ * The tiles and the offer flow are exactly the board's own, rendered
+ * on the server with every Server Action form intact, so this is a
+ * Server Component with nothing of its own to do in the browser. The
+ * app's room draws the same section with the same words;
+ * tests/unit/nights2-parity.test.ts holds the two together.
  */
 export function FlaresAtNight({
-  boards,
+  board,
   note = null,
 }: {
-  /** The board, rendered once per filter; null where the filter is empty. */
-  boards: Record<FlareFilter, ReactNode | null>;
+  /** The board: the viewer's working board, or the read-only one. */
+  board: ReactNode;
   /** Offers on the viewer's own Flares, said once above the board. */
   note?: ReactNode;
 }) {
-  const [filter, setFilter] = useState<FlareFilter>("all");
-  const id = useId();
-
   return (
     <section
       className="flex flex-col gap-3"
-      aria-labelledby={`${id}-label`}
+      aria-labelledby="flares-at-this-night"
       data-tour="room:board"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2
-          id={`${id}-label`}
-          className="text-xs font-semibold tracking-wide text-text-muted uppercase"
-        >
-          {FLARES_AT_THIS_NIGHT}
-        </h2>
-        <div
-          role="tablist"
-          aria-label="Filter the board"
-          className="flex rounded-full border border-border bg-surface p-0.5"
-        >
-          {FLARE_FILTER_ORDER.map((key) => {
-            const on = key === filter;
-            return (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={on}
-                aria-controls={`${id}-board`}
-                onClick={() => setFilter(key)}
-                className={cn(
-                  "h-7 cursor-pointer rounded-full px-3 text-xs font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none",
-                  on
-                    ? "bg-elevated text-text-primary"
-                    : "text-text-muted hover:text-text-secondary",
-                )}
-              >
-                {FLARE_FILTERS[key]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <h2
+        id="flares-at-this-night"
+        className="text-xs font-semibold tracking-wide text-text-muted uppercase"
+      >
+        {FLARES_AT_THIS_NIGHT}
+      </h2>
 
       {note}
 
-      <div id={`${id}-board`} role="tabpanel">
-        {boards[filter] ?? (
-          <p className="text-sm leading-5 text-text-secondary">{FILTER_EMPTY}</p>
-        )}
-      </div>
+      {board}
     </section>
   );
 }
@@ -102,7 +60,10 @@ export function FlaresAtNight({
  * "Somebody can help you": offers standing on the viewer's own Flares,
  * said once in one line above the board, where the MatchSummary card
  * used to be. The link jumps to their own group on the board, where
- * the offers themselves are listed under each Flare.
+ * the offers themselves are listed under each Flare. That group is
+ * folded to one line until it matters, and an offer is when it does,
+ * so it is open whenever this line is drawn (YourFlaresFold opens it
+ * again if it was hidden since).
  */
 export function OffersNote({
   offerCount,

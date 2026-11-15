@@ -81,11 +81,9 @@ describe("the board section", () => {
     joined.indexOf('label="Traded tonight"'),
   );
 
-  it("is one section labelled Flares at this Night, players split by hairlines, with the filter on its line", () => {
+  it("is one section labelled Flares at this Night, players split by hairlines, with no filter", () => {
     expect(board).toContain("label={FLARES_AT_THIS_NIGHT}");
-    expect(board).toContain(
-      "right={<FlareFilterRow value={filter} onChange={setFilter} />}",
-    );
+    expect(board).not.toContain("FlareFilterRow");
     expect(room).not.toContain("<Title>Flares in the room</Title>");
     expect(room).not.toContain("Newest first");
     /* The per-player groups are Views inside the one section. */
@@ -95,11 +93,11 @@ describe("the board section", () => {
     expect(board).toContain("borderTopColor: colors.border");
   });
 
-  it("says the empty line inside the section, by filter", () => {
+  it("says the empty line inside the section", () => {
     expect(board).toContain(
       "Nothing posted yet. Yours would be the first one on the board tonight.",
     );
-    expect(board).toContain(": emptyFilterLine(filter)}");
+    expect(board).not.toContain("emptyFilterLine");
     expect(room).not.toContain("No Flares yet");
   });
 

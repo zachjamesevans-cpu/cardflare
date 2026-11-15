@@ -224,7 +224,10 @@ describe("the night's own row", () => {
     const at = room.indexOf("<YourBinders");
     expect(at).toBeGreaterThan(0);
     expect(at).toBeLessThan(room.indexOf("<MatchesForYou"));
-    expect(room).toMatch(/going\?\.youGoing && !finished \? \(\s*<YourBinders/);
+    /* Planning only: not drawn in the room while the night is on. */
+    expect(room).toMatch(
+      /going\?\.youGoing && !finished && !inRoom \? \(\s*<YourBinders/,
+    );
     expect(room).toContain("onChanged={() => void refresh({ matches: true })}");
   });
 });
