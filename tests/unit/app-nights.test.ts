@@ -206,10 +206,10 @@ describe("the room and its night", () => {
     expect(room).not.toContain("PRE_START_PITCH");
     expect(room).not.toContain("YOURE_ON_THE_BOARD");
     expect(room).not.toContain("Who&rsquo;s going");
-    /* The board to read survives, under the same filter as the board
-       to write on. */
+    /* The board to read survives, the whole board, as the board to
+       write on is (no filter since Offering went, 2026-10-15). */
     expect(room).toContain("function ReadOnlyBoard");
-    expect(room).toContain("<ReadOnlyBoard flares={flares} filter={filter} />");
+    expect(room).toContain("<ReadOnlyBoard flares={flares} />");
   });
 
   it("says Going on the header line, as a chip off and a check on", () => {

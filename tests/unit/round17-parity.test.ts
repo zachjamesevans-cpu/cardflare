@@ -103,11 +103,16 @@ describe("the Feed's Coming up section", () => {
 });
 
 describe("the room lobby's count line", () => {
-  it("says coming, not tonight, on both platforms", () => {
-    /* Store days (2026-10-09): no "here now" count on player screens. */
-    expect(web.lobby).toContain("{participants.length} coming");
+  it("says how many players, not tonight, on both platforms", () => {
+    /* Store days (2026-10-09): no "here now" count on player screens.
+       It said "N coming" until 2026-11-15, when the room went "dead
+       simple": now the attendance is roomPlayersLine, the line the
+       scheduled night's header says in the room. */
+    expect(web.lobby).toContain("{roomPlayersLine(participants.length)}");
+    expect(web.lobby).not.toContain("{participants.length} coming");
     expect(web.lobby).not.toContain("here now\n");
-    expect(app.roomPeople).toContain("`${people.length} coming`");
+    expect(app.roomPeople).toContain("roomPlayersLine(people.length)");
+    expect(app.roomPeople).not.toContain("`${people.length} coming`");
     expect(web.lobby).not.toContain("{participants.length} tonight");
     expect(app.roomPeople).not.toContain("${people.length} tonight");
   });

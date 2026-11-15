@@ -84,7 +84,6 @@ const app = {
   matchesForYou: read("mobile/src/matches-for-you.tsx"),
   mutualMatch: read("mobile/src/mutual-match.tsx"),
   whatToBring: read("mobile/src/what-to-bring.tsx"),
-  flaresAtNight: read("mobile/src/flares-at-night.tsx"),
   playersGoing: read("mobile/src/players-going.tsx"),
   eventDetails: read("mobile/src/event-details.tsx"),
   flareFab: read("mobile/src/flare-fab.tsx"),
@@ -128,7 +127,6 @@ const PINNED = {
 
 const PINNED_OBJECTS = {
   NIGHT_TABS: { going: "Going", nearby: "Nearby", past: "Past" },
-  FLARE_FILTERS: { all: "All", hunting: "Hunting", offering: "Offering" },
 } as const;
 
 /** Every line function, with the inputs the brief spells out. */
@@ -348,12 +346,13 @@ describe("the night page", () => {
 
   it("draws the same sections in the same order on both", () => {
     expectInOrder(web.room, HIERARCHY, "the website's night page");
-    /* The app draws the Flares section's filter row in place of a
-       wrapper, with the board's own rows under it; the same slot. */
+    /* The app draws the Flares section's label in place of a wrapper,
+       with the board's own rows under it; the same slot. (It drew a
+       filter row there until the filter went, 2026-11-15.) */
     expectInOrder(
       app.room,
       HIERARCHY.map((marker) =>
-        marker === "<FlaresAtNight" ? "<FlareFilterRow" : marker,
+        marker === "<FlaresAtNight" ? "label={FLARES_AT_THIS_NIGHT}" : marker,
       ),
       "the app's room screen",
     );
@@ -413,7 +412,11 @@ describe("the night page", () => {
     expect(web.matchesForYou).toContain("href={`/e/${code}/matches`}");
     expect(web.matchesForYou).toContain("export const INLINE_MUTUAL = 3;");
     expect(web.matchesForYou).toContain("slice(0, INLINE_MUTUAL)");
-    expect(web.room).toMatch(/\{accountPlayerId \? \(\s*<MatchesForYou/);
+    /* In full while planning; in the room (2026-11-15) one line,
+       pinned in tests/unit/room-view-web.test.ts. */
+    expect(web.room).toMatch(
+      /\{accountPlayerId \? \(\s*roomView \? \(\s*<RoomMatchLine[\s\S]*?\) : \(\s*<MatchesForYou/,
+    );
     expect(web.room).toMatch(/\) : \(\s*<AccountPitch/);
     expect(web.room).toContain("nightMatches(event.id, accountPlayerId)");
   });
@@ -440,7 +443,9 @@ describe("the night page", () => {
     expect(web.whatToBring).toContain('role="checkbox"');
     expect(web.whatToBring).toContain("aria-checked={on}");
     expect(web.whatToBring).toContain("export const INLINE_BRING = 3;");
-    expect(web.room).toMatch(/matches\.bring\.length > 0 && \(\s*<WhatToBring/);
+    expect(web.room).toMatch(
+      /!roomView && accountPlayerId && matches\.bring\.length > 0 && \(\s*<WhatToBring/,
+    );
     for (const source of [web.whatToBring, app.whatToBring]) {
       expect(source).toContain("WHAT_TO_BRING");
       expect(source).toContain("PACKED");
@@ -451,24 +456,18 @@ describe("the night page", () => {
     expect(app.whatToBring).toContain("setPacked(eventId, cardId, next)");
   });
 
-  it("filters Flares at this Night on the client: All | Hunting | Offering", () => {
-    expect(web.flaresAtNight).toMatch(/^"use client";/);
-    expect(web.flaresAtNight).toContain(
-      'FLARE_FILTER_ORDER: FlareFilter[] = ["all", "hunting", "offering"]',
-    );
-    for (const source of [web.flaresAtNight, app.flaresAtNight]) {
-      expect(source).toContain("FLARE_FILTERS[");
-    }
+  it("draws Flares at this Night once, with no All | Hunting | Offering filter", () => {
+    /* The founder took offering out (2026-10-15), so Offering could only
+       be empty and Hunting was All; the filter went on 2026-11-15. */
+    expect(web.flaresAtNight).not.toContain('"use client"');
+    expect(code(web.flaresAtNight)).not.toContain("FLARE_FILTER");
+    expect(code(web.flaresAtNight)).not.toContain('role="tablist"');
     expect(web.flaresAtNight).toContain("FLARES_AT_THIS_NIGHT");
     expect(app.room).toContain("FLARES_AT_THIS_NIGHT");
-    /* Hunting is intent "want", Offering is "showcase"; the tiles are
-       the board's own, rendered on the server once per filter. */
-    expect(web.room).toContain(
-      'const hunting = flares.filter((entry) => entry.intent === "want");',
-    );
-    expect(web.room).toContain(
-      'const offering = flares.filter((entry) => entry.intent === "showcase");',
-    );
+    expect(code(app.room)).not.toContain("<FlareFilterRow");
+    expect(web.room).toContain("board={boardFor(flares)}");
+    expect(web.room).not.toContain('entry.intent === "want"');
+    expect(web.room).not.toContain('entry.intent === "showcase"');
     expect(web.room).toMatch(
       /<RoomBoardCard[\s\S]*<FlareBoard[\s\S]*<\/RoomBoardCard>/,
     );
@@ -527,7 +526,9 @@ describe("the night page", () => {
     expect(web.room).toMatch(/readable && accountPlayerId\s*\? nightMatches/);
     expect(web.room).toMatch(/\{\(readable \|\| finished\) && \(\s*<FlaresAtNight/);
     expect(web.room).toContain("if (inRoom && session && !finished) {");
-    expect(web.room).toContain("{readable && scheduled && <PlayersGoing");
+    expect(web.room).toMatch(
+      /\{!roomView && readable && scheduled && \(\s*<PlayersGoing/,
+    );
   });
 });
 
@@ -602,6 +603,7 @@ describe("the website's files", () => {
       "nightPlayer",
       "matchList",
       "preStart",
+      "flaresAtNight",
     ] as const) {
       expect(web[name], `${name} should be a Server Component`).not.toContain(
         '"use client"',
@@ -612,7 +614,6 @@ describe("the website's files", () => {
       "codeSheet",
       "earlyBanner",
       "whatToBring",
-      "flaresAtNight",
       "flareFab",
       "composerDoor",
     ] as const) {

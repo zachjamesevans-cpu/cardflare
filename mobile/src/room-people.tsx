@@ -1,6 +1,7 @@
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { roomPlayersLine } from "./room-view";
 import { SheetBackdrop } from "./action-menu";
 import type { RoomState } from "./api";
 import { OpenToTradesTag } from "./open-to-trades-tag";
@@ -109,8 +110,10 @@ export function RoomPeopleModal({
             <View style={{ gap: 2, flexShrink: 1 }}>
               <Title>Who&rsquo;s here</Title>
               {/* No "here now" (the founder, 2026-10-09): it counted
-                  people looking at the room from home. */}
-              <Muted>{`${people.length} coming`}</Muted>
+                  people looking at the room from home. "3 players",
+                  the room's one count since 2026-11-15 (room-view.ts),
+                  as the website's sheet says it. */}
+              <Muted>{roomPlayersLine(people.length)}</Muted>
             </View>
             <SheetClose onPress={onClose} />
           </View>

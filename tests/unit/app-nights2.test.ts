@@ -31,7 +31,6 @@ const banner = read("mobile/src/early-banner.tsx");
 const matchesForYou = read("mobile/src/matches-for-you.tsx");
 const mutual = read("mobile/src/mutual-match.tsx");
 const bring = read("mobile/src/what-to-bring.tsx");
-const filter = read("mobile/src/flares-at-night.tsx");
 const players = read("mobile/src/players-going.tsx");
 const details = read("mobile/src/event-details.tsx");
 const fab = read("mobile/src/flare-fab.tsx");
@@ -48,7 +47,6 @@ const NEW_FILES = {
   matchesForYou,
   mutual,
   bring,
-  filter,
   players,
   details,
   fab,
@@ -86,11 +84,9 @@ describe("the words", () => {
     );
     expect(copy.MUTUAL_MATCH).toBe("Mutual match");
     expect(copy.MUTUAL_LINE).toBe("You may already have the pieces for a trade.");
-    expect(copy.FLARE_FILTERS).toEqual({
-      all: "All",
-      hunting: "Hunting",
-      offering: "Offering",
-    });
+    /* The All / Hunting / Offering labels went with the filter
+       (2026-11-15): Offering was removed on 2026-10-15. */
+    expect("FLARE_FILTERS" in copy).toBe(false);
     expect(copy.POST_A_FLARE).toBe("Post a Flare");
   });
 
@@ -252,9 +248,13 @@ describe("the night's page", () => {
   });
 
   it("draws Matches for you for a signed-in viewer, the pitch for a guest, nothing when finished", () => {
+    /* Before the night, the full section; in the room, one line
+       (room-view.ts, the founder 2026-11-15). Both first under the header. */
     expect(room).toMatch(
-      /\{guest \? \(\s*finished \? null : \(\s*<AccountPitch variant=\{joined \? "room" : "join"\} \/>\s*\)\s*\) : eventId && !finished \? \(\s*<MatchesForYou/,
+      /\{guest \? \(\s*finished \? null : \(\s*<AccountPitch variant=\{joined \? "room" : "join"\} \/>\s*\)\s*\) : eventId && !finished \? \(\s*inRoom \? \(/,
     );
+    expect(room).toContain("<RoomMatchLine");
+    expect(room).toContain("<MatchesForYou");
     expect(room).toContain(
       'onSeeAll={() => navigation.navigate("NightMatches", { code })}',
     );
@@ -307,7 +307,10 @@ describe("the night's page", () => {
   });
 
   it("draws What to bring only with something to pack, three inline, Packed persisted optimistically", () => {
-    expect(room).toContain("{!guest && eventId && !finished && bring.length > 0 ? (");
+    /* Packing is planning: not drawn in the room while the night is on. */
+    expect(room).toContain(
+      "{!guest && eventId && !finished && !inRoom && bring.length > 0 ? (",
+    );
     expect(bring).toContain("export const BRING_INLINE = 3;");
     expect(bring).toContain("rows(bring.slice(0, BRING_INLINE))");
     expect(bring).toContain("{VIEW_LIST}");
@@ -320,28 +323,17 @@ describe("the night's page", () => {
     );
   });
 
-  it("filters Flares at this Night on the phone and keeps the board as it was", () => {
-    const filterFlares = lift<(flares: { intent: string }[], f: string) => unknown[]>(
-      filter,
-      /export function filterFlares<[^>]*>\(\s*flares: T\[\],\s*filter: FlareFilter,\s*\): T\[\] \{([\s\S]*?)\n\}/,
-      ["flares", "filter"],
-    );
-    const board = [{ intent: "want" }, { intent: "showcase" }, { intent: "want" }];
-    expect(filterFlares(board, "all")).toHaveLength(3);
-    expect(filterFlares(board, "hunting")).toEqual([
-      { intent: "want" },
-      { intent: "want" },
-    ]);
-    expect(filterFlares(board, "offering")).toEqual([{ intent: "showcase" }]);
-    expect(filter).toContain(
-      'export const FLARE_FILTER_ORDER: FlareFilter[] = ["all", "hunting", "offering"];',
-    );
-    expect(room).toContain("const flares = filterFlares(state.flares ?? [], filter);");
+  it("draws the whole board with no filter, and keeps the board as it was", () => {
+    /* The founder removed Offering on 2026-10-15, so Offering could only
+       be empty and Hunting was the whole board. */
+    expect(room).not.toContain("FlareFilterRow");
+    expect(room).not.toContain("filterFlares");
+    expect(room).toContain("const flares = state.flares ?? [];");
     /* The tiles and the offer flow are untouched. */
     expect(room).toContain("function CarouselFlare(");
     expect(room).toContain("function FlareRow(");
     expect(room).toContain("offerOnFlare(code, flare.id, message, quantity)");
-    expect(room).toContain("<ReadOnlyBoard flares={flares} filter={filter} />");
+    expect(room).toContain("<ReadOnlyBoard flares={flares} />");
   });
 
   it("draws Players going as compact rows that open the event-facing profile", () => {

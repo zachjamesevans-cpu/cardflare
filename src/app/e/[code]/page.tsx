@@ -11,7 +11,7 @@ import { EarlyBanner } from "@/components/events/early-banner";
 import { EventDetails } from "@/components/events/event-details";
 import { FlaresAtNight, OffersNote } from "@/components/events/flares-at-night";
 import { JoinEventForm } from "@/components/events/join-event-form";
-import { MatchesForYou } from "@/components/events/matches-for-you";
+import { MatchesForYou, RoomMatchLine } from "@/components/events/matches-for-you";
 import {
   NightHeader,
   NightShell,
@@ -64,6 +64,7 @@ import {
   offersByFlare,
 } from "@/lib/matching/schema";
 import { boardReadable, boardWritable, roomPhase } from "@/lib/events/schema";
+import { roomViewFor } from "@/lib/events/room-view";
 import { goingState, nightRoster } from "@/lib/events/going";
 import { EMPTY_MATCHES, nightMatches } from "@/lib/events/night-matches";
 import { nightBinderState } from "@/lib/events/night-binders";
@@ -344,6 +345,17 @@ async function RoomBody({
   const phase = roomPhase(event);
 
   /*
+   * And one view, decided from it. While the night is on the page is
+   * the room: the header, the clocks, one match line, the board and the
+   * + Flare button. The founder (2026-11-15), after a scan at the
+   * counter: "When someone scans into a room I feel like it should be
+   * dead simple imo. This is so much info." Before the night, and after
+   * it, the page stays the planning dashboard of 2026-10-03. See
+   * src/lib/events/room-view.ts; the app reads the same function.
+   */
+  const roomView = roomViewFor(phase) === "in-room";
+
+  /*
    * The board is open to look at from the moment the night is posted
    * until it closes, and read-only once it has (a night in Past keeps
    * its board, so what was wanted is still there to see). A viewer
@@ -614,18 +626,19 @@ async function RoomBody({
   const tickerMs = phase === "live" ? 12_000 : phase === "early" ? 60_000 : null;
 
   /*
-   * The board, once per filter: everything, the Hunting Flares (intent
-   * "want") and the Offering ones (intent "showcase"). Server-rendered
-   * three times so every tile and every offer form is exactly the
-   * board's own, and the filter island only picks which is on screen.
-   * A filter with nothing behind it hands over null, and the island
-   * says so in one line.
+   * The board, drawn once. It was drawn three times, once per filter
+   * (All, Hunting, Offering), until the filter went: the founder took
+   * offering out (2026-10-15), so Offering could only be empty and
+   * Hunting was All. See flares-at-night.tsx.
+   *
+   * The viewer's own group is folded to one line, open on arrival when
+   * somebody has offered on one of their Flares (the offers note links
+   * to it). The founder (2026-11-15): "When someone scans into a room I
+   * feel like it should be dead simple imo." In both views: managing
+   * your own Flares is the same chore before the night as during it.
    */
-  const hunting = flares.filter((entry) => entry.intent === "want");
-  const offering = flares.filter((entry) => entry.intent === "showcase");
-  const boardFor = (entries: ListEntry[], all: boolean) => {
+  const boardFor = (entries: ListEntry[]) => {
     if (inRoom && session && !finished) {
-      if (!all && entries.length === 0) return null;
       return (
         <RoomBoardCard
           empty={entries.length === 0 && openPlayers.length === 0}
@@ -648,13 +661,22 @@ async function RoomBody({
             counterName={event.storeName}
             heldCounts={heldCounts}
             early={phase === "early"}
+            yourFold={{ open: offersOnMine > 0 }}
           />
         </RoomBoardCard>
       );
     }
-    if (!all && entries.length === 0) return null;
     return <ReadOnlyBoard flares={entries} roster={roster} imagesEnabled={images} />;
   };
+
+  /*
+   * The viewer is in the room once they have a seat in it, here or on
+   * another device of the same account (`youGoing` counts the account's
+   * seats). In the room view their header says only how many players;
+   * without a seat it keeps the Going chip, and the join form below
+   * stays the way in.
+   */
+  const seated = inRoom || Boolean(night?.youGoing);
 
   const header = scheduled ? (
     <NightHeader
@@ -664,7 +686,11 @@ async function RoomBody({
       following={accountPlayerId ? followingStore : null}
       code={normalized}
       name={event.name}
-      when={nightWhenLine(event.startsAt, event.endsAt, event.storeTimeZone)}
+      when={
+        roomView
+          ? null
+          : nightWhenLine(event.startsAt, event.endsAt, event.storeTimeZone)
+      }
       remoteHref={remoteHref}
       helpHref={`/tournaments?from=${encodeURIComponent(`/e/${normalized}`)}`}
       line={
@@ -677,12 +703,15 @@ async function RoomBody({
             }
           : null
       }
+      roomCount={roomView && seated && night ? night.goingCount : null}
     />
   ) : (
     /*
      * The walk-in door: store, night, pulse. A walk-in room has no
      * schedule and no RSVP, so its door keeps the people list and the
-     * leave form behind the pulse line.
+     * leave form behind the pulse line. In the room it says no "when":
+     * it said "Trading now" until 2026-11-15, which the room already
+     * says by being open.
      */
     <RoomDoor
       storeId={event.storeId}
@@ -692,9 +721,15 @@ async function RoomBody({
       code={normalized}
       name={event.name}
       when={
-        event.kind === "walk_in"
-          ? "Trading now"
-          : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)
+        roomView
+          ? null
+          : event.kind === "walk_in"
+            ? /* A closed walk-in room is not trading now: its own
+                 "This room has closed" line below says what is true. */
+              finished
+              ? null
+              : "Trading now"
+            : formatEventWindow(event.startsAt, event.endsAt, event.storeTimeZone)
       }
       location={location}
       remoteHref={remoteHref}
@@ -705,7 +740,6 @@ async function RoomBody({
               participants,
               youId: session.id,
               imagesEnabled: images,
-              flareCount: flares.length,
             }
           : null
       }
@@ -800,15 +834,25 @@ async function RoomBody({
           )}
 
           {/* The binders they are bringing, just above the matches
-              those binders feed, while the night takes changes. */}
-          {accountPlayerId && night?.youGoing && binderState?.editable && (
+              those binders feed, while the night takes changes. Planning
+              only: in the room the binders are on the table already. */}
+          {!roomView && accountPlayerId && night?.youGoing && binderState?.editable && (
             <YourBinders eventId={event.id} code={normalized} state={binderState} />
           )}
 
           {/* Matches for you: the first section, for an account. A
-              guest sees here the one thing they lose without one. */}
+              guest sees here the one thing they lose without one. In
+              the room it is one line, or nothing (2026-11-15). */}
           {accountPlayerId ? (
-            <MatchesForYou matches={matches} code={normalized} imagesEnabled={images} />
+            roomView ? (
+              <RoomMatchLine summary={matches.summary} code={normalized} />
+            ) : (
+              <MatchesForYou
+                matches={matches}
+                code={normalized}
+                imagesEnabled={images}
+              />
+            )
           ) : (
             <AccountPitch
               next={`/e/${normalized}`}
@@ -816,7 +860,8 @@ async function RoomBody({
             />
           )}
 
-          {accountPlayerId && matches.bring.length > 0 && (
+          {/* What to pack is a question for home, not for the counter. */}
+          {!roomView && accountPlayerId && matches.bring.length > 0 && (
             <WhatToBring eventId={event.id} bring={matches.bring} />
           )}
         </>
@@ -827,11 +872,7 @@ async function RoomBody({
 
       {(readable || finished) && (
         <FlaresAtNight
-          boards={{
-            all: boardFor(flares, true),
-            hunting: boardFor(hunting, false),
-            offering: boardFor(offering, false),
-          }}
+          board={boardFor(flares)}
           note={
             session && offersOnMine > 0 ? (
               <OffersNote
@@ -844,9 +885,13 @@ async function RoomBody({
         />
       )}
 
-      {readable && scheduled && <PlayersGoing roster={roster} code={normalized} />}
+      {/* Who is going and the venue are planning. In the room the
+          header counts the players and the store is its first line. */}
+      {!roomView && readable && scheduled && (
+        <PlayersGoing roster={roster} code={normalized} />
+      )}
 
-      {scheduled && (
+      {!roomView && scheduled && (
         <EventDetails
           storeId={event.storeId}
           storeName={event.storeName}

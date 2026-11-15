@@ -8,6 +8,7 @@ import { FollowStoreButton } from "@/components/stores/follow-store-button";
 import { VerifiedMark } from "@/components/stores/verified-mark";
 import { cn } from "@/lib/cn";
 import { playersLine } from "@/lib/events/night-copy";
+import { roomPlayersLine } from "@/lib/events/room-view";
 import { SITE } from "@/lib/site";
 import { instantToLocal } from "@/lib/time/zone";
 
@@ -29,6 +30,15 @@ import { instantToLocal } from "@/lib/time/zone";
  * check and "Going" once pressed, which presses off again. The timer
  * remote and the help page stay as the two small round controls on
  * the name's line, as the walk-in door draws them.
+ *
+ * In the room, while the night is on, it is two lines fewer. The
+ * founder (2026-11-15), after scanning in: "When someone scans into a
+ * room I feel like it should be dead simple imo. This is so much
+ * info." So the page passes no `when` (the night is now), and once the
+ * viewer has a seat it passes `roomCount` in place of `line`: the
+ * attendance is `roomPlayersLine` alone, with no Going chip, because
+ * there is nothing left to RSVP to. A viewer without a seat keeps the
+ * chip, or the join form under the header, as the way in.
  *
  * Plain props on purpose, so the header can be drawn on a page with
  * no database behind it. The app's night-header.tsx draws the same
@@ -80,6 +90,7 @@ export function NightHeader({
   remoteHref,
   helpHref,
   line,
+  roomCount = null,
 }: {
   storeId: string;
   storeName: string;
@@ -89,8 +100,8 @@ export function NightHeader({
   /** The night's code, for the Follow chip's repaint and the sign-in return. */
   code: string;
   name: string;
-  /** The night's window, from `nightWhenLine`. */
-  when: string;
+  /** The night's window, from `nightWhenLine`; null draws no line (in the room). */
+  when: string | null;
   /** The timer remote, for an organizer of this store; null draws no icon. */
   remoteHref: string | null;
   /** The "how a night works" page; null draws no icon. */
@@ -105,6 +116,11 @@ export function NightHeader({
     goingCount: number;
     signedIn: boolean;
   } | null;
+  /**
+   * In the room with a seat: how many players, said alone, in place of
+   * `line`. Null (the default) draws `line` as it always was.
+   */
+  roomCount?: number | null;
 }) {
   return (
     <header className="flex flex-col gap-1.5">
@@ -141,22 +157,28 @@ export function NightHeader({
         )}
       </div>
 
-      <p className="text-sm text-text-secondary">{when}</p>
+      {when && <p className="text-sm text-text-secondary">{when}</p>}
 
-      {line && (
-        <p className="flex h-6 flex-wrap items-center gap-x-3 text-sm">
-          <GoingButton
-            eventId={line.eventId}
-            youGoing={line.youGoing}
-            goingCount={line.goingCount}
-            signedIn={line.signedIn}
-            next={`/e/${code}`}
-            compact
-          />
-          <span className="text-text-secondary tabular-nums">
-            {playersLine(line.goingCount)}
-          </span>
+      {roomCount !== null ? (
+        <p className="text-sm text-text-secondary tabular-nums">
+          {roomPlayersLine(roomCount)}
         </p>
+      ) : (
+        line && (
+          <p className="flex h-6 flex-wrap items-center gap-x-3 text-sm">
+            <GoingButton
+              eventId={line.eventId}
+              youGoing={line.youGoing}
+              goingCount={line.goingCount}
+              signedIn={line.signedIn}
+              next={`/e/${code}`}
+              compact
+            />
+            <span className="text-text-secondary tabular-nums">
+              {playersLine(line.goingCount)}
+            </span>
+          </p>
+        )
       )}
     </header>
   );

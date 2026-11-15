@@ -355,7 +355,9 @@ describe("no here now on a player's screen", () => {
     expect(src.header).not.toContain("hereNow");
     expect(src.room).not.toContain("hereNow");
     expect(src.rooms).not.toContain("hereNow");
-    expect(src.people).not.toContain("here now");
-    expect(src.people).toContain("`${people.length} coming`");
+    /* The comment beside the count still quotes the founder's "here
+       now"; the drawn line is the players count (2026-11-15). */
+    expect(src.people).not.toMatch(/\{[^}]*here now/i);
+    expect(src.people).toContain("{roomPlayersLine(people.length)}");
   });
 });
