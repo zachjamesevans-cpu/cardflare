@@ -127,7 +127,7 @@ describe("design tokens", () => {
 });
 
 /**
- * The Event Hub's five game accents.
+ * The Event Hub's game accents, one per game it runs a clock for.
  *
  * A timer panel is read from across a shop by somebody who is not
  * looking for it, so these have to clear AA against every surface they
@@ -142,6 +142,10 @@ describe("game accents", () => {
     "game-riftbound",
     "game-flesh-and-blood",
     "game-mtg",
+    "game-yugioh",
+    "game-gundam",
+    "game-cyberpunk",
+    "game-sorcery",
   ];
 
   it.each(GAMES)("%s clears AA on canvas, surface and elevated", (name) => {
@@ -150,6 +154,11 @@ describe("game accents", () => {
     for (const surface of ["canvas", "surface", "elevated"]) {
       expect(contrastRatio(accent, token(surface))).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("gives every game its own colour", () => {
+    const colours = GAMES.map((name) => token(name).toLowerCase());
+    expect(new Set(colours).size).toBe(GAMES.length);
   });
 
   it("keeps every game distinct from the cardflare accent", () => {

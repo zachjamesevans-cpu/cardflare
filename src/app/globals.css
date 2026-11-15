@@ -86,6 +86,10 @@
   --color-game-riftbound: #5fd8ee;
   --color-game-flesh-and-blood: #ff9d5c;
   --color-game-mtg: #7fe0b0;
+  --color-game-yugioh: #e9c98f;
+  --color-game-gundam: #8fb4ff;
+  --color-game-cyberpunk: #ff6fcf;
+  --color-game-sorcery: #b9c4d6;
 
   /* Radius */
   --radius-control: 0.625rem;

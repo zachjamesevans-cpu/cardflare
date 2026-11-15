@@ -1,5 +1,5 @@
 /**
- * Tournament timer profiles: the six games, as data.
+ * Tournament timer profiles: every game FlareCast runs a clock for, as data.
  *
  * DEVELOPER NOTE — Tournament rule summaries must be manually reviewed
  * against official publisher documentation periodically. Rules change,
@@ -14,8 +14,10 @@
  * a React component. Updating One Piece's extra-turn rule must be an
  * edit to a string array, never a rebuild of a timer.
  *
- * Five games in version one; Magic arrived with the card catalogue. A
- * seventh is an entry in `GAME_PROFILES` plus an accent token —
+ * Five games in version one; Magic arrived with the card catalogue, and
+ * Yu-Gi-Oh!, Gundam, Cyberpunk and Sorcery arrived for FlareCast alone
+ * (2026-11-12). Another is an entry in `GAME_PROFILES` plus an accent
+ * token and an additive migration on `event_hub_timers_game` —
  * deliberately a code change rather than a form field, because a game
  * here fans out into rules a store reads off a wall.
  */
@@ -29,14 +31,35 @@
  * and every scoped search came back empty.
  */
 export type GameId =
-  "one-piece" | "pokemon" | "lorcana" | "riftbound" | "flesh-and-blood" | "mtg";
+  | "one-piece"
+  | "pokemon"
+  | "lorcana"
+  | "riftbound"
+  | "flesh-and-blood"
+  | "mtg"
+  | "yugioh"
+  | "gundam"
+  | "cyberpunk"
+  | "sorcery";
 
 /*
- * The same six slugs as `TCG_GAMES` in players/games-catalog.ts, and
- * tests/unit/app-games-parity.test.ts holds them equal: a tournament's
- * QR carries one of these, the room's card search compares it to
- * `cards.game`, and the sign-up question stores it, so the three
- * cannot be allowed to drift again.
+ * Every game FlareCast runs a clock for: the six of the card catalogue,
+ * then four that are FlareCast only.
+ *
+ * The first six are the same slugs as `TCG_GAMES` in
+ * players/games-catalog.ts, and tests/unit/app-games-parity.test.ts
+ * holds them equal: a tournament's QR carries one of these, the room's
+ * card search compares it to `cards.game`, and the sign-up question
+ * stores it, so the three cannot be allowed to drift again.
+ *
+ * The last four have rules and timers and no cards. The founder
+ * (2026-11-11): "add sorcery, Gundam, cyberpunk, and yugioh to
+ * FlareCast with their respective rules and timers", and on scope,
+ * "FlareCast only". So they are not in the catalogue, not in the
+ * sign-up question and not in a store's games, and a tournament QR
+ * for one of them leaves the room's card search on the player's own
+ * games (e/[code]/page.tsx) instead of narrowing it to a game with no
+ * cards. `FLARECAST_ONLY` names them so nothing has to guess.
  */
 export const GAME_IDS: readonly GameId[] = [
   "one-piece",
@@ -45,6 +68,18 @@ export const GAME_IDS: readonly GameId[] = [
   "riftbound",
   "flesh-and-blood",
   "mtg",
+  "yugioh",
+  "gundam",
+  "cyberpunk",
+  "sorcery",
+];
+
+/** Games with timers and rules here and no cards in the catalogue. */
+export const FLARECAST_ONLY: readonly GameId[] = [
+  "yugioh",
+  "gundam",
+  "cyberpunk",
+  "sorcery",
 ];
 
 /** Which set of end-of-round rules applies. */
@@ -581,9 +616,321 @@ export const GAME_PROFILES: Record<GameId, GameProfile> = {
     rulesLastVerified: "2026-09-02",
     procedureVersion: "2026.09-mtr-end-of-match",
   },
+
+  /*
+   * YU-GI-OH! — Konami Digital Entertainment (KDE-US) Tournament Policy
+   * v2.5, in effect 5 September 2025. There is no end-of-match
+   * procedure any more: "If the Match does not finish within 50
+   * minutes, the result will be a double loss. When time ends in the
+   * Round, the Match is over. Neither Duelist may begin or continue any
+   * action." So no extra turns and no tiebreaks, and the screen says
+   * exactly that rather than borrowing another game's procedure.
+   */
+  yugioh: {
+    id: "yugioh",
+    displayName: "Yu-Gi-Oh! TCG",
+    shortName: "Yu-Gi-Oh!",
+    accentToken: "--color-game-yugioh",
+    presets: [
+      {
+        id: "swiss",
+        label: "Swiss (Bo3)",
+        durationSeconds: 50 * MIN,
+        overtimeSeconds: null,
+        note: "50:00. Time ends the match, with no extra turns.",
+      },
+      {
+        id: "top-cut",
+        label: "Top Cut (Bo3)",
+        durationSeconds: 50 * MIN,
+        overtimeSeconds: null,
+        note: "50:00 unless the organizer announced a longer playoff round before the event.",
+      },
+      {
+        id: "final",
+        label: "Final match (untimed)",
+        durationSeconds: null,
+        overtimeSeconds: null,
+        note: "The final match of the event is untimed.",
+      },
+    ],
+    defaultPresetId: "swiss",
+    swiss: {
+      headline: "TIME · MATCH OVER",
+      steps: [
+        "When time is called, the match is over. Nobody begins or continues any action.",
+        "A match is finished when a player has won 2 duels or lost 2 duels.",
+        "A match that has not finished is a double loss.",
+        "Three duels done, time left and no result yet? Play a 4th duel.",
+        "Report the result within 5 minutes of the round ending.",
+      ],
+      extraTimeLine:
+        "Time. The match is over: nobody begins or continues any action. Unfinished is a double loss.",
+      additionalTurns: 0,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    elimination: {
+      headline: "TIME · MATCH OVER",
+      steps: [
+        "Playoff rounds end the same way as Swiss rounds.",
+        "When time is called, the match is over. Nobody begins or continues any action.",
+        "A match is finished when a player has won 2 duels or lost 2 duels.",
+        "A match that has not finished is a double loss.",
+        "The final match of the event is untimed.",
+      ],
+      extraTimeLine:
+        "Time. The match is over: nobody begins or continues any action. Unfinished is a double loss.",
+      additionalTurns: 0,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    beginnerTldr: [
+      "Bring a Main Deck of 40 to 60 cards and a Side Deck of up to 15, no more than 3 copies of a card. Sleeves are worth it.",
+      "Matches are best-of-three duels on a 50-minute clock.",
+      "When time is called the match simply ends, and an unfinished match is a loss for both players, so keep a steady pace.",
+      "Locals expect nothing from you except your deck. Tell your opponent it is your first event.",
+    ],
+    officialRulesUrl:
+      "https://img.yugioh-card.com/en/downloads/penalty_guide/YGOTCG_Tournament_Policy_v_2_5.pdf",
+    rulesLastVerified: "2026-11-11",
+    procedureVersion: "2025.09.05-kde-us-policy-v2.5",
+  },
+
+  /*
+   * GUNDAM CARD GAME — Bandai's Organized Play Tournament Rules Manual
+   * (last updated 10 July 2025) and Sanctioned Tournament Floor Rules
+   * Ver. 1.1.0 (19 November 2025). Standard is best-of-one at 30:00;
+   * Top Cut Finals best-of-three at 60:00; the Championship match is
+   * untimed. "Stores may choose to adjust the format", which is what
+   * a custom length is for.
+   */
+  gundam: {
+    id: "gundam",
+    displayName: "Gundam Card Game",
+    shortName: "Gundam",
+    accentToken: "--color-game-gundam",
+    presets: [
+      {
+        id: "standard",
+        label: "Standard (Bo1)",
+        durationSeconds: 30 * MIN,
+        overtimeSeconds: 5 * MIN,
+        note: "30:00 regulation, 5:00 on the extra turns",
+      },
+      {
+        id: "top-cut",
+        label: "Top Cut Finals (Bo3)",
+        durationSeconds: 60 * MIN,
+        overtimeSeconds: 10 * MIN,
+        note: "60:00 regulation, 10:00 extra time",
+      },
+      {
+        id: "championship",
+        label: "Championship (untimed)",
+        durationSeconds: null,
+        overtimeSeconds: null,
+        note: "The Championship match has no time limit.",
+      },
+    ],
+    defaultPresetId: "standard",
+    swiss: {
+      headline: "+2 OR 3 TURNS · 5:00",
+      steps: [
+        "More game wins takes the match. Tied? Finish the current turn. That turn is Turn 0.",
+        "Time ran out on the first player's turn: play 3 more turns. On the second player's turn: play 2 more.",
+        "Nobody wins during those turns? Compare in this order.",
+        "If the 5:00 on the extra turns runs out, finish an attack through the Battle End Step, finish any effect already started, and stop at the end of the Main Phase.",
+        "Still no clear winner? Both players lose.",
+      ],
+      tiebreak: [
+        "Most cards in the Shield Area (Base and Shields)",
+        "Most cards remaining in deck",
+      ],
+      extraTimeLine:
+        "Finish the turn, then 3 more if time ran out on the first player's turn, 2 on the second's. Nobody has won? Compare in order:",
+      additionalTurns: 3,
+      timed: true,
+      overtimeSeconds: 5 * MIN,
+    },
+    elimination: {
+      headline: "+2 OR 3 TURNS · NO DRAWS",
+      steps: [
+        "Draws are not permitted. More game wins takes the match.",
+        "Tied? Finish the current turn as Turn 0, then 3 more turns if time ran out on the first player's turn, 2 on the second's.",
+        "Nobody wins during those turns? Compare in this order.",
+        "If the extra-turn clock runs out, finish an attack through the Battle End Step and stop at the end of the Main Phase.",
+        "The Championship match is untimed.",
+      ],
+      tiebreak: [
+        "Most cards in the Shield Area (Base and Shields)",
+        "Most cards remaining in deck",
+        "Most Units in the Battle Area",
+        "Whoever most recently removed a card from their Shield Area",
+      ],
+      extraTimeLine:
+        "Finish the turn, then 3 more (first player's turn) or 2 (second's). No draws. Nobody has won? Compare in order:",
+      additionalTurns: 3,
+      timed: true,
+      overtimeSeconds: 5 * MIN,
+    },
+    beginnerTldr: [
+      "Bring a 50-card deck and a 10-card Resource Deck, plus any tokens your deck makes.",
+      "Store tournaments are usually one game on a 30-minute clock.",
+      "When time is called you finish the turn plus 2 or 3 more, then Shields and deck size decide.",
+      "Store events are the place to learn. Ask your opponent anything mid-game.",
+    ],
+    officialRulesUrl: "https://www.gundam-gcg.com/en/events/storetournament_01.html",
+    rulesLastVerified: "2026-11-11",
+    procedureVersion: "2025.11.19-floor-rules-1.1.0",
+  },
+
+  /*
+   * CYBERPUNK TCG — the official Tournament Rules (cyberpunktcg.com,
+   * updated 28 October 2026), "Round-end Procedure". Each player has
+   * 5:00 for their own final turn: two clocks, one per turn, so no
+   * single overtime countdown is put on the wall for it.
+   */
+  cyberpunk: {
+    id: "cyberpunk",
+    displayName: "Cyberpunk TCG",
+    shortName: "Cyberpunk",
+    accentToken: "--color-game-cyberpunk",
+    presets: [
+      {
+        id: "swiss-bo3",
+        label: "Swiss (Bo3)",
+        durationSeconds: 50 * MIN,
+        overtimeSeconds: null,
+        note: "50:00 regulation",
+      },
+      {
+        id: "swiss-bo1",
+        label: "Swiss (Bo1)",
+        durationSeconds: 30 * MIN,
+        overtimeSeconds: null,
+        note: "30:00, plus 3:00 to sideboard before the round",
+      },
+      {
+        id: "top-cut-bo3",
+        label: "Top Cut (Bo3)",
+        durationSeconds: 75 * MIN,
+        overtimeSeconds: null,
+        note: "75:00 regulation",
+      },
+      {
+        id: "top-cut-bo1",
+        label: "Top Cut (Bo1)",
+        durationSeconds: 55 * MIN,
+        overtimeSeconds: null,
+        note: "55:00 regulation",
+      },
+    ],
+    defaultPresetId: "swiss-bo3",
+    swiss: {
+      headline: "+2 TURNS · 7 GIGS",
+      steps: [
+        "Finish the current turn.",
+        "Then each player takes one more full turn, with 5:00 to finish it.",
+        "After those two turns, a player with 7 or more Gig dice wins the game. Otherwise the game is a draw.",
+        "More game wins takes the match. Equal game wins is a drawn match.",
+      ],
+      extraTimeLine:
+        "Finish the turn, then one more each, 5:00 per turn. 7 or more Gig dice wins; otherwise a draw.",
+      additionalTurns: 2,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    elimination: {
+      headline: "+2 TURNS · THEN MOST GIGS",
+      steps: [
+        "Finish the current turn.",
+        "Then each player takes one more full turn, with 5:00 to finish it.",
+        "After those two turns, a player with 7 or more Gig dice wins the game.",
+        "Still no winner? Keep playing until one player has more Gigs than the other.",
+        "More game wins takes the match.",
+      ],
+      extraTimeLine:
+        "Finish the turn, then one more each, 5:00 per turn. No 7 Gigs? Play on until one player has more.",
+      additionalTurns: 2,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    beginnerTldr: [
+      "Bring a 40 to 50 card deck, exactly 3 Legends and your Gig dice. A sealed event hands you the cards.",
+      "Locals are best-of-three at 50 minutes, or best-of-one at 30.",
+      "When time is called you finish the turn, each player takes one more, and 7 Gig dice wins.",
+      "Night City Gauntlet events are casual by design: judges there are told to teach, not punish.",
+    ],
+    officialRulesUrl: "https://cyberpunktcg.com/tournament-rules",
+    rulesLastVerified: "2026-11-12",
+    procedureVersion: "2026.10.28-round-end",
+  },
+
+  /*
+   * SORCERY: CONTESTED REALM — the Codex's "Tournament Rules" entry is
+   * the whole of the publisher's word on tournaments, and it sets no
+   * round length and no end-of-round procedure: "Tournament organizers
+   * are empowered to modify the rules to maximize the fun of the
+   * players in their community". Inventing either here would be
+   * putting a rule on a wall that the publisher never wrote, so the
+   * preset is untimed until the store types its own minutes, and the
+   * procedure tells the room to listen to its organizer.
+   */
+  sorcery: {
+    id: "sorcery",
+    displayName: "Sorcery: Contested Realm",
+    shortName: "Sorcery",
+    accentToken: "--color-game-sorcery",
+    presets: [
+      {
+        id: "organizer",
+        label: "Organizer's round",
+        durationSeconds: null,
+        overtimeSeconds: null,
+        note: "Sorcery's publisher sets no round length. Enter your event's minutes as a custom length.",
+      },
+    ],
+    defaultPresetId: "organizer",
+    swiss: {
+      headline: "ORGANIZER DECIDES",
+      steps: [
+        "Sorcery's publisher sets no end-of-round procedure.",
+        "Your organizer announces what happens when time is called. Follow that.",
+        "Organizers may also change setup rules or ban cards for their event. Ask before round one.",
+        "Both Avatars dealt a death blow at once? The rules make it a draw, but many tournaments ignore it and play on. Check your event.",
+      ],
+      extraTimeLine: "Time. Follow your organizer's end-of-round rules.",
+      additionalTurns: 0,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    elimination: {
+      headline: "ORGANIZER DECIDES",
+      steps: [
+        "Sorcery's publisher sets no end-of-round procedure.",
+        "Your organizer announces what happens when time is called. Follow that.",
+        "A winner is required here. Call your organizer.",
+      ],
+      extraTimeLine: "Time. Follow your organizer's end-of-round rules.",
+      additionalTurns: 0,
+      timed: false,
+      overtimeSeconds: null,
+    },
+    beginnerTldr: [
+      "Bring your Avatar, your Spellbook and your Atlas.",
+      "Your organizer sets the round length and what happens when time is called. Ask at the counter.",
+      "Organizers may adjust the setup or ban cards for their event, so read the event post or ask.",
+      "The publisher's own advice: play Sorcery in whatever way you and your friends find most enjoyable.",
+    ],
+    officialRulesUrl:
+      "https://sorcerytcg.com/codex/c50ff53f-9b65-4695-8cf5-082a2a890106",
+    rulesLastVerified: "2026-11-12",
+    procedureVersion: "2026.11-codex-tournament-rules",
+  },
 };
 
-/** The profile, or null for a slug that is not one of the five. */
+/** The profile, or null for a slug that is not one of FlareCast's games. */
 export function gameProfile(id: string): GameProfile | null {
   return GAME_PROFILES[id as GameId] ?? null;
 }
