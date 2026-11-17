@@ -615,6 +615,9 @@ const FeedPost = memo(function FeedPost({
 export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const [me, setMe] = useState<Me | null>(null);
+  /* Whether `me` came from the server this visit, not from last
+     open's saved copy: the "Room open" banner trusts nothing older. */
+  const [meFresh, setMeFresh] = useState(false);
   /* The Nearby tour's stops (tour.tsx): Wanted near you, the ZIP ask. */
   const tourWanted = useTourTarget("nearby", "wanted");
   const tourLocation = useTourTarget("nearby", "location");
@@ -908,7 +911,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
     const account = (async (): Promise<Me | null> => {
       try {
         const fresh = await meRequest;
-        if (alive()) setMe(fresh);
+        if (alive()) {
+          setMe(fresh);
+          setMeFresh(true);
+        }
         /* The signed-in account's own id: the one place the cache's
            pointer is set (cache.ts). */
         void rememberAccount(fresh.player.id);
@@ -2154,7 +2160,14 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
          * pins here, above everything derived, and one tap lands on the
          * board. The website's Feed wears the same banner.
          */}
-        {me?.locals.some((local) => local.liveNow) && (
+        {/*
+         * Only from a fresh answer. The founder (2026-11-17): "EVERYTIME
+         * I open the app... it says room open at Mox... If I give it a
+         * few seconds it goes way on its own." The saved copy painted
+         * last visit's room as open; "right now" is the one thing a
+         * saved copy cannot know, so the banner waits for the server.
+         */}
+        {meFresh && me?.locals.some((local) => local.liveNow) && (
           <Tap
             onPress={() => {
               const live = me.locals.find((local) => local.liveNow);

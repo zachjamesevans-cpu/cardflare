@@ -3,6 +3,7 @@ import "server-only";
 import { cancelNoShowFlares } from "@/lib/lists/repository";
 import { plusDaysInZone } from "@/lib/time/zone";
 import { classifyCode } from "./join-code";
+import { WALK_IN_IDLE_MS } from "./room-live";
 import {
   closeEndedScheduledEvents,
   closeWalkInRoom,
@@ -56,7 +57,9 @@ import type {
  * ever walks in to a board of yesterday's Flares. Every store's opening hours
  * are shorter than the gap between closing and opening again.
  */
-export const WALK_IN_IDLE_MS = 6 * 60 * 60 * 1000;
+/* Kept in room-live.ts, which has no server in it, so the Feed's
+   banner can ask the same question the counter does. */
+export { WALK_IN_IDLE_MS } from "./room-live";
 
 /**
  * How early a scheduled event claims the counter code.
