@@ -1,5 +1,6 @@
 import "server-only";
 
+import { openRoomIsRunning } from "@/lib/events/room-live";
 import { earlyBoardOpensAt } from "@/lib/events/schema";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 
@@ -101,6 +102,33 @@ export async function removeLocal(playerId: string, storeId: string): Promise<vo
   if (error) console.error("Could not remove the local store", error);
 }
 
+/**
+ * When each walk-in room was last used, in one read: the newest
+ * `last_seen_at` among its participants. A room nobody joined has no
+ * entry, and the caller measures it from when it opened.
+ */
+async function lastActivityByRoom(roomIds: string[]): Promise<Map<string, string>> {
+  const last = new Map<string, string>();
+  if (roomIds.length === 0) return last;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("event_participants")
+    .select("event_id, last_seen_at")
+    .in("event_id", roomIds)
+    .order("last_seen_at", { ascending: false })
+    .limit(500);
+
+  if (error) {
+    console.error("Could not check when the rooms were last used", error);
+    return last;
+  }
+  for (const row of data ?? []) {
+    if (row.last_seen_at && !last.has(row.event_id))
+      last.set(row.event_id, row.last_seen_at);
+  }
+  return last;
+}
+
 /** The player's saved stores, newest first, each with its current pulse. */
 /**
  * Turns a set of store ids into what the Feed needs to know about them.
@@ -130,7 +158,7 @@ async function boardsForStores(
      */
     getSupabaseAdmin()
       .from("events")
-      .select("store_id, name, status, starts_at, join_code")
+      .select("id, store_id, name, status, kind, starts_at, ends_at, join_code")
       .in("store_id", storeIds)
       .neq("status", "closed"),
   ]);
@@ -138,13 +166,46 @@ async function boardsForStores(
   const byStore = new Map((stores ?? []).map((store) => [store.id, store]));
   const now = Date.now();
 
+  /*
+   * "Open" in the table is not "running": a quiet walk-in room and a
+   * night past its end stay open until the next scan closes them. The
+   * Feed's "Room open at" banner believed the status, and a tap on it
+   * was the scan that closed the room (the founder, 2026-11-17: "it
+   * says room open at Mox... Then I click it and it says I need to open
+   * it"). So each open room is put to the counter's own test
+   * (room-live.ts), with the walk-in rooms' last activity read in one
+   * query for all of them.
+   */
+  const openRooms = (events ?? []).filter((event) => event.status === "open");
+  const walkInIds = openRooms
+    .filter((event) => String(event.kind) === "walk_in")
+    .map((event) => event.id);
+  const lastSeen = await lastActivityByRoom(walkInIds);
+
   const live = new Set<string>();
+  for (const event of openRooms) {
+    const store = byStore.get(event.store_id);
+    if (
+      openRoomIsRunning(
+        {
+          kind: String(event.kind),
+          startsAt: event.starts_at,
+          endsAt: event.ends_at,
+          lastActivityAt: lastSeen.get(event.id) ?? null,
+          walkInEnabled: store?.walk_in_enabled ?? true,
+        },
+        now,
+      )
+    ) {
+      live.add(event.store_id);
+    }
+  }
+
   const next = new Map<
     string,
     { name: string; startsAt: string; joinCode: string | null }
   >();
   for (const event of events ?? []) {
-    if (event.status === "open") live.add(event.store_id);
     if (event.status === "draft" && Date.parse(event.starts_at) > now) {
       const current = next.get(event.store_id);
       if (!current || event.starts_at < current.startsAt) {
