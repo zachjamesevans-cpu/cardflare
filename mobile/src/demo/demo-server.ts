@@ -1,6 +1,7 @@
 import type { FeedCard } from "../api";
 import type { WantedSort } from "../nearby-shared";
 import { PEOPLE } from "./demo-people";
+import { DEMO_ROOM_CODE, demoRoom } from "./demo-room";
 import {
   demoAnswerTrade,
   demoComment,
@@ -76,16 +77,66 @@ const isDemoId = (id: string) => id.startsWith("demo-");
 
 /** The crowd behind your follower count: made-up, pictured, many. */
 const CROWD_NAMES = [
-  "Riley", "Noah P", "Isla", "Mateo", "Chloe R", "Kenji", "Amara", "Lucas",
-  "Sofia M", "Ethan", "Yuki", "Diego", "Nora", "Felix", "Imani", "Oscar",
-  "Lena", "Rafael", "Mila", "Jonah", "Aria", "Kai", "Esme", "Tariq",
-  "Ruby", "Hugo", "Zara", "Milo", "Ines", "Caleb", "Leah", "Ravi",
-  "Elena", "Owen", "Sana", "Finn", "Maeve", "Dante", "Juno", "Arlo",
-  "Tess", "Bodhi", "Lila", "Omar", "Wren", "Jasper", "Nina", "Ezra",
+  "Riley",
+  "Noah P",
+  "Isla",
+  "Mateo",
+  "Chloe R",
+  "Kenji",
+  "Amara",
+  "Lucas",
+  "Sofia M",
+  "Ethan",
+  "Yuki",
+  "Diego",
+  "Nora",
+  "Felix",
+  "Imani",
+  "Oscar",
+  "Lena",
+  "Rafael",
+  "Mila",
+  "Jonah",
+  "Aria",
+  "Kai",
+  "Esme",
+  "Tariq",
+  "Ruby",
+  "Hugo",
+  "Zara",
+  "Milo",
+  "Ines",
+  "Caleb",
+  "Leah",
+  "Ravi",
+  "Elena",
+  "Owen",
+  "Sana",
+  "Finn",
+  "Maeve",
+  "Dante",
+  "Juno",
+  "Arlo",
+  "Tess",
+  "Bodhi",
+  "Lila",
+  "Omar",
+  "Wren",
+  "Jasper",
+  "Nina",
+  "Ezra",
 ];
 const STYLES = ["notionists", "lorelei", "open-peeps", "avataaars"];
 const BACKGROUNDS = ["b6e3f4", "ffd5dc", "c0aede", "d1d4f9", "ffdfbf", "c1f4c5"];
-const RINGS = [null, "ring-sakura", null, "ring-ember", "ring-galaxy", null, "ring-water"];
+const RINGS = [
+  null,
+  "ring-sakura",
+  null,
+  "ring-ember",
+  "ring-galaxy",
+  null,
+  "ring-water",
+];
 
 const crowd = CROWD_NAMES.map((displayName, index) => ({
   playerId: `demo-crowd-${index}`,
@@ -120,15 +171,16 @@ export function demoSaw(method: string, path: string, value: unknown): unknown {
 
   if (route === "/api/v1/me") {
     if (Array.isArray(body.wants)) {
-      body.wants = (body.wants as { id: string; cardId: string; direction?: string }[]).filter(
+      body.wants = (
+        body.wants as { id: string; cardId: string; direction?: string }[]
+      ).filter(
         (want) =>
           !droppedWants.has(want.id) &&
           !(want.direction === "offering" && droppedOfferings.has(want.cardId)),
       );
     }
     const player = body.player as
-      | { id: string; displayName: string; avatarUrl?: string | null }
-      | undefined;
+      { id: string; displayName: string; avatarUrl?: string | null } | undefined;
     if (player) {
       me = {
         playerId: player.id,
@@ -172,7 +224,8 @@ export function demoSaw(method: string, path: string, value: unknown): unknown {
     for (const section of sections) {
       for (const item of section.items) {
         if (item.art) artBySlug.set(item.slug, item.art);
-        if (wornHere.has(section.kind)) item.equipped = item.slug === wornHere.get(section.kind);
+        if (wornHere.has(section.kind))
+          item.equipped = item.slug === wornHere.get(section.kind);
       }
     }
     body.equips = { ...(body.equips as object), ...Object.fromEntries(wornHere) };
@@ -231,6 +284,22 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
   const parts = route.split("/").filter(Boolean).map(decodeURIComponent);
   const input = (body ?? {}) as Record<string, unknown>;
 
+  /* The tournament room (demo-room.ts): its read, its trades and the
+     silent rejoin the room screen makes, all answered here. */
+  if (parts[0] === "api" && parts[2] === "rooms" && parts[3] === DEMO_ROOM_CODE) {
+    if (method === "GET" && parts.length === 4) return { value: demoRoom(me) };
+    if (method === "GET" && parts[4] === "trades") return { value: { trades: [] } };
+    if (method === "POST" && parts.length === 4) {
+      return {
+        value: {
+          joined: true,
+          you: { sessionId: "demo-session-you", displayName: me.displayName },
+        },
+      };
+    }
+    return ok();
+  }
+
   /* --- Reads ------------------------------------------------------ */
   if (method === "GET") {
     if (route === "/api/v1/feed") return { value: demoFeed() };
@@ -255,7 +324,8 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
         },
       };
     }
-    if (route === "/api/v1/followers") return { value: { followers: [...named, ...crowd] } };
+    if (route === "/api/v1/followers")
+      return { value: { followers: [...named, ...crowd] } };
     if (route === "/api/v1/following") {
       return { value: { following: [...named, ...crowd.slice(0, FOLLOWING_CROWD)] } };
     }
@@ -276,7 +346,12 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
       return hunt ? { value: { hunt } } : null;
     }
     /* /api/players/:id and its people and binders */
-    if (parts[0] === "api" && parts[1] === "players" && parts[2] && isDemoId(parts[2])) {
+    if (
+      parts[0] === "api" &&
+      parts[1] === "players" &&
+      parts[2] &&
+      isDemoId(parts[2])
+    ) {
       if (parts.length === 3) {
         const profile = demoProfile(parts[2]);
         if (profile) return { value: profile };
@@ -361,7 +436,11 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
 
   if (route === "/api/v1/flares/publish") {
     const items = Array.isArray(input.items)
-      ? (input.items as { cardId: string; printingId?: string | null; quantity: number }[])
+      ? (input.items as {
+          cardId: string;
+          printingId?: string | null;
+          quantity: number;
+        }[])
       : [];
     const cards: FeedCard[] = items.map((item, index) => {
       const seen =
@@ -410,7 +489,12 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
 
   if (parts[2] === "hunts" && parts[3] && input.action === "offer") {
     const lines = Array.isArray(input.lines) ? input.lines : [];
-    return ok({ offered: lines.length, messaged: 1, threadId: "demo-t-maya", refused: [] });
+    return ok({
+      offered: lines.length,
+      messaged: 1,
+      threadId: "demo-t-maya",
+      refused: [],
+    });
   }
 
   /* Any other write: done, as far as the screen can tell. */

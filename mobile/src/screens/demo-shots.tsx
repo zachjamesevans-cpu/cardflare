@@ -4,7 +4,9 @@ import { ScrollView, Text, View } from "react-native";
 
 import type { StackParams } from "../../App";
 import { demoOn, setDemoMode } from "../demo/demo-mode";
+import { rememberRoom } from "../api";
 import { DEMO_CARDS } from "../demo/demo-cards";
+import { DEMO_ROOM_CODE } from "../demo/demo-room";
 import { PEOPLE } from "../demo/demo-people";
 import { answerDraft } from "../nearby-shared";
 import { huntId, postId } from "../demo/demo-world";
@@ -35,6 +37,13 @@ export const SHOTS: Shot[] = [
     title: "1. The Feed",
     tip: "Hunts, held cards ringed in green, likes and comments.",
     go: (nav) => nav.navigate("Tabs", { screen: "Feed", params: { tab: "following" } }),
+  },
+  {
+    title: "Tournament room",
+    tip: "A live store championship: Round 3 on the clock, the board of every card the room wants, the ones you hold ringed in green.",
+    go: (nav) => {
+      void rememberRoom(DEMO_ROOM_CODE).then(() => nav.navigate("Room"));
+    },
   },
   {
     title: "2. You have this",
@@ -212,7 +221,9 @@ export function DemoShotsScreen() {
                   gap: 2,
                 }}
               >
-                <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}>
+                <Text
+                  style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}
+                >
                   {shot.title}
                 </Text>
                 <Muted>{shot.tip}</Muted>
