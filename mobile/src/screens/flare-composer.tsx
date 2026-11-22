@@ -548,6 +548,8 @@ export function FlareComposer({
             ? "One of these cards is already up."
             : code === "hunt-name"
               ? "Name your hunt."
+              : code === "objectionable"
+                ? "That has words cardflare doesn't allow. Please change it."
               : code === "not-migrated"
                 ? "Posting isn't switched on yet. The server needs its latest update."
                 : `Could not post the Flare. ${friendlyError(caught)}`,

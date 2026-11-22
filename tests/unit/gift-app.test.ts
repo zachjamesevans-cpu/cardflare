@@ -86,10 +86,22 @@ describe("where the app draws the bar", () => {
 describe("the app never sells Ultra", () => {
   const bar = read("mobile/src/gift-bar.tsx");
 
-  it("says where the website's Keep Ultra button is instead", () => {
-    expect(bar).toContain(
-      "Keep Ultra from Settings in your store console at cardflare.gg.",
-    );
+  /* App Store review, 3.1.1 / 3.1.3: no price and no pointer to the
+     website's checkout; and 2.2: no "beta". The shared copy keeps all
+     three for the website; the bar draws appTitle and appDetail. */
+  it("shows no price and no place to pay, and never says beta", async () => {
+    expect(bar).not.toContain("cardflare.gg");
+    expect(bar).not.toContain("{copy.detail}");
+    expect(bar).toContain("{appTitle(copy.title)}");
+    expect(bar).toContain("{appDetail(bar, copy.detail)}");
+    const { appTitle, appDetail } = await import("../../mobile/src/gift-bar-words");
+    for (const state of STATES) {
+      const copy = appCopy(state);
+      const words = `${appTitle(copy.title)} ${appDetail(state, copy.detail)}`;
+      expect(words, JSON.stringify(state)).not.toMatch(
+        /\$|beta|cardflare\.gg|a month/i,
+      );
+    }
   });
 
   it("has no link and no button", () => {

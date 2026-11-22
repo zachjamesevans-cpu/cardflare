@@ -31,6 +31,7 @@ import {
 } from "./post-queries";
 import { POST_COMMENT_MAX, type CardState, type PostComment } from "./post-schema";
 import { wornFrame } from "@/lib/players/worn-frame";
+import { isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * A Flare post as something people can answer under, not just walk to.
@@ -543,6 +544,8 @@ async function writeComment(
 ): Promise<string | null> {
   const clean = cleanBody(body, POST_COMMENT_MAX);
   if (clean.length === 0) return null;
+  /* Slurs and explicit words are refused (moderation/objectionable.ts). */
+  if (isObjectionable(clean)) return null;
 
   const { data, error } = await getSupabaseAdmin()
     .from("flare_post_comments")

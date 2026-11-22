@@ -11,6 +11,7 @@ import { addHuntRequests, createHunt } from "@/lib/players/hunts";
 import { saveWant } from "@/lib/players/wants";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import type { FlareIntent } from "@/lib/supabase/types";
+import { isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * Publishing a Flare: one post, one or many cards.
@@ -80,7 +81,13 @@ export type PublishResult =
     }
   | {
       ok: false;
-      reason: "empty" | "hunt-limit" | "hunt-name" | "unavailable" | "already-posted";
+      reason:
+        | "empty"
+        | "hunt-limit"
+        | "hunt-name"
+        | "unavailable"
+        | "already-posted"
+        | "objectionable";
       kept?: number;
       limit?: number;
     };
@@ -105,6 +112,20 @@ export async function publishPost(input: PublishInput): Promise<PublishResult> {
      written, never quietly dropped. */
   if (input.intent === "want" && input.hunt && "name" in input.hunt) {
     if (!cleanHuntName(input.hunt.name)) return { ok: false, reason: "hunt-name" };
+  }
+
+  /* The caption, the cards' notes and a new hunt's name are read by
+     everyone: slurs and explicit words are refused before anything is
+     written (moderation/objectionable.ts). */
+  if (
+    isObjectionable(input.caption) ||
+    items.some((item) => isObjectionable(item.cardNote)) ||
+    (input.intent === "want" &&
+      input.hunt &&
+      "name" in input.hunt &&
+      isObjectionable(input.hunt.name))
+  ) {
+    return { ok: false, reason: "objectionable" };
   }
 
   const admin = getSupabaseAdmin();

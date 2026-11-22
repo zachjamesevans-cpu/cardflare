@@ -3,6 +3,7 @@ import type { ComponentProps } from "react";
 import { Text, View } from "react-native";
 
 import type { GiftBar as GiftBarState } from "./api";
+import { appDetail, appTitle } from "./gift-bar-words";
 import { giftBarCopy } from "./gift-copy";
 import { colors, radius, spacing } from "./theme";
 
@@ -10,20 +11,18 @@ import { colors, radius, spacing } from "./theme";
  * The green bar from the top of the store console, drawn for an owner
  * holding the app: a beta gift's days, a Founding Store, or the trial's.
  *
- * The words come from gift-copy.ts, which mirrors the website's, so the
- * two say the same thing. One difference, on purpose: where the website
- * has its "Keep Ultra" button, the app says where that button is
- * instead. Buying happens on the website, so there is no link and no
- * button here.
+ * The words come from gift-copy.ts, which mirrors the website's. The
+ * app draws them with three differences, on purpose, for App Store
+ * review (Guidelines 3.1.1 and 3.1.3): Ultra is bought on the website,
+ * so the app shows no price, does not say where to buy it, and has no
+ * link or button. It says what state the store is in and when that
+ * changes, nothing more. And it never says "beta": a reviewer reads
+ * that as an unfinished app (2.2), so the gift is "free Ultra" here.
  *
  * Solid accent while Ultra is on; a bordered card once the beta has
  * ended, because a bright bar for something that has stopped would read
  * as the opposite.
  */
-
-/** Where the website's "Keep Ultra" button lives, said rather than linked. */
-export const KEEP_ULTRA_LINE =
-  "Keep Ultra from Settings in your store console at cardflare.gg.";
 
 type Glyph = ComponentProps<typeof Ionicons>["name"];
 
@@ -41,7 +40,6 @@ export function GiftBar({ bar, storeName }: { bar: GiftBarState; storeName?: str
   /* Ink on the lime fill, or the ordinary text colours on the card. */
   const ink = ended ? colors.textPrimary : colors.accentContrast;
   const soft = ended ? colors.textSecondary : colors.accentContrast;
-  const quiet = ended ? colors.textMuted : colors.accentContrast;
 
   return (
     <View
@@ -88,7 +86,7 @@ export function GiftBar({ bar, storeName }: { bar: GiftBarState; storeName?: str
           }}
         >
           <Text style={{ color: ink, fontSize: 16, fontWeight: "800", flexShrink: 1 }}>
-            {copy.title}
+            {appTitle(copy.title)}
           </Text>
           {copy.urgent ? (
             <View
@@ -113,20 +111,9 @@ export function GiftBar({ bar, storeName }: { bar: GiftBarState; storeName?: str
             </View>
           ) : null}
         </View>
-        <Text style={{ color: soft, fontSize: 14, lineHeight: 20 }}>{copy.detail}</Text>
-        {copy.action ? (
-          <Text
-            style={{
-              color: quiet,
-              fontSize: 13,
-              lineHeight: 18,
-              marginTop: spacing(1),
-              opacity: ended ? 1 : 0.75,
-            }}
-          >
-            {KEEP_ULTRA_LINE}
-          </Text>
-        ) : null}
+        <Text style={{ color: soft, fontSize: 14, lineHeight: 20 }}>
+          {appDetail(bar, copy.detail)}
+        </Text>
       </View>
     </View>
   );
