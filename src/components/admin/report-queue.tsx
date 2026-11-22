@@ -5,6 +5,10 @@ import { Card } from "@/components/ui/card";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { ago } from "@/lib/notifications/inbox-row";
 import { REPORT_REASONS, type OpenReport, type ReportKind } from "@/lib/players/safety";
+import {
+  removeReportedCommentAction,
+  removeReportedPostAction,
+} from "@/lib/admin/moderation-actions";
 import { resolveReportAction } from "@/lib/players/safety-actions";
 
 /**
@@ -13,8 +17,10 @@ import { resolveReportAction } from "@/lib/players/safety-actions";
  *
  * One row says who reported what and why, in their words when they
  * left any, with the door to the thing itself. Nothing automatic
- * happened to the reported player, so the only button is "Resolved":
- * the admin looked, did whatever was right, and this row is done.
+ * happened to the reported player. "Resolved" says the admin looked
+ * and this row is done; on a post or a comment, "Remove" takes exactly
+ * that one down and closes every open report about it
+ * (lib/admin/moderation.ts), the Terms' 24-hour promise kept from here.
  */
 
 const KIND_WORD: Record<ReportKind, string> = {
@@ -130,6 +136,30 @@ export function ReportQueue({ reports }: { reports: OpenReport[] }) {
                   >
                     Open
                   </Link>
+                  {(report.kind === "post" || report.kind === "comment") && (
+                    <form
+                      action={
+                        report.kind === "post"
+                          ? removeReportedPostAction
+                          : removeReportedCommentAction
+                      }
+                    >
+                      <input type="hidden" name="targetId" value={report.targetId} />
+                      <input
+                        type="hidden"
+                        name="ownerId"
+                        value={report.target?.playerId ?? ""}
+                      />
+                      <SubmitButton
+                        label={
+                          report.kind === "post" ? "Remove post" : "Remove comment"
+                        }
+                        pendingLabel="Removing…"
+                        variant="danger"
+                        size="sm"
+                      />
+                    </form>
+                  )}
                   <form action={resolveReportAction}>
                     <input type="hidden" name="reportId" value={report.id} />
                     <SubmitButton

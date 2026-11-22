@@ -1,4 +1,5 @@
 import { useHeaderHeight } from "@react-navigation/elements";
+import * as Haptics from "expo-haptics";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
@@ -6,6 +7,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   Text,
   View,
@@ -517,13 +519,37 @@ export function FlarePostScreen({ postId }: { postId: string }) {
             <Muted>Nothing here yet. Say something.</Muted>
           ) : (
             post.thread.map((comment) => (
-              <View
+              /* Hold a comment for its menu (Report, or Delete when it is
+                 yours or on your post), the way Instagram does; the "⋯"
+                 stays beside it for anyone who does not know to hold.
+                 VoiceOver offers the same as a named action. */
+              <Pressable
                 key={comment.id}
-                style={{
+                onLongPress={
+                  commentActions(comment)
+                    ? () => {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+                          () => {},
+                        );
+                        setCommentMenu(comment);
+                      }
+                    : undefined
+                }
+                delayLongPress={350}
+                accessibilityActions={
+                  commentActions(comment) ? [{ name: "menu", label: "More options" }] : []
+                }
+                onAccessibilityAction={() => setCommentMenu(comment)}
+                style={({ pressed }) => ({
                   flexDirection: "row",
                   alignItems: "flex-start",
                   gap: spacing(2.5),
-                }}
+                  marginHorizontal: -spacing(1.5),
+                  paddingHorizontal: spacing(1.5),
+                  paddingVertical: spacing(1),
+                  borderRadius: radius.control,
+                  backgroundColor: pressed ? colors.elevated : "transparent",
+                })}
               >
                 <Tap
                   onPress={() =>
@@ -597,7 +623,7 @@ export function FlarePostScreen({ postId }: { postId: string }) {
                   }
                   label="More about this comment"
                 />
-              </View>
+              </Pressable>
             ))
           )}
         </View>

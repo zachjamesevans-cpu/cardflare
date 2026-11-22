@@ -29,7 +29,7 @@ export function SubmitButton({
   label: string;
   /** What the button says while the action runs. */
   pendingLabel?: string;
-  variant?: "primary" | "secondary" | "ghost";
+  variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   className?: string;
   /** Drawn before the label; the spinner takes its place while pending. */

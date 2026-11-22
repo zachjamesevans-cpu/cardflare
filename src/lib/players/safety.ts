@@ -28,6 +28,7 @@ import {
   type ReportKind,
   type ReportReason,
 } from "./safety-reasons";
+import { postHref } from "@/lib/notifications/preview";
 
 export { REPORT_KINDS, REPORT_REASONS, type ReportKind, type ReportReason };
 
@@ -409,6 +410,19 @@ export async function listOpenReports(limit = 100): Promise<OpenReport[]> {
     .in("id", ids);
   const nameOf = new Map((players ?? []).map((row) => [row.id, row.display_name]));
 
+  /* A reported comment opens on its post: which post, read once. */
+  const commentIds = rows
+    .filter((row) => row.target_kind === "comment")
+    .map((row) => row.target_id);
+  const postOfComment = new Map<string, string>();
+  if (commentIds.length > 0) {
+    const { data: comments } = await admin
+      .from("flare_post_comments")
+      .select("id, post_id")
+      .in("id", commentIds);
+    for (const row of comments ?? []) postOfComment.set(row.id, row.post_id);
+  }
+
   const transcripts = new Map(
     await Promise.all(
       rows
@@ -443,9 +457,13 @@ export async function listOpenReports(limit = 100): Promise<OpenReport[]> {
     href:
       row.target_kind === "player"
         ? `/p/${row.target_id}`
-        : row.target_player_id
-          ? `/p/${row.target_player_id}`
-          : "/feed",
+        : row.target_kind === "post"
+          ? postHref(row.target_id)
+          : row.target_kind === "comment" && postOfComment.has(row.target_id)
+            ? postHref(postOfComment.get(row.target_id)!)
+            : row.target_player_id
+              ? `/p/${row.target_player_id}`
+              : "/feed",
     excerpt: row.target_excerpt ?? null,
     messages: transcripts.get(row.id) ?? [],
   }));
