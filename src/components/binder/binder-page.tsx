@@ -43,7 +43,6 @@ import {
   COLUMNS,
   EmptyPocket,
   POCKETS_PER_PAGE,
-  PageArrow,
   PageDots,
   PocketTile,
 } from "@/components/binder/pockets";
@@ -722,23 +721,6 @@ export function BinderView({
             );
           })}
         </ul>
-
-        {pages > 1 && (
-          <>
-            <PageArrow
-              side="prev"
-              disabled={page === 0}
-              onClick={() => setAt(page - 1)}
-              ring={over === "prev"}
-            />
-            <PageArrow
-              side="next"
-              disabled={page === pages - 1}
-              onClick={() => setAt(page + 1)}
-              ring={over === "next"}
-            />
-          </>
-        )}
       </div>
 
       {/*

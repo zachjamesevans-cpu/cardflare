@@ -131,9 +131,15 @@ describe("the binder page", () => {
     expect(web.view).not.toContain("reorderBinderAction");
     expect(web.view).not.toContain("draggable=");
     expect(web.view).toContain("hold Alt and use the arrow keys");
-    /* Both arrows turn the page while a card is held over them. */
-    expect(web.view).toContain('ring={over === "prev"}');
-    expect(web.view).toContain('ring={over === "next"}');
+    /* No arrows (2026-11-22, the founder: "just not needed. delete."):
+       a held card at the page's edge turns it, as before. */
+    expect(web.view).not.toContain("<PageArrow");
+    const drag = readFileSync(
+      resolve(import.meta.dirname, "../..", "src/components/binder/pocket-drag.ts"),
+      "utf8",
+    );
+    expect(drag).toContain('if (x < box.left + EDGE && turns("prev")) return "prev";');
+    expect(drag).toContain('if (x > box.right - EDGE && turns("next")) return "next";');
     /* The app: one held-then-dragged pan, the drop by the same rule. */
     expect(app.page).toContain(".activateAfterLongPress(HOLD_MS)");
     expect(app.page).toContain("placeBinderCard(writeId, entryId, pocket)");
@@ -175,10 +181,9 @@ describe("the binder page", () => {
     expect(web.view).toContain('direction="showcase"');
   });
 
-  it("turns pages with arrows and dots on the web", () => {
-    expect(web.pockets).toContain('"Previous page"');
-    expect(web.pockets).toContain('"Next page"');
-    expect(web.view).toContain("<PageArrow");
+  it("turns pages with the dots on the web, and no arrows", () => {
+    expect(web.pockets).not.toContain("export function PageArrow(");
+    expect(web.view).not.toContain("<PageArrow");
     expect(web.view).toContain("<PageDots");
     expect(web.view).toContain('from "@/components/binder/pockets"');
     /* Three by three, the one page a binder has. */

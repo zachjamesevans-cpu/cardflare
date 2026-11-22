@@ -9,7 +9,6 @@ import {
   AddPocket,
   EmptyPocket,
   POCKETS_PER_PAGE,
-  PageArrow,
   PageDots,
   PocketTile,
 } from "@/components/binder/pockets";
@@ -345,21 +344,6 @@ export function HuntBinder({
               </li>
             ))}
           </ul>
-
-          {pages > 1 && (
-            <>
-              <PageArrow
-                side="prev"
-                disabled={page === 0}
-                onClick={() => setAt(page - 1)}
-              />
-              <PageArrow
-                side="next"
-                disabled={page === pages - 1}
-                onClick={() => setAt(page + 1)}
-              />
-            </>
-          )}
         </div>
       </OfferPicksContext.Provider>
 
