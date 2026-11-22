@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
@@ -345,50 +344,6 @@ export function PageDots({ at, of }: { at: number; of: number }) {
         />
       ))}
     </View>
-  );
-}
-
-/**
- * A page turn beside the dots: the website's PageArrow, in the row
- * under the page rather than over its edge, because a finger already
- * swipes the page and an arrow over the pockets would cover a card.
- * Dimmed, and inert, at either end.
- */
-export function PageArrow({
-  side,
-  disabled,
-  onPress,
-}: {
-  side: "prev" | "next";
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      disabled={disabled}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={side === "prev" ? "Previous page" : "Next page"}
-      accessibilityState={{ disabled }}
-      style={{
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        opacity: disabled ? 0.3 : 1,
-      }}
-    >
-      <Ionicons
-        name={side === "prev" ? "chevron-back" : "chevron-forward"}
-        size={16}
-        color={colors.textSecondary}
-      />
-    </Tap>
   );
 }
 
