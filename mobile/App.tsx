@@ -19,6 +19,7 @@ import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { Component, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -845,7 +846,13 @@ function openNotificationLink(response: Notifications.NotificationResponse | nul
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <AppGates />
+      {/* At the root, not inside the navigator: the welcome gate renders
+          before NavigationContainer exists, and its splash reads the
+          insets. Without this a fresh install crashed on "No safe area
+          value available". */}
+      <SafeAreaProvider>
+        <AppGates />
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }
