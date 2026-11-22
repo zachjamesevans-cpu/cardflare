@@ -25,8 +25,11 @@ import { cn } from "@/lib/cn";
  *
  * Geometry, the same on both platforms: rounded 2px on the left and
  * 10% of the width on the right; a spine 5% wide; the zipper inset
- * 4% from the top, right and bottom; the pull 10% wide and 4% tall;
- * the label at bottom 9%, left 8%.
+ * 4% from the top, right and bottom; the pull 16% wide and 5.5% tall
+ * (at least 8x4, so it still reads on a swatch); the label at bottom
+ * 9%, left 8%. Light from above (a soft top-to-foot shade), a crease
+ * at the spine, and a hairline rim so a dark cover keeps its edge on
+ * the black page.
  */
 
 export type BinderCoverSize = "lg" | "sm" | "xs";
@@ -86,11 +89,23 @@ export function BinderCover({
         className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgb(0_0_0/0.06)_0_1px,transparent_1px_3px)]"
       />
 
+      {/* The light: a touch brighter at the top and darker at the
+          foot, so the body reads as padded. Soft, never a sheen. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgb(255_255_255/0.07),rgb(0_0_0/0.18))]"
+      />
+
       {/* The spine: the padded edge, straight, in the dark colour. */}
       <div
         aria-hidden="true"
         className="absolute inset-y-0 left-0 w-[5%]"
         style={{ background: spine }}
+      />
+      {/* The crease where the spine's padding folds into the cover. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-[5%] w-px bg-white/[0.14]"
       />
 
       {/* The zipper: a dashed track along the top, the right and the
@@ -107,7 +122,7 @@ export function BinderCover({
       {/* The pull, where the zipper starts: the one accent on the cover. */}
       <div
         aria-hidden="true"
-        className="absolute top-[2%] left-[7%] h-[4%] w-[10%] rounded-[2px] bg-accent"
+        className="absolute top-[1.25%] left-[7%] h-[max(4px,5.5%)] w-[max(8px,16%)] rounded-full border border-black/35 bg-accent"
       />
 
       {/* The name, embossed: the dark colour on the bright one, with
@@ -127,6 +142,13 @@ export function BinderCover({
           {label}
         </div>
       )}
+
+      {/* The rim: a hairline of light round the body, so a dark cover
+          (Charcoal) still has an edge on the black page. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-white/[0.09] ring-inset"
+      />
     </div>
   );
 }

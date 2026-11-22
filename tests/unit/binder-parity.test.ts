@@ -91,7 +91,7 @@ describe("the binder page", () => {
         "ON YOUR HUNT",
         "Cards you would trade. Add the ones you carry.",
         "Nothing to trade yet.",
-        "Only you can open it",
+        "binderStatusLabel(",
         "On your hunts",
       ]) {
         expect(page, `${name}: ${word}`).toContain(word);
@@ -274,7 +274,11 @@ describe("one cover drawing per platform", () => {
       "repeating-linear-gradient(45deg,rgb(0_0_0/0.06)_0_1px,transparent_1px_3px)",
       "inset-y-0 left-0 w-[5%]",
       "top-[4%] right-[4%] bottom-[4%] left-[5%] border-y-2 border-r-2 border-dashed opacity-70",
-      "top-[2%] left-[7%] h-[4%] w-[10%] rounded-[2px] bg-accent",
+      "top-[1.25%] left-[7%] h-[max(4px,5.5%)] w-[max(8px,16%)] rounded-full border border-black/35 bg-accent",
+      /* The light from above, the spine's crease and the rim. */
+      "bg-[linear-gradient(180deg,rgb(255_255_255/0.07),rgb(0_0_0/0.18))]",
+      "left-[5%] w-px bg-white/[0.14]",
+      "ring-1 ring-white/[0.09] ring-inset",
       /* The embossed name. */
       "right-[8%] bottom-[9%] left-[8%] truncate font-bold",
       'textShadow: "0 1px 0 rgb(255 255 255/0.12)"',

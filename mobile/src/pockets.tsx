@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import type { ReactNode } from "react";
 import { Text, View } from "react-native";
@@ -32,8 +33,8 @@ import { Tap } from "./ui";
  */
 
 /** The ring round each pocket, the gap between them. */
-export const POCKET_RING = 2;
-export const POCKET_GAP = spacing(2);
+export const POCKET_RING = 1;
+export const POCKET_GAP = spacing(1.5);
 /**
  * The page frame: PAGE_PAD is everything between the frame's outer
  * edge and the first pocket, the 1pt border included, so the measured
@@ -230,11 +231,19 @@ export function AddPocket({
   width,
   height,
   targeted = false,
+  quiet = false,
   onPress,
 }: {
   width: number;
   height: number;
   targeted?: boolean;
+  /**
+   * Not the page's first empty pocket: a faint outline and a small
+   * muted "+", still a door to exactly this pocket. A page of nine
+   * loud "+ Add" boxes read as a form, not a binder; the first one
+   * says it, the rest stay out of the way.
+   */
+  quiet?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -245,10 +254,14 @@ export function AddPocket({
         width,
         height,
         borderRadius: 5,
-        backgroundColor: colors.canvas,
-        borderWidth: targeted ? POCKET_RING : 1,
+        backgroundColor: quiet && !targeted ? "transparent" : colors.canvas,
+        borderWidth: targeted ? POCKET_RING + 1 : 1,
         borderStyle: targeted ? "solid" : "dashed",
-        borderColor: targeted ? colors.accent : colors.borderStrong,
+        borderColor: targeted
+          ? colors.accent
+          : quiet
+            ? "rgba(255,255,255,0.10)"
+            : colors.borderStrong,
         alignItems: "center",
         justifyContent: "center",
         gap: 2,
@@ -256,29 +269,46 @@ export function AddPocket({
     >
       <Text
         style={{
-          color: colors.accent,
-          fontSize: Math.min(28, Math.round(width / 3)),
+          color: quiet ? colors.textMuted : colors.accent,
+          opacity: quiet ? 0.6 : 1,
+          fontSize: quiet ? 18 : Math.min(28, Math.round(width / 3)),
           fontWeight: "300",
-          lineHeight: Math.min(30, Math.round(width / 3) + 2),
+          lineHeight: quiet ? 20 : Math.min(30, Math.round(width / 3) + 2),
         }}
       >
         +
       </Text>
-      <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
-        Add
-      </Text>
+      {quiet ? null : (
+        <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
+          Add
+        </Text>
+      )}
     </Tap>
   );
 }
 
-/** The sleeve lip: a thin highlight where the plastic folds. */
+/**
+ * The sleeve: a thin highlight where the plastic folds at the top,
+ * and a faint diagonal sheen across the face, so the card reads as
+ * sitting behind plastic rather than printed on the page.
+ */
 export function SleeveLip() {
   return (
-    <LinearGradient
-      colors={["rgba(255,255,255,0.22)", "transparent"]}
-      pointerEvents="none"
-      style={{ position: "absolute", top: 0, left: 0, right: 0, height: "6%" }}
-    />
+    <>
+      <LinearGradient
+        colors={["transparent", "rgba(255,255,255,0.07)", "transparent"]}
+        locations={[0.25, 0.42, 0.6]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        pointerEvents="none"
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+      />
+      <LinearGradient
+        colors={["rgba(255,255,255,0.22)", "transparent"]}
+        pointerEvents="none"
+        style={{ position: "absolute", top: 0, left: 0, right: 0, height: "6%" }}
+      />
+    </>
   );
 }
 
@@ -315,6 +345,50 @@ export function PageDots({ at, of }: { at: number; of: number }) {
         />
       ))}
     </View>
+  );
+}
+
+/**
+ * A page turn beside the dots: the website's PageArrow, in the row
+ * under the page rather than over its edge, because a finger already
+ * swipes the page and an arrow over the pockets would cover a card.
+ * Dimmed, and inert, at either end.
+ */
+export function PageArrow({
+  side,
+  disabled,
+  onPress,
+}: {
+  side: "prev" | "next";
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={side === "prev" ? "Previous page" : "Next page"}
+      accessibilityState={{ disabled }}
+      style={{
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
+        opacity: disabled ? 0.3 : 1,
+      }}
+    >
+      <Ionicons
+        name={side === "prev" ? "chevron-back" : "chevron-forward"}
+        size={16}
+        color={colors.textSecondary}
+      />
+    </Tap>
   );
 }
 

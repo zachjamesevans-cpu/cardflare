@@ -303,7 +303,7 @@ export function HuntBinder({
       <OfferPicksContext.Provider value={picks}>
         <div className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]">
           <ul
-            className="grid grid-cols-3 gap-2"
+            className="grid grid-cols-3 gap-1.5"
             aria-label={`Page ${page + 1} of ${pages}`}
           >
             {pockets.map((card, index) => (

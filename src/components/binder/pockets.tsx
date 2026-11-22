@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { isRenderableImageUrl } from "@/lib/cards/images";
+import { WANTED_STRIP } from "@/lib/binder/binder-status";
 import { cn } from "@/lib/cn";
 
 /**
@@ -26,7 +27,7 @@ export const POCKETS_PER_PAGE = COLUMNS * COLUMNS;
 
 /* A pocket: black, with the sleeve's lip catching the light at the top. */
 export const POCKET =
-  "relative aspect-[63/88] w-full overflow-hidden rounded-[5px] bg-black ring-2 ring-black/80 shadow-[inset_0_0_0_2px_rgb(255_255_255/0.06)]";
+  "relative aspect-[63/88] w-full overflow-hidden rounded-[5px] bg-black ring-1 ring-black/80 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]";
 
 /** What a pocket needs to know about the card in it. */
 export interface PocketCard {
@@ -43,10 +44,13 @@ export function PocketTile({
   card,
   imagesEnabled,
   dim = false,
+  wanted = false,
   children,
 }: {
   card: PocketCard;
   imagesEnabled: boolean;
+  /** The owner's card somebody nearby wants: the WANTED NEARBY strip. */
+  wanted?: boolean;
   /** Faded: a hunt's card with every copy found. */
   dim?: boolean;
   /** Anything else drawn over the art: a hunt's check or count chip. */
@@ -80,7 +84,12 @@ export function PocketTile({
           </span>
         )}
       </div>
-      {/* The sleeve lip. */}
+      {/* The sleeve: a faint diagonal sheen across the face, and the
+          lip where the plastic folds at the top. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,transparent_25%,rgb(255_255_255/0.07)_42%,transparent_60%)]"
+      />
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[6%] bg-[linear-gradient(180deg,rgb(255_255_255/0.22),transparent)]"
@@ -88,9 +97,9 @@ export function PocketTile({
       {card.quantity !== undefined && (
         <QuantityBadge quantity={card.quantity} className="absolute top-1 left-1" />
       )}
-      {card.onYourHunt && (
+      {(card.onYourHunt || wanted) && (
         <span className="absolute inset-x-0 bottom-0 bg-accent py-0.5 text-center text-[8px] font-bold tracking-wider text-accent-contrast uppercase">
-          ON YOUR HUNT
+          {card.onYourHunt ? "ON YOUR HUNT" : WANTED_STRIP}
         </span>
       )}
       {children}
@@ -124,8 +133,26 @@ const ADD_POCKET =
  * card that way." A binder opens its sheet (`onClick`); a hunt goes
  * to the composer with itself chosen (`href`).
  */
-export function AddPocket({ onClick, href }: { onClick?: () => void; href?: string }) {
-  const inside = (
+/* Not the page's first empty pocket: a faint outline and a small muted
+   "+", still a door to exactly this pocket. A page of nine loud "+ Add"
+   boxes read as a form, not a binder. The app's AddPocket matches. */
+const QUIET_POCKET =
+  "flex aspect-[63/88] w-full cursor-pointer items-center justify-center rounded-[5px] border border-dashed border-white/10 text-text-muted/60 transition-colors hover:border-accent hover:text-accent focus-visible:border-accent focus-visible:text-accent focus-visible:outline-none";
+
+export function AddPocket({
+  onClick,
+  href,
+  quiet = false,
+}: {
+  onClick?: () => void;
+  href?: string;
+  quiet?: boolean;
+}) {
+  const inside = quiet ? (
+    <span aria-hidden="true" className="text-lg leading-none font-light">
+      +
+    </span>
+  ) : (
     <>
       <span aria-hidden="true" className="text-3xl leading-none font-light">
         +
@@ -133,9 +160,10 @@ export function AddPocket({ onClick, href }: { onClick?: () => void; href?: stri
       <span className="text-[10px] font-semibold">Add</span>
     </>
   );
+  const look = quiet ? QUIET_POCKET : ADD_POCKET;
   if (href) {
     return (
-      <Link href={href} aria-label="Add a card" className={ADD_POCKET}>
+      <Link href={href} aria-label="Add a card" className={look}>
         {inside}
       </Link>
     );
@@ -145,7 +173,7 @@ export function AddPocket({ onClick, href }: { onClick?: () => void; href?: stri
       type="button"
       onClick={onClick}
       aria-label="Add a card"
-      className={ADD_POCKET}
+      className={look}
     >
       {inside}
     </button>
