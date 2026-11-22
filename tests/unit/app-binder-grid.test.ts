@@ -39,7 +39,7 @@ const create = read("mobile/src/create-binder-sheet.tsx");
 
 /* The numbers as the theme has them: spacing(n) = n * 4. */
 const PAGE_PAD = 12;
-const POCKET_GAP = 8;
+const POCKET_GAP = 6;
 const PAGE_BORDER = 1;
 
 describe("the binder grid on the phone", () => {
@@ -55,7 +55,7 @@ describe("the binder grid on the phone", () => {
       "Math.floor((pageWidth - 2 * PAGE_PAD - 2 * POCKET_GAP) / 3)",
     );
     expect(pockets).toContain("export const PAGE_PAD = spacing(3);");
-    expect(pockets).toContain("export const POCKET_GAP = spacing(2);");
+    expect(pockets).toContain("export const POCKET_GAP = spacing(1.5);");
     expect(pockets).toContain("export const PAGE_BORDER = 1;");
     /* The border is part of the pad, so the measured width is what is divided. */
     expect(pockets).toContain("padding: PAGE_PAD - PAGE_BORDER,");

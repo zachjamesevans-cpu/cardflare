@@ -1,3 +1,4 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { Text, View } from "react-native";
 
 import { binderCover, type BinderCoverId } from "./binder-covers";
@@ -31,8 +32,11 @@ import { colors } from "./theme";
  * Geometry, the same on both platforms: rounded 2 on the left and 10%
  * of the width on the right; the spine 5% wide; the zipper track inset
  * 4% from the top, right and bottom, 2 thick, dashed in the spine
- * colour at 70%; the pull 10% wide and 4% tall in the accent, on the
- * track just right of the spine; the name at bottom 9%, left 8%.
+ * colour at 70%; the pull 16% wide and 5.5% tall in the accent (at
+ * least 8x4, so it still reads on a swatch), on the track just right
+ * of the spine; the name at bottom 9%, left 8%. Light from above (a
+ * soft top-to-foot shade), a crease at the spine, and a hairline rim
+ * so a dark cover keeps its edge on the black page.
  */
 
 export type BinderCoverSize = "lg" | "sm" | "xs";
@@ -69,8 +73,8 @@ export function BinderCover({
   const rightRadius = Math.round(box.width * 0.1);
   const inset = Math.round(box.width * 0.04);
   const pull = {
-    width: Math.round(box.width * 0.1),
-    height: Math.max(3, Math.round(box.height * 0.04)),
+    width: Math.max(8, Math.round(box.width * 0.16)),
+    height: Math.max(4, Math.round(box.height * 0.055)),
   };
   const track = {
     position: "absolute" as const,
@@ -93,18 +97,13 @@ export function BinderCover({
         backgroundColor: colors[edge],
       }}
     >
-      {/* The matte: a fine weave on the website, a 6% darkening here,
-          so a flat colour still reads as fabric rather than paint. */}
-      <View
+      {/* The matte: light falling from above, a touch brighter at the
+          top and darker at the foot, so the body reads as a padded
+          object rather than a flat swatch. Soft, never a sheen. */}
+      <LinearGradient
         pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          bottom: 0,
-          left: 0,
-          backgroundColor: "rgba(0,0,0,0.06)",
-        }}
+        colors={["rgba(255,255,255,0.07)", "rgba(0,0,0,0.18)"]}
+        style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0 }}
       />
 
       {/* The spine: a thin padded strip, straight edges. */}
@@ -117,6 +116,19 @@ export function BinderCover({
           left: 0,
           width: "5%",
           backgroundColor: colors[spine],
+        }}
+      />
+      {/* The crease where the spine's padding folds into the cover:
+          a hairline of light, then a hairline of shade. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: "5%",
+          width: 1,
+          backgroundColor: "rgba(255,255,255,0.14)",
         }}
       />
 
@@ -148,6 +160,8 @@ export function BinderCover({
           height: pull.height,
           borderRadius: pull.height / 2,
           backgroundColor: colors.accent,
+          borderWidth: 1,
+          borderColor: "rgba(0,0,0,0.35)",
         }}
       />
 
@@ -173,6 +187,25 @@ export function BinderCover({
           {label}
         </Text>
       ) : null}
+
+      {/* The rim: a hairline of light round the whole body, so a dark
+          cover (Charcoal) still has an edge on the black page. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          borderWidth: 1,
+          borderColor: "rgba(255,255,255,0.09)",
+          borderTopLeftRadius: 2,
+          borderBottomLeftRadius: 2,
+          borderTopRightRadius: rightRadius,
+          borderBottomRightRadius: rightRadius,
+        }}
+      />
     </View>
   );
 }

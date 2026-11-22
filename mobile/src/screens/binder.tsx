@@ -75,6 +75,7 @@ import {
   Copies,
   EmptyPocket,
   PAGE_PAD,
+  PageArrow,
   PageDots,
   PageFrame,
   Pocket,
@@ -812,7 +813,7 @@ export function BinderScreen({
               {binderLine(binder)}
             </Text>
             <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-              {`${binder.count} ${binder.count === 1 ? "card" : "cards"} · Page ${at + 1} of ${pageCount}`}
+              {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
             </Text>
           </View>
           <View ref={tourShare} collapsable={false}>
@@ -980,7 +981,28 @@ export function BinderScreen({
           <RemoveZone over={drag.overRemove} onLayout={drag.onRemoveZoneLayout} />
         ) : null}
 
-        <PageDots at={at} of={pageCount} />
+        {/* The dots with a page turn either side, once there is a
+            second page to turn to. */}
+        {pageCount > 1 ? (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: spacing(4),
+            }}
+          >
+            <PageArrow side="prev" disabled={at === 0} onPress={() => turnTo(at - 1)} />
+            <PageDots at={at} of={pageCount} />
+            <PageArrow
+              side="next"
+              disabled={at === pageCount - 1}
+              onPress={() => turnTo(at + 1)}
+            />
+          </View>
+        ) : (
+          <PageDots at={at} of={pageCount} />
+        )}
 
         {/* "2 in your offer · Review": the picks stay in sight while
             the viewer is closed, and Review is the door straight to

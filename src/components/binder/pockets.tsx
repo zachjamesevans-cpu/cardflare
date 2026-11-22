@@ -26,7 +26,7 @@ export const POCKETS_PER_PAGE = COLUMNS * COLUMNS;
 
 /* A pocket: black, with the sleeve's lip catching the light at the top. */
 export const POCKET =
-  "relative aspect-[63/88] w-full overflow-hidden rounded-[5px] bg-black ring-2 ring-black/80 shadow-[inset_0_0_0_2px_rgb(255_255_255/0.06)]";
+  "relative aspect-[63/88] w-full overflow-hidden rounded-[5px] bg-black ring-1 ring-black/80 shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)]";
 
 /** What a pocket needs to know about the card in it. */
 export interface PocketCard {
@@ -80,7 +80,12 @@ export function PocketTile({
           </span>
         )}
       </div>
-      {/* The sleeve lip. */}
+      {/* The sleeve: a faint diagonal sheen across the face, and the
+          lip where the plastic folds at the top. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,transparent_25%,rgb(255_255_255/0.07)_42%,transparent_60%)]"
+      />
       <span
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-0 h-[6%] bg-[linear-gradient(180deg,rgb(255_255_255/0.22),transparent)]"

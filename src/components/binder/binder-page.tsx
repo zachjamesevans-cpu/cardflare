@@ -516,7 +516,7 @@ export function BinderView({
           )}
           {line && <p className="text-sm text-text-secondary">{line}</p>}
           <p className="text-xs text-text-muted tabular-nums">
-            {countLine} · Page {page + 1} of {pages}
+            {countLine}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
@@ -589,7 +589,7 @@ export function BinderView({
       >
         <ul
           ref={grid}
-          className="grid grid-cols-3 gap-2"
+          className="grid grid-cols-3 gap-1.5"
           aria-label={`Page ${page + 1} of ${pages}`}
         >
           {pockets.map((card, index) => {
