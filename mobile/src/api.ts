@@ -2654,6 +2654,25 @@ export const getBinder = (playerId: string | undefined, binderId: string) =>
   call<{ binder: Binder }>("GET", binderPath(binderId, playerId));
 
 /**
+ * Which of your binder's cards somebody nearby wants, and how many
+ * people: card id to people. Empty for a private binder, and for an
+ * older server that has no such read, so the line simply does not show.
+ */
+export const getBinderWanted = async (
+  binderId: string,
+): Promise<Record<string, number>> => {
+  try {
+    const { wanted } = await call<{ wanted?: Record<string, number> }>(
+      "GET",
+      `/api/v1/binders/${encodeURIComponent(binderId)}/wanted`,
+    );
+    return wanted ?? {};
+  } catch {
+    return {};
+  }
+};
+
+/**
  * A binder opened from a night's "Binders they're bringing": through
  * /api/v1/binders/<id>?night=, the one door a private binder its owner
  * showed to that night opens through, and only for a signed-in player

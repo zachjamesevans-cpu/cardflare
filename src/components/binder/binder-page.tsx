@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   useTransition,
   type ReactNode,
 } from "react";
@@ -13,7 +14,18 @@ import { createPortal } from "react-dom";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Pencil, Share2 } from "lucide-react";
+import {
+  ArrowLeftRight,
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Flame,
+  Hand,
+  Lock,
+  Pencil,
+  Share2,
+  XIcon,
+} from "lucide-react";
 
 import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import {
@@ -55,6 +67,12 @@ import {
   removeBinderCardAction,
 } from "@/lib/binder/actions";
 import { nightSharedLine } from "@/lib/events/night-binder-rules";
+import {
+  MOVE_HINT,
+  MOVE_HINT_KEY,
+  binderStatusLabel,
+  wantedNearbyLine,
+} from "@/lib/binder/binder-status";
 import type { Binder, BinderCard, BinderSettingsPatch } from "@/lib/binder/binder";
 import type { BinderCoverId } from "@/lib/binder/covers";
 import {
@@ -189,10 +207,8 @@ const settingsOf = (binder: Binder): Settings => ({
 });
 
 /**
- * The line under the title: what this binder's cards mean. Up for
- * trade, the owner reads what that gets them and a visitor what they
- * are looking at; private, the owner reads that it is theirs alone.
- * The same three sentences on the app's Binder screen.
+ * The line under the pill, when there is one: only the night-shared
+ * line a visitor needs. The same on the app's Binder screen.
  */
 function binderLine(
   forTrade: boolean,
@@ -200,17 +216,12 @@ function binderLine(
   ownerName: string,
   isPublic = false,
 ): string | null {
-  if (forTrade) {
-    return yours
-      ? "Up for trade. Somebody nearby hunting one of these hears about it."
-      : `Cards ${ownerName} will trade.`;
-  }
-  /* Shown on the profile but not up for trade: a binder to look at. */
-  if (isPublic)
-    return yours ? "On your profile. Not up for trade." : `${ownerName}'s binder.`;
-  /* A visitor sees a private binder only when its owner brought it to
-     a night and showed it to that night's attendees. */
-  return yours ? "Private. Only you can open it." : nightSharedLine(ownerName);
+  /* The owner has none: the pill says which way the switch is and
+     opens the sheet that explains it. A visitor sees a private binder
+     only when its owner brought it to a night and showed it to that
+     night's attendees, and is told so. */
+  if (yours || forTrade || isPublic) return null;
+  return nightSharedLine(ownerName);
 }
 
 export function BinderView({
@@ -224,6 +235,7 @@ export function BinderView({
   scanRights = null,
   pageQueues = null,
   openScan = null,
+  wanted = {},
 }: {
   binder: Binder;
   imagesEnabled: boolean;
@@ -247,6 +259,8 @@ export function BinderView({
   pageQueues?: PageQueues | null;
   /** A queue to check as the page opens: the notice's `?scan=<batchId>`. */
   openScan?: string | null;
+  /** Your binder up for trade: card id to how many people nearby want it. */
+  wanted?: Readonly<Record<string, number>>;
 }) {
   const router = useRouter();
   const [settings, setSettings] = useState(() => settingsOf(binder));
@@ -344,7 +358,23 @@ export function BinderView({
   const drawn =
     dragging && landing !== null ? placeInPockets(list, dragging, landing) : list;
   const pockets = pageOf(drawn, page);
+  /* The page's first empty pocket says "+ Add"; the rest stay quiet. */
+  const firstEmpty = pockets.findIndex((entry) => !entry);
   const held = dragging ? cards.find((card) => card.entryId === dragging) : undefined;
+
+  /* The move tip: shown until the owner has held a card once, then
+     never again on this device. Hidden on the server, so it never
+     flashes in for somebody who has already seen it. */
+  const hintDone = useSyncExternalStore(onHintChange, readHintDone, () => true);
+  useEffect(() => {
+    if (dragging && !hintDone) finishHint();
+  }, [dragging, hintDone]);
+
+  /* The cards somebody nearby wants, for the line and the pockets' strip. */
+  const wantedIds = new Set(
+    Object.keys(wanted).filter((cardId) => (wanted[cardId] ?? 0) > 0),
+  );
+  const wantedCount = cards.filter((card) => wantedIds.has(card.cardId)).length;
   const slide = useSlide(
     grid,
     `${page}:${pockets.map((card) => card?.entryId ?? "").join(",")}`,
@@ -508,16 +538,31 @@ export function BinderView({
           its own round button, and for the owner the pencil that opens
           the settings sheet beside it. */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-2">
           {title && (
             <h2 className="truncate text-lg font-extrabold text-text-primary">
               {title}
             </h2>
           )}
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill
+              label={binderStatusLabel(settings.forTrade, settings.isPublic)}
+              on={settings.forTrade}
+              onClick={binder.yours ? () => setSettingsOpen(true) : undefined}
+            />
+            <span className="text-sm text-text-muted tabular-nums">{countLine}</span>
+          </div>
           {line && <p className="text-sm text-text-secondary">{line}</p>}
-          <p className="text-xs text-text-muted tabular-nums">
-            {countLine}
-          </p>
+          {binder.yours && settings.forTrade && wantedCount > 0 && (
+            <Link
+              href="/feed/wanted"
+              className="inline-flex items-center gap-1.5 self-start text-sm font-bold text-accent hover:underline focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            >
+              <Flame className="size-3.5" aria-hidden="true" />
+              {wantedNearbyLine(wantedCount)}
+              <ChevronRight className="size-3.5" aria-hidden="true" />
+            </Link>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {(binder.yours || shareable) && (
@@ -656,11 +701,20 @@ export function BinderView({
                       )}
                       ask={askFor(card)}
                       thumbClassName="w-full"
-                      thumb={<PocketTile card={card} imagesEnabled={imagesEnabled} />}
+                      thumb={
+                        <PocketTile
+                          card={card}
+                          imagesEnabled={imagesEnabled}
+                          wanted={settings.forTrade && wantedIds.has(card.cardId)}
+                        />
+                      }
                     />
                   </div>
                 ) : binder.yours ? (
-                  <AddPocket onClick={() => setAdding({ pocket: slot })} />
+                  <AddPocket
+                    onClick={() => setAdding({ pocket: slot })}
+                    quiet={index !== firstEmpty}
+                  />
                 ) : (
                   <EmptyPocket />
                 )}
@@ -745,10 +799,8 @@ export function BinderView({
         </div>
       )}
 
-      {binder.yours && cards.length > 0 && (
-        <p className="text-center text-xs text-text-muted">
-          Hold a card to move it, or drop it on Remove.
-        </p>
+      {binder.yours && cards.length > 0 && !hintDone && (
+        <MoveTip onClose={finishHint} />
       )}
 
       {binder.count === 0 && (
@@ -1016,4 +1068,104 @@ function Chip({
       )}
     </button>
   );
+}
+
+/**
+ * Which way the switch is, as a pill: lime when up for trade, quiet
+ * otherwise. The owner's opens the settings sheet, where the switch
+ * and its explanation live; a visitor's is a label. The app's
+ * StatusPill in screens/binder.tsx is the same pill.
+ */
+function StatusPill({
+  label,
+  on,
+  onClick,
+}: {
+  label: string;
+  on: boolean;
+  onClick?: () => void;
+}) {
+  const Icon = on ? ArrowLeftRight : Lock;
+  const className = cn(
+    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold",
+    on
+      ? "bg-accent text-accent-contrast"
+      : "border border-border bg-elevated text-text-secondary",
+  );
+  const body = (
+    <>
+      <Icon className="size-3" strokeWidth={2.5} aria-hidden="true" />
+      {label}
+      {onClick && <ChevronDown className="size-3 opacity-70" aria-hidden="true" />}
+    </>
+  );
+  if (!onClick) return <span className={className}>{body}</span>;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${label}. Binder settings`}
+      className={cn(
+        className,
+        "cursor-pointer focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-canvas focus-visible:outline-none",
+      )}
+    >
+      {body}
+    </button>
+  );
+}
+
+/**
+ * The move tip, until the owner has held a card once: a quiet bar with
+ * a close, not a sentence that sits under the page forever.
+ */
+function MoveTip({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex items-center gap-2 rounded-[var(--radius-control)] border border-border bg-surface px-3 py-2">
+      <Hand className="size-4 shrink-0 text-accent" aria-hidden="true" />
+      <p className="flex-1 text-xs text-text-secondary">{MOVE_HINT}</p>
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Hide tip"
+        className="cursor-pointer rounded-full p-1 text-text-muted hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+      >
+        <XIcon className="size-4" aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+/* The move tip's memory: this device's storage, with an in-memory
+   fallback so a browser that refuses storage still hides it once
+   closed. An event tells every open binder at once. */
+const HINT_EVENT = "cardflare:binder-move-hint";
+let hintClosedHere = false;
+
+function readHintDone(): boolean {
+  if (hintClosedHere) return true;
+  try {
+    return window.localStorage.getItem(MOVE_HINT_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function onHintChange(changed: () => void): () => void {
+  window.addEventListener(HINT_EVENT, changed);
+  window.addEventListener("storage", changed);
+  return () => {
+    window.removeEventListener(HINT_EVENT, changed);
+    window.removeEventListener("storage", changed);
+  };
+}
+
+function finishHint(): void {
+  hintClosedHere = true;
+  try {
+    window.localStorage.setItem(MOVE_HINT_KEY, "1");
+  } catch {
+    /* Private mode: the in-memory flag carries this visit. */
+  }
+  window.dispatchEvent(new Event(HINT_EVENT));
 }

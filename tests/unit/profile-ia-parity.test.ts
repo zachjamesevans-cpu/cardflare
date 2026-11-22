@@ -391,16 +391,20 @@ describe("the binder page, by id", () => {
     expect(app.stack).toContain("<HuntsScreen");
   });
 
-  it("says what the binder's cards mean, under the title", () => {
-    /* The line follows the switch: up for trade, or private. */
+  it("says which way the switch is as a pill, not a sentence", () => {
+    /* 2026-11-22, the founder: the owner's always-present line under
+       the title was not contextual. A pill says Up for trade, On
+       profile or Private, and the owner's opens the settings sheet. */
     const own = "Up for trade. Somebody nearby hunting one of these hears about it.";
     const ownPrivate = "Private. Only you can open it.";
-    expect(web.view).toContain(own);
-    expect(web.view).toContain(ownPrivate);
-    expect(web.view).toContain("`Cards ${ownerName} will trade.`");
-    expect(app.binder).toContain(own);
-    expect(app.binder).toContain(ownPrivate);
-    expect(app.binder).toContain("will trade.");
+    for (const page of [web.view, app.binder]) {
+      expect(page).not.toContain(own);
+      expect(page).not.toContain(ownPrivate);
+      expect(page).toContain("<StatusPill");
+      expect(page).toContain("binderStatusLabel(");
+    }
+    expect(web.view).toContain("onClick={binder.yours ? () => setSettingsOpen(true) : undefined}");
+    expect(app.binder).toContain("onPress={yours ? () => setSettingsOpen(true) : undefined}");
   });
 
   it("names and deletes every binder", () => {

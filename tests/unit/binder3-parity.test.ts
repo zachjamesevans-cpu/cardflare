@@ -42,6 +42,10 @@ const app = {
   settingsSheet: read("mobile/src/binder-settings-sheet.tsx"),
 };
 
+/* The binder page's words, shared by both platforms (binder-status.ts). */
+const webStatus = read("src/lib/binder/binder-status.ts");
+const appStatus = read("mobile/src/binder-status.ts");
+
 /* The page as a whole, per platform. */
 const webPage = web.view + web.settings;
 const appPage = app.binder + app.settingsSheet;
@@ -68,7 +72,7 @@ describe("the binder page without its buttons", () => {
         "Binder settings",
         "Remove from binder",
         "Remove",
-        HINT,
+        "{MOVE_HINT}",
         EMPTY,
       ]) {
         expect(page, `${name}: ${word}`).toContain(word);
@@ -146,14 +150,17 @@ describe("removing a card is a drop", () => {
     expect(app.binder).toContain("onLayout");
   });
 
-  it("tells the owner how, under the page, once there is a card", () => {
+  it("tells the owner how, once, until they have held a card", () => {
+    /* 2026-11-22: the hint was always there. Now it is a tip with a
+       close, gone for good the first time a card is held. */
     expect(web.view).toMatch(
-      /cards\.length > 0 && \(\s*<p className="text-center text-xs text-text-muted">\s*Hold a card to move it, or drop it on Remove\.\s*<\/p>/,
+      /binder\.yours && cards\.length > 0 && !hintDone && \(\s*<MoveTip onClose=\{finishHint\} \/>/,
     );
-    expect(app.binder).toContain(HINT);
-    expect(app.binder).toMatch(
-      /colors\.textMuted[\s\S]{0,120}fontSize: 12|fontSize: 12[\s\S]{0,120}colors\.textMuted/,
-    );
+    expect(web.view).toContain("if (dragging && !hintDone) finishHint();");
+    expect(app.binder).toContain("if (!holding || hintDone) return;");
+    for (const status of [webStatus, appStatus]) {
+      expect(status).toContain(`export const MOVE_HINT = "${HINT}";`);
+    }
   });
 });
 

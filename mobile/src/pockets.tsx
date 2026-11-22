@@ -231,11 +231,19 @@ export function AddPocket({
   width,
   height,
   targeted = false,
+  quiet = false,
   onPress,
 }: {
   width: number;
   height: number;
   targeted?: boolean;
+  /**
+   * Not the page's first empty pocket: a faint outline and a small
+   * muted "+", still a door to exactly this pocket. A page of nine
+   * loud "+ Add" boxes read as a form, not a binder; the first one
+   * says it, the rest stay out of the way.
+   */
+  quiet?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -246,10 +254,14 @@ export function AddPocket({
         width,
         height,
         borderRadius: 5,
-        backgroundColor: colors.canvas,
-        borderWidth: targeted ? POCKET_RING : 1,
+        backgroundColor: quiet && !targeted ? "transparent" : colors.canvas,
+        borderWidth: targeted ? POCKET_RING + 1 : 1,
         borderStyle: targeted ? "solid" : "dashed",
-        borderColor: targeted ? colors.accent : colors.borderStrong,
+        borderColor: targeted
+          ? colors.accent
+          : quiet
+            ? "rgba(255,255,255,0.10)"
+            : colors.borderStrong,
         alignItems: "center",
         justifyContent: "center",
         gap: 2,
@@ -257,17 +269,20 @@ export function AddPocket({
     >
       <Text
         style={{
-          color: colors.accent,
-          fontSize: Math.min(28, Math.round(width / 3)),
+          color: quiet ? colors.textMuted : colors.accent,
+          opacity: quiet ? 0.6 : 1,
+          fontSize: quiet ? 18 : Math.min(28, Math.round(width / 3)),
           fontWeight: "300",
-          lineHeight: Math.min(30, Math.round(width / 3) + 2),
+          lineHeight: quiet ? 20 : Math.min(30, Math.round(width / 3) + 2),
         }}
       >
         +
       </Text>
-      <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
-        Add
-      </Text>
+      {quiet ? null : (
+        <Text maxFontSizeMultiplier={1.3} style={{ color: colors.textSecondary, fontSize: 11, fontWeight: "600" }}>
+          Add
+        </Text>
+      )}
     </Tap>
   );
 }

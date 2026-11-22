@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { HeaderButton } from "../header";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
@@ -47,6 +48,7 @@ import {
   deleteBinder,
   friendlyError,
   getBinder,
+  getBinderWanted,
   getBroughtBinder,
   getPageQueues,
   type OfferItem,
@@ -65,6 +67,13 @@ import { BINDER_COVERS, BINDER_LAYOUT } from "../binder-covers";
 import { BINDER_OFFER_COPY, binderOfferSentLine } from "../binder-offer-copy";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { nightSharedLine } from "../night-binder-copy";
+import {
+  MOVE_HINT,
+  MOVE_HINT_KEY,
+  WANTED_STRIP,
+  binderStatusLabel,
+  wantedNearbyLine,
+} from "../binder-status";
 import { binderShareUrl } from "../config";
 import { inYourOfferLine } from "../offer-copy";
 import { OfferReviewSheet } from "../offer-review-sheet";
@@ -263,6 +272,12 @@ export function BinderScreen({
   const [addAt, setAddAt] = useState<number | null>(null);
   /* The settings sheet, behind the pencil in the header. */
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /* Your binder up for trade: card id to how many people nearby want
+     it. Read after the binder, so opening one never waits on it. */
+  const [wanted, setWanted] = useState<Record<string, number>>({});
+  /* The move tip shows until the owner has held a card once; null
+     while the phone is still being asked. */
+  const [hintDone, setHintDone] = useState<boolean | null>(null);
   /* The delete confirm, over the page. */
   const [deleting, setDeleting] = useState(false);
   /* The page frame's width, as laid out; nothing is drawn before it is known. */
@@ -339,6 +354,11 @@ export function BinderScreen({
       setConfirmed(cacheKey);
       setBinder(fresh);
       setError(null);
+      if (fresh.yours && fresh.forTrade) {
+        void getBinderWanted(fresh.id).then(setWanted);
+      } else {
+        setWanted({});
+      }
       const viewer = await cachedPlayerId();
       if (viewer) void writeCache("binder", viewer, fresh, cacheKey);
     } catch (caught) {
@@ -599,6 +619,37 @@ export function BinderScreen({
     },
   });
 
+  /* The move tip: asked of the phone once, and done for good the first
+     time the owner holds a card, because then they know. */
+  useEffect(() => {
+    let live = true;
+    AsyncStorage.getItem(MOVE_HINT_KEY)
+      .then((value) => {
+        if (live) setHintDone(value === "1");
+      })
+      .catch(() => {
+        if (live) setHintDone(false);
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const holding = drag.held !== null;
+  useEffect(() => {
+    if (!holding || hintDone) return;
+    setHintDone(true);
+    AsyncStorage.setItem(MOVE_HINT_KEY, "1").catch(() => {});
+  }, [holding, hintDone]);
+
+  /* The cards somebody nearby wants, for the pockets' strip. */
+  const wantedIds = useMemo(
+    () => new Set(Object.keys(wanted).filter((cardId) => (wanted[cardId] ?? 0) > 0)),
+    [wanted],
+  );
+  const wantedCount = (binder?.cards ?? []).filter((card) =>
+    wantedIds.has(card.cardId),
+  ).length;
+
   /*
    * What the pages show: the cards where they are, or, while a held
    * card hovers a pocket, where they would be if it dropped there. The
@@ -808,13 +859,47 @@ export function BinderScreen({
             the title, and Share in its own round button beside it. A
             visitor is never shown a private one. */}
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
-          <View style={{ flex: 1, minWidth: 0, gap: spacing(1) }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
-              {binderLine(binder)}
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-              {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
-            </Text>
+          <View style={{ flex: 1, minWidth: 0, gap: spacing(2) }}>
+            <View
+              style={{
+                flexDirection: "row",
+                flexWrap: "wrap",
+                alignItems: "center",
+                gap: spacing(2),
+              }}
+            >
+              <StatusPill
+                label={binderStatusLabel(binder.forTrade, binder.isPublic)}
+                on={binder.forTrade}
+                onPress={yours ? () => setSettingsOpen(true) : undefined}
+              />
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
+              </Text>
+            </View>
+            {/* Only when it says something the pill does not: why a
+                visitor can see a private binder (a night it was
+                brought to), and whether anybody nearby wants a card. */}
+            {binderLine(binder) ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 13, lineHeight: 18 }}>
+                {binderLine(binder)}
+              </Text>
+            ) : null}
+            {yours && wantedCount > 0 ? (
+              <Tap
+                onPress={() => navigation.navigate("WantedNearYou")}
+                accessibilityRole="link"
+                accessibilityLabel={wantedNearbyLine(wantedCount)}
+                hitSlop={6}
+                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+              >
+                <Ionicons name="flame" size={14} color={colors.accent} />
+                <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>
+                  {wantedNearbyLine(wantedCount)}
+                </Text>
+                <Ionicons name="chevron-forward" size={13} color={colors.accent} />
+              </Tap>
+            ) : null}
           </View>
           <View ref={tourShare} collapsable={false}>
             <ShareButton onPress={share} />
@@ -952,6 +1037,7 @@ export function BinderScreen({
                       landing={holds && drag.target !== null && !drag.overRemove}
                       onAdd={onAdd}
                       offer={offer}
+                      wanted={wantedIds}
                     />
                   );
                 })}
@@ -1036,11 +1122,14 @@ export function BinderScreen({
           <View style={{ gap: spacing(3) }}>
             {binder.count === 0 ? (
               <Muted>Cards you would trade. Add the ones you carry.</Muted>
-            ) : (
-              <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-                Hold a card to move it, or drop it on Remove.
-              </Text>
-            )}
+            ) : hintDone === false ? (
+              <MoveTip
+                onClose={() => {
+                  setHintDone(true);
+                  AsyncStorage.setItem(MOVE_HINT_KEY, "1").catch(() => {});
+                }}
+              />
+            ) : null}
             {notice ? (
               <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                 {notice}
@@ -1214,24 +1303,111 @@ function binderTitle(binder: Binder): string {
   return binder.yours ? binder.name : `${binder.ownerName}'s ${binder.name}`;
 }
 
-/** The line under the title: what Up for trade means for this one. */
-function binderLine(binder: Binder): string {
-  if (binder.forTrade) {
-    return binder.yours
-      ? "Up for trade. Somebody nearby hunting one of these hears about it."
-      : `Cards ${binder.ownerName} will trade.`;
-  }
-  /* Shown on the profile but not up for trade: a binder to look at. */
-  if (binder.isPublic) {
-    return binder.yours
-      ? "On your profile. Not up for trade."
-      : `${binder.ownerName}'s binder.`;
-  }
-  /* A visitor sees a private binder only when its owner brought it to
-     a night and showed it to that night's attendees. */
-  return binder.yours
-    ? "Private. Only you can open it."
-    : nightSharedLine(binder.ownerName);
+/**
+ * The line under the pill, when there is one. The owner has none: the
+ * pill says which way the switch is and opens the sheet that explains
+ * it. A visitor sees a private binder only when its owner brought it
+ * to a night and showed it to that night's attendees, and is told so;
+ * the title already says whose binder it is.
+ */
+function binderLine(binder: Binder): string | null {
+  if (binder.yours || binder.forTrade || binder.isPublic) return null;
+  return nightSharedLine(binder.ownerName);
+}
+
+/**
+ * Which way the switch is, as a pill: lime when up for trade, quiet
+ * otherwise. The owner's opens the settings sheet, where the switch
+ * and its explanation live; a visitor's is a label.
+ */
+function StatusPill({
+  label,
+  on,
+  onPress,
+}: {
+  label: string;
+  on: boolean;
+  onPress?: () => void;
+}) {
+  const body = (
+    <>
+      <Ionicons
+        name={on ? "swap-horizontal" : "lock-closed"}
+        size={12}
+        color={on ? colors.accentContrast : colors.textSecondary}
+      />
+      <Text
+        maxFontSizeMultiplier={1.3}
+        style={{
+          color: on ? colors.accentContrast : colors.textSecondary,
+          fontSize: 12,
+          fontWeight: "700",
+        }}
+      >
+        {label}
+      </Text>
+      {onPress ? (
+        <Ionicons
+          name="chevron-down"
+          size={11}
+          color={on ? colors.accentContrast : colors.textMuted}
+        />
+      ) : null}
+    </>
+  );
+  const style = {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: spacing(1),
+    paddingHorizontal: spacing(2.5),
+    paddingVertical: spacing(1),
+    borderRadius: 999,
+    borderWidth: on ? 0 : 1,
+    borderColor: colors.border,
+    backgroundColor: on ? colors.accent : colors.elevated,
+  };
+  if (!onPress) return <View style={style}>{body}</View>;
+  return (
+    <Tap
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}. Binder settings`}
+      style={style}
+    >
+      {body}
+    </Tap>
+  );
+}
+
+/**
+ * The move tip, until the owner has held a card once: a quiet bar with
+ * a close, not a sentence that sits under the page forever.
+ */
+function MoveTip({ onClose }: { onClose: () => void }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(2),
+        paddingHorizontal: spacing(3),
+        paddingVertical: spacing(2),
+        borderRadius: radius.control,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
+      }}
+    >
+      <Ionicons name="hand-left-outline" size={15} color={colors.accent} />
+      <Text style={{ flex: 1, color: colors.textSecondary, fontSize: 12 }}>
+        {MOVE_HINT}
+      </Text>
+      <Tap onPress={onClose} hitSlop={10} accessibilityLabel="Hide tip">
+        <Ionicons name="close" size={16} color={colors.textMuted} />
+      </Tap>
+    </View>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -1612,6 +1788,7 @@ const BinderPage = memo(function BinderPage({
   landing,
   onAdd,
   offer,
+  wanted,
 }: {
   page: number;
   geometry: Geometry;
@@ -1629,8 +1806,12 @@ const BinderPage = memo(function BinderPage({
   onAdd: (pocket: number) => void;
   /** The offer being built, on somebody's trade binder; null otherwise. */
   offer: BinderOffer | null;
+  /** Card ids somebody nearby wants: those pockets wear the strip. */
+  wanted: ReadonlySet<string>;
 }) {
   const { pocketWidth, pocketHeight } = geometry;
+  /* The page's first empty pocket says "+ Add"; the rest stay quiet. */
+  const firstEmpty = slots.findIndex((card) => !card);
 
   return (
     <PageFrame geometry={geometry}>
@@ -1643,6 +1824,7 @@ const BinderPage = memo(function BinderPage({
                 <AddPocket
                   width={pocketWidth}
                   height={pocketHeight}
+                  quiet={index !== firstEmpty}
                   onPress={() => onAdd(pocket)}
                 />
               ) : (
@@ -1664,6 +1846,7 @@ const BinderPage = memo(function BinderPage({
               placeholder={placeholder}
               targeted={placeholder && landing}
               offer={offer}
+              wanted={wanted.has(card.cardId)}
             />
           </Animated.View>
         );
@@ -1692,11 +1875,13 @@ function samePage(
     landing: boolean;
     onAdd: (pocket: number) => void;
     offer: BinderOffer | null;
+    wanted: ReadonlySet<string>;
   },
   after: typeof before,
 ): boolean {
   return (
     before.page === after.page &&
+    before.wanted === after.wanted &&
     before.geometry === after.geometry &&
     before.shelf === after.shelf &&
     before.shelfAt === after.shelfAt &&
@@ -1732,6 +1917,7 @@ const BinderPocket = memo(function BinderPocket({
   placeholder,
   targeted,
   offer,
+  wanted,
 }: {
   card: BinderCard;
   /** This pocket's place on its page. */
@@ -1745,8 +1931,13 @@ const BinderPocket = memo(function BinderPocket({
   /** The held card will land here: the accent ring. */
   targeted: boolean;
   offer: BinderOffer | null;
+  /** Somebody nearby wants it: the owner's strip at the foot. */
+  wanted: boolean;
 }) {
   const { pocketWidth: width } = geometry;
+  /* The strip at the foot: the visitor's ON YOUR HUNT, or the owner's
+     WANTED NEARBY. Never both; the owner has no hunts on their own. */
+  const strip = card.onYourHunt ? "ON YOUR HUNT" : wanted ? WANTED_STRIP : null;
 
   return (
     <Pocket
@@ -1757,7 +1948,7 @@ const BinderPocket = memo(function BinderPocket({
       corner={
         <>
           <Copies quantity={card.quantity} />
-          {card.onYourHunt ? (
+          {strip ? (
             <View
               pointerEvents="none"
               style={{
@@ -1779,7 +1970,7 @@ const BinderPocket = memo(function BinderPocket({
                   letterSpacing: 1,
                 }}
               >
-                ON YOUR HUNT
+                {strip}
               </Text>
             </View>
           ) : null}
@@ -1818,11 +2009,13 @@ function samePocket(
     placeholder: boolean;
     targeted: boolean;
     offer: BinderOffer | null;
+    wanted: boolean;
   },
   after: typeof before,
 ): boolean {
   return (
     sameShallow(before.card, after.card) &&
+    before.wanted === after.wanted &&
     before.index === after.index &&
     before.geometry === after.geometry &&
     before.shelf === after.shelf &&

@@ -227,12 +227,15 @@ describe("the binder page", () => {
     ] as const) {
       expect(page, name).toContain("Up for trade");
       expect(page, name).toContain(FOR_TRADE_LINE);
-      expect(page, name).toContain(OWN_FOR_TRADE);
-      expect(page, name).toContain(OWN_PRIVATE);
-      expect(page, name).toContain("will trade.");
+      /* 2026-11-22, the founder: "i dont like how there's just this
+         small text above and below that isnt contextual." The owner's
+         sentence under the title is a status pill now; its meaning is
+         FOR_TRADE_LINE, in the settings sheet the pill opens. */
+      expect(page, name).not.toContain(OWN_FOR_TRADE);
+      expect(page, name).not.toContain(OWN_PRIVATE);
+      expect(page, name).toContain("binderStatusLabel(");
       expect(page, name).not.toContain("Anyone on cardflare can open it");
     }
-    expect(web.view).toContain("`Cards ${ownerName} will trade.`");
     expect(web.settings).toContain("<PublicSwitch");
     expect(web.settings).toContain("<ForTradeSwitch");
     expect(appPage).toContain("Show on your profile");

@@ -224,11 +224,12 @@ describe("hold and drag on the phone, in one touch", () => {
     expect(page).toContain("presence.value = withTiming(0, DROP");
     expect(page).toContain("opacity: presence.value");
     expect(page).toContain("removeBinderCard(entryId, writeId)");
-    expect(page).toContain("Hold a card to move it, or drop it on Remove.");
     expect(page).toContain("Cards you would trade. Add the ones you carry.");
+    /* The move tip shows until the owner has held a card once. */
     expect(page).toMatch(
-      /binder\.count === 0 \? \(\s*<Muted>Cards you would trade\. Add the ones you carry\.<\/Muted>\s*\) : \(\s*<Text style=\{\{ color: colors\.textMuted, fontSize: 12 \}\}>\s*Hold a card to move it, or drop it on Remove\./,
+      /binder\.count === 0 \? \(\s*<Muted>Cards you would trade\. Add the ones you carry\.<\/Muted>\s*\) : hintDone === false \? \(\s*<MoveTip/,
     );
+    expect(page).toContain("{MOVE_HINT}");
   });
 
   it("keeps the pocket a plain view: the slide is the wrapper's layout", () => {
@@ -329,11 +330,9 @@ describe("the binder's model in the app", () => {
   });
 
   it("says what the switch means under the title, and deletes any binder", () => {
-    expect(page).toContain(
-      "Up for trade. Somebody nearby hunting one of these hears about it.",
-    );
-    expect(page).toContain("`Cards ${binder.ownerName} will trade.`");
-    expect(page).toContain("Private. Only you can open it.");
+    /* The owner's sentence is the status pill now (2026-11-22). */
+    expect(page).toContain("<StatusPill");
+    expect(page).toContain("nightSharedLine(binder.ownerName)");
     expect(page).toContain("Delete binder");
     expect(page).toContain("deleteBinder(");
     expect(page).not.toContain('kind === "custom"');

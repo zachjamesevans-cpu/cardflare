@@ -462,6 +462,37 @@ export async function wantedNearYou(
   };
 }
 
+/**
+ * How many people nearby want each of the holder's tradeable cards, by
+ * card id: what a binder up for trade shows its owner as "3 of these
+ * are wanted nearby", with those pockets ringed. The same matches the
+ * Feed's "Wanted near you" reads, so the two never disagree, and empty
+ * the moment the holder opts out or has no ZIP.
+ */
+export async function wantedCountsForHolder(
+  holderId: string,
+): Promise<Record<string, number>> {
+  const matches = await nearbyMatchesForHolder(holderId);
+  const people = new Map<string, Set<string>>();
+  for (const match of matches) {
+    const who = people.get(match.card.cardId) ?? new Set<string>();
+    who.add(match.wanter.playerId);
+    people.set(match.card.cardId, who);
+  }
+  return Object.fromEntries([...people].map(([cardId, who]) => [cardId, who.size]));
+}
+
+/** Only the cards a binder holds: what its "wanted nearby" line counts. */
+export function wantedInBinder(
+  counts: Record<string, number>,
+  cardIds: readonly string[],
+): Record<string, number> {
+  const held = new Set(cardIds);
+  return Object.fromEntries(
+    Object.entries(counts).filter(([cardId, people]) => held.has(cardId) && people > 0),
+  );
+}
+
 /** Tells the holder about every match on their list that has not been told yet. */
 async function tellHolder(holderId: string, onlyCardId?: string): Promise<void> {
   const matches = await nearbyMatchesForHolder(holderId, onlyCardId);

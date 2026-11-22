@@ -91,7 +91,7 @@ describe("the binder page", () => {
         "ON YOUR HUNT",
         "Cards you would trade. Add the ones you carry.",
         "Nothing to trade yet.",
-        "Only you can open it",
+        "binderStatusLabel(",
         "On your hunts",
       ]) {
         expect(page, `${name}: ${word}`).toContain(word);

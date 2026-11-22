@@ -8,6 +8,7 @@ import { BackLink } from "@/components/ui/back-link";
 import { areasForUser } from "@/lib/auth/areas";
 import { getViewer } from "@/lib/auth/session";
 import { readBinder } from "@/lib/binder/binder";
+import { wantedCountsForHolder, wantedInBinder } from "@/lib/nearby/matching";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { pagesLeftToday, queuesFor } from "@/lib/cards/page-jobs";
 import { scanRights } from "@/lib/cards/scan";
@@ -68,14 +69,22 @@ export default async function OwnBinderPage({
   if (await needsSetup(playerId)) redirect("/welcome");
 
   const who = { playerId, userId: viewer.user.id };
-  const [binder, games, areas, rights, queues] = await Promise.all([
+  const [binder, games, areas, rights, queues, wantedCounts] = await Promise.all([
     readBinder(playerId, playerId, binderId),
     listPlayerGames(playerId),
     areasForUser(viewer.user.id, viewer.kind === "admin"),
     scanRights({ playerId, userId: viewer.user.id }),
     queuesFor(who, binderId),
+    /* Which cards somebody nearby wants: never worth failing the page. */
+    wantedCountsForHolder(playerId).catch(() => ({}) as Record<string, number>),
   ]);
   if (!binder) notFound();
+  const wanted = binder.forTrade
+    ? wantedInBinder(
+        wantedCounts,
+        binder.cards.map((card) => card.cardId),
+      )
+    : {};
   /* Only somebody who can scan has pages to count. */
   const left = rights.pages === "on" ? await pagesLeftToday(who) : 0;
 
@@ -102,6 +111,7 @@ export default async function OwnBinderPage({
             scanRights={rights}
             pageQueues={{ queues, left }}
             openScan={openScan}
+            wanted={wanted}
           />
 
           <TabBarSpacer />
