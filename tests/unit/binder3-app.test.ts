@@ -72,8 +72,11 @@ describe("the gesture handler", () => {
     expect(src.root).toContain(
       'import { GestureHandlerRootView } from "react-native-gesture-handler";',
     );
+    /* The safe-area provider sits just inside it: the welcome gate
+       renders before the navigator exists and its splash reads the
+       insets (2026-11-22, a fresh install crashed without it). */
     expect(src.root).toMatch(
-      /export default function App\(\) \{\s*return \(\s*<GestureHandlerRootView style=\{\{ flex: 1 \}\}>\s*<AppGates \/>\s*<\/GestureHandlerRootView>/,
+      /export default function App\(\) \{\s*return \(\s*<GestureHandlerRootView style=\{\{ flex: 1 \}\}>[\s\S]*?<SafeAreaProvider>\s*<AppGates \/>\s*<\/SafeAreaProvider>\s*<\/GestureHandlerRootView>/,
     );
   });
 });
