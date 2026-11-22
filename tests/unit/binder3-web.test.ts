@@ -195,10 +195,10 @@ describe("hold and move, in one gesture", () => {
     expect(view).toContain("ref={card ? slide(card.entryId) : undefined}");
   });
 
-  it("turns the page when held at an edge or over an arrow", () => {
+  it("turns the page when held at an edge (the arrows are gone)", () => {
     expect(drag).toContain("export const TURN_MS = 600;");
     expect(drag).toContain("latest.current.onTurn(side);");
-    expect(pockets).toContain("data-drop={side}");
+    expect(pockets).not.toContain("data-drop={side}");
     expect(view).toContain(
       'canTurn: (side) => (side === "prev" ? page > 0 : page < pages - 1),',
     );

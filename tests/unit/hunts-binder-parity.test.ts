@@ -282,13 +282,11 @@ describe("the hunt page: the open binder", () => {
     expect(web.page).not.toContain("Back to your hunts");
   });
 
-  it("draws 3x3 pockets on the binder-page background with arrows and dots", () => {
+  it("draws 3x3 pockets on the binder-page background with dots, no arrows", () => {
     expect(web.binder).toContain("cfa-bg-binder-page");
     expect(web.binder).toContain("grid-cols-3");
     expect(web.binder).toContain("POCKETS_PER_PAGE");
-    expect(web.binder).toContain("<PageArrow");
-    expect(web.binder).toContain('side="prev"');
-    expect(web.binder).toContain('side="next"');
+    expect(web.binder).not.toContain("<PageArrow");
     expect(web.binder).toContain("<PageDots");
     /* The progress is the ring in the header (2026-10-11), not a bar. */
     expect(web.binder).toContain(
@@ -405,7 +403,6 @@ describe("the pockets are shared with the binder", () => {
       "AddPocket",
       "EmptyPocket",
       "POCKETS_PER_PAGE",
-      "PageArrow",
       "PageDots",
       "PocketTile",
     ]) {
@@ -422,7 +419,6 @@ describe("the pockets are shared with the binder", () => {
       "export function PocketTile(",
       "export function EmptyPocket(",
       "export function AddPocket(",
-      "export function PageArrow(",
       "export function PageDots(",
     ]) {
       expect(web.pockets).toContain(name);

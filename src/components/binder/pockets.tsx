@@ -2,7 +2,6 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { isRenderableImageUrl } from "@/lib/cards/images";
@@ -169,49 +168,8 @@ export function AddPocket({
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Add a card"
-      className={look}
-    >
+    <button type="button" onClick={onClick} aria-label="Add a card" className={look}>
       {inside}
-    </button>
-  );
-}
-
-/**
- * The arrow over the page's middle: previous on the left, next on the
- * right. On the binder a card held over one turns the page.
- */
-export function PageArrow({
-  side,
-  disabled,
-  onClick,
-  ring = false,
-}: {
-  side: "prev" | "next";
-  disabled: boolean;
-  onClick: () => void;
-  /** Lit while a binder's card is held over it: hold on, the page turns. */
-  ring?: boolean;
-}) {
-  const Icon = side === "prev" ? ChevronLeft : ChevronRight;
-  return (
-    <button
-      type="button"
-      aria-label={side === "prev" ? "Previous page" : "Next page"}
-      disabled={disabled}
-      onClick={onClick}
-      /* Read by the binder's drag: a card held here turns the page. */
-      data-drop={side}
-      className={cn(
-        "absolute top-1/2 flex size-8 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-canvas/80 text-text-secondary transition-colors hover:text-text-primary disabled:cursor-default disabled:opacity-30",
-        side === "prev" ? "left-1" : "right-1",
-        ring && "ring-2 ring-accent",
-      )}
-    >
-      <Icon className="size-4" aria-hidden="true" />
     </button>
   );
 }
