@@ -9,6 +9,7 @@ import { conversationIdFor, pairThreadId } from "./pairs";
 import { MESSAGE_MAX_LENGTH } from "./shared";
 import { avatarSrc } from "@/lib/players/profile-image";
 import type { FlareMessageRow } from "@/lib/supabase/types";
+import { isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * Conversations between two accounts.
@@ -465,6 +466,9 @@ async function appendMessage(
     printingIds?: (string | null)[];
   },
 ): Promise<boolean> {
+  /* Every message passes here: slurs and explicit words are refused
+     (moderation/objectionable.ts), as a failed send. */
+  if (isObjectionable(body)) return false;
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
 

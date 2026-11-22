@@ -15,8 +15,6 @@
         "NSCameraUsageDescription": "cardflare uses the camera only to scan the QR code on a store's counter and to read the cards you add to a binder.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you, and to offer the room of the store you are standing in. Your exact position is never saved; only your approximate area (ZIP code) is kept, with posts you make.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
-        "NSLocationAlwaysUsageDescription": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
         "NSUserActivityTypes": ["INSendMessageIntent"]
       },
       "appleTeamId": "J2N92N3SMA",
@@ -47,25 +45,34 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "cardflare uses your photo library only when you choose a new profile picture."
+          "photosPermission": "cardflare uses your photo library only when you choose a new profile picture.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "cardflare uses the camera only to scan the QR code on a store's counter and to read the cards you add to a binder."
+          "cameraPermission": "cardflare uses the camera only to scan the QR code on a store's counter and to read the cards you add to a binder.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
           "locationWhenInUsePermission": "cardflare uses your location to show game stores and Flares near you. Only your approximate area (ZIP code) is saved, with posts you make.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false
         }
       ],
       "expo-notifications",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
       "expo-iap",
       [
         "expo-splash-screen",

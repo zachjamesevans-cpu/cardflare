@@ -41,20 +41,21 @@ describe("iOS permission strings", () => {
   it("explains location, in our own words", () => {
     expect(usesPlugin("expo-location")).toBe(true);
 
-    /* All three, because the plugin writes all three whatever we ask
-       for - and the one we do NOT set gets the plugin's own default,
-       "Allow $(PRODUCT_NAME) to access your location", which is a
-       sentence we did not write going in front of App Review. */
-    for (const key of [
-      "NSLocationWhenInUseUsageDescription",
-      "NSLocationAlwaysAndWhenInUseUsageDescription",
-      "NSLocationAlwaysUsageDescription",
-    ]) {
-      const why = ios.infoPlist[key];
-      expect(why, `${key} must be set`).toBeTypeOf("string");
-      expect(why as string).toContain("cardflare");
-      expect((why as string).length).toBeGreaterThan(40);
-    }
+    /* In use only: our sentence, never the plugin's default. */
+    const options = optionsFor("expo-location");
+    const why = options.locationWhenInUsePermission;
+    expect(why).toBeTypeOf("string");
+    expect(why as string).toContain("cardflare");
+    expect((why as string).length).toBeGreaterThan(40);
+
+    /* The two "Always" strings are not set at all (2026-11-22): the
+       plugin deletes a key given `false`, so App Review sees no
+       background-location purpose string for a feature the app does
+       not have, and no default "Allow $(PRODUCT_NAME)..." either. */
+    expect(options.locationAlwaysAndWhenInUsePermission).toBe(false);
+    expect(options.locationAlwaysPermission).toBe(false);
+    expect(ios.infoPlist.NSLocationAlwaysAndWhenInUseUsageDescription).toBeUndefined();
+    expect(ios.infoPlist.NSLocationAlwaysUsageDescription).toBeUndefined();
   });
 
   it("never asks to follow anybody around in the background", () => {
@@ -64,7 +65,15 @@ describe("iOS permission strings", () => {
     const options = optionsFor("expo-location");
     expect(options.isIosBackgroundLocationEnabled).toBe(false);
     expect(options.isAndroidBackgroundLocationEnabled).toBe(false);
-    expect(options.locationAlwaysAndWhenInUsePermission).toBeUndefined();
+    expect(options.locationAlwaysAndWhenInUsePermission).toBe(false);
+  });
+
+  it("asks for no microphone and no Face ID, which the app never uses", () => {
+    /* expo-camera, expo-image-picker and expo-secure-store each add a
+       generic purpose string by default; `false` deletes it. */
+    expect(optionsFor("expo-camera").microphonePermission).toBe(false);
+    expect(optionsFor("expo-image-picker").microphonePermission).toBe(false);
+    expect(optionsFor("expo-secure-store").faceIDPermission).toBe(false);
   });
 
   it("explains the camera too", () => {

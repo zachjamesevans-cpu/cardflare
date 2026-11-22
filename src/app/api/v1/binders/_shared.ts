@@ -2,12 +2,19 @@ import { z } from "zod";
 
 import { BINDER_NAME_MAX } from "@/lib/binder/binder";
 import { isBinderCover, type BinderCoverId } from "@/lib/binder/covers";
+import { OBJECTIONABLE_MESSAGE, isObjectionable } from "@/lib/moderation/objectionable";
 
 /** A binder's id. Anything else is a 404. */
 export const binderIdSchema = z.guid();
 
 export const settingsSchema = z.object({
-  name: z.string().trim().min(1).max(BINDER_NAME_MAX).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(BINDER_NAME_MAX)
+    .refine((value) => !isObjectionable(value), OBJECTIONABLE_MESSAGE)
+    .optional(),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
   /* Shown on your profile; for trade is always public. */
@@ -21,7 +28,12 @@ export const addCardSchema = z.object({
 });
 
 export const createSchema = z.object({
-  name: z.string().trim().min(1).max(BINDER_NAME_MAX),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(BINDER_NAME_MAX)
+    .refine((value) => !isObjectionable(value), OBJECTIONABLE_MESSAGE),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
   /* Shown on your profile; for trade is always public. */

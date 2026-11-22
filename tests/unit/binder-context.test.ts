@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import {
-  binderStatusLabel,
-  wantedNearbyLine,
-} from "@/lib/binder/binder-status";
+import { binderStatusLabel, wantedNearbyLine } from "@/lib/binder/binder-status";
 import { wantedInBinder } from "@/lib/nearby/matching";
 
 /**
@@ -56,12 +53,18 @@ describe("the binder's words", () => {
 
 describe("wanted nearby", () => {
   it("counts only this binder's cards, and only the wanted ones", () => {
-    expect(wantedInBinder({ a: 2, b: 1, c: 0, d: 4 }, ["a", "c", "x"])).toEqual({ a: 2 });
+    expect(wantedInBinder({ a: 2, b: 1, c: 0, d: 4 }, ["a", "c", "x"])).toEqual({
+      a: 2,
+    });
   });
 
   it("is the owner's, for a binder up for trade, and nobody else's", () => {
-    expect(web.route).toContain("readBinder(player.playerId, player.playerId, id.data)");
-    expect(web.route).toContain("if (!binder?.yours || !binder.forTrade) return Response.json({ wanted: {} });");
+    expect(web.route).toContain(
+      "readBinder(player.playerId, player.playerId, id.data)",
+    );
+    expect(web.route).toContain(
+      "if (!binder?.yours || !binder.forTrade) return Response.json({ wanted: {} });",
+    );
     expect(web.ownerPage).toContain("const wanted = binder.forTrade");
   });
 
@@ -71,7 +74,9 @@ describe("wanted nearby", () => {
   });
 
   it("shows only when there is something to say, and leads to the list", () => {
-    expect(web.view).toContain("binder.yours && settings.forTrade && wantedCount > 0 && (");
+    expect(web.view).toContain(
+      "binder.yours && settings.forTrade && wantedCount > 0 && (",
+    );
     expect(web.view).toContain('href="/feed/wanted"');
     expect(app.binder).toContain("yours && wantedCount > 0 ? (");
     expect(app.binder).toContain('navigation.navigate("WantedNearYou")');
@@ -87,9 +92,13 @@ describe("wanted nearby", () => {
 
 describe("empty pockets", () => {
   it("say + Add once a page and stay quiet after, every one still a door", () => {
-    expect(web.view).toContain("const firstEmpty = pockets.findIndex((entry) => !entry);");
+    expect(web.view).toContain(
+      "const firstEmpty = pockets.findIndex((entry) => !entry);",
+    );
     expect(web.view).toContain("quiet={index !== firstEmpty}");
-    expect(app.binder).toContain("const firstEmpty = slots.findIndex((card) => !card);");
+    expect(app.binder).toContain(
+      "const firstEmpty = slots.findIndex((card) => !card);",
+    );
     expect(app.binder).toContain("quiet={index !== firstEmpty}");
     /* Quiet is a look, never a missing door: the founder, "Adding a
        card in a specific slot should put that exact card there." */

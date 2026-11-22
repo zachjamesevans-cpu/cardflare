@@ -15,6 +15,7 @@ import { boardWritable, roomPhase } from "@/lib/events/schema";
 import { CAPTION_MAX, publishPost } from "@/lib/flares/publish";
 import { pointFromCoords } from "@/lib/geo/zip";
 import { notifyEarlyBoardFlares, notifyRoomFlare } from "@/lib/notifications/notify";
+import { OBJECTIONABLE_MESSAGE } from "@/lib/moderation/objectionable";
 
 export const dynamic = "force-dynamic";
 /* A deck-sized post on a board is still card by card (the room's cap is
@@ -164,6 +165,12 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
     if (result.reason === "empty") return badRequest("Pick a card first.");
+    if (result.reason === "objectionable") {
+      return Response.json(
+        { ok: false, error: "objectionable", message: OBJECTIONABLE_MESSAGE },
+        { status: 400 },
+      );
+    }
     if (result.reason === "hunt-name") {
       return Response.json(
         { ok: false, error: "hunt-name", message: HUNT_NAME_MESSAGE },

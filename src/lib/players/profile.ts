@@ -46,6 +46,7 @@ import {
   COVER_WIDTH,
   objectPathFrom,
 } from "./profile-image";
+import { isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * A player's profile: who they are, what they have earned, what they are
@@ -1445,6 +1446,8 @@ export async function setDisplayName(
 
   const admin = getSupabaseAdmin();
   const name = displayName.trim();
+  /* Every rename passes here, whichever form sent it. */
+  if (isObjectionable(name)) return "failed";
 
   const { error } = await admin
     .from("players")
@@ -1549,6 +1552,7 @@ export async function setHandle(
   handle: string,
 ): Promise<RenameOutcome> {
   if (!isSupabaseConfigured()) return "failed";
+  if (isObjectionable(handle)) return "failed";
 
   const { error } = await getSupabaseAdmin()
     .from("players")

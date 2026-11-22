@@ -258,14 +258,15 @@ export function PackShopSection({
             />
           </View>
         )}
-        {/* The odds, behind a quiet "?" - square, so it matches the
-            buttons' height instead of hovering at its own. */}
+        {/* The odds, one tap from Buy and labelled in words: a bare "?"
+            is easy for an App Store reviewer to miss, and 3.1.1 wants
+            the odds disclosed before anyone buys. */}
         <Tap
           onPress={() => setOddsOpen(true)}
           hitSlop={8}
           accessibilityLabel="What can be inside, and the exact odds"
           style={{
-            width: 44,
+            paddingHorizontal: spacing(3),
             borderRadius: radius.control,
             borderWidth: 1,
             borderColor: colors.border,
@@ -273,7 +274,9 @@ export function PackShopSection({
             justifyContent: "center",
           }}
         >
-          <Text style={{ color: colors.textMuted, fontWeight: "700" }}>?</Text>
+          <Text style={{ color: colors.textSecondary, fontWeight: "700", fontSize: 13 }}>
+            Odds
+          </Text>
         </Tap>
       </View>
 
@@ -333,8 +336,7 @@ export function PackShopSection({
               </View>
             ))}
             <Muted>
-              Three slots per pack, each rolled independently. No slot can repeat
-              another in the same pack.
+              {`${series.slots} ${series.slots === 1 ? "slot" : "slots"} per pack, each rolled independently. No slot can repeat another in the same pack.`}
             </Muted>
           </Pressable>
         </Pressable>

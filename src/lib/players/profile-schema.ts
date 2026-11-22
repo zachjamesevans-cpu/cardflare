@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { BIO_MAX, PRONOUNS_MAX } from "./profile-state";
+import { OBJECTIONABLE_MESSAGE, isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * Shared types for the profile actions.
@@ -22,7 +23,8 @@ export const displayNameSchema = z.object({
     .string()
     .trim()
     .min(1, "Pick a name people will recognise across the table.")
-    .max(40, "Keep the name under 40 characters."),
+    .max(40, "Keep the name under 40 characters.")
+    .refine((value) => !isObjectionable(value), OBJECTIONABLE_MESSAGE),
 });
 
 /**
@@ -47,7 +49,8 @@ export const aboutSchema = z.object({
         .refine(
           (value: string) => value.split("\n").length <= 4,
           "Keep the bio to four lines.",
-        ),
+        )
+        .refine((value: string) => !isObjectionable(value), OBJECTIONABLE_MESSAGE),
     )
     .transform((value): string | null => value || null),
 });

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { HelpCircle, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 
 import { FRAME_CLASS } from "@/components/players/cosmetic-card";
 import { Logo } from "@/components/brand/logo";
@@ -252,9 +252,9 @@ export function PackShop({
             aria-label="What can be inside, and the exact odds"
             aria-expanded={oddsOpen}
             onClick={() => setOddsOpen((current) => !current)}
-            className="flex h-full w-11 cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-border text-text-muted transition-colors hover:border-border-strong hover:text-text-primary"
+            className="flex h-full cursor-pointer items-center justify-center rounded-[var(--radius-control)] border border-border px-3 text-[13px] font-bold text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
           >
-            <HelpCircle className="size-4" aria-hidden="true" />
+            Odds
           </button>
 
           <div
@@ -292,8 +292,7 @@ export function PackShop({
               ))}
             </ul>
             <p className="mt-2 text-[11px] text-text-muted">
-              Three slots per pack, each rolled independently. No slot can repeat
-              another in the same pack.
+              {`${series.slots} ${series.slots === 1 ? "slot" : "slots"} per pack, each rolled independently. No slot can repeat another in the same pack.`}
             </p>
           </div>
         </div>

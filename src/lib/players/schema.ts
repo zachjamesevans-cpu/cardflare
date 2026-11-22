@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { DISPLAY_NAME_MAX, DISPLAY_NAME_MIN, UNSAFE_CHARACTERS } from "./name-rules";
+import { OBJECTIONABLE_MESSAGE, isObjectionable } from "@/lib/moderation/objectionable";
 
 /*
  * The limits, the unsafe-character test and the join form's idle state
@@ -20,7 +21,8 @@ export const displayNameSchema = z
       .max(DISPLAY_NAME_MAX, `Please keep it under ${DISPLAY_NAME_MAX} characters.`)
       .refine((value) => !UNSAFE_CHARACTERS.test(value), {
         message: "Please use ordinary characters.",
-      }),
+      })
+      .refine((value) => !isObjectionable(value), { message: OBJECTIONABLE_MESSAGE }),
   );
 
 export const joinAsPlayerSchema = z.object({ displayName: displayNameSchema });

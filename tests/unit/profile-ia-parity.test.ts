@@ -403,8 +403,12 @@ describe("the binder page, by id", () => {
       expect(page).toContain("<StatusPill");
       expect(page).toContain("binderStatusLabel(");
     }
-    expect(web.view).toContain("onClick={binder.yours ? () => setSettingsOpen(true) : undefined}");
-    expect(app.binder).toContain("onPress={yours ? () => setSettingsOpen(true) : undefined}");
+    expect(web.view).toContain(
+      "onClick={binder.yours ? () => setSettingsOpen(true) : undefined}",
+    );
+    expect(app.binder).toContain(
+      "onPress={yours ? () => setSettingsOpen(true) : undefined}",
+    );
   });
 
   it("names and deletes every binder", () => {

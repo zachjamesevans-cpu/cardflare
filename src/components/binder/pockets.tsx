@@ -169,12 +169,7 @@ export function AddPocket({
     );
   }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label="Add a card"
-      className={look}
-    >
+    <button type="button" onClick={onClick} aria-label="Add a card" className={look}>
       {inside}
     </button>
   );

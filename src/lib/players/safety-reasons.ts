@@ -11,6 +11,6 @@ export type ReportReason = "spam" | "scam" | "harassment" | "other";
 export const REPORT_REASONS: { value: ReportReason; label: string }[] = [
   { value: "spam", label: "Spam" },
   { value: "scam", label: "Scam or fake listing" },
-  { value: "harassment", label: "Harassment" },
+  { value: "harassment", label: "Harassment, hate or explicit content" },
   { value: "other", label: "Something else" },
 ];

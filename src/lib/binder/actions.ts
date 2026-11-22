@@ -29,6 +29,7 @@ import {
   binderOfferSentLine,
 } from "./offer-copy";
 import { offerOnBinder } from "./offers";
+import { OBJECTIONABLE_MESSAGE, isObjectionable } from "@/lib/moderation/objectionable";
 
 /**
  * The binders' Server Actions, for the website. The app goes through
@@ -61,7 +62,13 @@ function binderIdOf(value: unknown): string | null {
 }
 
 const settingsSchema = z.object({
-  name: z.string().trim().min(1).max(BINDER_NAME_MAX).optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(BINDER_NAME_MAX)
+    .refine((value) => !isObjectionable(value), OBJECTIONABLE_MESSAGE)
+    .optional(),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
   isPublic: z.boolean().optional(),
@@ -300,7 +307,12 @@ export async function reorderBinderAction(
 }
 
 const createSchema = z.object({
-  name: z.string().trim().min(1, "Give it a name.").max(BINDER_NAME_MAX),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Give it a name.")
+    .max(BINDER_NAME_MAX)
+    .refine((value) => !isObjectionable(value), OBJECTIONABLE_MESSAGE),
   cover: z.custom<BinderCoverId>(isBinderCover).optional(),
   forTrade: z.boolean().optional(),
   isPublic: z.boolean().optional(),

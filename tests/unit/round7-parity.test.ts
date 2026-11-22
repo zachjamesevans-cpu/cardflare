@@ -101,7 +101,7 @@ describe("one report sheet, shared by profile, post and conversation", () => {
     expect(labels).toEqual([
       "Spam",
       "Scam or fake listing",
-      "Harassment",
+      "Harassment, hate or explicit content",
       "Something else",
     ]);
   });
