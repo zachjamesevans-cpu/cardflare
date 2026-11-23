@@ -1,5 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
+import { EXPERIMENT_API_BASE, experimentPath, UI_EXPERIMENT } from "./ui-experiment";
 import type { GiftBar } from "./gift-copy";
 import { clearCache } from "./cache";
 import type { RoomTimerWire } from "./room-timer-wire";
@@ -671,7 +672,13 @@ async function call<T>(
   let response: Response;
   try {
     // No body unless asked for: see the header note above.
-    response = await fetch(`${API_BASE}${path}`, {
+    /* The UI experiment's one endpoint goes to the local server running
+       it (src/ui-experiment.ts); everything else to API_BASE as always. */
+    const base =
+      UI_EXPERIMENT && EXPERIMENT_API_BASE && experimentPath(path)
+        ? EXPERIMENT_API_BASE
+        : API_BASE;
+    response = await fetch(`${base}${path}`, {
       method,
       headers,
       signal: controller.signal,
@@ -1654,6 +1661,49 @@ export const searchCards = (query: string, game?: string | null) =>
       game ? `&game=${encodeURIComponent(game)}` : ""
     }`,
   );
+
+/* ------------------------------------------------------------------ */
+/* Traders near you (the UI experiment, src/ui-experiment.ts)          */
+/* ------------------------------------------------------------------ */
+
+/** A nearby player with cards up for trade. Distance is already rounded. */
+export interface NearbyTrader {
+  playerId: string;
+  displayName: string;
+  handle: string | null;
+  avatarUrl: string | null;
+  frame: string | null;
+  miles: number;
+  milesLabel: string;
+  /** Copies in their binders up for trade (in the chosen game, if any). */
+  tradeCount: number;
+  /** Their cards up for trade that you are hunting. */
+  matchCount: number;
+}
+
+export type TradersAnswer =
+  | { state: "off" }
+  | { state: "no-location" }
+  | { state: "unavailable" }
+  | { state: "ok"; radius: number; hunting: number; traders: NearbyTrader[] };
+
+export const getTradersNearYou = (options: {
+  radius?: number | null;
+  game?: string | null;
+  matchingOnly?: boolean;
+  coords?: { latitude: number; longitude: number } | null;
+}) => {
+  const params = new URLSearchParams();
+  if (options.radius) params.set("radius", String(options.radius));
+  if (options.game) params.set("game", options.game);
+  if (options.matchingOnly) params.set("matching", "1");
+  if (options.coords) {
+    params.set("lat", options.coords.latitude.toFixed(3));
+    params.set("lng", options.coords.longitude.toFixed(3));
+  }
+  const query = params.toString();
+  return call<TradersAnswer>("GET", `/api/v1/nearby/traders${query ? `?${query}` : ""}`);
+};
 
 /* ------------------------------------------------------------------ */
 /* The card page: one card, who has it, who hunts it, where it sits    */

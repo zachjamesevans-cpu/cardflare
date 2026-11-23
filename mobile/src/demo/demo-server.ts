@@ -238,6 +238,37 @@ export function demoAnswer(method: string, path: string, body: unknown): DemoAns
       const sort = /[?&]sort=(most|closest|newest)/.exec(path)?.[1] ?? "most";
       return { value: demoWanted(sort as WantedSort) };
     }
+    /* Traders near you, the UI experiment's list (src/ui-experiment.ts):
+       made-up people with made-up counts, in demo mode only. */
+    if (route === "/api/v1/nearby/traders") {
+      const matchingOnly = /[?&]matching=1/.test(path);
+      const rows = [
+        { who: PEOPLE.maya, trade: 148, match: 3 },
+        { who: PEOPLE.kaito, trade: 86, match: 2 },
+        { who: PEOPLE.jordan, trade: 212, match: 1 },
+        { who: PEOPLE.theo, trade: 64, match: 0 },
+        { who: PEOPLE.ava, trade: 39, match: 0 },
+        { who: PEOPLE.priya, trade: 27, match: 0 },
+      ].filter((row) => !matchingOnly || row.match > 0);
+      return {
+        value: {
+          state: "ok",
+          radius: 25,
+          hunting: 14,
+          traders: rows.map(({ who, trade, match }) => ({
+            playerId: who.playerId,
+            displayName: who.displayName,
+            handle: who.handle,
+            avatarUrl: who.avatarUrl,
+            frame: who.frame,
+            miles: Math.max(1, Math.round(who.miles)),
+            milesLabel: who.miles < 2 ? "Under 2 mi away" : `About ${Math.round(who.miles)} mi away`,
+            tradeCount: trade,
+            matchCount: match,
+          })),
+        },
+      };
+    }
     if (route === "/api/v1/notifications") return { value: demoNotifications() };
     if (route === "/api/v1/notifications/unread") return { value: demoUnread() };
     if (route === "/api/v1/local/threads") return { value: demoThreads() };

@@ -1,4 +1,6 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { TradersStrip } from "../traders-strip";
+import { UI_EXPERIMENT } from "../ui-experiment";
 import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -2127,6 +2129,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
         {/* You're here: offered when the app opened inside a store,
             never joined by itself (src/youre-here.tsx). */}
         <YoureHereBanner />
+
+        {/* Traders near you, above the Flares: the UI experiment only
+            (src/ui-experiment.ts). The store banner above stays first, so
+            being IN a store outranks being near people. */}
+        {UI_EXPERIMENT && mode === "nearby" && !guest ? <TradersStrip /> : null}
 
         {/*
          * A guest's first screen says what this is and offers the two
