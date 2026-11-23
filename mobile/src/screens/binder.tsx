@@ -833,7 +833,13 @@ export function BinderScreen({
       return;
     }
     const url = binderShareUrl(binder.shareCode ?? binder.id);
-    void Share.share({ message: url, url }).catch(() => {});
+    /* iOS gets the url alone: given both, Copy and Messages paste the
+       link twice. Android has no url field, so it gets the message. */
+    void Share.share(
+      Platform.OS === "ios"
+        ? { url, title: `${binder.name} on cardflare` }
+        : { message: url, title: `${binder.name} on cardflare` },
+    ).catch(() => {});
   };
 
   const inOffer = Object.keys(picks).length;

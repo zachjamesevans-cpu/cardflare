@@ -1018,7 +1018,11 @@ function AccountCard({
       <Row label="Name and username" value="Edit profile" onPress={onEditProfile} />
       <Row label="Email" value={email ?? "Not available"} />
       <Muted>To change your email, get in touch from Help.</Muted>
-      <Row label="Password" value="Reset it from the sign-in screen" />
+      <Row
+        label="Password"
+        value="Reset by email"
+        onPress={() => void Linking.openURL(`${API_BASE}/login/reset`)}
+      />
       <Row label="Version" value={build ? `${version} (${build})` : version} />
     </Card>
   );

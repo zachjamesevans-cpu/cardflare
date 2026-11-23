@@ -52,6 +52,7 @@ import {
 import type { ThreadMessage, ThreadRead, ThreadSummary } from "@/lib/local/threads";
 import type { ProposeInput, ThreadTrade } from "@/lib/trades/thread-trades";
 import { cn } from "@/lib/cn";
+import { previewWithoutPostLink, splitSharedPost } from "@/lib/notifications/preview";
 
 /** One bit in the browser: "they chose device location here before". */
 const DEVICE_CHOICE_KEY = "cf-local-device";
@@ -425,7 +426,7 @@ function RadiusRow({
  */
 function ThreadRow({ thread, onOpen }: { thread: ThreadSummary; onOpen: () => void }) {
   const unread = thread.unread > 0;
-  const preview = thread.lastMessagePreview ?? "";
+  const preview = previewWithoutPostLink(thread.lastMessagePreview ?? "");
   return (
     <button
       type="button"
@@ -909,7 +910,7 @@ function ThreadView({
                           : "bg-elevated text-text-primary",
                       )}
                     >
-                      <p className="break-words whitespace-pre-wrap">{message.body}</p>
+                      <MessageWords body={message.body} />
                     </div>
                   </div>
                 </div>
@@ -1205,4 +1206,19 @@ function acceptsLabelFor(flare: LocalFlare): string {
 /** A line's first word, capitalised: "Trade or cash". */
 function capitalised(text: string): string {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+/**
+ * A message's words. A post shared from the app rides on a last line,
+ * `cardflare://post/<id>`; the app draws the post there, and here it
+ * reads "Shared a post" instead of a raw link.
+ */
+function MessageWords({ body }: { body: string }) {
+  const { text, postId } = splitSharedPost(body);
+  return (
+    <>
+      {text ? <p className="break-words whitespace-pre-wrap">{text}</p> : null}
+      {postId ? <p className="italic opacity-80">Shared a post</p> : null}
+    </>
+  );
 }
