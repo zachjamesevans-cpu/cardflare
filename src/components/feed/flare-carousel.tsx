@@ -297,28 +297,10 @@ export function SingleFlare({
   const justOffered = Boolean(card.flareId && offered.has(card.flareId));
   const youOffered = Boolean(card.youOffered) || justOffered;
   const badge = justOffered && (card.state ?? "open") === "open";
-  /* The details beside the art open the card too, the way the app's
-     row does: the whole row is the card. */
-  const art = useRef<HTMLSpanElement>(null);
-  const openCard = () => art.current?.querySelector<HTMLElement>("button, a")?.click();
   return (
     <div className="flex items-center gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-2.5">
-      <span ref={art} className="flex shrink-0">
-        <OfferedOverlay badge={badge}>{tile}</OfferedOverlay>
-      </span>
-      <div
-        role="button"
-        tabIndex={0}
-        aria-label={`View ${card.cardName}`}
-        onClick={openCard}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            openCard();
-          }
-        }}
-        className="flex min-w-0 flex-1 cursor-pointer flex-col justify-center gap-0.5 self-stretch"
-      >
+      <OfferedOverlay badge={badge}>{tile}</OfferedOverlay>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         {children}
         {youOffered ? (
           <p className="text-xs text-text-secondary">You offered this</p>

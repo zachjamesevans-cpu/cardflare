@@ -144,9 +144,9 @@ describe("the picks live on the post, not in the viewer", () => {
     expect(src.card).toContain("onPicks: (next: ZoomPicks) => void;");
     expect(src.card).not.toContain("useState<ZoomPicks>");
     expect(src.zoom).toContain("export type ZoomPicks = Record<string, number>;");
-    /* Both the single-card row and the carousel carry them to the zoom. */
-    expect(src.card.match(/picks=\{picks\}/g)?.length).toBe(2);
-    expect(src.card.match(/onPicks=\{onPicks\}/g)?.length).toBe(2);
+    /* The strip carries them to the zoom, for one card or many. */
+    expect(src.card.match(/picks=\{picks\}/g)?.length).toBe(1);
+    expect(src.card.match(/onPicks=\{onPicks\}/g)?.length).toBe(1);
     expect(src.pager).toContain("picks?: ZoomPicks;");
     expect(src.pager.match(/picks=\{picks\}/g)?.length).toBe(2);
   });

@@ -7,7 +7,7 @@ import { ActionSheet, DotsButton, type ActionItem } from "./action-menu";
 import { agoFrom } from "./ago";
 import type { FeedEntry } from "./api";
 import { cardsLabel } from "./flare-copy";
-import { FlareCardSlide, FlareStrip, remainingOf, shelfFor } from "./flare-deck-pager";
+import { FlareStrip, remainingOf } from "./flare-deck-pager";
 import { GuestChip } from "./feed-person";
 import { inYourOfferLine } from "./offer-copy";
 import { OfferReviewSheet } from "./offer-review-sheet";
@@ -361,9 +361,6 @@ export function FlareFeedCard({
   const direction = item.direction ?? "want";
   /* Found cards at the far right (found-last.ts). */
   const cards = [...item.cards].sort(foundLast);
-  const lead = cards[0];
-  const single = item.total === 1 && lead;
-  const shelf = shelfFor(cards, post);
   const completed = item.completed ?? false;
   /* "28m · nearby": when it went up and how far, beside the name. */
   const meta = [
@@ -544,30 +541,19 @@ export function FlareFeedCard({
           way the post points, and the founder read "Looking for" twice
           on every post. Same on the website. */}
 
-      {/* The card and what is asked of it. Several cards are the same
-          row, swiped, with the next one peeking in. */}
-      {single ? (
-        <FlareCardSlide
-          card={lead}
-          direction={direction}
-          post={post}
-          siblings={shelf}
-          position={0}
-          picks={picks}
-          onPicks={onPicks}
-        />
-      ) : (
-        <FlareStrip
-          cards={cards}
-          total={item.total}
-          direction={direction}
-          post={post}
-          picks={picks}
-          onPicks={onPicks}
-          onSeeAll={onViewAll}
-          bleed={FEED_LOOK === "open" ? gutter : spacing(3)}
-        />
-      )}
+      {/* Every post the same strip, one card or thirty: the founder,
+          "delete the text next to perona ... id rather just have it all
+          uniform". */}
+      <FlareStrip
+        cards={cards}
+        total={item.total}
+        direction={direction}
+        post={post}
+        picks={picks}
+        onPicks={onPicks}
+        onSeeAll={onViewAll}
+        bleed={FEED_LOOK === "open" ? gutter : spacing(3)}
+      />
 
       {/* "2 in your offer · Review": the picks stay in sight while the
           viewer is closed, and Review is the door straight to them. */}

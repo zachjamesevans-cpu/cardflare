@@ -464,7 +464,10 @@ describe("a card in the Feed opens larger", () => {
 
   it("in the app, with the rail to swipe along", () => {
     expect(read("mobile/src/card-rail.tsx")).toContain("siblings={shelf}");
-    expect(read("mobile/src/flare-feed-card.tsx")).toContain("siblings={shelf}");
+    /* Every Feed post is the strip now, one card or many, and the strip
+       hands each card its post's shelf. */
+    expect(read("mobile/src/flare-feed-card.tsx")).toContain("<FlareStrip");
+    expect(read("mobile/src/flare-deck-pager.tsx")).toContain("siblings={shelf}");
   });
 });
 
