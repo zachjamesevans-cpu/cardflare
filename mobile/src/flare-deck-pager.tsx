@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ScrollView, Text, View } from "react-native";
 
 import { setCardNote, type FeedCard } from "./api";
@@ -107,7 +108,10 @@ export function FlareCardSlide({
   siblings,
   position,
   width,
-  cardWidth = 72,
+  /* The strip's tile, so a one-card post's card is no smaller than a
+     thirty-card post's (the founder: "it shrinks it compared to other
+     cards ... look how weird it looks in the feed"). */
+  cardWidth = STRIP_TILE,
   picks,
   onPicks,
 }: {
@@ -131,6 +135,8 @@ export function FlareCardSlide({
         ? GONE_LABEL
         : availableLabel(copiesOf(card))
       : wantsLine(copiesOf(card), remaining);
+  /* The words beside the art open the card too: the whole row is it. */
+  const zoom = useRef<{ open: () => void } | null>(null);
 
   return (
     <View
@@ -155,11 +161,16 @@ export function FlareCardSlide({
           position={position}
           picks={picks}
           onPicks={onPicks}
+          zoomRef={zoom}
         />
         {/* Inset: the pager clips anything outside the slide. */}
         <HeldRing match={card.match} inset />
       </View>
-      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+      <Tap
+        onPress={() => zoom.current?.open()}
+        accessibilityLabel={`View ${card.cardName}`}
+        style={{ flex: 1, minWidth: 0, gap: 3, alignSelf: "stretch", justifyContent: "center" }}
+      >
         <Text
           numberOfLines={2}
           style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}
@@ -197,7 +208,7 @@ export function FlareCardSlide({
             Somebody offered
           </Text>
         ) : null}
-      </View>
+      </Tap>
     </View>
   );
 }

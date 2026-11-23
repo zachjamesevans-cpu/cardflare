@@ -2,10 +2,12 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import {
   useEffect,
+  useImperativeHandle,
   useRef,
   useState,
   type PropsWithChildren,
   type ReactNode,
+  type RefObject,
 } from "react";
 import {
   type AccessibilityRole,
@@ -875,9 +877,16 @@ export function CardImage({
   onLongPress,
   picks: givenPicks,
   onPicks,
+  zoomRef,
 }: {
   imageUrl: string | null;
   width: number;
+  /**
+   * Opens the large view from outside the thumbnail: a single-card
+   * Feed post's name and details beside the art open the same view a
+   * tap on the art does, so the whole row is the card.
+   */
+  zoomRef?: RefObject<{ open: () => void } | null>;
   name: string;
   cardNumber: string;
   /**
@@ -938,6 +947,12 @@ export function CardImage({
   position?: number;
 }) {
   const [open, setOpen] = useState(false);
+  useImperativeHandle(zoomRef, () => ({
+    open: () => {
+      setAt(position);
+      setOpen(true);
+    },
+  }));
 
   /* A shelf of one is no shelf: no arrows, no counter, nothing new. */
   const shelf = siblings && siblings.length > 1 ? siblings : null;
