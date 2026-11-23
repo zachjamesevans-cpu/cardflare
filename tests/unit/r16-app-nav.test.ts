@@ -95,9 +95,9 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     expect(tabs).toContain("{() => <LocalScreen threadsOnly />}");
     expect(tabs).toContain("const unreadMessages = useUnreadMessages();");
     expect(tabs).toContain('if (route.name === "Messages" && unreadMessages > 0) {');
-    expect(tabs).toContain("<MessagesDot />");
+    expect(tabs).toContain("<MessagesCount count={unreadMessages} />");
     expect(tabs).toMatch(
-      /tabBarAccessibilityLabel:\s*unreadMessages > 0 \? "Messages, unread" : "Messages"/,
+      /tabBarAccessibilityLabel:\s*unreadMessages > 0 \? `Messages, \$\{unreadMessages\} unread` : "Messages"/,
     );
     /* Asked again on every tab change, foreground and arriving push. */
     expect(

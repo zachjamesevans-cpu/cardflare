@@ -135,9 +135,9 @@ describe("the Inbox dot", () => {
     expect(route).toContain("if (!player) return unauthorized();");
   });
 
-  it("is a dot on the website's tab bar, not a number", () => {
+  it("is a count on the website's tab bar, Instagram's way", () => {
     const tabs = read("src/components/players/player-tabs.tsx");
-    expect(tabs).toContain("size-2.5 rounded-full bg-accent ring-2 ring-surface");
-    expect(tabs).not.toContain('unread > 9 ? "9+" : unread');
+    expect(tabs).toContain("rounded-full bg-accent px-1");
+    expect(tabs).toContain('unread > 9 ? "9+" : unread');
   });
 });

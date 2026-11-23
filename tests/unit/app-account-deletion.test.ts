@@ -46,8 +46,11 @@ describe("account deletion", () => {
     const page = read("src/app/profile/settings/settings-content.tsx");
     const form = read("src/components/players/delete-account-form.tsx");
 
-    expect(page).toContain("Delete your account");
-    expect(page.replace(/\s+/g, " ")).toContain(WARNING);
+    expect(page).toContain("<DeleteAccountForm");
+    /* Closed, a big red button; open, the warning (the founder). */
+    expect(form).toContain("Delete your account");
+    expect(form).toContain("bg-[#e5484d]");
+    expect(form.replace(/\s+/g, " ")).toContain(WARNING);
     expect(form).toContain("deleteAccountAction");
   });
 });

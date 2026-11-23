@@ -1,4 +1,4 @@
-import { View, type ViewStyle } from "react-native";
+import { Text, View, type ViewStyle } from "react-native";
 
 import { colors } from "./theme";
 
@@ -30,5 +30,59 @@ export function UnreadDot({ ring, style }: { ring: string; style: ViewStyle }) {
         style,
       ]}
     />
+  );
+}
+
+/** What the count says: the number, or "9+" past nine. */
+export function unreadLabel(count: number): string {
+  return count > 9 ? "9+" : String(count);
+}
+
+/**
+ * The count on the Messages tab, Instagram's way: the founder, "show you
+ * how many messages you have unread on the taskbar on bottom like how it
+ * does with instagram dms". The dot's accent and ring, grown into a pill
+ * that holds the number of unread messages, "9+" past nine. The website's
+ * dock draws the same (src/components/players/player-tabs.tsx).
+ */
+export function UnreadCount({
+  count,
+  ring,
+  style,
+}: {
+  count: number;
+  ring: string;
+  style: ViewStyle;
+}) {
+  return (
+    <View
+      pointerEvents="none"
+      style={[
+        {
+          position: "absolute",
+          minWidth: 18,
+          height: 18,
+          paddingHorizontal: 4,
+          borderRadius: 9,
+          backgroundColor: colors.accent,
+          borderWidth: 1.5,
+          borderColor: ring,
+          alignItems: "center",
+          justifyContent: "center",
+        },
+        style,
+      ]}
+    >
+      <Text
+        style={{
+          color: colors.accentContrast,
+          fontSize: 10,
+          fontWeight: "800",
+          lineHeight: 12,
+        }}
+      >
+        {unreadLabel(count)}
+      </Text>
+    </View>
   );
 }

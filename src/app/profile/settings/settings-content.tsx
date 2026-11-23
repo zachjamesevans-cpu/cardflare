@@ -347,22 +347,18 @@ export async function SettingsContent({
    * website that could not do what the app can would be the odd one.
    */
   const deleteCard = playerId ? (
-    <Card key="delete" className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1">
-        <p className="font-semibold text-text-primary">Delete your account</p>
-        <p className="text-sm text-text-secondary">
-          Everything goes: your profile, Flares, hunts, binders, showcase, trade
-          history, Embers and unlocks. There is no undo.
-        </p>
-        {PRO_ENABLED ? (
-          <p className="text-sm text-text-muted">
+    <DeleteAccountForm
+      key="delete"
+      handle={handle}
+      note={
+        PRO_ENABLED ? (
+          <>
             <ProMark /> through the App Store is billed by Apple: cancel it in your
             Apple ID subscriptions too, or it keeps renewing.
-          </p>
-        ) : null}
-      </div>
-      <DeleteAccountForm handle={handle} />
-    </Card>
+          </>
+        ) : null
+      }
+    />
   ) : null;
 
   /* Nearby matching, in Privacy & safety beside the ZIP it reads. */

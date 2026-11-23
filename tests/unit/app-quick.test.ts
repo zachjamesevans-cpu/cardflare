@@ -260,7 +260,10 @@ describe("the unread dot (round 16: on the Feed's bell, not an Inbox tab)", () =
     expect(dot).toContain("export const UNREAD_DOT = 9;");
     expect(dot).toContain("backgroundColor: colors.accent,");
     expect(dot).toContain("borderColor: ring,");
-    expect(dot).not.toContain("<Text");
+    /* The bell's dot has no number; Messages' count lives beside it. */
+    expect(dot.slice(0, dot.indexOf("export function unreadLabel"))).not.toContain(
+      "<Text",
+    );
     expect(dot).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
@@ -314,5 +317,13 @@ describe("house rules on everything this round touched", () => {
   it("has no literal hex and no em dash in the new module", () => {
     expect(unread).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(unread).not.toContain("—");
+  });
+});
+
+describe("the Messages count (Instagram's way)", () => {
+  it("says the number, and 9+ past nine", () => {
+    const dot = read("mobile/src/unread-dot.tsx");
+    expect(dot).toContain('return count > 9 ? "9+" : String(count);');
+    expect(dot).toContain("{unreadLabel(count)}");
   });
 });

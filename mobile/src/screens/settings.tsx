@@ -877,6 +877,15 @@ function DeleteAccount({ handle }: { handle: string | null }) {
   const bare = typed.trim().replace(/^@/, "").toLowerCase();
   const matches = handle === null ? bare.length > 0 : bare === handle.toLowerCase();
 
+  /* Closed, one big red button and nothing else (the founder: "the
+     delete your account should be a big red button. then you click it
+     and it goes over that extra text"). Open, the card says what goes
+     and asks for the handle. The website's Settings does the same. */
+  if (!open) {
+    return (
+      <Button label="Delete your account" variant="danger" onPress={() => setOpen(true)} />
+    );
+  }
   return (
     <Card>
       <Title>Delete your account</Title>
@@ -889,56 +898,47 @@ function DeleteAccount({ handle }: { handle: string | null }) {
           subscriptions too, or it keeps renewing.
         </Muted>
       ) : null}
-      {open ? (
-        <>
-          <Body>
-            {handle ? `Type your handle, @${handle}, to confirm.` : "Type your handle to confirm."}
-          </Body>
-          <Input
-            value={typed}
-            onChangeText={setTyped}
-            placeholder={handle ? `@${handle}` : "@your_handle"}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Type your handle to confirm"
-          />
-          <AsyncButton
-            label="Delete my account"
-            pendingLabel="Deleting…"
-            disabled={!matches}
-            onPress={async () => {
-              setSaid(null);
-              try {
-                await deleteAccount(typed);
-                await signOut();
-              } catch (caught) {
-                setSaid(
-                  caught instanceof ApiError && caught.code === "handle-mismatch"
-                    ? "That is not your handle."
-                    : `The account could not be deleted. ${friendlyError(caught)}`,
-                );
-              }
-            }}
-          />
-          <Tap
-            accessibilityLabel="Keep the account"
-            onPress={() => {
-              setOpen(false);
-              setTyped("");
-              setSaid(null);
-            }}
-          >
-            <Muted>Keep it</Muted>
-          </Tap>
-          {said && <Muted>{said}</Muted>}
-        </>
-      ) : (
-        <Tap accessibilityLabel="Delete your account" onPress={() => setOpen(true)}>
-          <Text style={{ color: colors.danger, fontSize: 14 }}>
-            Delete your account
-          </Text>
-        </Tap>
-      )}
+      <Body>
+        {handle ? `Type your handle, @${handle}, to confirm.` : "Type your handle to confirm."}
+      </Body>
+      <Input
+        value={typed}
+        onChangeText={setTyped}
+        placeholder={handle ? `@${handle}` : "@your_handle"}
+        autoCapitalize="none"
+        autoCorrect={false}
+        accessibilityLabel="Type your handle to confirm"
+      />
+      <AsyncButton
+        label="Delete my account"
+        pendingLabel="Deleting…"
+        variant="danger"
+        disabled={!matches}
+        onPress={async () => {
+          setSaid(null);
+          try {
+            await deleteAccount(typed);
+            await signOut();
+          } catch (caught) {
+            setSaid(
+              caught instanceof ApiError && caught.code === "handle-mismatch"
+                ? "That is not your handle."
+                : `The account could not be deleted. ${friendlyError(caught)}`,
+            );
+          }
+        }}
+      />
+      <Tap
+        accessibilityLabel="Keep the account"
+        onPress={() => {
+          setOpen(false);
+          setTyped("");
+          setSaid(null);
+        }}
+      >
+        <Muted>Keep it</Muted>
+      </Tap>
+      {said && <Muted>{said}</Muted>}
     </Card>
   );
 }

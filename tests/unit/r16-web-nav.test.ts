@@ -86,8 +86,8 @@ describe("the tab bar", () => {
       '{ href: "/local", label: "Messages", icon: MessageCircle }',
     );
     expect(web.tabs).toContain('const dot = tab.label === "Messages" && unread > 0;');
-    expect(web.tabs).toContain("size-2.5 rounded-full bg-accent ring-2 ring-surface");
-    expect(web.tabs).toContain('{dot && ", unread"}');
+    expect(web.tabs).toContain("rounded-full bg-accent px-1");
+    expect(web.tabs).toContain("{dot && `, ${unread} unread`}");
     expect(web.tabBar).toContain("unreadMessages(playerId)");
     expect(web.tabBar).not.toContain("unreadCount(");
   });

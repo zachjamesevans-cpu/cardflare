@@ -91,7 +91,7 @@ import { registerForPush } from "./src/push";
 import { DockTabBar, restoreDock } from "./src/dock";
 import { GlassFill, TAB_BAR, TAB_BAR_RADIUS } from "./src/glass";
 import { StackHeader, TabHeader } from "./src/header";
-import { UnreadDot } from "./src/unread-dot";
+import { UnreadCount } from "./src/unread-dot";
 import { refreshUnread } from "./src/unread";
 import { isActiveThreadPush } from "./src/active-thread";
 import { refreshUnreadMessages, useUnreadMessages } from "./src/unread-messages";
@@ -415,8 +415,10 @@ function TabButton({
  * wears it for unread messages; the Feed's bell wears the same dot for
  * unread notices (src/unread-dot.tsx).
  */
-function MessagesDot() {
-  return <UnreadDot ring={colors.elevated} style={{ top: -1, right: -3 }} />;
+function MessagesCount({ count }: { count: number }) {
+  /* The count, not the dot, since the founder asked for Instagram's
+     (src/unread-dot.tsx UnreadCount). */
+  return <UnreadCount count={count} ring={colors.elevated} style={{ top: -6, right: -10 }} />;
 }
 
 function Tabs() {
@@ -541,7 +543,7 @@ function Tabs() {
             return (
               <View>
                 <Ionicons name={icon} color={color} size={TAB_BAR.icon} />
-                <MessagesDot />
+                <MessagesCount count={unreadMessages} />
               </View>
             );
           }
@@ -614,7 +616,7 @@ function Tabs() {
           tabBarLabel: "Messages",
           /* The dot has no words of its own, so the label says it. */
           tabBarAccessibilityLabel:
-            unreadMessages > 0 ? "Messages, unread" : "Messages",
+            unreadMessages > 0 ? `Messages, ${unreadMessages} unread` : "Messages",
         }}
       >
         {() => <LocalScreen threadsOnly />}
