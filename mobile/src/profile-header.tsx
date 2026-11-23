@@ -10,7 +10,7 @@ import {
 } from "react-native";
 
 import type { ProfileStats } from "./api";
-import { API_BASE } from "./config";
+import { SITE_URL } from "./config";
 import { EmberBadge } from "./ember-badge";
 import { formatHandle } from "./handle";
 import { OrganizerChips } from "./remote-entry";
@@ -267,7 +267,7 @@ export function ProfileActionButton({
 
 /** The profile's public address, the one Share profile hands out. */
 export function profileUrl(playerId: string): string {
-  return `${API_BASE}/p/${encodeURIComponent(playerId)}`;
+  return `${SITE_URL}/p/${encodeURIComponent(playerId)}`;
 }
 
 /**

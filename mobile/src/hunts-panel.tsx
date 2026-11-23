@@ -19,7 +19,7 @@ import {
 } from "./api";
 import { BinderCover } from "./binder-cover";
 import { huntCover } from "./binder-covers";
-import { API_BASE } from "./config";
+import { SITE_URL } from "./config";
 import { cardsLabel, copiesLabel, printingLabel } from "./flare-copy";
 import { huntRowLine } from "./hunt-copy";
 import { HUNT_EXPLAINER, HuntSheet, type HuntSheetMode } from "./hunt-sheet";
@@ -287,7 +287,7 @@ export const foundOf = (card: HuntCard): number =>
 
 /** A hunt's public address, the one Share hands out. */
 export function huntUrl(huntId: string): string {
-  return `${API_BASE}/hunts/${encodeURIComponent(huntId)}`;
+  return `${SITE_URL}/hunts/${encodeURIComponent(huntId)}`;
 }
 
 /** The line that offers to put the last change back, for a few seconds. */

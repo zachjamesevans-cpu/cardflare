@@ -193,11 +193,23 @@ export function StackHeader({
   );
 }
 
-/** A tab's header: the same bar, with nothing to go back to. */
-export function TabHeader({ options, route }: BottomTabHeaderProps) {
+/** A tab's header: the same bar; only Post a Flare has a back. */
+export function TabHeader({ options, route, navigation }: BottomTabHeaderProps) {
   return (
     <AppHeader
       title={titleOf(options.headerTitle, options.title, route.name)}
+      left={
+        /* Post a Flare is a tab with no slot in the bar, opened from
+           the Feed's +: back is the way out, as on a pushed screen. */
+        route.name === "Flare" ? (
+          <HeaderButton
+            icon="chevron-back"
+            label="Back"
+            color={colors.accent}
+            onPress={() => navigation.goBack()}
+          />
+        ) : null
+      }
       right={options.headerRight?.({
         tintColor: colors.textPrimary,
         canGoBack: false,
