@@ -375,7 +375,7 @@ describe("the home screen's furniture", () => {
       '{ href: "/search", label: "Search", icon: Search }',
     );
     expect(read("mobile/App.tsx")).toMatch(
-      /name="Search"\s*component=\{SearchScreen\}/,
+      /name="Search"\s*(\/\*[^*]*\*\/\s*)?component=\{(UI_EXPERIMENT \? SearchLabScreen : )?SearchScreen\}/,
     );
     expect(read("mobile/src/screens/home.tsx")).toContain(
       'navigation.navigate("Tabs", { screen: "Search" })',

@@ -53,6 +53,9 @@ import { BindersScreen } from "./src/screens/binders";
 import { HuntsScreen } from "./src/screens/hunts";
 import { CardScreen } from "./src/screens/card";
 import { SearchScreen } from "./src/screens/search";
+import { SearchLabScreen } from "./src/screens/search-lab";
+import { TradersScreen } from "./src/screens/traders";
+import { UI_EXPERIMENT } from "./src/ui-experiment";
 import { StoreProfileScreen } from "./src/screens/store-profile";
 import { HomeScreen } from "./src/screens/home";
 import { HubScreen } from "./src/screens/hub";
@@ -288,6 +291,8 @@ export type StackParams = {
   LogTrade: undefined;
   /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
   Card: { cardId: string };
+  /* Traders near you: the UI experiment's list (src/ui-experiment.ts). */
+  Traders: undefined;
   /**
    * A shop, from a Nearby row — the website's /s/[storeId].
    *
@@ -628,7 +633,8 @@ function Tabs() {
           open. */}
       <Tab.Screen
         name="Search"
-        component={SearchScreen}
+        /* The UI experiment's Search while it is on (src/ui-experiment.ts). */
+        component={UI_EXPERIMENT ? SearchLabScreen : SearchScreen}
         options={{ title: "Search", tabBarLabel: "Search" }}
       />
       {/* No header: the profile's cover runs to the top of the screen,
@@ -1298,6 +1304,13 @@ function AppGates() {
           <Stack.Screen name="Remote" options={{ title: "Timer remote" }}>
             {({ route }) => <RemoteScreen storeId={route.params?.storeId} />}
           </Stack.Screen>
+          {UI_EXPERIMENT ? (
+            <Stack.Screen
+              name="Traders"
+              component={TradersScreen}
+              options={{ title: "Traders near you" }}
+            />
+          ) : null}
           <Stack.Screen name="Card" options={{ title: "Card" }}>
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>

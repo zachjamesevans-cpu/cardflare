@@ -63,7 +63,9 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
       'name="Profile"',
       'name="Nights"',
     ]);
-    expect(tabs).toMatch(/name="Search"\s*component=\{SearchScreen\}/);
+    expect(tabs).toMatch(
+      /name="Search"\s*(\/\*[^*]*\*\/\s*)?component=\{(UI_EXPERIMENT \? SearchLabScreen : )?SearchScreen\}/,
+    );
     expect(tabs).not.toContain('name="Inbox"');
     /* Local still takes the second slot when it is switched on. */
     expect(tabs).toContain("{LOCAL_ENABLED ? (");
