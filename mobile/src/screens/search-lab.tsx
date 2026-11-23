@@ -1,7 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { LinearGradient } from "expo-linear-gradient";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
@@ -65,16 +64,28 @@ import { colors, gutter, radius, spacing } from "../theme";
 const ASPECT = 88 / 63;
 const GRID_GAP = spacing(2.5);
 
-/* Already-approved art: the welcome intro's photos, one per game. */
-const GAME_ART: Partial<Record<GameSlug, ImageSourcePropType>> = {
-  "one-piece": require("../../assets/intro/one-piece-1.jpg"),
-  pokemon: require("../../assets/intro/pokemon-1.jpg"),
-  mtg: require("../../assets/intro/mtg-1.jpg"),
-  lorcana: require("../../assets/intro/lorcana-1.jpg"),
-  "flesh-and-blood": require("../../assets/intro/flesh-and-blood-1.jpg"),
+/*
+ * Each game's own logo, in cardflare's green: the founder, "the icons for
+ * lorcana and other tcgs on this screen should just be the logo of the
+ * actual game, with the classic cardflare green as the logo color."
+ * Made from the logos Wikipedia and Wikimedia Commons host, recoloured
+ * offline to the accent (#cefc84): a one-colour logo flat, a many-colour
+ * one as a green duotone so its outlines stay legible. Riftbound has no
+ * logo file there yet, so its tile is its name.
+ */
+const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
+  "one-piece": require("../../assets/games/one-piece.png"),
+  pokemon: require("../../assets/games/pokemon.png"),
+  mtg: require("../../assets/games/mtg.png"),
+  lorcana: require("../../assets/games/lorcana.png"),
+  "flesh-and-blood": require("../../assets/games/flesh-and-blood.png"),
 };
 
-type Answer<T> = { state: "idle" } | { state: "loading" } | { state: "error" } | { state: "done"; items: T[] };
+type Answer<T> =
+  | { state: "idle" }
+  | { state: "loading" }
+  | { state: "error" }
+  | { state: "done"; items: T[] };
 
 export function SearchLabScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
@@ -101,26 +112,23 @@ export function SearchLabScreen() {
     void lastSearchGame().then((stored) => setGame(labScope(stored)));
   }, []);
 
-  const run = useCallback(
-    async (words: string, scope: GameSlug | null) => {
-      const ticket = ++asked.current;
-      setCards({ state: "loading" });
-      const [found, people, places] = await Promise.allSettled([
-        searchCards(words, scope),
-        searchPlayersByName(words),
-        searchStores(words),
-      ]);
-      if (ticket !== asked.current) return;
-      setCards(
-        found.status === "fulfilled"
-          ? { state: "done", items: found.value.cards }
-          : { state: "error" },
-      );
-      setPlayers(people.status === "fulfilled" ? people.value.players.slice(0, 3) : []);
-      setStores(places.status === "fulfilled" ? places.value.stores.slice(0, 3) : []);
-    },
-    [],
-  );
+  const run = useCallback(async (words: string, scope: GameSlug | null) => {
+    const ticket = ++asked.current;
+    setCards({ state: "loading" });
+    const [found, people, places] = await Promise.allSettled([
+      searchCards(words, scope),
+      searchPlayersByName(words),
+      searchStores(words),
+    ]);
+    if (ticket !== asked.current) return;
+    setCards(
+      found.status === "fulfilled"
+        ? { state: "done", items: found.value.cards }
+        : { state: "error" },
+    );
+    setPlayers(people.status === "fulfilled" ? people.value.players.slice(0, 3) : []);
+    setStores(places.status === "fulfilled" ? places.value.stores.slice(0, 3) : []);
+  }, []);
 
   useEffect(() => {
     if (!searching) {
@@ -197,7 +205,11 @@ export function SearchLabScreen() {
             backgroundColor: colors.elevated,
           }}
         >
-          <Ionicons name="search" size={20} color={text ? colors.accent : colors.textSecondary} />
+          <Ionicons
+            name="search"
+            size={20}
+            color={text ? colors.accent : colors.textSecondary}
+          />
           <TextInput
             ref={field}
             value={query}
@@ -208,10 +220,19 @@ export function SearchLabScreen() {
             autoCorrect={false}
             autoCapitalize="none"
             accessibilityLabel="Search cards, players and stores"
-            style={{ flex: 1, color: colors.textPrimary, fontSize: 17, fontWeight: "600" }}
+            style={{
+              flex: 1,
+              color: colors.textPrimary,
+              fontSize: 17,
+              fontWeight: "600",
+            }}
           />
           {query ? (
-            <Tap onPress={() => setQuery("")} hitSlop={10} accessibilityLabel="Clear search">
+            <Tap
+              onPress={() => setQuery("")}
+              hitSlop={10}
+              accessibilityLabel="Clear search"
+            >
               <Ionicons name="close-circle" size={20} color={colors.textMuted} />
             </Tap>
           ) : null}
@@ -309,15 +330,16 @@ function GameChips({
   game: GameSlug | null;
   onChoose: (game: GameSlug | null) => void;
 }) {
-  const chips: { key: string; label: string; value: GameSlug | null; soon: boolean }[] = [
-    { key: "all", label: "All", value: null, soon: false },
-    ...LAB_GAMES.map((entry) => ({
-      key: entry.slug,
-      label: entry.name,
-      value: entry.slug,
-      soon: !entry.catalog,
-    })),
-  ];
+  const chips: { key: string; label: string; value: GameSlug | null; soon: boolean }[] =
+    [
+      { key: "all", label: "All", value: null, soon: false },
+      ...LAB_GAMES.map((entry) => ({
+        key: entry.slug,
+        label: entry.name,
+        value: entry.slug,
+        soon: !entry.catalog,
+      })),
+    ];
   return (
     <ScrollView
       horizontal
@@ -357,7 +379,9 @@ function GameChips({
               {chip.label}
             </Text>
             {chip.soon ? (
-              <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700" }}>
+              <Text
+                style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700" }}
+              >
                 SOON
               </Text>
             ) : null}
@@ -368,7 +392,7 @@ function GameChips({
   );
 }
 
-/** A game's tile: its intro photo under a dark wash, the name on it. */
+/** A game's tile: its logo in the accent, and nothing else to read. */
 function GameTile({
   game,
   width,
@@ -378,43 +402,47 @@ function GameTile({
   width: number;
   onPress: () => void;
 }) {
-  const art = GAME_ART[game.slug];
+  const logo = GAME_LOGO[game.slug];
   return (
     <Tap
       disabled={!game.catalog}
       onPress={onPress}
-      accessibilityLabel={game.catalog ? `Search ${game.name}` : `${game.name}, coming soon`}
+      accessibilityLabel={
+        game.catalog ? `Search ${game.name}` : `${game.name}, coming soon`
+      }
       style={{
         width,
         height: Math.round(width * 0.62),
         borderRadius: radius.card,
-        overflow: "hidden",
         borderWidth: 1,
         borderColor: colors.border,
-        backgroundColor: colors.elevated,
+        backgroundColor: colors.surface,
+        alignItems: "center",
+        justifyContent: "center",
+        padding: spacing(4),
+        gap: spacing(1),
+        opacity: game.catalog ? 1 : 0.6,
       }}
     >
-      {art ? (
-        <Image source={art} style={{ position: "absolute", width: "100%", height: "100%" }} />
-      ) : null}
-      <LinearGradient
-        colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.82)"]}
-        style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
-      />
-      <View style={{ flex: 1, justifyContent: "flex-end", padding: spacing(3), gap: 2 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "800" }}>
-          {game.name}
-        </Text>
-        <Text
-          style={{
-            color: game.catalog ? colors.accent : colors.textMuted,
-            fontSize: 12,
-            fontWeight: "700",
-          }}
-        >
-          {game.catalog ? "Search cards" : "Coming soon"}
-        </Text>
-      </View>
+      {logo ? (
+        <Image
+          source={logo}
+          resizeMode="contain"
+          style={{ width: "100%", height: "100%" }}
+          accessibilityIgnoresInvertColors
+        />
+      ) : (
+        <>
+          <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "800" }}>
+            {game.name}
+          </Text>
+          {!game.catalog ? (
+            <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700" }}>
+              Coming soon
+            </Text>
+          ) : null}
+        </>
+      )}
     </Tap>
   );
 }
@@ -462,8 +490,22 @@ function Results({
                     backgroundColor: colors.elevated,
                   }}
                 />
-                <View style={{ width: tile * 0.8, height: 10, borderRadius: 5, backgroundColor: colors.elevated }} />
-                <View style={{ width: tile * 0.5, height: 8, borderRadius: 4, backgroundColor: colors.surface }} />
+                <View
+                  style={{
+                    width: tile * 0.8,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: colors.elevated,
+                  }}
+                />
+                <View
+                  style={{
+                    width: tile * 0.5,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: colors.surface,
+                  }}
+                />
               </View>
             ))}
           </Grid>
@@ -482,7 +524,9 @@ function Results({
         ) : (
           <Grid>
             {answer.items.map((hit) => {
-              const lead = hit.printings.find((p) => p.id === hit.basePrintingId) ?? hit.printings[0];
+              const lead =
+                hit.printings.find((p) => p.id === hit.basePrintingId) ??
+                hit.printings[0];
               const card: RecentCard = {
                 cardId: hit.id,
                 name: hit.name,
@@ -494,14 +538,20 @@ function Results({
               const more = printingsLine(hit.printings.length);
               return (
                 <View key={hit.id} style={{ width: tile, gap: spacing(1) }}>
-                  <Tap onPress={() => onOpen(card)} accessibilityLabel={`Open ${hit.name}`}>
+                  <Tap
+                    onPress={() => onOpen(card)}
+                    accessibilityLabel={`Open ${hit.name}`}
+                  >
                     <Art uri={card.imageUrl} width={tile} name={hit.name} />
                   </Tap>
                   <Text numberOfLines={2} style={tileName()}>
                     {displayCardName(hit.name, hit.cardNumber)}
                   </Text>
                   <Text numberOfLines={1} style={tileMeta()}>
-                    {[hit.cardNumber, !game && hit.game ? gameShortName(hit.game) : null]
+                    {[
+                      hit.cardNumber,
+                      !game && hit.game ? gameShortName(hit.game) : null,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </Text>
@@ -511,7 +561,9 @@ function Results({
                     </Text>
                   ) : null}
                   {more ? (
-                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>{more}</Text>
+                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>
+                      {more}
+                    </Text>
                   ) : null}
                   {/* One tap from a result to hunting it: the composer,
                       with this card as its first line. */}
@@ -531,7 +583,9 @@ function Results({
                     }}
                   >
                     <Ionicons name="locate" size={13} color={colors.accent} />
-                    <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}>
+                    <Text
+                      style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}
+                    >
                       Hunt it
                     </Text>
                   </Tap>
@@ -560,7 +614,10 @@ function Results({
                   size={36}
                 />
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text numberOfLines={1} style={{ color: colors.textPrimary, fontWeight: "700" }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{ color: colors.textPrimary, fontWeight: "700" }}
+                  >
                     {person.displayName}
                   </Text>
                   {person.handle ? (
@@ -587,8 +644,15 @@ function Results({
                 accessibilityLabel={`Open ${store.name}`}
                 style={[listRow(), index > 0 && listDivider()]}
               >
-                <Ionicons name="storefront-outline" size={20} color={colors.textSecondary} />
-                <Text numberOfLines={1} style={{ flex: 1, color: colors.textPrimary, fontWeight: "700" }}>
+                <Ionicons
+                  name="storefront-outline"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+                <Text
+                  numberOfLines={1}
+                  style={{ flex: 1, color: colors.textPrimary, fontWeight: "700" }}
+                >
                   {store.name}
                 </Text>
                 <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -617,7 +681,15 @@ function Grid({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Art({ uri, width, name }: { uri: string | null; width: number; name: string }) {
+function Art({
+  uri,
+  width,
+  name,
+}: {
+  uri: string | null;
+  width: number;
+  name: string;
+}) {
   return (
     <View
       style={{
@@ -631,10 +703,25 @@ function Art({ uri, width, name }: { uri: string | null; width: number; name: st
       }}
     >
       {uri ? (
-        <RemoteImage uri={uri} style={{ width: "100%", height: "100%" }} contentFit="cover" accessibilityLabel={name} />
+        <RemoteImage
+          uri={uri}
+          style={{ width: "100%", height: "100%" }}
+          contentFit="cover"
+          accessibilityLabel={name}
+        />
       ) : (
-        <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: spacing(2) }}>
-          <Text numberOfLines={3} style={{ color: colors.textMuted, fontSize: 11, textAlign: "center" }}>
+        <View
+          style={{
+            flex: 1,
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(2),
+          }}
+        >
+          <Text
+            numberOfLines={3}
+            style={{ color: colors.textMuted, fontSize: 11, textAlign: "center" }}
+          >
             {name}
           </Text>
         </View>
@@ -661,12 +748,17 @@ function Heading({
         justifyContent: "space-between",
       }}
     >
-      <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontSize: 19, fontWeight: "800" }}>
+      <Text
+        accessibilityRole="header"
+        style={{ color: colors.textPrimary, fontSize: 19, fontWeight: "800" }}
+      >
         {title}
       </Text>
       {action && onAction ? (
         <Tap onPress={onAction} hitSlop={8} accessibilityLabel={action}>
-          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>{action}</Text>
+          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "600" }}>
+            {action}
+          </Text>
         </Tap>
       ) : null}
     </View>
@@ -695,17 +787,26 @@ function Notice({
         backgroundColor: colors.surface,
       }}
     >
-      <Text style={{ color: colors.textSecondary, fontSize: 15, textAlign: "center" }}>{line}</Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 15, textAlign: "center" }}>
+        {line}
+      </Text>
       {action && onAction ? (
         <Tap onPress={onAction} accessibilityLabel={action}>
-          <Text style={{ color: colors.accent, fontSize: 15, fontWeight: "700" }}>{action}</Text>
+          <Text style={{ color: colors.accent, fontSize: 15, fontWeight: "700" }}>
+            {action}
+          </Text>
         </Tap>
       ) : null}
     </View>
   );
 }
 
-const tileName = () => ({ color: colors.textPrimary, fontSize: 13, fontWeight: "700" as const, lineHeight: 17 });
+const tileName = () => ({
+  color: colors.textPrimary,
+  fontSize: 13,
+  fontWeight: "700" as const,
+  lineHeight: 17,
+});
 const tileMeta = () => ({ color: colors.textSecondary, fontSize: 11.5 });
 const listBox = () => ({
   marginHorizontal: gutter,
