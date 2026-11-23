@@ -59,7 +59,12 @@ describe("the share link", () => {
   });
 
   it("goes to the share sheet, and a private binder is told how to get one", () => {
-    expect(binder).toContain("Share.share({ message: url, url })");
+    /* The link once: iOS given both message and url pastes it twice. */
+    expect(binder).not.toContain("Share.share({ message: url, url })");
+    expect(binder).toContain("? { url, title: `${binder.name} on cardflare` }");
+    expect(binder).toContain(
+      ": { message: url, title: `${binder.name} on cardflare` },",
+    );
     expect(binder).toContain('name="share-outline"');
     /* Shown is enough for a link: public, or up for trade. */
     expect(binder).toContain("if (!binder.forTrade && !binder.isPublic) {");
