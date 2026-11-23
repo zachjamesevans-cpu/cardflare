@@ -110,6 +110,10 @@
   /* Type */
   --font-sans: var(--font-brand-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-brand-mono), ui-monospace, monospace;
+  /* Headings and names (the Satoshi test): `font-display`. */
+  --font-display:
+    var(--font-brand-display), var(--font-brand-sans), ui-sans-serif, system-ui,
+    sans-serif;
   /*
    * There is no display face. The wordmark is the founder's ARTWORK,
    * drawn by components/brand/logo.tsx from the cut-out derivative of
@@ -168,6 +172,14 @@ html[data-backdrop="black"] {
     background-color: var(--color-canvas);
     color: var(--color-text-primary);
     font-family: var(--font-sans);
+  }
+
+  /* Headings in Satoshi, a touch tighter, the way the app draws them. */
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
   }
 
   /*

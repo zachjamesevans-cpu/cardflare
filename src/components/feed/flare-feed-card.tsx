@@ -285,7 +285,7 @@ export function FlareFeedCard({
                 href={`/p/${item.playerId}`}
                 className="flex min-w-0 items-center gap-1.5 hover:underline"
               >
-                <span className="truncate text-base font-extrabold text-text-primary">
+                <span className="truncate font-display text-base font-extrabold text-text-primary">
                   {item.displayName}
                 </span>
                 {!item.playerId && <GuestChip />}

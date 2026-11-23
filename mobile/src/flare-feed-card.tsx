@@ -1,4 +1,5 @@
 import { foundLast } from "./found-last";
+import { DISPLAY } from "./fonts";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -453,7 +454,7 @@ export function FlareFeedCard({
                   style={{
                     color: colors.textPrimary,
                     fontSize: 17,
-                    fontWeight: "800",
+                    fontFamily: DISPLAY,
                     flexShrink: 1,
                   }}
                 >

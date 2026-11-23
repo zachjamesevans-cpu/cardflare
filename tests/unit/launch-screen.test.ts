@@ -43,7 +43,7 @@ describe("the launch screen", () => {
     expect(view).toContain("BACKDROPS.green.surface");
     expect(read("mobile/index.ts")).toContain("createElement(LaunchView)");
     expect(read("mobile/App.tsx")).toMatch(
-      /gate === "checking"\) \{\s*return <LaunchView \/>;/,
+      /gate === "checking"( \|\| !fontsReady)?\) \{\s*return <LaunchView \/>;/,
     );
   });
 });

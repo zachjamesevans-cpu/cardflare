@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { DISPLAY } from "./fonts";
 import * as Haptics from "expo-haptics";
 import {
   useEffect,
@@ -1885,7 +1886,7 @@ const styles = StyleSheet.create({
     padding: spacing(4),
     gap: spacing(2),
   },
-  title: { color: colors.textPrimary, fontSize: 18, fontWeight: "700" },
+  title: { color: colors.textPrimary, fontSize: 18, fontFamily: DISPLAY },
   body: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
   muted: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   button: {

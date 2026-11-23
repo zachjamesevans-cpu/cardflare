@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { BACKDROP_SCRIPT } from "@/lib/players/backdrop";
@@ -9,6 +10,20 @@ import "./globals.css";
 const sans = Inter({
   variable: "--font-brand-sans",
   subsets: ["latin"],
+  display: "swap",
+});
+
+/*
+ * Satoshi, for headings and names: the founder's test (2026-11-22), "do
+ * satoshi on both to test". Fontshare's official variable file, self-hosted
+ * as its ITF Free Font License allows (never converted or subset - the
+ * license forbids both). The app loads the same face from
+ * mobile/assets/fonts.
+ */
+const display = localFont({
+  src: "./fonts/Satoshi-Variable.woff2",
+  variable: "--font-brand-display",
+  weight: "300 900",
   display: "swap",
 });
 
@@ -68,7 +83,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${sans.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${display.variable} ${mono.variable} h-full antialiased`}
       // The head script below may set data-backdrop before React hydrates.
       suppressHydrationWarning
     >

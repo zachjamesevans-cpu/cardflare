@@ -47,7 +47,7 @@ export function WornNameRow({
       <span className="flex items-center gap-2">
         <span
           className={cn(
-            "cfx-name",
+            "cfx-name font-display",
             worn.nameplate ? `cfa-${worn.nameplate}` : "text-text-primary",
           )}
         >

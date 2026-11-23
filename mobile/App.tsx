@@ -1,4 +1,5 @@
 import { LaunchView } from "./src/launch-view";
+import { useDisplayFonts } from "./src/fonts";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
@@ -909,6 +910,9 @@ function AppGates() {
    * if storage is slow.
    */
   const [gate, setGate] = useState<"checking" | "welcome" | "open">("checking");
+  /* Satoshi for headings and names (src/fonts.ts): the canvas holds a
+     moment longer while its three faces load, so no title draws twice. */
+  const fontsReady = useDisplayFonts();
   /* Where the player was before a backdrop change redrew the app
      (src/backdrop.ts), taken once so they land back on Settings. */
   const [restored] = useState(takeNavigation);
@@ -1012,7 +1016,7 @@ function AppGates() {
   }, [gate]);
 
   /* Still the launch screen while the session is read (launch-view.tsx). */
-  if (gate === "checking") {
+  if (gate === "checking" || !fontsReady) {
     return <LaunchView />;
   }
 

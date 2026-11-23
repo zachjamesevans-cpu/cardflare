@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { DISPLAY, DISPLAY_HEAVY } from "../fonts";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -433,7 +434,7 @@ function GameTile({
         />
       ) : (
         <>
-          <Text style={{ color: colors.accent, fontSize: 20, fontWeight: "800" }}>
+          <Text style={{ color: colors.accent, fontSize: 21, fontFamily: DISPLAY_HEAVY }}>
             {game.name}
           </Text>
           {!game.catalog ? (
@@ -750,7 +751,7 @@ function Heading({
     >
       <Text
         accessibilityRole="header"
-        style={{ color: colors.textPrimary, fontSize: 19, fontWeight: "800" }}
+        style={{ color: colors.textPrimary, fontSize: 20, fontFamily: DISPLAY_HEAVY }}
       >
         {title}
       </Text>
@@ -804,7 +805,7 @@ function Notice({
 const tileName = () => ({
   color: colors.textPrimary,
   fontSize: 13,
-  fontWeight: "700" as const,
+  fontFamily: DISPLAY,
   lineHeight: 17,
 });
 const tileMeta = () => ({ color: colors.textSecondary, fontSize: 11.5 });

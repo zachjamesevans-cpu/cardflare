@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { DISPLAY } from "./fonts";
 import { Text, View } from "react-native";
 
 import type { NearbyTrader } from "./api";
@@ -52,7 +53,7 @@ export function TraderRow({
         size={46}
       />
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 16, fontWeight: "800" }}>
+        <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 17, fontFamily: DISPLAY }}>
           {trader.displayName}
         </Text>
         <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 13 }}>

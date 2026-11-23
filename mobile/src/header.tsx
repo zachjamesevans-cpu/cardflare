@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { DISPLAY } from "./fonts";
 import type { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackHeaderProps } from "@react-navigation/native-stack";
 import type { ComponentProps, ReactNode } from "react";
@@ -105,7 +106,7 @@ export function AppHeader({
           <Text
             numberOfLines={1}
             accessibilityRole="header"
-            style={{ color: colors.textPrimary, fontSize: 17, fontWeight: "700" }}
+            style={{ color: colors.textPrimary, fontSize: 17, fontFamily: DISPLAY }}
           >
             {title}
           </Text>

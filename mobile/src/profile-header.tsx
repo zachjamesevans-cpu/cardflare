@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { DISPLAY_HEAVY } from "./fonts";
 import type { ReactNode } from "react";
 import {
   Platform,
@@ -123,9 +124,9 @@ export function ProfileHeader({
               nameplate={equips.nameplate}
               baseStyle={{
                 color: colors.textPrimary,
-                fontSize: 17,
+                fontSize: 18,
                 lineHeight: 22,
-                fontWeight: "800",
+                fontFamily: DISPLAY_HEAVY,
               }}
             />
             <WornBadge badge={equips.badge} />

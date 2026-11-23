@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { DISPLAY_HEAVY } from "./fonts";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
@@ -40,7 +41,7 @@ export function TradersStrip() {
     >
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
         <Ionicons name="people" size={18} color={colors.accent} />
-        <Text accessibilityRole="header" style={{ flex: 1, color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+        <Text accessibilityRole="header" style={{ flex: 1, color: colors.textPrimary, fontSize: 19, fontFamily: DISPLAY_HEAVY }}>
           Traders near you
         </Text>
         {traders.length > 0 ? (
