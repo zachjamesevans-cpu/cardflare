@@ -139,7 +139,7 @@ describe("the scanner is one flow, a single read first", () => {
 
   it("sends a page as a page for somebody who scans pages, else the PRO screen", () => {
     expect(scanner).toMatch(
-      /if \(reason === "is-page"\) \{\s*if \(rights\.pages === "on" && photo\) await sendAsPage\(photo\);\s*else setStep\(\{ kind: "pro", why: PAGES_ARE_PRO \}\);/,
+      /if \(reason === "is-page"\) \{\s*if \(rights\.pages === "on" && photo\) await sendAsPage\(photo\);\s*else setStep\(\{ kind: "pro", why: PAGES_LINE \}\);/,
     );
     /* Made ready from the kept photo at full size, the page scanner's own helpers. */
     expect(scanner).toContain("photo = await preparePage(file);");
@@ -150,11 +150,11 @@ describe("the scanner is one flow, a single read first", () => {
 
   it("shows the PRO screen when the day's free scans are gone", () => {
     expect(scanner).toMatch(
-      /if \(reason === "daily-singles"\) \{\s*setSinglesLeft\(0\);\s*setStep\(\{ kind: "pro", why: SCAN_REFUSALS\["daily-singles"\] \}\);/,
+      /if \(reason === "daily-singles"\) \{\s*setSinglesLeft\(0\);\s*setStep\(\{ kind: "pro", why: SINGLES_DONE \}\);/,
     );
     /* Known gone before the shot: nothing is sent at all. */
     expect(scanner).toMatch(
-      /if \(rights\.singles === "used-up" \|\| singlesLeft === 0\) \{\s*setStep\(\{ kind: "pro", why: SCAN_REFUSALS\["daily-singles"\] \}\);\s*return;/,
+      /if \(rights\.singles === "used-up" \|\| singlesLeft === 0\) \{\s*setStep\(\{ kind: "pro", why: SINGLES_DONE \}\);\s*return;/,
     );
   });
 

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PRO_ENABLED } from "../pro-enabled";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   type RouteProp,
@@ -438,7 +439,8 @@ export function SettingsScreen() {
               email={me?.player.email ?? null}
               onEditProfile={() => navigation.navigate("EditProfile")}
             />
-            <ProCard />
+            {/* Pro is not on sale for launch (pro-enabled.ts). */}
+            {PRO_ENABLED ? <ProCard /> : null}
             {/* Always here when the account is: App Review's 5.1.1(v).
                 Last and on its own, never in the menu itself. */}
             {deleteBlock}
@@ -881,10 +883,12 @@ function DeleteAccount({ handle }: { handle: string | null }) {
       <Body>
         {"Everything goes: your profile, Flares, hunts, binders, showcase, trade history, Embers and unlocks. There is no undo."}
       </Body>
-      <Muted>
-        Pro through the App Store is billed by Apple: cancel it in your Apple ID
-        subscriptions too, or it keeps renewing.
-      </Muted>
+      {PRO_ENABLED ? (
+        <Muted>
+          Pro through the App Store is billed by Apple: cancel it in your Apple ID
+          subscriptions too, or it keeps renewing.
+        </Muted>
+      ) : null}
       {open ? (
         <>
           <Body>

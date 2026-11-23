@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ChevronRight, Flame, Settings, Store, Wand2 } from "lucide-react";
@@ -223,14 +224,16 @@ export default async function ProfilePage({
               {/* The Embers shop, its own icon - the founder: "the embers
                   shop should be its own icon along with the top right
                   icons on profile". */}
-              <Link
-                href="/profile/store"
-                title="Embers shop"
-                className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
-              >
-                <Store className="size-5" aria-hidden="true" />
-                <span className="sr-only">Embers shop</span>
-              </Link>
+              {PRO_ENABLED ? (
+                <Link
+                  href="/profile/store"
+                  title="Embers shop"
+                  className="flex size-10 items-center justify-center rounded-full border border-border bg-surface/80 text-text-secondary backdrop-blur transition-colors hover:border-border-strong hover:text-text-primary"
+                >
+                  <Store className="size-5" aria-hidden="true" />
+                  <span className="sr-only">Embers shop</span>
+                </Link>
+              ) : null}
               {/* The wand: Edit profile, which holds what you wear now
                   (its Look and Showcase tabs). */}
               <Link

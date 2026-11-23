@@ -59,7 +59,7 @@ describe("Edit profile, the app's screen", () => {
     expect(screen).toContain('"Change cover"');
     expect(screen).toContain('"Change picture"');
     expect(screen).toContain('label="Use a GIF"');
-    expect(screen).toContain("mark={<ProMark size={15} />}");
+    expect(screen).toContain("mark={PRO_ENABLED ? <ProMark size={15} /> : undefined}");
   });
 
   it("writes through the same endpoints the website's forms use", () => {

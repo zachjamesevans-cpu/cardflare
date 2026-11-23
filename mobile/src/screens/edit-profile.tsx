@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PRO_ENABLED } from "../pro-enabled";
 import { useNavigation, usePreventRemove } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -98,7 +99,10 @@ const TABS: { key: EditTab; label: string }[] = [
  */
 export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: EditTab }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const [tab, setTab] = useState<EditTab>(initialTab);
+  const [chosenTab, setTab] = useState<EditTab>(initialTab);
+  /* Look and Showcase dress you in the shop's cosmetics: hidden with
+     it while Pro is off (pro-enabled.ts), so it is Profile alone. */
+  const tab: EditTab = PRO_ENABLED ? chosenTab : "profile";
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);
@@ -257,6 +261,7 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
       }}
     >
       {/* The tabs. */}
+      {PRO_ENABLED ? (
       <View
         accessibilityRole="tablist"
         style={{
@@ -297,6 +302,7 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
           );
         })}
       </View>
+      ) : null}
 
       {tab !== "profile" ? (
         <Wardrobe
@@ -336,6 +342,7 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
             auraArt={shown.wear?.auraArt ?? null}
             size={CIRCLE}
           />
+          {PRO_ENABLED ? (
           <Tap
             onPress={() => setTab("look")}
             accessibilityLabel="Avatar effects"
@@ -352,6 +359,7 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
           >
             <Ionicons name="color-wand" size={32} color={colors.textSecondary} />
           </Tap>
+          ) : null}
         </View>
 
         {/* One link, the way Instagram has one. It reveals the picture
@@ -398,11 +406,13 @@ export function EditProfileScreen({ initialTab = "profile" }: { initialTab?: Edi
              */}
             <Button
               label="Use a GIF"
-              mark={<ProMark size={15} />}
+              mark={PRO_ENABLED ? <ProMark size={15} /> : undefined}
               variant="secondary"
               disabled={busy !== null}
               onPress={() =>
-                profile.pro ? void animated() : navigation.navigate("Pro")
+                (profile.animatedAvatar ?? profile.pro)
+                  ? void animated()
+                  : navigation.navigate("Pro")
               }
             />
           </View>

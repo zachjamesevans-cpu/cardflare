@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import Link from "next/link";
 import {
   Ban,
@@ -353,10 +354,12 @@ export async function SettingsContent({
           Everything goes: your profile, Flares, hunts, binders, showcase, trade
           history, Embers and unlocks. There is no undo.
         </p>
-        <p className="text-sm text-text-muted">
-          <ProMark /> through the App Store is billed by Apple: cancel it in your Apple
-          ID subscriptions too, or it keeps renewing.
-        </p>
+        {PRO_ENABLED ? (
+          <p className="text-sm text-text-muted">
+            <ProMark /> through the App Store is billed by Apple: cancel it in your
+            Apple ID subscriptions too, or it keeps renewing.
+          </p>
+        ) : null}
       </div>
       <DeleteAccountForm handle={handle} />
     </Card>
@@ -369,27 +372,29 @@ export async function SettingsContent({
   ) : null;
 
   /* Cardflare Pro, under Account: one row, not a category. */
-  const proCard = playerId ? (
-    <Card key="pro" className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
-        <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
-        <div className="flex flex-col gap-1">
-          <p className="font-semibold text-text-primary">
-            <ProMark />
-          </p>
-          <p className="text-sm text-text-secondary">
-            What Pro adds, and your subscription. Bought in the app, Apple bills it and
-            manages it from your Apple ID.
-          </p>
+  /* Hidden while Pro is not on sale (pro-enabled.ts). */
+  const proCard =
+    PRO_ENABLED && playerId ? (
+      <Card key="pro" className="flex flex-col gap-3">
+        <div className="flex items-start gap-3">
+          <Sparkles className="mt-0.5 size-5 shrink-0 text-accent" aria-hidden="true" />
+          <div className="flex flex-col gap-1">
+            <p className="font-semibold text-text-primary">
+              <ProMark />
+            </p>
+            <p className="text-sm text-text-secondary">
+              What Pro adds, and your subscription. Bought in the app, Apple bills it
+              and manages it from your Apple ID.
+            </p>
+          </div>
         </div>
-      </div>
-      <div>
-        <Link href="/pro" className={buttonStyles("secondary")}>
-          Open Pro
-        </Link>
-      </div>
-    </Card>
-  ) : null;
+        <div>
+          <Link href="/pro" className={buttonStyles("secondary")}>
+            Open Pro
+          </Link>
+        </div>
+      </Card>
+    ) : null;
 
   /* Help: getting in touch, and the pages App Review reads for. */
   const helpCard = (

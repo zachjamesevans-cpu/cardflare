@@ -126,6 +126,9 @@ export async function GET(request: Request): Promise<Response> {
        */
       tier: profile.tier,
       pro: tierAllows(profile.tier, "cosmetics"),
+      /* GIF pictures, separate from cosmetics: open to everyone while
+         Pro is not on sale (src/lib/billing/pro-enabled.ts). */
+      animatedAvatar: tierAllows(profile.tier, "animatedAvatar"),
       /*
        * The Pro screen's "Renews 12 Nov" (or "Ends", once cancelled) and
        * where it is managed: Apple's subscription page for an app

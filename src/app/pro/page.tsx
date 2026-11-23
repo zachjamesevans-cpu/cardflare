@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import Link from "next/link";
 import { Check, Film, RefreshCw, Sparkles } from "lucide-react";
 
@@ -8,6 +9,7 @@ import { ProMark } from "@/components/stores/ultra-mark";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Section, SectionHeading } from "@/components/ui/section";
+import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/auth/session";
 import {
   PRO_PRICE_LABEL,
@@ -89,6 +91,9 @@ export default async function ProPage({
     await reconcileCheckoutSession(session_id, { playerId });
   }
   const plan = playerId ? await proPlanForPlayer(playerId) : null;
+  /* Not on sale for launch (pro-enabled.ts): the page stays only for
+     somebody already on Pro, to see and manage their plan. */
+  if (!PRO_ENABLED && (!plan || plan.state === "none")) redirect("/");
 
   const notice =
     checkout === "success"

@@ -1,5 +1,6 @@
 "use client";
 
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { Camera, Images, Minus, Plus, ScanLine } from "lucide-react";
@@ -24,7 +25,9 @@ import {
   DONE_SCANNING,
   FILL_THE_FRAME,
   GET_PRO,
+  LAUNCH_REFUSALS,
   PAGES_ARE_PRO,
+  PAGES_NOT_YET,
   READING_CARD,
   SCAN_AGAIN,
   SCAN_INTRO_PAGES,
@@ -44,6 +47,12 @@ import {
 } from "@/lib/cards/scan-rules";
 import type { CardPrinting, CardResult } from "@/lib/cards/schema";
 
+/* What the door says: about Pro while it is on sale, plainly while it
+   is not (src/lib/billing/pro-enabled.ts). */
+const PAGES_LINE = PRO_ENABLED ? PAGES_ARE_PRO : PAGES_NOT_YET;
+const SINGLES_DONE = PRO_ENABLED
+  ? SCAN_REFUSALS["daily-singles"]
+  : LAUNCH_REFUSALS["daily-singles"];
 /**
  * The scanner: one camera for one card or a whole binder page, over
  * everything. The founder (2026-10-09): "a unified scan - it can detect
@@ -224,7 +233,7 @@ export function Scanner({
     }
     /* The day's free scans are gone: the Pro screen, nothing sent. */
     if (rights.singles === "used-up" || singlesLeft === 0) {
-      setStep({ kind: "pro", why: SCAN_REFUSALS["daily-singles"] });
+      setStep({ kind: "pro", why: SINGLES_DONE });
       return;
     }
     kept.current = file;
@@ -263,12 +272,12 @@ export function Scanner({
     const reason = answer.ok ? "not-found" : answer.reason;
     if (reason === "is-page") {
       if (rights.pages === "on" && photo) await sendAsPage(photo);
-      else setStep({ kind: "pro", why: PAGES_ARE_PRO });
+      else setStep({ kind: "pro", why: PAGES_LINE });
       return;
     }
     if (reason === "daily-singles") {
       setSinglesLeft(0);
-      setStep({ kind: "pro", why: SCAN_REFUSALS["daily-singles"] });
+      setStep({ kind: "pro", why: SINGLES_DONE });
       return;
     }
     if (reason === "not-found" && !answer.ok && answer.read) {
@@ -341,9 +350,11 @@ export function Scanner({
               <h2 className="text-xl font-bold text-text-primary">
                 {SCAN_INTRO_SINGLE}
               </h2>
-              <p className="text-base text-text-secondary">
-                {SCAN_INTRO_PAGES} <ProMark />
-              </p>
+              {PRO_ENABLED ? (
+                <p className="text-base text-text-secondary">
+                  {SCAN_INTRO_PAGES} <ProMark />
+                </p>
+              ) : null}
             </div>
             <p className="max-w-xs text-sm text-text-muted">{FILL_THE_FRAME}</p>
             {singlesLeft !== null && (
@@ -467,11 +478,14 @@ function ProScreen({ why, onAgain }: { why: string; onAgain: () => void }) {
       <p className="max-w-xs text-base text-text-primary">
         <ProWords text={why} />
       </p>
-      <ProMark className="text-6xl" />
+      {/* No Pro to sell while it is off (pro-enabled.ts): the line alone. */}
+      {PRO_ENABLED ? <ProMark className="text-6xl" /> : null}
       <div className="flex w-full max-w-xs flex-col gap-2">
-        <Link href="/pro" className={buttonStyles("primary", "lg")}>
-          {GET_PRO}
-        </Link>
+        {PRO_ENABLED ? (
+          <Link href="/pro" className={buttonStyles("primary", "lg")}>
+            {GET_PRO}
+          </Link>
+        ) : null}
         <Button type="button" variant="secondary" onClick={onAgain}>
           {SCAN_AGAIN}
         </Button>

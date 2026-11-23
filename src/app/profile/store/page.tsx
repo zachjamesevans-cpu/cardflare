@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import { redirect } from "next/navigation";
 import { Flame } from "lucide-react";
 
@@ -43,6 +44,8 @@ export const dynamic = "force-dynamic";
  * a player account, setup finished.
  */
 export default async function EmberStorePage() {
+  /* Hidden for launch with Pro (src/lib/billing/pro-enabled.ts). */
+  if (!PRO_ENABLED) redirect("/profile");
   const viewer = await getViewer();
 
   if (viewer.kind === "anonymous") redirect("/login?next=/profile/store");

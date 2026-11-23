@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+/* The tiers as they are when Pro is on sale. While it is off for launch,
+   these limits are lifted for everyone (tests/unit/pro-enabled.test.ts). */
+vi.mock("@/lib/billing/pro-enabled", () => ({ PRO_ENABLED: true }));
 
 import {
   ANIMATED_AVATAR_MAX_BYTES,

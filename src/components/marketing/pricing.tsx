@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { MaxMark, ProMark, UltraMark } from "@/components/stores/ultra-mark";
@@ -84,8 +85,10 @@ export function Pricing() {
 
       {/* Four tiles with width; on a phone, four rows, so the tiers
           read down the screen instead of as a column of small cards. */}
-      <div className="mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-2 md:mt-8 md:gap-4 lg:grid-cols-4">
-        {TIERS.map((tier) => (
+      <div
+        className={`mx-auto mt-6 grid w-full max-w-6xl gap-3 sm:grid-cols-2 md:mt-8 md:gap-4 ${PRO_ENABLED ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}
+      >
+        {TIERS.filter((tier) => PRO_ENABLED || tier.name !== "Pro").map((tier) => (
           <Card
             key={tier.name}
             className={`flex flex-row flex-wrap items-center gap-x-4 gap-y-2 sm:flex-col sm:items-stretch sm:gap-3 ${tier.featured ? "border-accent" : ""}`}
