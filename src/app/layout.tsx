@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
-import localFont from "next/font/local";
+import {
+  Inter,
+  JetBrains_Mono,
+  Plus_Jakarta_Sans,
+  Space_Grotesk,
+} from "next/font/google";
 
 import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { BACKDROP_SCRIPT } from "@/lib/players/backdrop";
@@ -14,16 +18,22 @@ const sans = Inter({
 });
 
 /*
- * Satoshi, for headings and names: the founder's test (2026-11-22), "do
- * satoshi on both to test". Fontshare's official variable file, self-hosted
- * as its ITF Free Font License allows (never converted or subset - the
- * license forbids both). The app loads the same face from
- * mobile/assets/fonts.
+ * The type, matched to TUKAR's at the founder's request (2026-11-22: "go
+ * the full match on both"): Plus Jakarta Sans for headings and names,
+ * Space Grotesk in spaced capitals for small labels. The app embeds the
+ * same two (mobile/src/fonts.ts).
  */
-const display = localFont({
-  src: "./fonts/Satoshi-Variable.woff2",
+const display = Plus_Jakarta_Sans({
   variable: "--font-brand-display",
-  weight: "300 900",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
+
+const caps = Space_Grotesk({
+  variable: "--font-brand-caps",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
   display: "swap",
 });
 
@@ -83,7 +93,7 @@ export default function RootLayout({
     <html
       lang="en"
       data-scroll-behavior="smooth"
-      className={`${sans.variable} ${display.variable} ${mono.variable} h-full antialiased`}
+      className={`${sans.variable} ${display.variable} ${caps.variable} ${mono.variable} h-full antialiased`}
       // The head script below may set data-backdrop before React hydrates.
       suppressHydrationWarning
     >

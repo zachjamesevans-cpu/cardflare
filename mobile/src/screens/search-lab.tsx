@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { DISPLAY, DISPLAY_HEAVY } from "../fonts";
+import { capsLabel, DISPLAY, DISPLAY_HEAVY, DISPLAY_SEMI } from "../fonts";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -617,7 +617,7 @@ function Results({
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text
                     numberOfLines={1}
-                    style={{ color: colors.textPrimary, fontWeight: "700" }}
+                    style={{ color: colors.textPrimary, fontSize: 16, fontFamily: DISPLAY_SEMI }}
                   >
                     {person.displayName}
                   </Text>
@@ -751,7 +751,7 @@ function Heading({
     >
       <Text
         accessibilityRole="header"
-        style={{ color: colors.textPrimary, fontSize: 20, fontFamily: DISPLAY_HEAVY }}
+        style={[capsLabel(12, true), { color: colors.textPrimary }]}
       >
         {title}
       </Text>
@@ -808,7 +808,7 @@ const tileName = () => ({
   fontFamily: DISPLAY,
   lineHeight: 17,
 });
-const tileMeta = () => ({ color: colors.textSecondary, fontSize: 11.5 });
+const tileMeta = () => ({ ...capsLabel(9.5), color: colors.textSecondary });
 const listBox = () => ({
   marginHorizontal: gutter,
   paddingHorizontal: spacing(3),

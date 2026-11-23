@@ -1,4 +1,5 @@
 import { useNavigation } from "@react-navigation/native";
+import { capsLabel } from "../fonts";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo, useState } from "react";
 import { RefreshControl, ScrollView, Switch, Text, View } from "react-native";
@@ -139,7 +140,7 @@ function Chips({
 }) {
   return (
     <View style={{ gap: spacing(1.5) }}>
-      <Text style={{ color: colors.textMuted, fontSize: 12, fontWeight: "700", letterSpacing: 0.6 }}>
+      <Text style={[capsLabel(11, true), { color: colors.textMuted }]}>
         {label.toUpperCase()}
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing(2) }}>

@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { DISPLAY_HEAVY } from "./fonts";
+import { capsLabel, DISPLAY_HEAVY } from "./fonts";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useMemo } from "react";
@@ -51,7 +51,7 @@ export function TradersStrip() {
         ) : null}
       </View>
       {view.state === "ok" && traders.length > 0 ? (
-        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
+        <Text style={[capsLabel(10), { color: colors.textMuted, marginTop: 4 }]}>
           {`${traders.length} within ${view.radius} mi`}
           {traders.some((trader) => trader.matchCount > 0)
             ? ` · ${traders.filter((trader) => trader.matchCount > 0).length} have cards you hunt`

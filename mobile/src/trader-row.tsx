@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { DISPLAY } from "./fonts";
+import { capsLabel, DISPLAY_SEMI } from "./fonts";
 import { Text, View } from "react-native";
 
 import type { NearbyTrader } from "./api";
@@ -8,6 +8,11 @@ import { PlayerAvatar } from "./player-avatar";
 import { matchLine, tradeCountLine, type TradersView } from "./traders";
 import { Tap } from "./ui";
 import { colors, spacing } from "./theme";
+
+/** "<2 MI", "7 MI": the distance as short as TUKAR's, still only rounded. */
+export function shortDistance(miles: number): string {
+  return miles < 2 ? "<2 mi" : `${Math.round(miles)} mi`;
+}
 
 /**
  * One trader near you (the UI experiment): face, name, handle and
@@ -52,26 +57,31 @@ export function TraderRow({
         frame={trader.frame}
         size={46}
       />
-      <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-        <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 17, fontFamily: DISPLAY }}>
+      {/* TUKAR's arrangement, in our colours: the name large, the
+          handle and distance under it in spaced capitals, the count on
+          the right. */}
+      <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
+        <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 19, fontFamily: DISPLAY_SEMI }}>
           {trader.displayName}
         </Text>
-        <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 13 }}>
-          {[trader.handle ? formatHandle(trader.handle) : null, trader.milesLabel]
+        <Text numberOfLines={1} style={[capsLabel(11), { color: colors.textMuted }]}>
+          {[trader.handle ? formatHandle(trader.handle) : null, shortDistance(trader.miles)]
             .filter(Boolean)
             .join(" · ")}
         </Text>
-        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: "700" }}>
-          {tradeCountLine(trader.tradeCount)}
-        </Text>
         {matches ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-            <Ionicons name="locate" size={13} color={colors.accent} />
-            <Text style={{ color: colors.accent, fontSize: 13, fontWeight: "700" }}>{matches}</Text>
+            <Ionicons name="locate" size={12} color={colors.accent} />
+            <Text numberOfLines={1} style={[capsLabel(11, true), { color: colors.accent }]}>
+              {/* Short, so the spaced capitals keep to one line. */}
+              {`${trader.matchCount} ${trader.matchCount === 1 ? "hunt match" : "hunt matches"}`}
+            </Text>
           </View>
         ) : null}
       </View>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      <Text style={[capsLabel(11, true), { color: colors.textPrimary }]}>
+        {`${trader.tradeCount.toLocaleString("en-US")} for trade`}
+      </Text>
     </Tap>
   );
 }
