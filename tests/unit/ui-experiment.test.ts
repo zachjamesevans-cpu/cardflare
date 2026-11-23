@@ -51,26 +51,26 @@ const pocket = (
   game,
 });
 
-describe("the experiment is off unless switched on", () => {
+describe("shipped on, with an off switch on both ends", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   it("on the server", () => {
     vi.stubEnv("CARDFLARE_UI_EXPERIMENT", "");
-    expect(uiExperimentEnabled()).toBe(false);
-    vi.stubEnv("CARDFLARE_UI_EXPERIMENT", "1");
     expect(uiExperimentEnabled()).toBe(true);
+    vi.stubEnv("CARDFLARE_UI_EXPERIMENT", "0");
+    expect(uiExperimentEnabled()).toBe(false);
   });
 
   it("answers 404 from its endpoint while off, before asking who you are", async () => {
-    vi.stubEnv("CARDFLARE_UI_EXPERIMENT", "");
+    vi.stubEnv("CARDFLARE_UI_EXPERIMENT", "0");
     const response = await GET(new Request("http://localhost/api/v1/nearby/traders"));
     expect(response.status).toBe(404);
   });
 
-  it("in the app: read from an env var no real build sets", () => {
+  it("in the app: on unless a build sets the variable to 0", () => {
     const flag = read("mobile/src/ui-experiment.ts");
     expect(flag).toContain(
-      'export const UI_EXPERIMENT = process.env.EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT === "1";',
+      'export const UI_EXPERIMENT = process.env.EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT !== "0";',
     );
     for (const config of ["mobile/app.json", "mobile/eas.json"]) {
       expect(read(config)).not.toContain("CARDFLARE_UI_EXPERIMENT");

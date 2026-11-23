@@ -1,10 +1,11 @@
 # UI experiment: card search and traders near you
 
-A reversible experiment, OFF by default everywhere. Branch
-`experiment/search-nearby-overhaul`, worktree `../cardflare-ui-lab`.
-Nothing here is deployed, and no database migration was added or run.
+Built as a reversible experiment on `experiment/search-nearby-overhaul`,
+then **shipped ON** by the founder on 2026-11-22 ("push this to main branch
+and app"). Both halves keep an off switch (below). No database migration was
+added or run.
 
-## What it changes (only while switched on)
+## What it changes
 
 **App, Search tab** (`mobile/src/screens/search-lab.tsx`):
 
@@ -26,8 +27,8 @@ the store "You're here" banner. Its "See all" opens `Traders`
 mi), game, and "Only people with cards I hunt", plus pull to refresh.
 
 **Server**: `GET /api/v1/nearby/traders` (`src/lib/nearby/traders.ts`,
-ranking in `src/lib/nearby/traders-rank.ts`). It answers **404** unless the
-server runs with `CARDFLARE_UI_EXPERIMENT=1`.
+ranking in `src/lib/nearby/traders-rank.ts`). It answers **404** when the
+server runs with `CARDFLARE_UI_EXPERIMENT=0`.
 
 ### What "traders near you" counts, and never counts
 
@@ -48,59 +49,33 @@ server runs with `CARDFLARE_UI_EXPERIMENT=1`.
 tab, no feed of listings." This lists people and a count, never the cards,
 and only people who opted in. Whether to adopt it is the founder's call.
 
-## Run it
-
-Two terminals. The website must run locally because the new endpoint isn't
-deployed. Everything else in the app keeps talking to cardflare.gg.
-
-```bash
-# 1. The website, with the experiment's endpoint switched on
-cd ~/cardflare-ui-lab
-cp ~/cardflare/.env.local .env.local        # first time only (gitignored)
-CARDFLARE_UI_EXPERIMENT=1 npx next dev -p 3000
-
-# 2. The app's bundler, with the experiment switched on
-cd ~/cardflare-ui-lab/mobile
-EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT=1 \
-EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT_API=http://localhost:3000 \
-npx expo start --dev-client --clear
-```
-
-Then open the dev build in the simulator. Stop any other Metro on port 8081
-first.
-
-To see the traders list filled with made-up people, use Settings → Demo
-mode → Turn demo mode on. That only exists in development builds; the demo
-answer is in `mobile/src/demo/demo-server.ts`. With demo mode off, the list
-is real: your ZIP or this phone's location, and real opted-in players.
-
 ## Switch it off
 
-Restart Metro **without** the two `EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT*`
-variables (and `--clear`). The Search and Nearby tabs go back to the
-original screens. Stop the local `next dev`.
+- **Server:** set `CARDFLARE_UI_EXPERIMENT=0` in Vercel's environment and
+  redeploy. `GET /api/v1/nearby/traders` then answers 404, and the app's
+  Traders card says it couldn't load.
+- **App:** build with `EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT=0` (for example in
+  `eas.json`'s production `env`), or locally start Metro with it. The Search
+  and Nearby tabs go back to the original screens.
 
-No real build can switch it on, because EAS, TestFlight and App Store builds
-never set those variables (`tests/unit/ui-experiment.test.ts` checks
-`app.json` and `eas.json`).
-
-## Go back to the original app
+## Try a server change locally
 
 ```bash
-cd ~/cardflare/mobile && npx expo start --dev-client --clear   # main checkout
+cd <repo> && npx next dev -p 3000
+cd <repo>/mobile && EXPO_PUBLIC_CARDFLARE_UI_EXPERIMENT_API=http://localhost:3000 npx expo start --dev-client --clear
 ```
+
+Only the traders request goes to the local server; everything else stays on
+cardflare.gg. To see the list filled with made-up people, turn on Settings →
+Demo mode (development builds only).
 
 ## Remove it entirely
 
-The experiment lives only on its branch and worktree, and main is untouched:
+Revert the merge commit on main (`git revert -m 1 <merge sha>`), or switch
+both halves off as above. The original Search screen
+(`mobile/src/screens/search.tsx`) and Nearby are unchanged in the code.
 
-```bash
-cd ~/cardflare
-git worktree remove ../cardflare-ui-lab          # add --force if it has uncommitted files
-git branch -D experiment/search-nearby-overhaul  # only if you're sure
-```
-
-## What adopting it would still need
+## Still to do
 
 - **The website.** This round is app-only. The repo rule is both platforms,
   so the website needs the same Search and Traders before it ships.

@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * `radius` is 10/25/50/100 miles, `game` a catalogue slug, `matching=1`
  * keeps only people with a card you hunt.
  *
- * 404 unless CARDFLARE_UI_EXPERIMENT=1 (src/lib/ui-experiment.ts).
+ * 404 when CARDFLARE_UI_EXPERIMENT=0 (src/lib/ui-experiment.ts).
  */
 export async function GET(request: Request): Promise<Response> {
   if (!uiExperimentEnabled()) return new Response("Not found", { status: 404 });
