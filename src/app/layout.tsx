@@ -26,14 +26,12 @@ const sans = Inter({
 const display = Plus_Jakarta_Sans({
   variable: "--font-brand-display",
   subsets: ["latin"],
-  weight: ["500", "600", "700", "800"],
   display: "swap",
 });
 
 const caps = Space_Grotesk({
   variable: "--font-brand-caps",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
   display: "swap",
 });
 
