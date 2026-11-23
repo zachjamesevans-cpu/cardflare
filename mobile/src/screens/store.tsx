@@ -176,6 +176,8 @@ export function StoreScreen() {
         />
       ) : null}
 
+      {/* Only once the packs have loaded: before, the card stood empty. */}
+      {packSeries.length > 0 ? (
       <Card>
         <Title>cardflare packs</Title>
         <Muted>
@@ -205,6 +207,7 @@ export function StoreScreen() {
           />
         ))}
       </Card>
+      ) : null}
 
       <Card>
         <Shelf

@@ -130,7 +130,7 @@ describe("the switches", () => {
       ["messages", "Messages", "A new message in a conversation."],
       [
         "nights",
-        "Nights",
+        "Rooms and events",
         "Boards opening, matches, a reminder on the day, and Flares in a room you are in.",
       ],
       [

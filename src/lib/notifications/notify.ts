@@ -1,7 +1,7 @@
 import "server-only";
 
 import { unreadCount } from "@/lib/notifications/inbox";
-import { postHref, truncatePreview } from "@/lib/notifications/preview";
+import { messagePreview, postHref, truncatePreview } from "@/lib/notifications/preview";
 import { groupForKind } from "@/lib/notifications/push-prefs";
 import { pushPrefsFor } from "@/lib/notifications/push-prefs-server";
 import type { NotificationRow } from "@/lib/supabase/types";
@@ -1081,7 +1081,7 @@ export async function notifyMessageReceived(
     const title = card?.exact_name
       ? `${name} messaged about ${card.exact_name}`
       : `${name} sent a message`;
-    const preview = truncatePreview(body);
+    const preview = messagePreview(body);
     /* The thread itself, not the list: a tap lands in the conversation. */
     const path = `/local?thread=${encodeURIComponent(threadId)}`;
 

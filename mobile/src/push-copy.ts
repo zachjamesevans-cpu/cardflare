@@ -27,7 +27,7 @@ export const PUSH_GROUPS: { key: PushGroup; label: string; line: string }[] = [
   { key: "messages", label: "Messages", line: "A new message in a conversation." },
   {
     key: "nights",
-    label: "Nights",
+    label: "Rooms and events",
     line: "Boards opening, matches, a reminder on the day, and Flares in a room you are in.",
   },
   {
