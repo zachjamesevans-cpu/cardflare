@@ -251,7 +251,9 @@ export function NeedBadge({
 const RING_ROOM = HELD_RING_WIDTH + 3;
 
 /** A strip tile's width: two and a half across a phone, so it scrolls. */
-export const STRIP_TILE = 108;
+/* 97, a tenth under the 108 it was: the founder, "i almost think the
+   cards are too large tbh. maybe make them 10% smaller". */
+export const STRIP_TILE = 97;
 
 /**
  * A multi-card Flare, as a strip: every card's art at once, the count

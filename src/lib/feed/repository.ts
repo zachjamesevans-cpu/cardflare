@@ -1,4 +1,5 @@
 import { huntStartPosts } from "@/lib/feed/hunt-starts";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import {
   nearbyMatchesForHolder,
   wantedSummaryOf,
@@ -3190,8 +3191,9 @@ export async function listFeed(
     ),
     tradedItems(locals.map((local) => local.storeId)),
     suggestionItem(playerId, wanted, new Set(followed.keys())),
-    packItem(balance),
-    shopItem(playerId, balance),
+    /* The shop's two cards only while it is on sale (pro-enabled.ts). */
+    PRO_ENABLED ? packItem(balance) : Promise.resolve([] as PackItem[]),
+    PRO_ENABLED ? shopItem(playerId, balance) : Promise.resolve([] as ShopItem[]),
     nearbyStoreItems(playerId, locals, device),
     /* The lead item, and the one that needs nothing from anybody else
        having posted this week. See wantedItems. */

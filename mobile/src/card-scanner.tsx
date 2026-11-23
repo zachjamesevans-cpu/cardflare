@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PRO_ENABLED } from "./pro-enabled";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
@@ -51,7 +52,9 @@ import {
   DONE_SCANNING,
   FILL_THE_FRAME,
   GET_PRO,
+  LAUNCH_REFUSALS,
   PAGES_ARE_PRO,
+  PAGES_NOT_YET,
   QUEUE_FULL,
   READING_CARD,
   SCAN_AGAIN,
@@ -629,12 +632,20 @@ function Scanner({
       <View style={styles.door}>
         <Text accessibilityLiveRegion="polite" style={styles.refusal}>
           <ProWords
-            text={step.why === "pages" ? PAGES_ARE_PRO : SCAN_REFUSALS["daily-singles"]}
+            text={
+              PRO_ENABLED
+                ? step.why === "pages" ? PAGES_ARE_PRO : SCAN_REFUSALS["daily-singles"]
+                : step.why === "pages"
+                  ? PAGES_NOT_YET
+                  : LAUNCH_REFUSALS["daily-singles"]
+            }
           />
         </Text>
-        <ProMark size={56} />
+        {/* No Pro to sell while it is off (pro-enabled.ts): the line
+            alone, and the camera again. */}
+        {PRO_ENABLED ? <ProMark size={56} /> : null}
         <View style={{ alignSelf: "stretch", gap: spacing(2) }}>
-          {onGetPro ? <Button label={GET_PRO} onPress={onGetPro} /> : null}
+          {onGetPro && PRO_ENABLED ? <Button label={GET_PRO} onPress={onGetPro} /> : null}
           <Button label={SCAN_AGAIN} variant="secondary" onPress={again} />
         </View>
       </View>
@@ -659,9 +670,11 @@ function Scanner({
             <Text accessibilityRole="header" style={styles.intro}>
               {SCAN_INTRO_SINGLE}
             </Text>
-            <Text style={styles.introPages}>
-              {SCAN_INTRO_PAGES} <ProMark size={15} />
-            </Text>
+            {PRO_ENABLED ? (
+              <Text style={styles.introPages}>
+                {SCAN_INTRO_PAGES} <ProMark size={15} />
+              </Text>
+            ) : null}
             <Text style={styles.hint}>{FILL_THE_FRAME}</Text>
             {rights.singlesLeft !== null ? (
               <Text style={styles.small}>{freeScansLeftLine(rights.singlesLeft)}</Text>

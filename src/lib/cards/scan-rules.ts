@@ -457,6 +457,18 @@ export const FILL_THE_FRAME =
   "One card or one binder page, filling the frame, in good light.";
 export const PAGES_ARE_PRO = "Scanning whole binder pages is Pro.";
 export const GET_PRO = "Get Pro";
+
+/*
+ * The same refusals while Pro is not on sale (pro-enabled.ts): nothing
+ * points at a plan nobody can buy. Chosen where they are shown, so this
+ * file still imports nothing.
+ */
+export const PAGES_NOT_YET =
+  "Whole binder pages can't be scanned yet. One card at a time for now.";
+export const LAUNCH_REFUSALS = {
+  "daily-singles": "That's your 10 free scans for today. More tomorrow.",
+  "is-page": "That's a whole binder page. Scan one card at a time for now.",
+} as const;
 export const THATS_IT = "That's it";
 export const NOT_THIS_CARD = "Not this card";
 export const OTHER_PRINTING = "Other printing";

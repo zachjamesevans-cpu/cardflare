@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -66,7 +67,10 @@ export default async function EditProfilePage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const asked = (await searchParams).tab;
-  const tab: EditTab = asked === "look" || asked === "showcase" ? asked : "profile";
+  /* Look and Showcase dress you in the shop's cosmetics: hidden with it
+     while Pro is off (pro-enabled.ts), so it is Profile alone. */
+  const tab: EditTab =
+    PRO_ENABLED && (asked === "look" || asked === "showcase") ? asked : "profile";
   const viewer = await getViewer();
   if (viewer.kind === "anonymous") redirect("/login?next=/profile/edit");
 
@@ -104,30 +108,32 @@ export default async function EditProfilePage({
           {/* Back and Done, and the picks the tabs hold until Done. */}
           <LookDraftProvider>
             {/* The tabs. */}
-            <nav
-              aria-label="Edit profile"
-              className="flex rounded-full border border-border bg-elevated p-[3px]"
-            >
-              {TABS.map((entry) => (
-                <Link
-                  key={entry.key}
-                  href={
-                    entry.key === "profile"
-                      ? "/profile/edit"
-                      : `/profile/edit?tab=${entry.key}`
-                  }
-                  aria-current={entry.key === tab ? "page" : undefined}
-                  className={cn(
-                    "flex-1 rounded-full py-2 text-center text-sm font-bold transition-colors",
-                    entry.key === tab
-                      ? "bg-accent text-accent-contrast"
-                      : "text-text-secondary hover:text-text-primary",
-                  )}
-                >
-                  {entry.label}
-                </Link>
-              ))}
-            </nav>
+            {PRO_ENABLED ? (
+              <nav
+                aria-label="Edit profile"
+                className="flex rounded-full border border-border bg-elevated p-[3px]"
+              >
+                {TABS.map((entry) => (
+                  <Link
+                    key={entry.key}
+                    href={
+                      entry.key === "profile"
+                        ? "/profile/edit"
+                        : `/profile/edit?tab=${entry.key}`
+                    }
+                    aria-current={entry.key === tab ? "page" : undefined}
+                    className={cn(
+                      "flex-1 rounded-full py-2 text-center text-sm font-bold transition-colors",
+                      entry.key === tab
+                        ? "bg-accent text-accent-contrast"
+                        : "text-text-secondary hover:text-text-primary",
+                    )}
+                  >
+                    {entry.label}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
 
             {wardrobe ? (
               <>

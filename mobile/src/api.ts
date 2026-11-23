@@ -1976,6 +1976,8 @@ export interface Profile {
    */
   tier?: string;
   pro?: boolean;
+  /** May upload a GIF picture. Absent from an older server: read `pro`. */
+  animatedAvatar?: boolean;
   /**
    * The player's own subscription, for the Pro screen's renewal line and
    * its Manage subscription door. Null with none; absent (undefined)

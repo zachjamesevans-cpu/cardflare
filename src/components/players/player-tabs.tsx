@@ -139,22 +139,25 @@ export function PlayerTabs({ unread = 0 }: { unread?: number }) {
                 <span className="relative flex items-center justify-center">
                   <Icon className="size-6.5" aria-hidden="true" />
 
-                  {/* A dot, not a number: the founder, "a small neon green
-                      dot on the inbox icon so you know to check your
-                      inbox." It moved to Messages with the Inbox's slot.
-                      The app's tab bar draws the same. The ring in the
-                      bar's colour keeps it legible over the icon. */}
+                  {/* The count, Instagram's way: the founder, "show you how
+                      many messages you have unread on the taskbar on bottom
+                      like how it does with instagram dms". The old dot's
+                      neon green, grown into a pill, "9+" past nine. The
+                      app's tab bar draws the same (mobile/src/unread-dot.tsx).
+                      The ring in the bar's colour keeps it legible. */}
                   {dot && (
                     <span
                       aria-hidden="true"
-                      className="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-accent ring-2 ring-surface"
-                    />
+                      className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] leading-none font-extrabold text-accent-contrast ring-2 ring-surface"
+                    >
+                      {unread > 9 ? "9+" : unread}
+                    </span>
                   )}
                 </span>
 
                 <span className="sr-only">
                   {tab.label}
-                  {dot && ", unread"}
+                  {dot && `, ${unread} unread`}
                 </span>
               </Link>
             </li>

@@ -1,6 +1,7 @@
 import { manifest as pro } from "./pro";
 import { manifest as ultra } from "./ultra";
 import { manifest as max } from "./max";
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 
 /**
  * Membership tiers: free, pro, ultra, max.
@@ -21,8 +22,23 @@ export type Tier = (typeof TIERS)[number];
 
 export type TierCapability = keyof typeof pro | keyof typeof ultra | keyof typeof max;
 
+/*
+ * While Pro is not on sale (src/lib/billing/pro-enabled.ts), the limits
+ * that would wall a free player off with no way through are lifted for
+ * everyone. Cosmetics stay Pro (the shop is hidden with it), and so do
+ * whole-page scans, which cost per page.
+ */
+export const FREE_AT_LAUNCH: Partial<Record<TierCapability, boolean>> = PRO_ENABLED
+  ? {}
+  : {
+      tradeHistory: true,
+      moreHunts: true,
+      animatedAvatar: true,
+      wholeListOnWall: true,
+    };
+
 const LADDER: Record<Tier, Partial<Record<TierCapability, boolean>>> = {
-  free: {},
+  free: { ...FREE_AT_LAUNCH },
   pro: { ...pro },
   ultra: { ...pro, ...ultra },
   max: { ...pro, ...ultra, ...max },

@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+/* The tiers as they are when Pro is on sale. While it is off for launch,
+   these limits are lifted for everyone (tests/unit/pro-enabled.test.ts). */
+vi.mock("@/lib/billing/pro-enabled", () => ({ PRO_ENABLED: true }));
 
 import {
   draftSummary,

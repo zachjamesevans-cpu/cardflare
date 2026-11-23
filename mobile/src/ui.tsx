@@ -1674,6 +1674,9 @@ export function Muted({ children }: PropsWithChildren) {
   return <Text style={styles.muted}>{children}</Text>;
 }
 
+/** The solid red of a button that cannot be undone; the website's too. */
+export const DANGER_SOLID = "#e5484d";
+
 export function Button({
   label,
   onPress,
@@ -1687,7 +1690,8 @@ export function Button({
   busy?: boolean;
   /** Inert without the spinner — e.g. while "Posted ✓" is on display. */
   disabled?: boolean;
-  variant?: "primary" | "secondary";
+  /** "danger": solid red, white words - Delete your account. */
+  variant?: "primary" | "secondary" | "danger";
   /** Drawn after the label, in its line: the PRO mark on a door to Pro. */
   mark?: ReactNode;
 }) {
@@ -1698,19 +1702,29 @@ export function Button({
       style={[
         styles.button,
         variant === "secondary" && styles.buttonSecondary,
+        variant === "danger" && { backgroundColor: DANGER_SOLID },
+        /* Red reads as "go": until it may be pressed, it looks it. */
+        variant === "danger" && disabled && !busy && { opacity: 0.4 },
         busy && { opacity: 0.7 },
       ]}
     >
       {busy && (
         <ActivityIndicator
           size="small"
-          color={variant === "primary" ? colors.accentContrast : colors.textPrimary}
+          color={
+            variant === "primary"
+              ? colors.accentContrast
+              : variant === "danger"
+                ? "#ffffff"
+                : colors.textPrimary
+          }
         />
       )}
       <Text
         style={[
           styles.buttonLabel,
           variant === "secondary" && { color: colors.textPrimary },
+          variant === "danger" && { color: "#ffffff" },
         ]}
       >
         {label}
@@ -1745,7 +1759,7 @@ export function AsyncButton({
   pendingLabel: string;
   onPress: () => Promise<unknown>;
   disabled?: boolean;
-  variant?: "primary" | "secondary";
+  variant?: "primary" | "secondary" | "danger";
 }) {
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);

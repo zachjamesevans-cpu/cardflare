@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PRO_ENABLED } from "../pro-enabled";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   type RouteProp,
@@ -438,7 +439,8 @@ export function SettingsScreen() {
               email={me?.player.email ?? null}
               onEditProfile={() => navigation.navigate("EditProfile")}
             />
-            <ProCard />
+            {/* Pro is not on sale for launch (pro-enabled.ts). */}
+            {PRO_ENABLED ? <ProCard /> : null}
             {/* Always here when the account is: App Review's 5.1.1(v).
                 Last and on its own, never in the menu itself. */}
             {deleteBlock}
@@ -875,66 +877,68 @@ function DeleteAccount({ handle }: { handle: string | null }) {
   const bare = typed.trim().replace(/^@/, "").toLowerCase();
   const matches = handle === null ? bare.length > 0 : bare === handle.toLowerCase();
 
+  /* Closed, one big red button and nothing else (the founder: "the
+     delete your account should be a big red button. then you click it
+     and it goes over that extra text"). Open, the card says what goes
+     and asks for the handle. The website's Settings does the same. */
+  if (!open) {
+    return (
+      <Button label="Delete your account" variant="danger" onPress={() => setOpen(true)} />
+    );
+  }
   return (
     <Card>
       <Title>Delete your account</Title>
       <Body>
         {"Everything goes: your profile, Flares, hunts, binders, showcase, trade history, Embers and unlocks. There is no undo."}
       </Body>
-      <Muted>
-        Pro through the App Store is billed by Apple: cancel it in your Apple ID
-        subscriptions too, or it keeps renewing.
-      </Muted>
-      {open ? (
-        <>
-          <Body>
-            {handle ? `Type your handle, @${handle}, to confirm.` : "Type your handle to confirm."}
-          </Body>
-          <Input
-            value={typed}
-            onChangeText={setTyped}
-            placeholder={handle ? `@${handle}` : "@your_handle"}
-            autoCapitalize="none"
-            autoCorrect={false}
-            accessibilityLabel="Type your handle to confirm"
-          />
-          <AsyncButton
-            label="Delete my account"
-            pendingLabel="Deleting…"
-            disabled={!matches}
-            onPress={async () => {
-              setSaid(null);
-              try {
-                await deleteAccount(typed);
-                await signOut();
-              } catch (caught) {
-                setSaid(
-                  caught instanceof ApiError && caught.code === "handle-mismatch"
-                    ? "That is not your handle."
-                    : `The account could not be deleted. ${friendlyError(caught)}`,
-                );
-              }
-            }}
-          />
-          <Tap
-            accessibilityLabel="Keep the account"
-            onPress={() => {
-              setOpen(false);
-              setTyped("");
-              setSaid(null);
-            }}
-          >
-            <Muted>Keep it</Muted>
-          </Tap>
-          {said && <Muted>{said}</Muted>}
-        </>
-      ) : (
-        <Tap accessibilityLabel="Delete your account" onPress={() => setOpen(true)}>
-          <Text style={{ color: colors.danger, fontSize: 14 }}>
-            Delete your account
-          </Text>
-        </Tap>
-      )}
+      {PRO_ENABLED ? (
+        <Muted>
+          Pro through the App Store is billed by Apple: cancel it in your Apple ID
+          subscriptions too, or it keeps renewing.
+        </Muted>
+      ) : null}
+      <Body>
+        {handle ? `Type your handle, @${handle}, to confirm.` : "Type your handle to confirm."}
+      </Body>
+      <Input
+        value={typed}
+        onChangeText={setTyped}
+        placeholder={handle ? `@${handle}` : "@your_handle"}
+        autoCapitalize="none"
+        autoCorrect={false}
+        accessibilityLabel="Type your handle to confirm"
+      />
+      <AsyncButton
+        label="Delete my account"
+        pendingLabel="Deleting…"
+        variant="danger"
+        disabled={!matches}
+        onPress={async () => {
+          setSaid(null);
+          try {
+            await deleteAccount(typed);
+            await signOut();
+          } catch (caught) {
+            setSaid(
+              caught instanceof ApiError && caught.code === "handle-mismatch"
+                ? "That is not your handle."
+                : `The account could not be deleted. ${friendlyError(caught)}`,
+            );
+          }
+        }}
+      />
+      <Tap
+        accessibilityLabel="Keep the account"
+        onPress={() => {
+          setOpen(false);
+          setTyped("");
+          setSaid(null);
+        }}
+      >
+        <Muted>Keep it</Muted>
+      </Tap>
+      {said && <Muted>{said}</Muted>}
     </Card>
   );
 }

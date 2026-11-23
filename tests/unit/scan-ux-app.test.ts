@@ -436,7 +436,9 @@ describe("the PRO mark", () => {
     expect(files.settings).toMatch(/<Title>\s*<ProMark size=\{18\} \/>\s*<\/Title>/);
     expect(files.store).toContain("<ProMark size={11} /> to wear");
     expect(files.trades).toContain("with cardflare <ProMark size={14} />.");
-    expect(files.editProfile).toContain("mark={<ProMark size={15} />}");
+    expect(files.editProfile).toContain(
+      "mark={PRO_ENABLED ? <ProMark size={15} /> : undefined}",
+    );
     expect(files.stack).toContain("cardflare <ProMark size={17} />");
   });
 

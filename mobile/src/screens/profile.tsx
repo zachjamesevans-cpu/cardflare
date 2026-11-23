@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { PRO_ENABLED } from "../pro-enabled";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -983,11 +984,13 @@ export function ProfileScreen() {
           {/* The Embers shop, its own icon again - the founder: "the
               embers shop should be its own icon along with the top
               right icons on profile". */}
-          <HeaderButton
-            icon="storefront-outline"
-            label="Embers shop"
-            onPress={() => navigation.navigate("Store")}
-          />
+          {PRO_ENABLED ? (
+            <HeaderButton
+              icon="storefront-outline"
+              label="Embers shop"
+              onPress={() => navigation.navigate("Store")}
+            />
+          ) : null}
           {/* The wand: Edit profile, which holds what you wear now (its
               Look and Showcase tabs). Straight there, no menu. */}
           <View ref={tourWand} collapsable={false}>

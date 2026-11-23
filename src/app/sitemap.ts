@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { PRO_ENABLED } from "@/lib/billing/pro-enabled";
 import { siteUrl } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -20,7 +21,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "monthly",
       priority: 0.8,
     },
-    { url: `${origin}/pro`, lastModified, changeFrequency: "monthly", priority: 0.8 },
+    ...(PRO_ENABLED
+      ? [
+          {
+            url: `${origin}/pro`,
+            lastModified,
+            changeFrequency: "monthly" as const,
+            priority: 0.8,
+          },
+        ]
+      : []),
     { url: `${origin}/max`, lastModified, changeFrequency: "monthly", priority: 0.7 },
     {
       url: `${origin}/invite`,
