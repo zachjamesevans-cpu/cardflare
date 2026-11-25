@@ -509,7 +509,9 @@ describe("the night page", () => {
     expect(web.composerDoor).toContain("<FlareFab onOpen={() => setOpen(true)} />");
     expect(web.composerDoor).not.toContain('size="lg"');
     expect(web.room).toMatch(/\{poster && writable && \(\s*<RoomComposerDoor/);
-    expect(app.flareFab).toContain("accessibilityLabel={POST_A_FLARE}");
+    /* The app's room posts through its one Flare button, the same label. */
+    expect(app.flareFab).toContain("<FlareButton");
+    expect(app.flareFab).toContain("label={POST_A_FLARE}");
     expect(app.room).toContain("<FlareFab");
   });
 

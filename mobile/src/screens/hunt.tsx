@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { FlareButton } from "../flare-button";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
 import { ScrollView, View } from "react-native";
@@ -71,6 +72,7 @@ export function HuntScreen({ huntId }: { huntId: string }) {
   }
 
   return (
+    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
@@ -91,5 +93,18 @@ export function HuntScreen({ huntId }: { huntId: string }) {
         }
       />
     </ScrollView>
+    {/* The Flare button (flare-button.tsx): on your own hunt it adds to
+        THIS hunt; on somebody else's it is the plain composer. */}
+    <FlareButton
+      label={hunt.yours ? `Add to ${hunt.name}` : "Post a Flare"}
+      onPress={() =>
+        navigation.navigate(
+          "Tabs",
+          hunt.yours ? { screen: "Flare", params: { hunt: hunt.id } } : { screen: "Flare" },
+        )
+      }
+      style={{ right: gutter + spacing(1), bottom: spacing(10) }}
+    />
+    </View>
   );
 }

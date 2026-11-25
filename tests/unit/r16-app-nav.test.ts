@@ -72,7 +72,7 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     expect(tabs).toContain('<Tab.Screen name="Local" component={LocalScreen}');
   });
 
-  it("keeps Post a Flare's route but gives it no slot: the Feed's + opens it", () => {
+  it("keeps Post a Flare's route but gives it no slot: the Flare button opens it", () => {
     /* The founder: "Not a fan of the big plus... move the + to top left
        and messages bottom middle." */
     expect(tabs).toContain(
@@ -83,13 +83,19 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
        whole tab at the bottom." */
     expect(tabs).toContain('tabBarItemStyle: { display: "none" }');
     expect(app).not.toContain("function PostButton(");
-    const header = read("mobile/src/collapsing-header.tsx");
-    expect(header).toContain(
-      '<HeaderButton icon="add" label="Post a Flare" onPress={onPost} />',
+    /* The Flare button above the tab bar opens it; the Feed's header
+       no longer gets a +. */
+    const dock = read("mobile/src/dock.tsx");
+    expect(dock).toContain('onPress={() => props.navigation.navigate("Flare")}');
+    const feedHeader = home.slice(
+      home.indexOf("<CollapsingHeader"),
+      home.indexOf("<Spotlight onOpen"),
     );
-    /* A guest has no account to post with, so no + at all. */
-    expect(read("mobile/src/screens/home.tsx")).toContain(
-      'onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}',
+    expect(feedHeader).toContain("onInbox=");
+    expect(feedHeader).not.toContain("onPost=");
+    /* A guest has no account to post with, so no Flare button at all. */
+    expect(dock).toContain(
+      "const flare = signedIn && route !== undefined && !NO_FLARE_BUTTON.has(route);",
     );
   });
 

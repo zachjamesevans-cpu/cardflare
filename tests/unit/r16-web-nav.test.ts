@@ -72,12 +72,12 @@ describe("the tab bar", () => {
     expect(web.tabs).toMatch(/LOCAL_ENABLED\s*\?\s*\[\{ href: "\/local"/);
   });
 
-  it("posts a Flare from the + at the Feed's top left, a player's", () => {
-    expect(web.feedPage).toContain('href="/flare"');
-    expect(web.feedPage).toContain('aria-label="Post a Flare"');
-    expect(web.feedPage).toContain(
-      '<Plus className={HEADER_ICON} aria-hidden="true" />',
-    );
+  it("posts a Flare from the Flare button above the tab bar, not the Feed's top left", () => {
+    /* The Feed's + is gone; the one Flare button rides above the bar
+       and opens the composer (or flares the card on a card's page). */
+    expect(web.feedPage).not.toContain('href="/flare"');
+    expect(web.tabs).toContain("const flare = flareTarget(pathname);");
+    expect(web.tabs).toContain("<FlareButton");
     expect(web.shell).toContain("{leading}");
   });
 

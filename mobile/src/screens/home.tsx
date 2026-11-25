@@ -2044,9 +2044,9 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
 
       <CollapsingHeader
         state={header}
-        /* No + for a guest: posting needs an account, and a button that
-           only says so is a dead end at the top of the first screen. */
-        onPost={guest ? undefined : () => navigation.navigate("Tabs", { screen: "Flare" })}
+        /* No + up here any more: posting is the Flare button over the
+           tab bar (dock.tsx), on every tab - the founder, "a persistent
+           cardflare green '+ flame icon' everywhere". */
         /* Nearby's top left is the way into a store's room - Scan QR or
            Enter event code - which lived on the Rooms tab it replaced. */
         left={tab === "nearby" ? <NightsCodeButton /> : undefined}

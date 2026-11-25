@@ -36,7 +36,7 @@ export default async function CardOverPage({
   if (!page) notFound();
 
   return (
-    <CardModal>
+    <CardModal cardId={page.card.cardId}>
       <CardPageView
         page={page}
         viewerId={viewerId}

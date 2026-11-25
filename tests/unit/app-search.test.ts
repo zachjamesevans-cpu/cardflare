@@ -202,12 +202,15 @@ describe("the card page", () => {
 
   it("draws the card, then you, then the three sections in order", () => {
     const you = src.card.indexOf("{you ? (");
-    const has = src.card.indexOf(
-      'heading={located ? "Who has it near you" : "Who has it"}',
+    /* Each heading is a count: "3 players have it near you". */
+    const has = src.card.search(
+      /heading=\{countHeading\(\s*holders\.length,\s*"player has it",\s*"players have it",\s*located \? "near you" : null,?\s*\)\}/,
     );
-    const hunting = src.card.indexOf('heading="Who is hunting it"');
-    const stores = src.card.indexOf(
-      'heading={located ? "In the case nearby" : "In the case"}',
+    const hunting = src.card.search(
+      /heading=\{countHeading\(\s*hunters\.length,\s*"player hunting it",\s*"players hunting it",\s*null,?\s*\)\}/,
+    );
+    const stores = src.card.search(
+      /heading=\{countHeading\(\s*stores\.length,\s*"store has it",\s*"stores have it",\s*located \? "nearby" : null,?\s*\)\}/,
     );
     expect(you).toBeGreaterThan(src.card.indexOf("uri={card.imageUrl}"));
     expect(has).toBeGreaterThan(you);
@@ -216,8 +219,8 @@ describe("the card page", () => {
     expect(src.card).toContain("{gameShortName(card.game)}");
   });
 
-  it("the You block is one line per true fact, then Post a Flare for it", () => {
-    const block = between(src.card, "{you ? (", "<Section heading={located");
+  it("the You block is one line per true fact, and the Flare button flares the card", () => {
+    const block = between(src.card, "{you ? (", "{holders.length > 0 ? (");
     expect(block).toContain(
       "{you.inTradeBinder ? <Fact>In your trade binder</Fact> : null}",
     );
@@ -227,19 +230,24 @@ describe("the card page", () => {
       'navigation.navigate("Hunt", { huntId: you.onHunt?.huntId ?? "" })',
     );
     expect(block).toContain("{you.wanted ? <Fact>You want this</Fact> : null}");
-    expect(block).toContain('label="Post a Flare for it"');
-    /* The card goes with it, to be the draft's first line. */
-    expect(block).toMatch(
-      /navigation\.navigate\("Tabs", \{\s*screen: "Flare",\s*params: \{\s*card: \{\s*cardId: card\.cardId,/,
+    /* "Post a Flare for it" is gone: the Flare button, labelled for this
+       card, opens the composer with the card as the draft's first line. */
+    expect(src.card).not.toContain('label="Post a Flare for it"');
+    const button = src.card.slice(src.card.indexOf("<FlareButton"));
+    expect(button).toContain("label={`Flare ${name}`}");
+    expect(button).toMatch(
+      /navigationRef\.navigate\("Tabs", \{\s*screen: "Flare",\s*params: \{\s*card: \{\s*cardId: card\.cardId,/,
     );
   });
 
-  it("every section has rows from the page object or its one honest empty line", () => {
-    expect(src.card).toContain(
-      "<Muted>Nobody with it in a binder up for trade yet.</Muted>",
-    );
-    expect(src.card).toContain("<Muted>Nobody is hunting it yet.</Muted>");
-    expect(src.card).toContain("<Muted>No store near you has it listed.</Muted>");
+  it("every section is drawn only when it has rows, led by its count", () => {
+    expect(src.card).toContain("{holders.length > 0 ? (");
+    expect(src.card).toContain("{hunters.length > 0 ? (");
+    expect(src.card).toContain("{stores.length > 0 ? (");
+    /* No line that only says "nobody". */
+    expect(src.card).not.toContain("Nobody with it in a binder up for trade yet.");
+    expect(src.card).not.toContain("Nobody is hunting it yet.");
+    expect(src.card).not.toContain("No store near you has it listed.");
     expect(src.card).toContain("holders.map((holder, index) =>");
     expect(src.card).toContain("hunters.map((hunter, index) =>");
     expect(src.card).toContain("stores.map((store, index) =>");

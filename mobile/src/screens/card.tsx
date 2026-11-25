@@ -1,4 +1,7 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { navigationRef } from "../navigation-ref";
+import { FlareButton } from "../flare-button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -56,6 +59,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
     void loadCardPrices(cardId);
   }, [cardId]);
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -158,6 +162,8 @@ export function CardScreen({ cardId }: { cardId: string }) {
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
         gap: spacing(4),
+        /* Room under the last section for the Flare button. */
+        paddingBottom: spacing(24),
       }}
     >
       {/* The card: the art large and centred, tap to read it at full
@@ -213,31 +219,15 @@ export function CardScreen({ cardId }: { cardId: string }) {
             </Tap>
           ) : null}
           {you.wanted ? <Fact>You want this</Fact> : null}
-          <Button
-            label="Post a Flare for it"
-            /* The card goes with it, as the draft's first line: the
-               founder, "Should autofill as the first flare." */
-            onPress={() =>
-              navigation.navigate("Tabs", {
-                screen: "Flare",
-                params: {
-                  card: {
-                    cardId: card.cardId,
-                    name: card.name,
-                    cardNumber: card.number,
-                    imageUrl: card.imageUrl,
-                  },
-                },
-              })
-            }
-          />
         </View>
       ) : null}
 
-      <Section heading={located ? "Who has it near you" : "Who has it"}>
-        {holders.length === 0 ? (
-          <Muted>Nobody with it in a binder up for trade yet.</Muted>
-        ) : (
+      {/* Each list only when it has someone in it, led by how many: no
+          line that only says "nobody". The founder: "i don't like all
+          that text at the bottom". */}
+      {holders.length > 0 ? (
+      <Section heading={countHeading(holders.length, "player has it", "players have it", located ? "near you" : null)}>
+        {(
           holders.map((holder, index) => (
             <HolderRow
               key={holder.player.playerId}
@@ -248,11 +238,11 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
 
-      <Section heading="Who is hunting it">
-        {hunters.length === 0 ? (
-          <Muted>Nobody is hunting it yet.</Muted>
-        ) : (
+      {hunters.length > 0 ? (
+      <Section heading={countHeading(hunters.length, "player hunting it", "players hunting it", null)}>
+        {(
           hunters.map((hunter, index) => (
             <Row
               key={`${hunter.player.playerId}-${hunter.postId ?? hunter.huntId ?? index}`}
@@ -289,11 +279,11 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
 
-      <Section heading={located ? "In the case nearby" : "In the case"}>
-        {stores.length === 0 ? (
-          <Muted>No store near you has it listed.</Muted>
-        ) : (
+      {stores.length > 0 ? (
+      <Section heading={countHeading(stores.length, "store has it", "stores have it", located ? "nearby" : null)}>
+        {(
           stores.map((store, index) => (
             <Row
               key={store.storeId}
@@ -324,7 +314,48 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
     </ScrollView>
+    {/* The Flare button, for THIS card: the composer, the card already
+        in it (flare-button.tsx). It replaced "Post a Flare for it". */}
+    <FlareButton
+      label={`Flare ${name}`}
+      onPress={() => {
+        /*
+         * Close the sheet FIRST, then open the composer once it has gone.
+         * Jumping to the composer while iOS was still presenting the
+         * sheet left the screen behind it shrunk, its top dropped, after
+         * the composer closed - the founder: "it goes back to main menu
+         * and has a layered drop down thing". The timer is a fallback for
+         * a transition that never reports its end.
+         */
+        const flareIt = () =>
+          navigationRef.navigate("Tabs", {
+            screen: "Flare",
+            params: {
+              card: {
+                cardId: card.cardId,
+                name: card.name,
+                cardNumber: card.number,
+                imageUrl: card.imageUrl,
+              },
+            },
+          });
+        let done = false;
+        const once = () => {
+          if (done) return;
+          done = true;
+          unsubscribe();
+          flareIt();
+        };
+        const unsubscribe = navigation.addListener("transitionEnd", (event) => {
+          if (event.data.closing) once();
+        });
+        navigation.goBack();
+        setTimeout(once, 700);
+      }}
+      style={{ right: gutter + spacing(1), bottom: insets.bottom + spacing(4) }}
+    />
     </CardOverlay>
   );
 }
@@ -382,6 +413,16 @@ function Fact({ children }: { children: ReactNode }) {
 }
 
 /** A heading, then its rows or its one honest empty line. */
+/** "3 players have it near you", "1 player hunting it". */
+function countHeading(
+  count: number,
+  one: string,
+  many: string,
+  where: string | null,
+): string {
+  return [String(count), count === 1 ? one : many, where].filter(Boolean).join(" ");
+}
+
 function Section({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <View style={{ gap: spacing(2) }}>

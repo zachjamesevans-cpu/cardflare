@@ -1,5 +1,6 @@
 "use client";
 
+import { FlareButton } from "@/components/flares/flare-button";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { X } from "lucide-react";
@@ -23,7 +24,13 @@ const CLOSE_MS = 220;
  * a drag down on the handle all close it. A card's own URL still opens
  * the full page (src/app/cards/[cardId]).
  */
-export function CardModal({ children }: { children: ReactNode }) {
+export function CardModal({
+  cardId,
+  children,
+}: {
+  cardId: string;
+  children: ReactNode;
+}) {
   const router = useRouter();
   const [closing, setClosing] = useState(false);
   const [drag, setDrag] = useState(0);
@@ -110,7 +117,13 @@ export function CardModal({ children }: { children: ReactNode }) {
         >
           <X className="size-[1.1rem]" aria-hidden="true" />
         </button>
-        <div className="overflow-y-auto px-4 pt-2 pb-8 sm:px-6">{children}</div>
+        <div className="overflow-y-auto px-4 pt-2 pb-24 sm:px-6">{children}</div>
+        {/* The Flare button, for THIS card (flare-button.tsx). */}
+        <FlareButton
+          href={`/flare?card=${cardId}`}
+          label="Flare this card"
+          className="absolute right-4 bottom-4"
+        />
       </div>
     </div>
   );

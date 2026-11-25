@@ -1,11 +1,11 @@
 import { LaunchView } from "./src/launch-view";
+import { navigationRef } from "./src/navigation-ref";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
   NavigationContainer,
   type LinkingOptions,
   type Theme,
-  createNavigationContainerRef,
 } from "@react-navigation/native";
 import {
   createBottomTabNavigator,
@@ -801,7 +801,7 @@ class StartupGuard extends Component<
  * open. Two entry points: a tap that wakes a cold app is read once the
  * navigator is ready, a tap while running arrives through the listener.
  */
-const navigationRef = createNavigationContainerRef<StackParams>();
+/* Shared, so a screen can navigate after it has closed (src/navigation-ref.ts). */
 
 /**
  * Links that open the app, and where they land.

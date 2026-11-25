@@ -45,6 +45,8 @@ const web = {
   playerSearch: read("src/components/players/player-search.tsx"),
   cardRoute: read("src/app/cards/[cardId]/page.tsx"),
   cardPage: read("src/components/cards/card-page.tsx"),
+  cardModal: read("src/components/cards/card-modal.tsx"),
+  flareButton: read("src/components/flares/flare-button.tsx"),
   sheet: read("src/components/feed/flare-cards-sheet.tsx"),
   postActions: read("src/components/feed/post-actions.tsx"),
   binder: read("src/components/players/hunt-binder.tsx"),
@@ -151,23 +153,39 @@ describe("search, from the Feed", () => {
 });
 
 describe("the card page", () => {
+  /* Each list only when it has rows, led by its count ("3 players have
+     it near you"); no "nobody" line on either platform. */
   const SECTIONS = [
     "In your trade binder",
     "On your hunt: ",
     "You want this",
-    "Post a Flare for it",
-    'located ? "Who has it near you" : "Who has it"',
+    "holders.length > 0",
+    '"player has it"',
+    '"players have it"',
+    'located ? "near you" : null',
+    "hunters.length > 0",
+    '"player hunting it"',
+    '"players hunting it"',
+    "stores.length > 0",
+    '"store has it"',
+    '"stores have it"',
+    'located ? "nearby" : null',
+  ];
+  const GONE_EMPTIES = [
     "Nobody with it in a binder up for trade yet.",
-    "Who is hunting it",
     "Nobody is hunting it yet.",
-    'located ? "In the case nearby" : "In the case"',
     "No store near you has it listed.",
   ];
 
-  it("draws the same sections in the same order with the same empties, on both", () => {
+  it("draws the same sections in the same order with the same count headings, on both", () => {
     inOrder(web.cardPage, SECTIONS);
     inOrder(app.card, SECTIONS);
     for (const source of [web.cardPage, app.card]) {
+      expect(source).toContain("function countHeading(");
+      expect(source).toContain(
+        '[String(count), count === 1 ? one : many, where].filter(Boolean).join(" ")',
+      );
+      for (const empty of GONE_EMPTIES) expect(source).not.toContain(empty);
       expect(source).toContain("gameShortName(card.game)");
       expect(source).toContain("`Wants ${");
       expect(source).toContain('store.inCase ? "In the case" : "Counter has it"');
@@ -184,19 +202,23 @@ describe("the card page", () => {
     expect(web.cardPage).toContain("Sign in to see what you have");
     expect(web.cardPage).toContain("href={`/login?next=${encodeURIComponent(href)}`}");
     expect(web.cardPage).toContain("const href = `/cards/${card.cardId}`;");
-    expect(web.cardPage).toContain(
-      "href={`/flare?card=${encodeURIComponent(card.cardId)}`}",
+    /* Posting the card is the Flare button's: flareTarget on this page,
+       and the card modal's own button, both to /flare?card=. */
+    expect(web.cardPage).not.toContain("Post a Flare for it");
+    expect(web.flareButton).toContain(
+      'if (card) return { href: `/flare?card=${card[1]}`, label: "Flare this card" };',
     );
+    expect(web.cardModal).toContain("href={`/flare?card=${cardId}`}");
     expect(web.cardPage).toContain("href={`/hunts/${you.onHunt.huntId}`}");
     /* A holder's row: face, name, miles, Message. */
-    const holders = between(web.cardPage, '"Who has it near you"', "Who is hunting it");
+    const holders = between(web.cardPage, '"player has it"', '"player hunting it"');
     expect(holders).toContain("<PlayerRow");
     expect(holders).toContain("<MessageButton playerId={player.playerId}");
     /* A hunter's row opens the hunt when it is one. */
-    const hunters = between(web.cardPage, "Who is hunting it", '"In the case nearby"');
+    const hunters = between(web.cardPage, '"player hunting it"', '"store has it"');
     expect(hunters).toContain("`/hunts/${row.huntId}`");
     expect(hunters).toContain("row.printingLabel");
-    const stores = between(web.cardPage, '"In the case nearby"', "function PlayerRow(");
+    const stores = between(web.cardPage, '"store has it"', "function PlayerRow(");
     expect(stores).toContain("href={`/s/${store.storeId}`}");
   });
 
@@ -205,7 +227,10 @@ describe("the card page", () => {
     expect(app.api).toContain("export const getCardPage =");
     expect(app.api).toContain("/api/v1/cards/${encodeURIComponent(cardId)}/page");
     expect(app.card).toContain("getCardPage(cardId)");
-    expect(app.card).toContain('label="Post a Flare for it"');
+    /* The sheet flares its card from the Flare button, not a "Post a
+       Flare for it" button. */
+    expect(app.card).not.toContain('label="Post a Flare for it"');
+    expect(app.card).toContain("label={`Flare ${name}`}");
     expect(app.card).toContain('navigation.navigate("Hunt", { huntId: you.onHunt');
     expect(app.card).toContain(
       'navigation.navigate("FlarePost", { postId: hunter.postId',

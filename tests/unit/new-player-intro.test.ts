@@ -125,10 +125,15 @@ describe("the app's sign-up", () => {
   });
 });
 
-describe("the spotlight on the +", () => {
-  it("rings the Feed's + on the app", () => {
-    expect(read("mobile/src/collapsing-header.tsx")).toContain(
-      "<View ref={postTarget} collapsable={false}>",
+describe("the spotlight on the Flare button", () => {
+  it("rings the Flare button on the app", () => {
+    /* The tab bar's Flare button carries the spotlight target now that
+       the Feed's + is gone (dock.tsx, flare-button.tsx). */
+    expect(read("mobile/src/dock.tsx")).toMatch(
+      /<FlareButton\s+label="Post a Flare"\s+spotlight\s/,
+    );
+    expect(read("mobile/src/flare-button.tsx")).toContain(
+      "ref={spotlight ? target : outerRef}",
     );
     expect(read("mobile/src/screens/home.tsx")).toContain(
       '<Spotlight onOpen={() => navigation.navigate("Tabs", { screen: "Flare" })} />',
@@ -138,9 +143,15 @@ describe("the spotlight on the +", () => {
     expect(spot).toContain("await SecureStore.deleteItemAsync(PENDING_KEY);");
   });
 
-  it("rings the Feed's + on the website", () => {
+  it("rings the Flare button on the website", () => {
     const feed = read("src/app/feed/page.tsx");
-    expect(feed).toContain('data-spotlight="post-flare"');
+    expect(read("src/components/flares/flare-button.tsx")).toContain(
+      'data-spotlight="post-flare"',
+    );
+    expect(read("src/components/players/player-tabs.tsx")).toContain("<FlareButton");
+    expect(read("src/components/onboarding/post-spotlight.tsx")).toContain(
+      `document.querySelector<HTMLElement>('[data-spotlight="post-flare"]')`,
+    );
     expect(feed).toContain("{tour && <PostSpotlight />}");
     expect(read("src/components/onboarding/intro-cards.tsx")).toContain(
       'const LOOK_HREF = "/feed?tour=post";',
