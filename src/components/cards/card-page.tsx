@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CardArtCarousel } from "@/components/cards/card-art-carousel";
 import type { ReactNode } from "react";
 import { Crosshair, Layers, Search, Store } from "lucide-react";
 
@@ -56,28 +57,24 @@ export function CardPageView({
   const { card, you, located, holders, hunters, stores } = page;
   const standing = demandLine(page.demand);
   const href = `/cards/${card.cardId}`;
-  const art =
-    imagesEnabled && isRenderableImageUrl(card.imageUrl) ? card.imageUrl : null;
+  /* Only arts this site may draw (the image allow-list). */
+  const arts = (card.arts ?? []).filter((entry) =>
+    isRenderableImageUrl(entry.imageUrl),
+  );
 
   return (
     <div className="flex w-full flex-col gap-5">
-      {/* The card: the art down the left, one aligned column beside it,
-          the round 16b shape (88 x 123). */}
-      <div className="flex items-stretch gap-3">
-        <span className="block h-[7.75rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
-          {art && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={art} alt="" className="size-full object-cover" />
-          )}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+      {/* The card: every art of it, swiped (card-art-carousel.tsx), then
+          the name, number and game centred under it - the app's sheet. */}
+      <div className="flex flex-col items-center gap-3">
+        <CardArtCarousel arts={imagesEnabled ? arts : []} name={card.name} />
+        <div className="flex flex-col items-center gap-1 text-center">
           <h1 className="text-xl leading-tight font-extrabold text-text-primary">
             {card.name}
           </h1>
-          <p className="text-sm text-text-secondary">{card.number}</p>
-          <p className="text-sm text-text-muted">{gameShortName(card.game)}</p>
-          {/* "12 hunting · 3 have it for trade": the two lists below,
-              counted. What a price would say, without one. */}
+          <p className="text-sm text-text-secondary">
+            {card.number} · {gameShortName(card.game)}
+          </p>
           {standing && (
             <p className="text-sm font-semibold text-text-secondary">{standing}</p>
           )}

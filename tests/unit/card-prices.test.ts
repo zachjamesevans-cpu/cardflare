@@ -131,7 +131,7 @@ describe("the price panel on both platforms", () => {
     );
     expect(read("src/app/cards/[cardId]/page.tsx")).toContain("<CardPricesSection");
     expect(read("mobile/src/screens/card.tsx")).toContain(
-      "<CardPricesPanel cardId={card.cardId} />",
+      "<CardPricesPanel\n        cardId={card.cardId}",
     );
   });
 

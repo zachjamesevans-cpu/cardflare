@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
 import { FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -62,6 +63,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);
+  /* Which art the carousel shows; back to the first on another card. */
+  const [artAt, setArtAt] = useState(0);
+  useEffect(() => setArtAt(0), [cardId]);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -153,6 +157,13 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const name = displayCardName(card.name, card.number);
   /* Large, but never wider than a card reads comfortably. */
   const artWidth = Math.min(240, screenWidth - gutter * 2);
+  /* The arts to swipe; an older server sends only the one. */
+  const arts =
+    card.arts && card.arts.length > 0
+      ? card.arts
+      : card.imageUrl
+        ? [{ imageUrl: card.imageUrl, label: "", variants: [] }]
+        : [];
 
   return (
     <CardOverlay>
@@ -170,12 +181,23 @@ export function CardScreen({ cardId }: { cardId: string }) {
           size like every other card in the app, then the name, the
           number and the game under it. */}
       <View style={{ alignItems: "center", gap: spacing(3) }}>
-        <CardImage
-          imageUrl={card.imageUrl}
-          width={artWidth}
-          name={name}
-          cardNumber={card.number}
-        />
+        {/* Every art of the card, swiped (art-carousel.tsx); the sheet's
+            full width, past the gutter, so a page is one art. */}
+        {arts.length === 0 ? (
+          <CardImage imageUrl={null} width={artWidth} name={name} cardNumber={card.number} />
+        ) : (
+        <View style={{ marginHorizontal: -gutter }}>
+          <ArtCarousel
+            arts={arts}
+            name={name}
+            cardNumber={card.number}
+            pageWidth={screenWidth}
+            artWidth={artWidth}
+            index={Math.min(artAt, Math.max(0, arts.length - 1))}
+            onIndex={setArtAt}
+          />
+        </View>
+        )}
         <View style={{ alignItems: "center", gap: spacing(1) }}>
           <Title>{name}</Title>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
@@ -196,7 +218,14 @@ export function CardScreen({ cardId }: { cardId: string }) {
 
       {/* Market prices from Scrydex, loaded after the card: the
           website's panel, the same spot (src/card-prices.tsx). */}
-      <CardPricesPanel cardId={card.cardId} />
+      <CardPricesPanel
+        cardId={card.cardId}
+        variants={arts[artAt]?.variants}
+        onPick={(variant) => {
+          const at = arts.findIndex((art) => art.variants.includes(variant));
+          if (at >= 0) setArtAt(at);
+        }}
+      />
 
       {/* You: one line per true fact, then the one control. Nothing of
           this when signed out; the server sends `you` as null. */}

@@ -42,7 +42,17 @@ function updatedLabel(iso: string): string {
   return hours < 24 ? `${hours}h ago` : `${Math.round(hours / 24)}d ago`;
 }
 
-export function CardPricesPanel({ cardId }: { cardId: string }) {
+export function CardPricesPanel({
+  cardId,
+  variants,
+  onPick,
+}: {
+  cardId: string;
+  /** The art the carousel shows: its printing is the one priced. */
+  variants?: string[];
+  /** A chip tapped: the carousel slides to that printing's art. */
+  onPick?: (variant: string) => void;
+}) {
   /* Prices already in hand draw in the first frame; otherwise the copy
      on the phone, then the server's answer (src/price-cache.ts). */
   const [prices, setPrices] = useState<CardPrices | null>(() => peekCardPrices(cardId));
@@ -76,6 +86,15 @@ export function CardPricesPanel({ cardId }: { cardId: string }) {
     };
   }, [cardId, fade]);
 
+  /* Follow the carousel: the printing of the art on show. */
+  const showing = variants?.join("|") ?? "";
+  useEffect(() => {
+    if (!prices || prices.state !== "ok" || !showing) return;
+    const wanted = showing.split("|");
+    const index = prices.printings.findIndex((printing) => wanted.includes(printing.variant));
+    if (index >= 0) setAt(index);
+  }, [prices, showing]);
+
   return (
     <View style={{ gap: spacing(2) }}>
       <Text
@@ -100,7 +119,15 @@ export function CardPricesPanel({ cardId }: { cardId: string }) {
         </Text>
       ) : (
         <Animated.View style={{ opacity: fade, gap: spacing(2) }}>
-          <Panel prices={prices} at={Math.min(at, prices.printings.length - 1)} onPick={setAt} />
+          <Panel
+            prices={prices}
+            at={Math.min(at, prices.printings.length - 1)}
+            onPick={(index) => {
+              setAt(index);
+              const variant = prices.printings[index]?.variant;
+              if (variant) onPick?.(variant);
+            }}
+          />
         </Animated.View>
       )}
     </View>
