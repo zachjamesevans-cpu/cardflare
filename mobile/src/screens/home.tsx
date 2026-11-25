@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
 import { FirstFlareCard } from "../first-flare-card";
 import { TradersStrip } from "../traders-strip";
@@ -618,6 +619,9 @@ const FeedPost = memo(function FeedPost({
 
 export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearby" }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  /* Tapping Feed (or Nearby) again: back to the top (tab-reset.ts). */
+  const feedScroll = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
+  useTabReset(() => feedScroll.current?.scrollTo({ y: 0, animated: true }));
   const [me, setMe] = useState<Me | null>(null);
   /* Whether `me` came from the server this visit, not from last
      open's saved copy: the "Room open" banner trusts nothing older. */
@@ -2063,6 +2067,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
           passed over. */}
       {mode === "nearby" && !guest ? <Tour id="nearby" /> : null}
       <Animated.ScrollView
+        ref={feedScroll}
         /*
          * flex: 1, and it is load-bearing rather than tidy.
          *

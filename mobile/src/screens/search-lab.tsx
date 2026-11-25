@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -37,7 +38,6 @@ import {
   LAB_GAMES,
   labScope,
   noCardsLine,
-  printingsLine,
   type LabGame,
 } from "../search-lab-games";
 import { leadArt, SEARCH_DEBOUNCE_MS } from "./search";
@@ -107,6 +107,15 @@ export function SearchLabScreen() {
   const [refreshing, setRefreshing] = useState(false);
   /* Only the newest answer lands: shop wifi lets keystrokes overtake. */
   const asked = useRef(0);
+  /* Tapping Search again: the search as if just opened - nothing typed,
+     All games, at the top, keyboard down (tab-reset.ts). */
+  const page = useRef<ScrollView>(null);
+  useTabReset(() => {
+    setQuery("");
+    setGame(null);
+    field.current?.blur();
+    page.current?.scrollTo({ y: 0, animated: true });
+  });
 
   const text = query.trim();
   const searching = text.length >= 2;
@@ -176,6 +185,7 @@ export function SearchLabScreen() {
 
   return (
     <ScrollView
+      ref={page}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       style={{ flex: 1, backgroundColor: colors.canvas }}
@@ -558,16 +568,87 @@ function Results({
                 imageUrl: leadArt(hit),
                 game: hit.game ?? null,
               };
-              const more = printingsLine(hit.printings.length);
+              const count = hit.printings.length;
               return (
                 <View key={hit.id} style={{ width: tile, gap: spacing(1) }}>
-                  <Tap
-                    onPress={() => onOpen(card)}
-                    accessibilityLabel={`Open ${hit.name}`}
-                  >
-                    <Art uri={card.imageUrl} width={tile} name={hit.name} />
-                  </Tap>
-                  <Text numberOfLines={2} style={tileName()}>
+                  <View>
+                    <Tap
+                      onPress={() => onOpen(card)}
+                      accessibilityLabel={`Open ${hit.name}`}
+                    >
+                      <Art uri={card.imageUrl} width={tile} name={hit.name} />
+                    </Tap>
+                    {/* How many printings, on the card itself: the founder,
+                        "a small icon with number of printings on the card
+                        itself, instead of a whole row". One printing, none. */}
+                    {count > 1 ? (
+                      <View
+                        pointerEvents="none"
+                        accessibilityLabel={`${count} printings`}
+                        style={{
+                          position: "absolute",
+                          left: 5,
+                          bottom: 5,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 3,
+                          paddingHorizontal: 6,
+                          height: 20,
+                          borderRadius: 999,
+                          backgroundColor: "rgba(0,0,0,0.78)",
+                        }}
+                      >
+                        <Ionicons name="layers" size={11} color={colors.textPrimary} />
+                        <Text style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "800" }}>
+                          {count}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {/* Hunting it is the Flare button, small, on the art's
+                        corner: the composer with this card as its first
+                        line. It replaced "Hunt it", which sat at a
+                        different height in every tile. */}
+                    <Tap
+                      onPress={() => onHunt(card)}
+                      accessibilityLabel={`Flare ${hit.name}`}
+                      hitSlop={6}
+                      style={{
+                        position: "absolute",
+                        top: 5,
+                        right: 5,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 15,
+                        backgroundColor: colors.accent,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        shadowColor: "#000",
+                        shadowOpacity: 0.35,
+                        shadowRadius: 4,
+                        shadowOffset: { width: 0, height: 1 },
+                      }}
+                    >
+                      <Ionicons name="flame" size={15} color={colors.accentContrast} />
+                      <View
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: colors.accentContrast,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Ionicons name="add" size={9} color={colors.accent} />
+                      </View>
+                    </Tap>
+                  </View>
+                  {/* One line each, so every tile is the same height and
+                      the rows line up. */}
+                  <Text numberOfLines={1} style={tileName()}>
                     {displayCardName(hit.name, hit.cardNumber)}
                   </Text>
                   <Text numberOfLines={1} style={tileMeta()}>
@@ -578,40 +659,9 @@ function Results({
                       .filter(Boolean)
                       .join(" · ")}
                   </Text>
-                  {lead?.label ? (
-                    <Text numberOfLines={1} style={tileMeta()}>
-                      {lead.label}
-                    </Text>
-                  ) : null}
-                  {more ? (
-                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>
-                      {more}
-                    </Text>
-                  ) : null}
-                  {/* One tap from a result to hunting it: the composer,
-                      with this card as its first line. */}
-                  <Tap
-                    onPress={() => onHunt(card)}
-                    accessibilityLabel={`Hunt ${hit.name}`}
-                    style={{
-                      marginTop: spacing(1),
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 4,
-                      height: 28,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: colors.accentMuted,
-                    }}
-                  >
-                    <Ionicons name="locate" size={13} color={colors.accent} />
-                    <Text
-                      style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}
-                    >
-                      Hunt it
-                    </Text>
-                  </Tap>
+                  <Text numberOfLines={1} style={tileMeta()}>
+                    {lead?.label ?? " "}
+                  </Text>
                 </View>
               );
             })}

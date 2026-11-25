@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useTabReset } from "../tab-reset";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FlatList, RefreshControl, Text, View } from "react-native";
@@ -73,6 +74,9 @@ export function LocalScreen({
       nothing near-you at all. See src/local-enabled.ts. */
   threadsOnly?: boolean;
 }) {
+  /* Tapping Messages again: back to the top (tab-reset.ts). */
+  const threadList = useRef<FlatList<Row>>(null);
+  useTabReset(() => threadList.current?.scrollToOffset({ offset: 0, animated: true }));
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const tabInset = useTabBarInset();
 
@@ -271,6 +275,7 @@ export function LocalScreen({
 
   return (
     <FlatList
+      ref={threadList}
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
         paddingHorizontal: gutter,

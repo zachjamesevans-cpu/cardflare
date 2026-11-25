@@ -37,8 +37,3 @@ export function noCardsLine(query: string, game: GameSlug | null): string {
     ? `No ${name} cards match "${query}".`
     : `No cards match "${query}".`;
 }
-
-/** "+3 printings" under a result with more than one, else null. */
-export function printingsLine(count: number): string | null {
-  return count > 1 ? `+${count - 1} ${count - 1 === 1 ? "printing" : "printings"}` : null;
-}
