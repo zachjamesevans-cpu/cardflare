@@ -29,7 +29,7 @@ const printing = (over: Partial<CardPrinting> = {}): CardPrinting => ({
   rarity: "SR",
   printingName: "Roronoa Zoro",
   isPromo: null,
-  imageUrl: "https://optcgapi.com/media/static/Card_Images/EB04-007.jpg",
+  imageUrl: "https://images.scrydex.com/onepiece/EB04-007.jpg",
   ...over,
 });
 

@@ -11,8 +11,8 @@ import { cardArt, type CardPrinting } from "@/lib/cards/schema";
  * back null and drew as a black tile on a profile, even though the card's
  * other printings had art. The founder found two on one profile.
  */
-const OWN = "https://optcgapi.com/media/static/Card_Images/OP12-034_p1.jpg";
-const BASE = "https://optcgapi.com/media/static/Card_Images/OP12-034.jpg";
+const OWN = "https://images.scrydex.com/onepiece/OP12-034_p1.jpg";
+const BASE = "https://images.scrydex.com/onepiece/OP12-034.jpg";
 
 const printing = (over: Partial<CardPrinting> = {}): CardPrinting => ({
   id: crypto.randomUUID(),

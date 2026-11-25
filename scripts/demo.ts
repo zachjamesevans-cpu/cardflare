@@ -118,16 +118,19 @@ async function migrate(databaseUrl: string) {
 }
 
 function catalogue() {
-  /* The real sync, against the demo project: the same command the
-     production catalogue came from. */
+  /* The real import, against the demo project: the same command the
+     production catalogue came from. Needs SCRYDEX_API_KEY and
+     SCRYDEX_TEAM_ID in .env.demo. */
   const run = spawnSync(
     "npx",
     [
       "tsx",
       "--conditions=react-server",
       "--env-file=.env.demo",
-      "scripts/sync-onepiece.ts",
-      "--full",
+      "scripts/import-catalogue.ts",
+      "--game",
+      "one-piece",
+      "--all",
       "--confirm",
     ],
     { cwd: root, stdio: "inherit" },

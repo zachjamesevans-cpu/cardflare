@@ -54,24 +54,22 @@ misconfigured.
 
 ## Scripts
 
-| Command                                           | Does                                             |
-| ------------------------------------------------- | ------------------------------------------------ |
-| `npm run dev`                                     | Development server                               |
-| `npm run build`                                   | Production build                                 |
-| `npm run verify`                                  | Format check, lint, typecheck, unit tests, build |
-| `npm test`                                        | Unit and integration tests                       |
-| `npm run test:e2e`                                | Playwright tests (builds and starts the app)     |
-| `npm run lint`                                    | ESLint                                           |
-| `npm run typecheck`                               | `tsc --noEmit`                                   |
-| `npm run format`                                  | Prettier write                                   |
-| `npm run brand:assets`                            | Regenerate logo derivatives from the master      |
-| `npm run cards:probe`                             | Inspect the card provider's live response shape  |
-| `npm run cards:sync:onepiece -- --sample`         | Import ~75–150 cards for testing                 |
-| `npm run cards:sync:onepiece -- --full --confirm` | Import the full catalog                          |
+| Command                                                 | Does                                             |
+| ------------------------------------------------------- | ------------------------------------------------ |
+| `npm run dev`                                           | Development server                               |
+| `npm run build`                                         | Production build                                 |
+| `npm run verify`                                        | Format check, lint, typecheck, unit tests, build |
+| `npm test`                                              | Unit and integration tests                       |
+| `npm run test:e2e`                                      | Playwright tests (builds and starts the app)     |
+| `npm run lint`                                          | ESLint                                           |
+| `npm run typecheck`                                     | `tsc --noEmit`                                   |
+| `npm run format`                                        | Prettier write                                   |
+| `npm run brand:assets`                                  | Regenerate logo derivatives from the master      |
+| `npm run cards:import -- --game <game> --all --confirm` | Import a game's catalogue from Scrydex           |
 
 Card imports can also be run from **Admin → Card catalog**, which uses the
 service-role key already configured on the deployed server rather than a local
-copy. See [docs/CARD_DATA.md](./docs/CARD_DATA.md#synchronisation).
+copy. See [docs/CARD_DATA.md](./docs/CARD_DATA.md).
 
 ## Environment variables
 

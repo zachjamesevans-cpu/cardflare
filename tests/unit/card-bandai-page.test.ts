@@ -274,7 +274,7 @@ describe("classifying a printing", () => {
 
   it("says what a human choice actually claims, in the provider's words", () => {
     /* The founder, comparing an import against a synced set: the words
-       have to match what optcgapi lands, so search reads one way. The
+       have to match what the synced catalogue lands, so search reads one way. The
        chip is label-or-set-code first, so the variant word must ride in
        variant_type and printing_label must stay null. */
     const manga = classificationColumns("manga");

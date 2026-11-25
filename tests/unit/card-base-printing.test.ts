@@ -9,7 +9,7 @@ import { pickBasePrinting, type CardPrinting } from "@/lib/cards/schema";
  * where a picture helps most, since somebody who will take any version is
  * usually picturing the ordinary one.
  */
-const IMAGE = "https://optcgapi.com/media/static/Card_Images/OP12-034.jpg";
+const IMAGE = "https://images.scrydex.com/onepiece/OP12-034.jpg";
 
 const printing = (over: Partial<CardPrinting> = {}): CardPrinting => ({
   id: crypto.randomUUID(),

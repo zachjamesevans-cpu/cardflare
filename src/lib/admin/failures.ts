@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { SCRYDEX_KEY } from "@/lib/cards/providers/scrydex/adapter";
 import { wrongCards } from "@/lib/cards/spot-check-verdicts";
 import { openReportCount } from "@/lib/players/safety";
 
@@ -32,17 +33,18 @@ export interface Failure {
 const STALE_DAYS = 14;
 const RECENT_DAYS = 30;
 
+/* The sources in use. Runs left by the catalogues Scrydex replaced
+   (2026-11-25) are history, not something to warn about. */
 const PROVIDER_NAMES: Record<string, string> = {
-  optcgapi: "One Piece (OPTCG API)",
-  scryfall: "Magic (Scryfall)",
-  tcgdex: "Pokémon (TCGdex)",
-  fabcube: "Flesh and Blood (FaB Cube)",
-  riftcodex: "Riftbound (Riftcodex)",
-  lorcast: "Lorcana (Lorcast)",
+  [SCRYDEX_KEY]: "Card catalogue (Scrydex)",
 };
 
 function providerName(key: string): string {
   return PROVIDER_NAMES[key] ?? key;
+}
+
+function currentProvider(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(PROVIDER_NAMES, key);
 }
 
 export async function recentFailures(now = Date.now()): Promise<{
@@ -73,7 +75,7 @@ export async function recentFailures(now = Date.now()): Promise<{
      fixed is history, not a problem. */
   const latestByProvider = new Map<string, NonNullable<typeof runs>[number]>();
   for (const run of runs ?? []) {
-    if (run.status === "running") continue;
+    if (run.status === "running" || !currentProvider(run.provider_key)) continue;
     if (!latestByProvider.has(run.provider_key))
       latestByProvider.set(run.provider_key, run);
   }
@@ -108,7 +110,11 @@ export async function recentFailures(now = Date.now()): Promise<{
     .limit(200);
   const newestGood = new Map<string, string>();
   for (const run of lastGood ?? []) {
-    if (run.finished_at && !newestGood.has(run.provider_key)) {
+    if (
+      run.finished_at &&
+      currentProvider(run.provider_key) &&
+      !newestGood.has(run.provider_key)
+    ) {
       newestGood.set(run.provider_key, run.finished_at);
     }
   }

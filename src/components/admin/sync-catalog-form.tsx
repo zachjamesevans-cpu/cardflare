@@ -28,7 +28,7 @@ const MODES = [
     value: "full",
     label: "Full: the provider's entire catalog",
     blurb:
-      "Thousands of records from a free service. Run it when you actually need the whole catalog, not to test.",
+      "Thousands of records, each page a metered request. Run it when you actually need the whole catalog, not to test.",
   },
 ] as const;
 

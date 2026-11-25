@@ -43,7 +43,9 @@ describe("cardImagesEnabled", () => {
 
 describe("isRenderableImageUrl", () => {
   it("accepts an https URL on an allowed host", () => {
-    expect(isRenderableImageUrl("https://optcgapi.com/images/OP01-024.png")).toBe(true);
+    expect(
+      isRenderableImageUrl("https://images.scrydex.com/onepiece/OP01-024.png"),
+    ).toBe(true);
   });
 
   it("rejects a missing URL", () => {
@@ -53,7 +55,7 @@ describe("isRenderableImageUrl", () => {
   });
 
   it("rejects http", () => {
-    expect(isRenderableImageUrl("http://optcgapi.com/a.png")).toBe(false);
+    expect(isRenderableImageUrl("http://images.scrydex.com/a.png")).toBe(false);
   });
 
   /*
@@ -64,8 +66,8 @@ describe("isRenderableImageUrl", () => {
   it("rejects a host that is not on the list", () => {
     for (const url of [
       "https://evil.example/a.png",
-      "https://optcgapi.com.evil.example/a.png",
-      "https://notoptcgapi.com/a.png",
+      "https://images.scrydex.com.evil.example/a.png",
+      "https://notimages.scrydex.com/a.png",
     ]) {
       expect(isRenderableImageUrl(url)).toBe(false);
     }

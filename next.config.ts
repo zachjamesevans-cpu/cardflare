@@ -103,20 +103,7 @@ const nextConfig: NextConfig = {
      * provider to have supplied the URL, and NEXT_PUBLIC_ENABLE_CARD_IMAGES to
      * be true.
      */
-    remotePatterns: [
-      { protocol: "https", hostname: "optcgapi.com" },
-      { protocol: "https", hostname: "www.optcgapi.com" },
-      { protocol: "https", hostname: "cards.scryfall.io" },
-      { protocol: "https", hostname: "assets.tcgdex.net" },
-      {
-        protocol: "https",
-        hostname: "legendstory-production-s3-public.s3.amazonaws.com",
-      },
-      { protocol: "https", hostname: "storage.googleapis.com" },
-      { protocol: "https", hostname: "cmsassets.rgpub.io" },
-      { protocol: "https", hostname: "cards.lorcast.io" },
-      { protocol: "https", hostname: "images.scrydex.com" },
-    ],
+    remotePatterns: [{ protocol: "https", hostname: "images.scrydex.com" }],
   },
 };
 
