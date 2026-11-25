@@ -16,22 +16,15 @@ const app = read("mobile/src/screens/flare-composer.tsx");
 const web = read("src/components/flares/flare-composer.tsx");
 
 describe("the printing", () => {
-  /* The founder (2026-11-25), of the card editor: "it is ALL over the
-     place ... so much info." The printing is now the card's arts as
-     pictures in the editor itself, "Any" first; no row, no second sheet. */
-  it("is the card's arts as pictures, Any first, on both platforms", () => {
-    expect(app).toContain('label="Any"');
-    expect(app).toContain("<ArtChoice");
-    expect(app).not.toContain('label="Printing"');
-    expect(web).toContain('label="Any"');
-    expect(web).toContain("<ArtChoice");
-    expect(web).not.toContain('label="Printing"');
-    const appSheets = read("mobile/src/composer-sheets.tsx");
-    expect(appSheets).toContain('label="Any printing"');
-    expect(appSheets).toMatch(/art=\{\s*<CardImage imageUrl=\{printing\.imageUrl\}/);
-    const webSheets = read("src/components/flares/composer-sheets.tsx");
-    expect(webSheets).toContain('label="Any printing"');
-    expect(webSheets).toContain("printing.imageUrl &&");
+  /* The founder (2026-11-25): "just the swipe is needed on this screen".
+     Each art is its own card, so the editor has nothing to pick: no
+     Printing row, no art pictures. */
+  it("is not chosen in the editor at all, on either platform", () => {
+    for (const source of [app, web]) {
+      expect(source).not.toContain('label="Printing"');
+      expect(source).not.toContain("<ArtChoice");
+      expect(source).not.toContain("<PrintingSheet");
+    }
   });
 
   it("no longer scrolls sideways or drops down", () => {
@@ -136,7 +129,9 @@ describe("the card editor, kept quiet", () => {
       const body = editor.slice(0, editor.indexOf("\n}\n"));
       expect(body).not.toContain("Make cover");
       expect(body).not.toMatch(/>\s*Remove\s*</);
-      expect(body).toContain("Add a note");
+      /* "remove the add a note button it's so awkward." */
+      expect(body).not.toContain("Add a note");
+      expect(body).not.toContain("<CardNoteField");
     }
     /* The app's row: drop a card on the bin. The website's: the same,
        and Delete on a focused card. */

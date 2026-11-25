@@ -76,17 +76,18 @@ describe("posting a note", () => {
     );
   });
 
-  it("is written in the composer on both platforms", () => {
-    expect(read("src/components/flares/flare-composer.tsx")).toContain(
-      "<CardNoteField",
-    );
-    expect(read("src/components/flares/flare-composer.tsx")).toContain(
-      "cardNote: item.cardNote?.trim() || null",
-    );
-    expect(read("mobile/src/screens/flare-composer.tsx")).toContain("<CardNoteField");
-    expect(read("mobile/src/screens/flare-composer.tsx")).toContain(
-      "cardNote: item.cardNote?.trim() || null",
-    );
+  /* The founder (2026-11-25), of the composer's card editor: "remove the
+     add a note button it's so awkward." No field to write one any more;
+     a note already on a draft line still goes up with it, and notes
+     already posted still show. */
+  it("is no longer written in the composer, but a draft's note still posts", () => {
+    for (const file of [
+      "src/components/flares/flare-composer.tsx",
+      "mobile/src/screens/flare-composer.tsx",
+    ]) {
+      expect(read(file), file).not.toContain("<CardNoteField");
+      expect(read(file), file).toContain("cardNote: item.cardNote?.trim() || null");
+    }
   });
 });
 

@@ -2,7 +2,6 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
-import { CardNoteField } from "../card-note-field";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -920,11 +919,12 @@ function artFor(item: DraftItem): string | null {
 
 /**
  * One tray card, opened, kept to what a line needs: the founder, "it is
- * ALL over the place ... so much info." The art, large, with its name
- * under it; the card's other arts as small pictures to tap (only when
- * there are any); how many copies; a note, folded away until wanted;
- * Done. Order and removing live in the row itself: drag a card to the
- * front to make it the cover, pull it out of the row to remove it.
+ * ALL over the place ... so much info", then "just the swipe is needed
+ * on this screen". The art, large, with its name and art under it, and
+ * how many copies; Done. Swipe to the next card. Each art is its own
+ * card already (it came in as the art it was flared from), so there is
+ * nothing to pick here. Order and removing live in the row: drag a card
+ * to the front to make it the cover, onto the bin to remove it.
  */
 function CardEditor({
   item,
@@ -937,7 +937,6 @@ function CardEditor({
   onChange: (next: DraftItem) => void;
   onDone: () => void;
 }) {
-  const [noting, setNoting] = useState(false);
   if (!item) return null;
 
   /* One choice per picture: a foil and a normal sharing an image are
@@ -954,8 +953,6 @@ function CardEditor({
   const chosen = item.printingId
     ? item.printings.find((printing) => printing.id === item.printingId)
     : undefined;
-  const chosenArt = chosen ? arts.find((art) => art.imageUrl === chosen.imageUrl) : undefined;
-  const showNote = noting || Boolean(item.cardNote);
 
   return (
     <View style={{ gap: spacing(4) }}>
@@ -981,30 +978,6 @@ function CardEditor({
         </View>
       </View>
 
-      {/* The card's arts, as pictures: tap one to want that art. "Any"
-          first, for a player who would take whichever comes. */}
-      {arts.length > 1 ? (
-        /* Wrapped, never scrolled sideways: the founder, "it feels weird to
-           scroll left when everywhere else on the app you scroll down". */
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-          <ArtChoice
-            label="Any"
-            imageUrl={null}
-            on={!item.printingId}
-            onPress={() => onChange({ ...item, printingId: null })}
-          />
-          {arts.map((art) => (
-            <ArtChoice
-              key={art.imageUrl}
-              label={art.label}
-              imageUrl={art.imageUrl}
-              on={chosenArt?.imageUrl === art.imageUrl}
-              onPress={() => onChange({ ...item, printingId: art.printingId })}
-            />
-          ))}
-        </View>
-      ) : null}
-
       <View
         style={{
           flexDirection: "row",
@@ -1025,26 +998,6 @@ function CardEditor({
         />
       </View>
 
-      {/* Why this card: folded to one link, since most never write one. */}
-      {showNote ? (
-        <CardNoteField
-          value={item.cardNote ?? ""}
-          onChange={(cardNote) => onChange({ ...item, cardNote })}
-          cardName={item.name}
-        />
-      ) : (
-        <Tap
-          onPress={() => setNoting(true)}
-          accessibilityRole="button"
-          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
-        >
-          <Ionicons name="add" size={16} color={colors.accent} />
-          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
-            Add a note
-          </Text>
-        </Tap>
-      )}
-
       <Button label="Done" onPress={onDone} />
     </View>
   );
@@ -1062,58 +1015,6 @@ export function artName(label: string | null): string {
   return last.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (first) => first.toUpperCase());
 }
 
-/** One art to tap in the editor: the picture, outlined when it is the one. */
-function ArtChoice({
-  label,
-  imageUrl,
-  on,
-  onPress,
-}: {
-  label: string;
-  imageUrl: string | null;
-  on: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: on }}
-      accessibilityLabel={label === "Any" ? "Any art" : label}
-      style={{ alignItems: "center", gap: 4, width: 56 }}
-    >
-      <View
-        style={{
-          width: 52,
-          height: 72,
-          borderRadius: 6,
-          borderWidth: 2,
-          borderColor: on ? colors.accent : "transparent",
-          backgroundColor: colors.elevated,
-          overflow: "hidden",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {imageUrl ? (
-          <RemoteImage uri={imageUrl} style={{ width: "100%", height: "100%" }} />
-        ) : (
-          <Ionicons name="albums-outline" size={20} color={colors.textSecondary} />
-        )}
-      </View>
-      <Text
-        numberOfLines={1}
-        style={{
-          color: on ? colors.accent : colors.textMuted,
-          fontSize: 10,
-          fontWeight: "700",
-        }}
-      >
-        {label}
-      </Text>
-    </Tap>
-  );
-}
 
 /**
  * The cards in this flare, side by side in the overlay, one page each:

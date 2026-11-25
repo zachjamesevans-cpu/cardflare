@@ -2,7 +2,6 @@
 
 import { Sheet } from "@/components/ui/sheet";
 import { AddingToHunt } from "@/components/flares/composer-sheets";
-import { CardNoteField } from "@/components/flares/card-note-field";
 import {
   useEffect,
   useState,
@@ -11,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Layers, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
 
@@ -29,9 +28,7 @@ import {
   saveDraft,
   type Draft,
   type DraftCard,
-  changePrinting,
   keyOf,
-  lineKey,
   withCardFirst,
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
@@ -539,13 +536,7 @@ function ComposerBody({
               onDone={() => setEditing(null)}
               item={editingCard}
               copiesLabel={copiesLabel}
-              onPrinting={(printingId) => {
-                const key = keyOf(editingCard);
-                patch({ cards: changePrinting(draft.cards, key, printingId) });
-                setEditing(lineKey(editingCard.card.id, printingId));
-              }}
               onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
-              onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
             />
           )}
         </Sheet>
@@ -634,29 +625,25 @@ function ComposerBody({
 
 /**
  * One card's own settings, kept to what a line needs: the founder, "it
- * is ALL over the place ... so much info." The art and its name; the
- * card's other arts as small pictures to tap; copies; a note folded away
- * until wanted; Done. The order and removing live in the row: drag a
+ * is ALL over the place ... so much info", then "just the swipe is
+ * needed on this screen". The art and its name, how many copies, Done;
+ * step to the next card. Each art is its own card already, so there is
+ * nothing to pick here. The order and removing live in the row: drag a
  * card to the front for the cover, onto the bin to remove it. The app's
  * editor is the same (mobile/src/screens/flare-composer.tsx).
  */
 function CardEditor({
   item,
   copiesLabel,
-  onPrinting,
   onQuantity,
-  onNote,
   onDone,
 }: {
   onDone: () => void;
   item: DraftCard;
   copiesLabel: string;
-  onPrinting: (printingId: string | null) => void;
   onQuantity: (quantity: number) => void;
-  onNote: (note: string) => void;
 }) {
   const printing = chosenPrinting(item);
-  const [noting, setNoting] = useState(false);
 
   /* One choice per picture: a foil and a normal sharing an image are one
      art, as on the card page's carousel. */
@@ -676,7 +663,6 @@ function CardEditor({
   const chosenArt = chosen
     ? arts.find((art) => art.imageUrl === chosen.imageUrl)
     : undefined;
-  const showNote = noting || Boolean(item.cardNote);
 
   return (
     <div className="flex flex-col gap-5">
@@ -702,28 +688,6 @@ function CardEditor({
         </div>
       </div>
 
-      {/* The card's arts, as pictures: click one to want that art. "Any"
-          first, for a player who would take whichever comes. */}
-      {arts.length > 1 && (
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Art">
-          <ArtChoice
-            label="Any"
-            imageUrl={null}
-            on={!item.printingId}
-            onClick={() => onPrinting(null)}
-          />
-          {arts.map((art) => (
-            <ArtChoice
-              key={art.imageUrl}
-              label={art.label}
-              imageUrl={art.imageUrl}
-              on={chosenArt?.imageUrl === art.imageUrl}
-              onClick={() => onPrinting(art.printingId)}
-            />
-          ))}
-        </div>
-      )}
-
       <div className="flex items-center justify-between gap-3">
         <span className="font-semibold text-text-primary">
           {copiesLabel === "Copies needed" ? "Copies" : copiesLabel}
@@ -737,74 +701,10 @@ function CardEditor({
         />
       </div>
 
-      {/* Why this card: folded to one link, since most never write one. */}
-      {showNote ? (
-        <CardNoteField
-          value={item.cardNote ?? ""}
-          onChange={onNote}
-          cardName={item.card.exactName}
-        />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setNoting(true)}
-          className="flex cursor-pointer items-center gap-1.5 self-start text-sm font-bold text-accent hover:underline"
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          Add a note
-        </button>
-      )}
-
       <Button type="button" onClick={onDone}>
         Done
       </Button>
     </div>
-  );
-}
-
-/** One art to click in the editor: the picture, outlined when it is the one. */
-function ArtChoice({
-  label,
-  imageUrl,
-  on,
-  onClick,
-}: {
-  label: string;
-  imageUrl: string | null;
-  on: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="radio"
-      aria-checked={on}
-      aria-label={label === "Any" ? "Any art" : label}
-      onClick={onClick}
-      className="flex w-14 shrink-0 cursor-pointer flex-col items-center gap-1"
-    >
-      <span
-        className={cn(
-          "flex h-[72px] w-[52px] items-center justify-center overflow-hidden rounded-[6px] border-2 bg-elevated",
-          on ? "border-accent" : "border-transparent hover:border-border-strong",
-        )}
-      >
-        {imageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={imageUrl} alt="" className="size-full object-cover" />
-        ) : (
-          <Layers className="size-5 text-text-secondary" aria-hidden="true" />
-        )}
-      </span>
-      <span
-        className={cn(
-          "w-full truncate text-center text-[10px] font-bold",
-          on ? "text-accent" : "text-text-muted",
-        )}
-      >
-        {label}
-      </span>
-    </button>
   );
 }
 
