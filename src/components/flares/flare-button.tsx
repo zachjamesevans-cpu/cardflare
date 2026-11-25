@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { ART_EVENT, shownArtPrinting } from "@/components/cards/card-art-carousel";
-import { Flame, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 
@@ -52,12 +52,9 @@ export function FlareButton({
         className,
       )}
     >
-      <span className="relative flex">
-        <Flame className="size-6" aria-hidden="true" />
-        <span className="absolute -top-1.5 -right-2 flex size-4 items-center justify-center rounded-full bg-accent-contrast text-accent">
-          <Plus className="size-3" strokeWidth={3} aria-hidden="true" />
-        </span>
-      </span>
+      {/* One bold +, nothing else (the app's is the same): the founder,
+          of the flame with a + disc on its shoulder, "still so ugly". */}
+      <Plus className="size-7" strokeWidth={2.75} aria-hidden="true" />
     </Link>
   );
 }

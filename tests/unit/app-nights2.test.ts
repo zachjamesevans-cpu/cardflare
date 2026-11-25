@@ -362,13 +362,14 @@ describe("the night's page", () => {
       /const writable =\s*phase === null\s*\? room\.status === "open" \|\| room\.early\s*: phase === "live" \|\| phase === "early";/,
     );
     expect(room).not.toContain("styles.actionBar");
-    /* The room's button is the app's one Flare button: a green "+ flame". */
+    /* The room's button is the app's one Flare button: a green circle
+       with one bold "+" (the flame and its + disc went, 2026-11-25). */
     expect(fab).toContain("<FlareButton");
     expect(fab).toContain("label={POST_A_FLARE}");
     expect(fab).toContain("export const FAB_HEIGHT = FLARE_BUTTON;");
     expect(flareButton).toContain("accessibilityLabel={label}");
     expect(flareButton).toContain('name="add"');
-    expect(flareButton).toContain('name="flame"');
+    expect(flareButton).not.toContain('name="flame"');
     expect(flareButton).toContain("backgroundColor: colors.accent");
   });
 

@@ -68,23 +68,10 @@ export function FlareButton({
           elevation: 8,
         }}
       >
-        <Ionicons name="flame" size={26} color={colors.accentContrast} />
-        {/* The +: a small disc on the flame's shoulder. */}
-        <View
-          style={{
-            position: "absolute",
-            top: 11,
-            right: 11,
-            width: 17,
-            height: 17,
-            borderRadius: 9,
-            backgroundColor: colors.accentContrast,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Ionicons name="add" size={14} color={colors.accent} />
-        </View>
+        {/* One bold +, nothing else: the founder (2026-11-25), of the
+            flame with a + disc on its shoulder, "still so ugly", then
+            this. The compose button everyone already reads. */}
+        <Ionicons name="add" size={34} color={colors.accentContrast} />
       </Tap>
     </View>
   );
