@@ -500,7 +500,7 @@ export type EventStatus = "draft" | "open" | "closed";
  * this column, so the two had to be one vocabulary.
  */
 export type Game =
-  "one-piece" | "riftbound" | "lorcana" | "mtg" | "pokemon" | "flesh-and-blood";
+  "one-piece" | "riftbound" | "lorcana" | "mtg" | "pokemon" | "flesh-and-blood" | "gundam";
 
 /**
  * `walk_in` rooms are opened by the application when somebody scans a store's

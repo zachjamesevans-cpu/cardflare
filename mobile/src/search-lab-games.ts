@@ -9,7 +9,7 @@ import { TCG_GAMES, type GameSlug } from "./games";
  * so Riftbound is drawn as "Coming soon" and cannot be chosen, rather
  * than opening an empty catalogue. Flip it when Riftbound is imported.
  */
-const NO_CATALOG: ReadonlySet<GameSlug> = new Set(["riftbound"]);
+const NO_CATALOG: ReadonlySet<GameSlug> = new Set(["flesh-and-blood"]);
 
 export interface LabGame {
   slug: GameSlug;

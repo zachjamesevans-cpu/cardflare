@@ -52,7 +52,8 @@ export type GameId =
  * card search compares it to `cards.game`, and the sign-up question
  * stores it, so the three cannot be allowed to drift again.
  *
- * The last four have rules and timers and no cards. The founder
+ * The last of these have rules and timers and no cards (Gundam had
+ * none until Scrydex, 2026-11-25). The founder
  * (2026-11-11): "add sorcery, Gundam, cyberpunk, and yugioh to
  * FlareCast with their respective rules and timers", and on scope,
  * "FlareCast only". So they are not in the catalogue, not in the
@@ -77,7 +78,7 @@ export const GAME_IDS: readonly GameId[] = [
 /** Games with timers and rules here and no cards in the catalogue. */
 export const FLARECAST_ONLY: readonly GameId[] = [
   "yugioh",
-  "gundam",
+  /* Gundam left this list on 2026-11-25: Scrydex carries its cards. */
   "cyberpunk",
   "sorcery",
 ];

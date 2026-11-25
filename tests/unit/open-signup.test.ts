@@ -74,7 +74,7 @@ describe("the starter name", () => {
 });
 
 describe("the games catalogue", () => {
-  it("carries the founder's five plus Flesh and Blood, in the founder's order", () => {
+  it("carries the founder's five, Flesh and Blood, and Gundam (Scrydex), in order", () => {
     expect(TCG_GAMES.map((game) => game.label)).toEqual([
       "One Piece TCG",
       "Riftbound",
@@ -82,6 +82,7 @@ describe("the games catalogue", () => {
       "Magic: The Gathering",
       "Pokémon",
       "Flesh and Blood",
+      "Gundam Card Game",
     ]);
   });
 

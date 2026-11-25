@@ -49,7 +49,8 @@ describe("the games", () => {
        FlareCast alone (2026-11-12). Another arrives by adding a
        profile, which is deliberately a code change. */
     expect([...GAME_IDS]).toEqual([...SIX, ...FOUR]);
-    expect([...FLARECAST_ONLY]).toEqual(FOUR);
+    /* Gundam gained cards with Scrydex (2026-11-25): no longer FlareCast-only. */
+    expect([...FLARECAST_ONLY]).toEqual(FOUR.filter((game) => game !== "gundam"));
     expect(allProfiles()).toHaveLength(10);
   });
 

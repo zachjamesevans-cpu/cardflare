@@ -41,6 +41,9 @@ export const ALLOWED_IMAGE_HOSTS = [
   "storage.googleapis.com",
   "cmsassets.rgpub.io",
   "cards.lorcast.io",
+  /* Scrydex, the one source from 2026-11-25. The hosts above serve the
+     cards imported before it until those are deleted. */
+  "images.scrydex.com",
 ] as const;
 
 /**

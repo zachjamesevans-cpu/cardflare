@@ -163,7 +163,7 @@ describe("sign-up", () => {
   it("names the games from the one list", () => {
     expect(appPlayersLine()).toBe(webPlayersLine());
     expect(webPlayersLine()).toBe(
-      "For One Piece, Riftbound, Lorcana, Magic, Pokémon and Flesh & Blood players",
+      "For One Piece, Riftbound, Lorcana, Magic, Pokémon, Flesh & Blood and Gundam players",
     );
     expect(read("src/app/signup/page.tsx")).toContain("{playersLine()}.");
     /* Not on the app's splash any more: the founder, "this splash screen
