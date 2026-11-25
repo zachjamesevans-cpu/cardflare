@@ -54,7 +54,8 @@ describe("the composer says only what the cards do not", () => {
       '<Muted>{LOCAL_ENABLED ? "To friends and nearby" : "To friends"}</Muted>',
     );
     expect(app).toContain("`In room ${target.code}`");
-    expect(read("mobile/src/card-tray.tsx")).not.toContain("{index + 1}");
+    /* No number drawn on a tile; VoiceOver still hears "card 2 of 5". */
+    expect(read("mobile/src/card-tray.tsx")).not.toMatch(/>\s*\{index \+ 1\}\s*</);
     const web = read("src/components/flares/flare-composer.tsx");
     expect(web).not.toContain("Posting to your area.");
     expect(web).not.toContain(">Cards in this flare<");
