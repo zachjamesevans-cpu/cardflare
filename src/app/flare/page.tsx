@@ -78,13 +78,20 @@ export default async function FlarePage({
 }: {
   /* "Add cards" on a profile hunt arrives here, so the composer opens
      with that hunt already chosen rather than asking a second time. */
-  searchParams: Promise<{ hunt?: string; card?: string }>;
+  searchParams: Promise<{ hunt?: string; card?: string; printing?: string }>;
 }) {
-  const { hunt, card } = await searchParams;
+  const { hunt, card, printing } = await searchParams;
   /* "Post a Flare for it" on a card page: the card goes in first. A
      malformed or unknown id is simply no card. */
   const initialCard =
     card && /^[0-9a-f-]{36}$/i.test(card) ? await cardResultById(card) : null;
+  /* The art it was flared from, when it is one of this card's printings. */
+  const initialPrinting =
+    initialCard &&
+    printing &&
+    initialCard.printings.some((entry) => entry.id === printing)
+      ? printing
+      : null;
   const [viewer, session] = await Promise.all([getViewer(), getPlayerSession()]);
 
   const playerId =
@@ -170,6 +177,7 @@ export default async function FlarePage({
               }
               initialHuntId={hunt ?? null}
               initialCard={initialCard}
+              initialPrinting={initialPrinting}
             />
           ) : (
             <Card className="flex flex-col gap-3">

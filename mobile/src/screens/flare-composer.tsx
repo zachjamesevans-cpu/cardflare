@@ -136,7 +136,11 @@ export type HandedCard = NonNullable<NonNullable<TabParams["Flare"]>["card"]>;
  * built by hand is never rewritten by a tap on a card page.
  */
 export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem): Draft {
-  const at = draft.items.findIndex((item) => item.cardId === card.cardId);
+  /* The same card AND art: another art of it is a line of its own. */
+  const printingId = card.printingId ?? null;
+  const at = draft.items.findIndex(
+    (item) => item.cardId === card.cardId && (item.printingId ?? null) === printingId,
+  );
   if (at >= 0) {
     if (at === 0) return draft;
     const items = [...draft.items];
@@ -155,7 +159,7 @@ export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem):
         /* Filled by a search as soon as it answers; until then, and if
            it never does, the line is any printing. */
         printings: [],
-        printingId: null,
+        printingId: card.printingId ?? null,
         quantity: 1,
       },
       ...draft.items,
@@ -291,7 +295,11 @@ export function FlareComposer({
         setDraft((current) => {
           const card = handed.current;
           const handedLine = card
-            ? current.items.find((item) => item.cardId === card.cardId)
+            ? current.items.find(
+                (item) =>
+                  keyOf(item) ===
+                  lineKey({ cardId: card.cardId, printingId: card.printingId ?? null }),
+              )
             : undefined;
           const onlyHanded = handedLine !== undefined && current.items.length === 1;
           if (current.items.length > 0 && !onlyHanded) return current;

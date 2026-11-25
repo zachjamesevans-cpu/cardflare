@@ -172,6 +172,8 @@ export type TabParams = {
           name: string;
           cardNumber: string;
           imageUrl: string | null;
+          /** The art it was flared from: each art is its own line. */
+          printingId?: string | null;
         };
       }
     | undefined;

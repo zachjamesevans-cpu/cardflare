@@ -96,6 +96,8 @@ export function FlareComposer(props: {
   initialHuntId: string | null;
   /** "Post a Flare for it" on a card page arrives with the card. */
   initialCard?: CardResult | null;
+  /** The art it was flared from: a line of its own. */
+  initialPrinting?: string | null;
   /** A row at the foot of the compose step: the room's open-to-trades switch. */
   footer?: ReactNode;
 }) {
@@ -132,6 +134,7 @@ function ComposerBody({
   room,
   initialHuntId,
   initialCard = null,
+  initialPrinting = null,
   footer,
 }: {
   viewer: ComposerViewer;
@@ -142,13 +145,18 @@ function ComposerBody({
   room: ComposerRoom | null;
   initialHuntId: string | null;
   initialCard?: CardResult | null;
+  initialPrinting?: string | null;
   footer?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Draft>(() => {
     const loaded = loadDraft() ?? EMPTY_DRAFT;
     /* A card handed in goes first, as a want; the rest of the draft stays. */
     const saved: Draft = initialCard
-      ? { ...loaded, intent: "want", cards: withCardFirst(loaded.cards, initialCard) }
+      ? {
+          ...loaded,
+          intent: "want",
+          cards: withCardFirst(loaded.cards, initialCard, initialPrinting),
+        }
       : loaded;
     if (initialHuntId && hunts.some((hunt) => hunt.id === initialHuntId)) {
       return {

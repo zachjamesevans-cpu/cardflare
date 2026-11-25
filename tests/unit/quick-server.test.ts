@@ -108,6 +108,16 @@ describe("the Flare button carries the card (website)", () => {
     ).toEqual(["c", "a", "b"]);
   });
 
+  it("keeps another art of a card already on the draft as its own line", () => {
+    const foil: DraftCard = { card: card("b"), printingId: "foil", quantity: 1 };
+    const out = withCardFirst([line("a"), foil], card("b"), "alt");
+    expect(out.map((l) => `${l.card.id}:${l.printingId}`)).toEqual([
+      "b:alt",
+      "a:null",
+      "b:foil",
+    ]);
+  });
+
   it("moves a card already on the draft to the front, copies kept, never twice", () => {
     const out = withCardFirst([line("a"), line("b", 3)], card("b"));
     expect(out.map((l) => l.card.id)).toEqual(["b", "a"]);
@@ -130,7 +140,7 @@ describe("the Flare button carries the card (website)", () => {
     expect(page).toContain("cardResultById(card)");
     expect(page).toContain("initialCard={initialCard}");
     expect(read("src/components/flares/flare-composer.tsx")).toContain(
-      "withCardFirst(loaded.cards, initialCard)",
+      "withCardFirst(loaded.cards, initialCard, initialPrinting)",
     );
   });
 });

@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useTabReset } from "../tab-reset";
-import { openComposer } from "../open-composer";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -113,6 +112,8 @@ export function SearchLabScreen() {
   useTabReset(() => {
     setQuery("");
     setGame(null);
+    /* Kept, so the next open is All too, not the game picked before. */
+    void rememberSearchGame("all");
     field.current?.blur();
     page.current?.scrollTo({ y: 0, animated: true });
   });
@@ -166,15 +167,6 @@ export function SearchLabScreen() {
     navigation.navigate("Card", { cardId: card.cardId });
   };
 
-  const hunt = (card: RecentCard) =>
-    openComposer(navigation, {
-      card: {
-        cardId: card.cardId,
-        name: card.name,
-        cardNumber: card.cardNumber,
-        imageUrl: card.imageUrl,
-      },
-    });
 
   const refresh = async () => {
     setRefreshing(true);
@@ -262,7 +254,6 @@ export function SearchLabScreen() {
           players={players}
           stores={stores}
           onOpen={open}
-          onHunt={hunt}
           onAllGames={() => choose(null)}
           onRetry={() => void run(text, game)}
           onPlayer={(playerId) => navigation.navigate("PlayerProfile", { playerId })}
@@ -488,7 +479,6 @@ function Results({
   players,
   stores,
   onOpen,
-  onHunt,
   onAllGames,
   onRetry,
   onPlayer,
@@ -501,7 +491,6 @@ function Results({
   players: FoundPlayer[];
   stores: FoundStore[];
   onOpen: (card: RecentCard) => void;
-  onHunt: (card: RecentCard) => void;
   onAllGames: () => void;
   onRetry: () => void;
   onPlayer: (playerId: string) => void;
@@ -604,47 +593,6 @@ function Results({
                         </Text>
                       </View>
                     ) : null}
-                    {/* Hunting it is the Flare button, small, on the art's
-                        corner: the composer with this card as its first
-                        line. It replaced "Hunt it", which sat at a
-                        different height in every tile. */}
-                    <Tap
-                      onPress={() => onHunt(card)}
-                      accessibilityLabel={`Flare ${hit.name}`}
-                      hitSlop={6}
-                      style={{
-                        position: "absolute",
-                        top: 5,
-                        right: 5,
-                        width: 30,
-                        height: 30,
-                        borderRadius: 15,
-                        backgroundColor: colors.accent,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        shadowColor: "#000",
-                        shadowOpacity: 0.35,
-                        shadowRadius: 4,
-                        shadowOffset: { width: 0, height: 1 },
-                      }}
-                    >
-                      <Ionicons name="flame" size={15} color={colors.accentContrast} />
-                      <View
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          right: 4,
-                          width: 10,
-                          height: 10,
-                          borderRadius: 5,
-                          backgroundColor: colors.accentContrast,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Ionicons name="add" size={9} color={colors.accent} />
-                      </View>
-                    </Tap>
                   </View>
                   {/* One line each, so every tile is the same height and
                       the rows line up. */}

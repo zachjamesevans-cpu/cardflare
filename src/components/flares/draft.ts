@@ -104,9 +104,17 @@ export function keyOf(item: DraftCard): string {
  * already a line (any printing) that line moves to the front and keeps
  * its copies; nothing is added twice.
  */
-export function withCardFirst(cards: DraftCard[], card: CardResult): DraftCard[] {
-  const index = cards.findIndex((item) => item.card.id === card.id);
-  if (index === -1) return [{ card, printingId: null, quantity: 1 }, ...cards];
+export function withCardFirst(
+  cards: DraftCard[],
+  card: CardResult,
+  /* The art it was flared from: another art of the card is its own line
+     (the founder, "all alternate arts need to be treated as separate
+     cards"). */
+  printingId: string | null = null,
+): DraftCard[] {
+  const key = lineKey(card.id, printingId);
+  const index = cards.findIndex((item) => keyOf(item) === key);
+  if (index === -1) return [{ card, printingId, quantity: 1 }, ...cards];
   if (index === 0) return cards;
   const line = cards[index];
   return line ? [line, ...cards.filter((_, at) => at !== index)] : cards;

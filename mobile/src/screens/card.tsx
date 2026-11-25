@@ -352,12 +352,16 @@ export function CardScreen({ cardId }: { cardId: string }) {
       onPress={() =>
         /* Pushed inside the sheet, so back returns to this very card
            (src/open-composer.ts). */
+        /* The art on show, as its own line: an alternate art is a
+           different card to hunt (the founder, "all alternate arts
+           need to be treated as separate cards"). */
         openComposer(navigation, {
           card: {
             cardId: card.cardId,
             name: card.name,
             cardNumber: card.number,
-            imageUrl: card.imageUrl,
+            imageUrl: arts[artAt]?.imageUrl ?? card.imageUrl,
+            printingId: arts[artAt]?.printingIds?.[0] ?? null,
           },
         })
       }

@@ -20,9 +20,10 @@ describe("tapping the tab you are on resets it", () => {
 
 describe("a search result tile", () => {
   const search = read("mobile/src/screens/search-lab.tsx");
-  it("counts printings on the art and flares from its corner, no Hunt it row", () => {
+  it("counts printings on the art; no Flare button or Hunt it on a result", () => {
     expect(search).toContain("accessibilityLabel={`${count} printings`}");
-    expect(search).toContain("accessibilityLabel={`Flare ${hit.name}`}");
+    /* No Flare button on each result: the founder, "not a fan". */
+    expect(search).not.toContain("accessibilityLabel={`Flare ${hit.name}`}");
     expect(search).not.toMatch(/>\s*Hunt it\s*</);
     expect(search).not.toContain("printingsLine");
   });

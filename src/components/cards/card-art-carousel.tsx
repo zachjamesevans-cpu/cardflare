@@ -13,6 +13,8 @@ export const VARIANT_EVENT = "cf-card-variant";
 /** The variants of the art on show now, for a prices panel that mounts
     after the carousel said so (it streams in later). */
 export let shownArtVariants: string[] | null = null;
+/** The printing a Flare from here names: the art on show's first. */
+export let shownArtPrinting: string | null = null;
 
 /**
  * A card's artworks, swiped one at a time (src/lib/cards/card-arts.ts):
@@ -46,6 +48,7 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
   /* Tell the prices which art is on show. */
   useEffect(() => {
     shownArtVariants = arts[at]?.variants ?? null;
+    shownArtPrinting = arts[at]?.printingIds[0] ?? null;
     window.dispatchEvent(
       new CustomEvent(ART_EVENT, { detail: arts[at]?.variants ?? [] }),
     );
