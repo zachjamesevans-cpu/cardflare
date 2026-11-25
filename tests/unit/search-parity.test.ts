@@ -233,7 +233,7 @@ describe("the card page", () => {
     /* The sheet flares its card from the Flare button, not a "Post a
        Flare for it" button. */
     expect(app.card).not.toContain('label="Post a Flare for it"');
-    expect(app.card).toContain("label={`Flare ${name}`}");
+    expect(app.card).toContain("`Add ${name} to your Flare`");
     expect(app.card).toContain('navigation.navigate("Hunt", { huntId: you.onHunt');
     expect(app.card).toContain(
       'navigation.navigate("FlarePost", { postId: hunter.postId',

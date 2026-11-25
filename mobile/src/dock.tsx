@@ -1,4 +1,5 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { cartCount, useFlareCart } from "./flare-cart";
 import { openComposer } from "./open-composer";
 import Animated, {
   interpolate,
@@ -41,6 +42,7 @@ export function restoreDock(): void {
 }
 
 export function DockTabBar(props: BottomTabBarProps) {
+  useFlareCart();
   const shrink = useAnimatedStyle(() => ({
     transform: [
       { scale: interpolate(dockCompact.value, [0, 1], [1, DOCK_COMPACT_SCALE]) },
@@ -89,9 +91,12 @@ export function DockTabBar(props: BottomTabBarProps) {
           height: FLARE_BUTTON,
         }}
       >
+        {/* The full cart: opens your Flare with what you added from
+            cards so far, its count on the button (flare-cart.ts). */}
         <FlareButton
-          label="Post a Flare"
+          label={cartCount() > 0 ? `Your Flare, ${cartCount()} cards` : "Post a Flare"}
           spotlight
+          count={cartCount()}
           onPress={() => openComposer(props.navigation)}
         />
       </View>

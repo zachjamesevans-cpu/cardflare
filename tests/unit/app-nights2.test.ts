@@ -368,7 +368,7 @@ describe("the night's page", () => {
     expect(fab).toContain("label={POST_A_FLARE}");
     expect(fab).toContain("export const FAB_HEIGHT = FLARE_BUTTON;");
     expect(flareButton).toContain("accessibilityLabel={label}");
-    expect(flareButton).toContain('name="add"');
+    expect(flareButton).toContain('name={done ? "checkmark" : "add"}');
     expect(flareButton).not.toContain('name="flame"');
     expect(flareButton).toContain("backgroundColor: colors.accent");
   });

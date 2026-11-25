@@ -2,6 +2,7 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { cartSaved } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -327,6 +328,8 @@ export function FlareComposer({
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void writeCache("composer", draftKey, draft);
+      /* The cart's count is the draft's (flare-cart.ts). */
+      cartSaved(draft.items);
     }, 400);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -557,6 +560,7 @@ export function FlareComposer({
       setPreviewing(false);
       setEditing(null);
       if (draftKey) void writeCache("composer", draftKey, EMPTY);
+      cartSaved([]);
     } catch (caught) {
       const code = caught instanceof ApiError ? caught.code : "";
       setError(
@@ -1027,6 +1031,8 @@ function CardEditor({
  * is the art's own name when it has one.
  */
 export function artName(label: string | null): string {
+  /* Already a name ("Alt Art", from a card sheet's carousel). */
+  if (label && !label.includes("·") && /^[A-Z]/.test(label)) return label;
   const last = (label ?? "").split("·").pop()?.trim() ?? "";
   if (!/^[a-z][A-Za-z0-9]*$/.test(last)) return "Standard";
   return last.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (first) => first.toUpperCase());
