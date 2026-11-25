@@ -19,6 +19,8 @@ export const TCG_GAMES = [
   { slug: "mtg", label: "Magic: The Gathering", shortName: "Magic" },
   { slug: "pokemon", label: "Pokémon", shortName: "Pokémon" },
   { slug: "flesh-and-blood", label: "Flesh and Blood", shortName: "Flesh & Blood" },
+  /* Added with the move to Scrydex, which carries it (2026-11-25). */
+  { slug: "gundam", label: "Gundam Card Game", shortName: "Gundam" },
 ] as const;
 
 export type GameSlug = (typeof TCG_GAMES)[number]["slug"];

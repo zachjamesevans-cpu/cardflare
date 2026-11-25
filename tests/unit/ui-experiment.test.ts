@@ -212,10 +212,11 @@ describe("search: recent cards and games", () => {
     expect(recentCardsKey(null)).toBe("cardflare.cache.v2.recent-cards.guest");
   });
 
-  it("offers every game, with Riftbound (no cards yet) last and not choosable", () => {
-    expect(LAB_GAMES.at(-1)).toMatchObject({ slug: "riftbound", catalog: false });
-    expect(LAB_GAMES.filter((game) => game.catalog)).toHaveLength(5);
-    expect(labScope("riftbound")).toBeNull();
+  it("offers every game, with Flesh and Blood (not on Scrydex) last and not choosable", () => {
+    expect(LAB_GAMES.at(-1)).toMatchObject({ slug: "flesh-and-blood", catalog: false });
+    expect(LAB_GAMES.filter((game) => game.catalog)).toHaveLength(6);
+    expect(labScope("flesh-and-blood")).toBeNull();
+    expect(labScope("riftbound")).toBe("riftbound");
     expect(labScope("pokemon")).toBe("pokemon");
     expect(labScope("all")).toBeNull();
   });

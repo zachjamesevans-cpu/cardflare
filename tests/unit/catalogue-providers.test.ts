@@ -43,22 +43,25 @@ import { GAME_SLUGS } from "@/lib/players/games-catalog";
  */
 
 describe("the registry", () => {
-  it("names a provider for every game but One Piece", () => {
+  it("names Scrydex for every game it carries, and nothing for Flesh and Blood", () => {
+    /* One source for every game since 2026-11-25. */
     expect(CATALOGUE_SOURCES.map((source) => source.game)).toEqual([
-      "mtg",
+      "one-piece",
       "pokemon",
-      "flesh-and-blood",
-      "riftbound",
+      "mtg",
       "lorcana",
+      "riftbound",
+      "gundam",
     ]);
+    for (const source of CATALOGUE_SOURCES) expect(source.providerKey).toBe("scrydex");
     for (const source of CATALOGUE_SOURCES) {
       const provider = providerForGame(source.game);
       expect(provider?.game).toBe(source.game);
       expect(provider?.providerKey).toBe(source.providerKey);
       expect(GAME_SLUGS).toContain(source.game);
     }
-    /* One Piece has its own sync and its own by-hand importer. */
-    expect(providerForGame("one-piece")).toBeNull();
+    /* Scrydex does not carry Flesh and Blood. */
+    expect(providerForGame("flesh-and-blood")).toBeNull();
     expect(catalogueSource("yugioh")).toBeNull();
   });
 

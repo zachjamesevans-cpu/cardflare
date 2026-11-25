@@ -19,6 +19,8 @@ export interface HttpOptions {
   sleep?: (ms: number) => Promise<void>;
   fetchImpl?: typeof fetch;
   onProgress?: (message: string) => void;
+  /** Sent with every request: an API's key, for a source that needs one. */
+  headers?: Record<string, string>;
 }
 
 const DEFAULTS = {
@@ -120,6 +122,7 @@ export class ProviderHttp {
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly fetchImpl: typeof fetch;
   private readonly onProgress?: (message: string) => void;
+  private readonly headers: Record<string, string>;
 
   constructor(
     private readonly baseUrl: string,
@@ -131,6 +134,7 @@ export class ProviderHttp {
     this.sleep = options.sleep ?? defaultSleep;
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.onProgress = options.onProgress;
+    this.headers = options.headers ?? {};
   }
 
   /**
@@ -179,6 +183,7 @@ export class ProviderHttp {
             // Identifies the client honestly, so the operator can see who is
             // calling and get in touch rather than just blocking.
             "user-agent": "cardflare/1.0 (+https://cardflare.gg)",
+            ...this.headers,
           },
           signal: AbortSignal.timeout(this.timeoutMs),
         });
