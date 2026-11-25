@@ -2,10 +2,11 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cartSaved } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -210,6 +211,9 @@ export function FlareComposer({
   footer?: React.ReactNode;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  /* Opened as the Compose sheet, fitted to its contents (App.tsx). */
+  const inSheet = useRoute().name === "Compose";
+  const insets = useSafeAreaInsets();
   const tabInset = useTabBarInset();
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -586,7 +590,9 @@ export function FlareComposer({
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
         gap: spacing(3),
-        paddingBottom: spacing(4) + tabInset,
+        /* As a sheet (Compose) there is no tab bar under it, only the
+           home indicator; as the tab, clear of the floating bar. */
+        paddingBottom: spacing(4) + (inSheet ? insets.bottom : tabInset),
       }}
       keyboardShouldPersistTaps="handled"
       /* A touch anywhere, or a scroll, closes a Delete left showing on

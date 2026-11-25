@@ -63,3 +63,20 @@ describe("the composer says only what the cards do not", () => {
     expect(web).toContain("In {room.name} at {room.storeName}");
   });
 });
+
+describe("the composer sheet is only as tall as what is in it", () => {
+  /* "there is no need for this screen to extend so far vertically ... it
+     should slide up just below the preview button." */
+  it("is an iOS form sheet fitted to its contents, with no tab-bar gap", () => {
+    const app = read("mobile/App.tsx");
+    const compose = app.slice(
+      app.indexOf('name="Compose"'),
+      app.indexOf('name="PostFlare"'),
+    );
+    expect(compose).toContain('presentation: "formSheet"');
+    expect(compose).toContain('sheetAllowedDetents: "fitToContents"');
+    expect(read("mobile/src/screens/flare-composer.tsx")).toContain(
+      "paddingBottom: spacing(4) + (inSheet ? insets.bottom : tabInset)",
+    );
+  });
+});

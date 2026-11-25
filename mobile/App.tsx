@@ -1337,7 +1337,18 @@ function AppGates() {
           <Stack.Screen
             name="Compose"
             component={HubScreen}
-            options={{ title: "Post a Flare", presentation: "modal", gestureEnabled: true }}
+            /* Only as tall as what is in it, not the whole screen: the
+               founder, "there is no need for this screen to extend so far
+               vertically ... it should slide up just below the preview
+               button." iOS's form sheet, fitted to its contents. */
+            options={{
+              title: "Post a Flare",
+              presentation: "formSheet",
+              sheetAllowedDetents: "fitToContents",
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 22,
+              gestureEnabled: true,
+            }}
           />
           <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
             {({ route }) => (
