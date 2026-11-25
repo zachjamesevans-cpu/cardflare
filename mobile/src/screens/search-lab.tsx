@@ -1,5 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import { openComposer } from "../open-composer";
+import { FlaredTag } from "../flared-mark";
+import { cardFlared, useMyFlares } from "../my-flares";
+import { useTabReset } from "../tab-reset";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -37,7 +39,6 @@ import {
   LAB_GAMES,
   labScope,
   noCardsLine,
-  printingsLine,
   type LabGame,
 } from "../search-lab-games";
 import { leadArt, SEARCH_DEBOUNCE_MS } from "./search";
@@ -71,8 +72,10 @@ const GRID_GAP = spacing(2.5);
  * actual game, with the classic cardflare green as the logo color."
  * Made from the logos Wikipedia and Wikimedia Commons host, recoloured
  * offline to the accent (#cefc84): a one-colour logo flat, a many-colour
- * one as a green duotone so its outlines stay legible. Riftbound has no
- * logo file there yet, so its tile is its name.
+ * one as a green duotone so its outlines stay legible. Riftbound (Riot's
+ * own lockup) and Gundam (Scrydex's copy of Bandai's, enlarged with its
+ * edge re-sharpened) are flat green; the founder found the plain-name
+ * tiles "awful" (2026-11-25).
  */
 const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
   "one-piece": require("../../assets/games/one-piece.png"),
@@ -80,6 +83,8 @@ const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
   mtg: require("../../assets/games/mtg.png"),
   lorcana: require("../../assets/games/lorcana.png"),
   "flesh-and-blood": require("../../assets/games/flesh-and-blood.png"),
+  riftbound: require("../../assets/games/riftbound.png"),
+  gundam: require("../../assets/games/gundam.png"),
 };
 
 type Answer<T> =
@@ -103,6 +108,17 @@ export function SearchLabScreen() {
   const [refreshing, setRefreshing] = useState(false);
   /* Only the newest answer lands: shop wifi lets keystrokes overtake. */
   const asked = useRef(0);
+  /* Tapping Search again: the search as if just opened - nothing typed,
+     All games, at the top, keyboard down (tab-reset.ts). */
+  const page = useRef<ScrollView>(null);
+  useTabReset(() => {
+    setQuery("");
+    setGame(null);
+    /* Kept, so the next open is All too, not the game picked before. */
+    void rememberSearchGame("all");
+    field.current?.blur();
+    page.current?.scrollTo({ y: 0, animated: true });
+  });
 
   const text = query.trim();
   const searching = text.length >= 2;
@@ -153,15 +169,6 @@ export function SearchLabScreen() {
     navigation.navigate("Card", { cardId: card.cardId });
   };
 
-  const hunt = (card: RecentCard) =>
-    openComposer(navigation, {
-      card: {
-        cardId: card.cardId,
-        name: card.name,
-        cardNumber: card.cardNumber,
-        imageUrl: card.imageUrl,
-      },
-    });
 
   const refresh = async () => {
     setRefreshing(true);
@@ -172,6 +179,7 @@ export function SearchLabScreen() {
 
   return (
     <ScrollView
+      ref={page}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       style={{ flex: 1, backgroundColor: colors.canvas }}
@@ -248,7 +256,6 @@ export function SearchLabScreen() {
           players={players}
           stores={stores}
           onOpen={open}
-          onHunt={hunt}
           onAllGames={() => choose(null)}
           onRetry={() => void run(text, game)}
           onPlayer={(playerId) => navigation.navigate("PlayerProfile", { playerId })}
@@ -338,8 +345,21 @@ function GameChips({
         soon: !entry.catalog,
       })),
     ];
+  /* The chosen game's chip is always in sight: picked from a tile (Gundam
+     is the last chip) it would otherwise sit off the right edge. */
+  const row = useRef<ScrollView>(null);
+  const where = useRef(new Map<string, { x: number; width: number }>());
+  const { width: screen } = useWindowDimensions();
+  const reveal = useCallback(() => {
+    const spot = where.current.get(game ?? "all");
+    if (!spot) return;
+    row.current?.scrollTo({ x: Math.max(0, spot.x + spot.width / 2 - screen / 2), animated: true });
+  }, [game, screen]);
+  useEffect(reveal, [reveal]);
+
   return (
     <ScrollView
+      ref={row}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: gutter, gap: spacing(2) }}
@@ -347,8 +367,15 @@ function GameChips({
       {chips.map((chip) => {
         const on = chip.value === game;
         return (
-          <Tap
+          <View
             key={chip.key}
+            onLayout={(event) => {
+              const { x, width } = event.nativeEvent.layout;
+              where.current.set(chip.key, { x, width });
+              if (on) reveal();
+            }}
+          >
+          <Tap
             disabled={chip.soon}
             onPress={() => onChoose(chip.value)}
             accessibilityRole="button"
@@ -384,6 +411,7 @@ function GameChips({
               </Text>
             ) : null}
           </Tap>
+          </View>
         );
       })}
     </ScrollView>
@@ -453,7 +481,6 @@ function Results({
   players,
   stores,
   onOpen,
-  onHunt,
   onAllGames,
   onRetry,
   onPlayer,
@@ -466,12 +493,13 @@ function Results({
   players: FoundPlayer[];
   stores: FoundStore[];
   onOpen: (card: RecentCard) => void;
-  onHunt: (card: RecentCard) => void;
   onAllGames: () => void;
   onRetry: () => void;
   onPlayer: (playerId: string) => void;
   onStore: (storeId: string) => void;
 }) {
+  /* Cards already on your Flares wear a small flame (my-flares.ts). */
+  useMyFlares();
   return (
     <View style={{ gap: spacing(5) }}>
       <View style={{ gap: spacing(3) }}>
@@ -533,16 +561,53 @@ function Results({
                 imageUrl: leadArt(hit),
                 game: hit.game ?? null,
               };
-              const more = printingsLine(hit.printings.length);
+              const count = hit.printings.length;
               return (
                 <View key={hit.id} style={{ width: tile, gap: spacing(1) }}>
-                  <Tap
-                    onPress={() => onOpen(card)}
-                    accessibilityLabel={`Open ${hit.name}`}
-                  >
-                    <Art uri={card.imageUrl} width={tile} name={hit.name} />
-                  </Tap>
-                  <Text numberOfLines={2} style={tileName()}>
+                  <View>
+                    <Tap
+                      onPress={() => onOpen(card)}
+                      accessibilityLabel={`Open ${hit.name}`}
+                    >
+                      <Art uri={card.imageUrl} width={tile} name={hit.name} />
+                    </Tap>
+                    {/* Already on your Flares, any art of it: the founder,
+                        "it'll have a logo or something when you search for
+                        it that you already have it on your list." */}
+                    {cardFlared(hit.id) ? (
+                      <FlaredTag style={{ position: "absolute", bottom: 5, right: 5 }} />
+                    ) : null}
+                    {/* How many printings, on the card itself: the founder,
+                        "a small icon with number of printings on the card
+                        itself, instead of a whole row". One printing, none. */}
+                    {count > 1 ? (
+                      <View
+                        pointerEvents="none"
+                        accessibilityLabel={`${count} printings`}
+                        style={{
+                          position: "absolute",
+                          left: 5,
+                          bottom: 5,
+                          flexDirection: "row",
+                          alignItems: "center",
+                          gap: 3,
+                          paddingHorizontal: 6,
+                          height: 20,
+                          /* The Flared tag's rounding: the two pair up. */
+                          borderRadius: 6,
+                          backgroundColor: "rgba(0,0,0,0.78)",
+                        }}
+                      >
+                        <Ionicons name="layers" size={11} color={colors.textPrimary} />
+                        <Text style={{ color: colors.textPrimary, fontSize: 11, fontWeight: "800" }}>
+                          {count}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  {/* One line each, so every tile is the same height and
+                      the rows line up. */}
+                  <Text numberOfLines={1} style={tileName()}>
                     {displayCardName(hit.name, hit.cardNumber)}
                   </Text>
                   <Text numberOfLines={1} style={tileMeta()}>
@@ -553,40 +618,9 @@ function Results({
                       .filter(Boolean)
                       .join(" · ")}
                   </Text>
-                  {lead?.label ? (
-                    <Text numberOfLines={1} style={tileMeta()}>
-                      {lead.label}
-                    </Text>
-                  ) : null}
-                  {more ? (
-                    <Text style={{ color: colors.textMuted, fontSize: 11 }}>
-                      {more}
-                    </Text>
-                  ) : null}
-                  {/* One tap from a result to hunting it: the composer,
-                      with this card as its first line. */}
-                  <Tap
-                    onPress={() => onHunt(card)}
-                    accessibilityLabel={`Hunt ${hit.name}`}
-                    style={{
-                      marginTop: spacing(1),
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 4,
-                      height: 28,
-                      borderRadius: 999,
-                      borderWidth: 1,
-                      borderColor: colors.accentMuted,
-                    }}
-                  >
-                    <Ionicons name="locate" size={13} color={colors.accent} />
-                    <Text
-                      style={{ color: colors.accent, fontSize: 12, fontWeight: "700" }}
-                    >
-                      Hunt it
-                    </Text>
-                  </Tap>
+                  <Text numberOfLines={1} style={tileMeta()}>
+                    {lead?.label ?? " "}
+                  </Text>
                 </View>
               );
             })}

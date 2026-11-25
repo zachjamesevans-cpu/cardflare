@@ -1,10 +1,8 @@
 import {
-  PickerRow,
-  PrintingSheet,
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
-import { CardNoteField } from "../card-note-field";
+import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -136,7 +134,11 @@ export type HandedCard = NonNullable<NonNullable<TabParams["Flare"]>["card"]>;
  * built by hand is never rewritten by a tap on a card page.
  */
 export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem): Draft {
-  const at = draft.items.findIndex((item) => item.cardId === card.cardId);
+  /* The same card AND art: another art of it is a line of its own. */
+  const printingId = card.printingId ?? null;
+  const at = draft.items.findIndex(
+    (item) => item.cardId === card.cardId && (item.printingId ?? null) === printingId,
+  );
   if (at >= 0) {
     if (at === 0) return draft;
     const items = [...draft.items];
@@ -155,7 +157,7 @@ export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem):
         /* Filled by a search as soon as it answers; until then, and if
            it never does, the line is any printing. */
         printings: [],
-        printingId: null,
+        printingId: card.printingId ?? null,
         quantity: 1,
       },
       ...draft.items,
@@ -204,7 +206,7 @@ export function FlareComposer({
    * cards the instant the post lands rather than after a re-read. The
    * founder: "The second I hit post, it needs to be visible in flares."
    */
-  onPosted?: (rows: Me["wants"]) => void;
+  onPosted?: (rows: Me["wants"], complete: boolean) => boolean | void;
   /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
@@ -214,6 +216,10 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /* For the flame on a card already on your Flares (my-flares.ts). */
+  useMyFlares();
+  /* The card row is being rearranged: the page holds still (card-tray.tsx). */
+  const [rearranging, setRearranging] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
@@ -291,7 +297,11 @@ export function FlareComposer({
         setDraft((current) => {
           const card = handed.current;
           const handedLine = card
-            ? current.items.find((item) => item.cardId === card.cardId)
+            ? current.items.find(
+                (item) =>
+                  keyOf(item) ===
+                  lineKey({ cardId: card.cardId, printingId: card.printingId ?? null }),
+              )
             : undefined;
           const onlyHanded = handedLine !== undefined && current.items.length === 1;
           if (current.items.length > 0 && !onlyHanded) return current;
@@ -497,7 +507,13 @@ export function FlareComposer({
       const postedItems = wentUp
         ? draft.items.filter((item) => wentUp.has(item.cardId))
         : draft.items;
-      onPosted?.(
+      /* Every card went up (or an older server, which posts all or
+         nothing): the screen around may leave for the Feed at once. */
+      const complete =
+        result.total === undefined ||
+        result.posted === undefined ||
+        result.posted === result.total;
+      const left = onPosted?.(
         postedItems.map((item) => ({
           id: `just-posted:${keyOf(item)}`,
           cardId: item.cardId,
@@ -515,12 +531,16 @@ export function FlareComposer({
           postedAt: null,
           postedBoards: [],
         })),
+        complete,
       );
       void loadHunts();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
-      setPosted({
+      /* Gone to the Feed: no "Posted" panel behind it. The founder
+         (2026-11-25): "when you post a flare, it should immediately
+         automatically take you to the main feed with your flare there". */
+      if (!left) setPosted({
         postId: result.postId ?? null,
         summary:
           result.total !== undefined && result.posted !== undefined
@@ -562,6 +582,7 @@ export function FlareComposer({
 
   return (
     <ScrollView
+      scrollEnabled={!rearranging}
       contentContainerStyle={{
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
@@ -678,6 +699,10 @@ export function FlareComposer({
                   name: item.name,
                   imageUrl: artFor(item),
                   quantity: item.quantity,
+                  /* Already out: the same card, and the same art or any. */
+                  flared: item.printingId
+                    ? artFlared(item.cardId, [item.printingId])
+                    : cardFlared(item.cardId),
                 }))}
                 editing={editing}
                 onEdit={(key) => setEditing(editing === key ? null : key)}
@@ -689,6 +714,14 @@ export function FlareComposer({
                   const [moved] = next.splice(from, 1);
                   if (moved) next.splice(to, 0, moved);
                   setItems(next);
+                }}
+                /* Pulled out of the row: gone. It replaced the editor's
+                   Remove button (card-tray.tsx). */
+                onRearrange={setRearranging}
+                onRemove={(index) => {
+                  const gone = draft.items[index];
+                  setItems(draft.items.filter((_, at) => at !== index));
+                  if (gone && editing === keyOf(gone)) setEditing(null);
                 }}
               />
 
@@ -711,8 +744,6 @@ export function FlareComposer({
                         <CardEditor
                           onDone={() => setEditing(null)}
                           item={item}
-                          index={index}
-                          count={draft.items.length}
                           intent={draft.intent}
                           onChange={(next) => {
                             /* A printing change re-keys the line; landing on
@@ -749,18 +780,6 @@ export function FlareComposer({
                               );
                             }
                             setEditing(target);
-                          }}
-                          onCover={() =>
-                            setItems([
-                              item,
-                              ...draft.items.filter((entry) => entry !== item),
-                            ])
-                          }
-                          onRemove={() => {
-                            setItems(
-                              draft.items.filter((entry) => keyOf(entry) !== key),
-                            );
-                            setEditing(null);
                           }}
                         />
                       );
@@ -915,92 +934,66 @@ function artFor(item: DraftItem): string | null {
   return item.imageUrl;
 }
 
-/** One tray card, opened: printing, copies, order, remove. */
+/**
+ * One tray card, opened, kept to what a line needs: the founder, "it is
+ * ALL over the place ... so much info", then "just the swipe is needed
+ * on this screen". The art, large, with its name and art under it, and
+ * how many copies; Done. Swipe to the next card. Each art is its own
+ * card already (it came in as the art it was flared from), so there is
+ * nothing to pick here. Order and removing live in the row: drag a card
+ * to the front to make it the cover, onto the bin to remove it.
+ */
 function CardEditor({
   item,
-  index,
-  count,
   intent,
   onChange,
-  onCover,
-  onRemove,
   onDone,
 }: {
   item: DraftItem | null;
-  index: number;
-  count: number;
   intent: "want" | "showcase";
   onChange: (next: DraftItem) => void;
-  onCover: () => void;
-  onRemove: () => void;
   onDone: () => void;
 }) {
-  const [choosingPrinting, setChoosingPrinting] = useState(false);
   if (!item) return null;
-  const options: { id: string | null; label: string }[] = [
-    { id: null, label: "Any printing" },
-    ...item.printings.map((printing) => ({
-      id: printing.id,
-      label: printing.label ?? "Standard printing",
-    })),
-  ];
-  /* The overlay is the panel; this is only what goes in it. */
+
+  /* One choice per picture: a foil and a normal sharing an image are
+     one art (as on the card sheet's carousel). */
+  const arts: { imageUrl: string; label: string; printingId: string }[] = [];
+  for (const printing of item.printings) {
+    if (!printing.imageUrl || arts.some((art) => art.imageUrl === printing.imageUrl)) continue;
+    arts.push({
+      imageUrl: printing.imageUrl,
+      label: artName(printing.label),
+      printingId: printing.id,
+    });
+  }
+  const chosen = item.printingId
+    ? item.printings.find((printing) => printing.id === item.printingId)
+    : undefined;
+
   return (
-    <View style={{ gap: spacing(3) }}>
+    <View style={{ gap: spacing(4) }}>
       <View style={{ alignItems: "center", gap: spacing(2) }}>
         <CardImage
           imageUrl={artFor(item)}
-          width={132}
+          width={160}
           name={item.name}
           cardNumber={item.cardNumber}
-          caption={
-            item.printingId
-              ? (item.printings.find((printing) => printing.id === item.printingId)
-                  ?.label ?? null)
-              : null
-          }
         />
         <View style={{ alignItems: "center", gap: 2 }}>
           <Text
-            numberOfLines={2}
-            style={{
-              color: colors.textPrimary,
-              fontWeight: "700",
-              fontSize: 16,
-              textAlign: "center",
-            }}
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "800", fontSize: 17 }}
           >
             {item.name}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {`${item.cardNumber} · ${index === 0 ? "Cover" : `Card ${index + 1} of ${count}`}`}
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {[item.cardNumber, chosen ? artName(chosen.label) : arts.length > 1 ? "Any art" : null]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
         </View>
       </View>
-
-      {/* Which printing: one row saying which, the list down in a sheet.
-          The founder: "it feels weird to scroll left when everywhere else
-          on the app you scroll down to change printing." */}
-      {item.printings.length > 0 ? (
-        <PickerRow
-          label="Printing"
-          value={
-            options.find((option) => option.id === item.printingId)?.label ??
-            "Any printing"
-          }
-          onPress={() => setChoosingPrinting(true)}
-        />
-      ) : null}
-      {choosingPrinting ? (
-        <PrintingSheet
-          name={item.name}
-          cardNumber={item.cardNumber}
-          printings={item.printings}
-          value={item.printingId}
-          onPick={(printingId) => onChange({ ...item, printingId })}
-          onClose={() => setChoosingPrinting(false)}
-        />
-      ) : null}
 
       <View
         style={{
@@ -1010,8 +1003,8 @@ function CardEditor({
           gap: spacing(2),
         }}
       >
-        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-          {intent === "want" ? "Copies needed" : "Copies available"}
+        <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+          {intent === "want" ? "Copies" : "Copies available"}
         </Text>
         <Stepper
           value={item.quantity}
@@ -1022,23 +1015,23 @@ function CardEditor({
         />
       </View>
 
-      {/* Why this card: shown under it when it is opened, and on Wanted
-          near you, where it is how a holder picks who to message. */}
-      <CardNoteField
-        value={item.cardNote ?? ""}
-        onChange={(cardNote) => onChange({ ...item, cardNote })}
-        cardName={item.name}
-      />
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-        {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
-        <SmallAction label="Remove" onPress={onRemove} danger />
-      </View>
-
       <Button label="Done" onPress={onDone} />
     </View>
   );
 }
+
+/**
+ * A printing's art in a word or two, the card sheet's names: "Alt Art",
+ * "Foil", "Third Anniversary". The search's label is the whole line
+ * ("OP12 · Super Rare · Alt Art · Super Rare · altArt"); its last piece
+ * is the art's own name when it has one.
+ */
+export function artName(label: string | null): string {
+  const last = (label ?? "").split("·").pop()?.trim() ?? "";
+  if (!/^[a-z][A-Za-z0-9]*$/.test(last)) return "Standard";
+  return last.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (first) => first.toUpperCase());
+}
+
 
 /**
  * The cards in this flare, side by side in the overlay, one page each:
@@ -1164,41 +1157,6 @@ function CardOverlay({
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
-  );
-}
-
-function SmallAction({
-  label,
-  onPress,
-  danger = false,
-}: {
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityLabel={label}
-      style={{
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1.5),
-      }}
-    >
-      <Text
-        style={{
-          color: danger ? colors.danger : colors.textSecondary,
-          fontSize: 12,
-          fontWeight: "700",
-        }}
-      >
-        {label}
-      </Text>
-    </Tap>
   );
 }
 

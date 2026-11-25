@@ -144,17 +144,23 @@ describe("the conversations list", () => {
   });
 });
 
+/* The founder (2026-11-25): "i dont think a flare history is necessary
+   on this screen". The list left the composer for the Profile's Flares,
+   and History went with it, to the foot of that list. */
 describe("the Flare tab's list", () => {
-  it("shows only the Flares still working", () => {
-    expect(hub).toContain("wants?.filter((want) => !want.found)");
-    expect(hub).toContain("working.map((want) => (");
-    expect(hub).not.toContain("wants.map((want) => (");
+  it("is gone from the composer; only the markers still hear it", () => {
+    expect(hub).not.toContain("working.map((want) => (");
+    expect(hub).not.toContain('navigation.navigate("TradeHistory")');
+    expect(read("mobile/src/my-flares.ts")).toContain("!want.found");
   });
 
-  it("points at History where the finished ones went", () => {
-    expect(hub).toContain('navigation.navigate("TradeHistory")');
-    expect(hub).toContain('name="time-outline"');
-    expect(hub).toMatch(/>\s*History\s*</);
+  it("points at History from the Profile's Flares", () => {
+    const flares = read("mobile/src/profile-flares.tsx");
+    expect(flares).toContain('name="time-outline"');
+    expect(flares).toMatch(/>\s*History\s*</);
+    expect(read("mobile/src/screens/profile.tsx")).toContain(
+      'onHistory={() => navigation.navigate("TradeHistory")}',
+    );
   });
 });
 

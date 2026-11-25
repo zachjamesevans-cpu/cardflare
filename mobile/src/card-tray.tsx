@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { FlaredTag } from "./flared-mark";
+import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -69,6 +71,9 @@ const ROW_PAD = 4;
 /* How far past the line a card must go before its slot changes, as a
    fraction of a slot. Over a half, so hovering the line cannot flip. */
 const DEAD_ZONE = 0.6;
+/* How far up or down out of the row a card is pulled to be removed:
+   most of a tile's height, so a sloppy sideways drag never does it. */
+const REMOVE_PX = 70;
 
 /** Snappy, not rigid: the pick-up, and the neighbours making way. */
 const SPRING = { damping: 20, stiffness: 240, mass: 0.6 } as const;
@@ -80,6 +85,9 @@ export interface TrayItem {
   name: string;
   imageUrl: string | null;
   quantity: number;
+  /** This card and art is already on your Flares: a small flame, so a
+      second Flare for it is not posted by accident. */
+  flared?: boolean;
 }
 
 const clamp = (value: number, low: number, high: number) =>
@@ -91,6 +99,8 @@ export function CardTray({
   onEdit,
   onAdd,
   onReorder,
+  onRemove,
+  onRearrange,
 }: {
   items: TrayItem[];
   editing: string | null;
@@ -98,10 +108,32 @@ export function CardTray({
   onAdd: () => void;
   /** Told once, when the card has landed: the card at `from` now sits at `to`. */
   onReorder: (from: number, to: number) => void;
+  /** A card pulled out of the row and let go: the founder, "we have
+      that touch and drag thing to remove" - it replaced the editor's
+      Remove button. */
+  onRemove?: (index: number) => void;
+  /** Rearranging or not: the page around stops scrolling meanwhile, or
+      a pull up or down is taken as a scroll and the card is dropped. */
+  onRearrange?: (on: boolean) => void;
 }) {
   const [wiggling, setWiggling] = useState(false);
+  /*
+   * While rearranging, the sheet the composer sits in does not close on
+   * a pull down: that pull is a card being dragged out of the row to
+   * remove it, and the sheet's own gesture took it otherwise.
+   */
+  const navigation = useNavigation();
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: !wiggling } as never);
+    onRearrange?.(wiggling);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, wiggling]);
   /* The card in the air, and where it was picked up from. */
   const [held, setHeld] = useState<{ key: string; from: number } | null>(null);
+  /* Pulled far enough out of the row that letting go removes it. */
+  const [armed, setArmed] = useState(false);
+  const armedRef = useRef(false);
+  const gone = useSharedValue(0);
   /*
    * Read at the moment of the question rather than captured when the
    * responder was built, so the touch that starts the wiggle can turn
@@ -131,6 +163,9 @@ export function CardTray({
      parent, so it has to subtract this to sit on the picked-up tile. */
   const scrollX = useRef(0);
   const [overlayLeft, setOverlayLeft] = useState(0);
+  const overlayLeftRef = useRef(0);
+  /* The row's width, for where the bin sits at its right end. */
+  const rowWidth = useRef(0);
 
   const startWiggle = () => {
     wigglingRef.current = true;
@@ -167,8 +202,31 @@ export function CardTray({
     lift.value = 0;
   };
 
+  /* Let go out of the row: the card shrinks away, then it is removed. */
+  const drop = (index: number) => {
+    heldRef.current = false;
+    armedRef.current = false;
+    setArmed(false);
+    setHeld(null);
+    onRemove?.(index);
+    dragX.value = 0;
+    dragY.value = 0;
+    lift.value = 0;
+    gone.value = 0;
+  };
+
   const release = () => {
     if (!heldRef.current) return;
+    if (armedRef.current && onRemove) {
+      const index = startIndex.current;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      gone.value = withTiming(1, DROP, (finished) => {
+        if (finished) runOnJS(drop)(index);
+      });
+      return;
+    }
+    armedRef.current = false;
+    setArmed(false);
     const fromIndex = startIndex.current;
     const toIndex = slotNow.current;
     /* Glide to where the slot will be laid out, then land. The three
@@ -209,7 +267,8 @@ export function CardTray({
               dragX.value = 0;
               dragY.value = 0;
               lift.value = withSpring(1, SPRING);
-              setOverlayLeft(at * SLOT - scrollX.current);
+              overlayLeftRef.current = at * SLOT - scrollX.current;
+              setOverlayLeft(overlayLeftRef.current);
               setHeld({ key: item.key, from: at });
             },
             onPanResponderMove: (_e, g) => {
@@ -218,6 +277,26 @@ export function CardTray({
                  under the finger on the very next frame. */
               dragX.value = g.dx;
               dragY.value = g.dy;
+
+              /* Over the bin at the row's right end, or pulled well out
+                 of the row: let go and it is removed. The neighbours go
+                 back, and nothing is reordered while it is there. (In
+                 a sheet, iOS keeps a vertical pull for itself, so the
+                 bin is the way that always works.) */
+              const centre = overlayLeftRef.current + g.dx + TILE_W / 2;
+              const overBin = centre > rowWidth.current - TILE_W - GAP / 2;
+              const out =
+                onRemove !== undefined && (overBin || Math.abs(g.dy) > REMOVE_PX);
+              if (out !== armedRef.current) {
+                armedRef.current = out;
+                setArmed(out);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+                if (out) {
+                  slotNow.current = startIndex.current;
+                  slot.value = withSpring(startIndex.current, SPRING);
+                }
+              }
+              if (out) return;
 
               /*
                * The slot the card is over, measured from where it was
@@ -265,7 +344,11 @@ export function CardTray({
 
   return (
     <View style={{ gap: spacing(1.5) }}>
-      <View>
+      <View
+        onLayout={(event) => {
+          rowWidth.current = event.nativeEvent.layout.width;
+        }}
+      >
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -277,6 +360,8 @@ export function CardTray({
           /* The card in the air is drawn outside the row, so the row
              itself can keep clipping and scrolling like any other. */
           contentContainerStyle={{ gap: GAP, paddingVertical: ROW_PAD }}
+          /* Room for the bin while rearranging. */
+          style={wiggling && onRemove ? { marginRight: TILE_W + GAP } : undefined}
         >
           {items.map((item, index) => (
             <TrayTile
@@ -326,6 +411,35 @@ export function CardTray({
           )}
         </ScrollView>
 
+        {/* The bin: drop a card on it to remove it (it replaced the
+            editor's Remove button). Only while rearranging. */}
+        {wiggling && onRemove ? (
+          <View
+            pointerEvents="none"
+            accessibilityLabel="Drop a card here to remove it"
+            style={{
+              position: "absolute",
+              right: 0,
+              top: ROW_PAD,
+              width: TILE_W,
+              height: TILE_H,
+              borderRadius: 8,
+              borderWidth: armed ? 2 : 1,
+              borderStyle: armed ? "solid" : "dashed",
+              borderColor: armed ? colors.danger : colors.borderStrong,
+              backgroundColor: armed ? "rgba(255,90,90,0.18)" : "transparent",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+            }}
+          >
+            <Ionicons name="trash-outline" size={22} color={armed ? colors.danger : colors.textMuted} />
+            <Text style={{ color: armed ? colors.danger : colors.textMuted, fontSize: 11, fontWeight: "600" }}>
+              Remove
+            </Text>
+          </View>
+        ) : null}
+
         {/* The card in hand, over the row, following the finger. */}
         {held && heldItem ? (
           <HeldCard
@@ -336,6 +450,8 @@ export function CardTray({
             dragX={dragX}
             dragY={dragY}
             lift={lift}
+            armed={armed}
+            gone={gone}
           />
         ) : null}
       </View>
@@ -344,8 +460,19 @@ export function CardTray({
           in, and "tap a card" is not guessable. */}
       {wiggling ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-          <Text style={{ color: colors.textMuted, fontSize: 12, flex: 1 }}>
-            Drag a card to reorder. The first is the cover.
+          <Text
+            style={{
+              color: armed ? colors.danger : colors.textMuted,
+              fontSize: 12,
+              fontWeight: armed ? "700" : "400",
+              flex: 1,
+            }}
+          >
+            {armed
+              ? "Let go to remove it."
+              : onRemove
+                ? "Drag to reorder; the first is the cover. Drop one on the bin to remove it."
+                : "Drag a card to reorder. The first is the cover."}
           </Text>
           <Tap
             onPress={stopWiggle}
@@ -417,6 +544,9 @@ function TileFace({
           {index + 1}
         </Text>
       </View>
+      {item.flared ? (
+        <FlaredTag small style={{ position: "absolute", top: 3, right: 3 }} />
+      ) : null}
       {/* The copies: the one quantity tag, in the corner the count always had. */}
       <QuantityBadge
         quantity={item.quantity}
@@ -518,6 +648,8 @@ function HeldCard({
   dragX,
   dragY,
   lift,
+  armed,
+  gone,
 }: {
   item: TrayItem;
   index: number;
@@ -526,12 +658,17 @@ function HeldCard({
   dragX: SharedValue<number>;
   dragY: SharedValue<number>;
   lift: SharedValue<number>;
+  /** Out of the row: let go and it is removed. */
+  armed: boolean;
+  /** 0 to 1 as a removed card shrinks away. */
+  gone: SharedValue<number>;
 }) {
   const style = useAnimatedStyle(() => ({
+    opacity: 1 - gone.value,
     transform: [
       { translateX: dragX.value },
       { translateY: dragY.value },
-      { scale: 1 + 0.12 * lift.value },
+      { scale: (1 + 0.12 * lift.value) * (1 - 0.6 * gone.value) },
     ],
     shadowOpacity: 0.5 * lift.value,
   }));
@@ -557,6 +694,23 @@ function HeldCard({
       ]}
     >
       <TileFace item={item} index={index} outlined />
+      {/* Out of the row: red, with a bin, so letting go is no surprise. */}
+      {armed ? (
+        <View
+          style={{
+            position: "absolute",
+            inset: 0,
+            borderRadius: 8,
+            borderWidth: 2,
+            borderColor: colors.danger,
+            backgroundColor: "rgba(255,90,90,0.35)",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="trash" size={24} color={colors.textPrimary} />
+        </View>
+      ) : null}
     </Animated.View>
   );
 }

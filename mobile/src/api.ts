@@ -1732,10 +1732,12 @@ export interface CardPage {
     game: string;
     imageUrl: string | null;
     /** Every distinct artwork, the lead first: the sheet's carousel. Older servers omit it. */
-    arts?: { imageUrl: string; label: string; variants: string[] }[];
+    arts?: { imageUrl: string; label: string; variants: string[]; printingIds?: string[] }[];
   };
   /** Null when signed out. */
   you: {
+    /** The printings on your Flares; null is "any art". Older servers omit it. */
+    wantedPrintings?: (string | null)[];
     inTradeBinder: boolean;
     onHunt: { huntId: string; name: string } | null;
     wanted: boolean;

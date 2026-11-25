@@ -151,7 +151,8 @@ try {
 
 export type TabParams = {
   /** `tab` lands the Feed on one of its tabs: Nights sends "nearby". */
-  Feed: { tab?: "following" | "nearby"; at?: number } | undefined;
+  /** `posted`: a Flare just went up; the Feed scrolls to its top. */
+  Feed: { tab?: "following" | "nearby"; at?: number; posted?: number } | undefined;
   /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
   Search: undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
@@ -172,6 +173,8 @@ export type TabParams = {
           name: string;
           cardNumber: string;
           imageUrl: string | null;
+          /** The art it was flared from: each art is its own line. */
+          printingId?: string | null;
         };
       }
     | undefined;

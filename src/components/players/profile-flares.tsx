@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { History } from "lucide-react";
 
 import { CardImageZoom, type ZoomCard } from "@/components/cards/card-image-zoom";
 import { buttonStyles } from "@/components/ui/button";
@@ -167,6 +168,17 @@ export function ProfileFlares({
             );
           })}
         </ul>
+      )}
+      {/* Your past Flares: History, at the foot of your own list. It
+          moved here from the composer (the founder, 2026-11-25). */}
+      {yours && (
+        <Link
+          href="/profile/trades"
+          className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-text-secondary hover:text-text-primary"
+        >
+          <History className="size-4" aria-hidden="true" />
+          History
+        </Link>
       )}
     </section>
   );

@@ -18,12 +18,7 @@ import {
   withRecentCard,
   type RecentCard,
 } from "../../mobile/src/recent-card-list";
-import {
-  LAB_GAMES,
-  labScope,
-  noCardsLine,
-  printingsLine,
-} from "../../mobile/src/search-lab-games";
+import { LAB_GAMES, labScope, noCardsLine } from "../../mobile/src/search-lab-games";
 
 /**
  * The search and nearby-traders UI experiment (docs/UI_EXPERIMENT.md).
@@ -224,8 +219,5 @@ describe("search: recent cards and games", () => {
   it("says what it could not find, and counts printings without merging them", () => {
     expect(noCardsLine("zoro", "one-piece")).toBe('No One Piece cards match "zoro".');
     expect(noCardsLine("zoro", null)).toBe('No cards match "zoro".');
-    expect(printingsLine(1)).toBeNull();
-    expect(printingsLine(2)).toBe("+1 printing");
-    expect(printingsLine(4)).toBe("+3 printings");
   });
 });

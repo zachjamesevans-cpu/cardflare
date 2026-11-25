@@ -121,7 +121,14 @@ const cardScore = (text: string) => (card: SearchCard) =>
 const best = <T,>(items: T[], score: (item: T) => number) =>
   items.reduce((top, item) => Math.max(top, score(item)), 0);
 
-export function EverythingSearch({ account = null }: { account?: string | null }) {
+export function EverythingSearch({
+  account = null,
+  flaredCardIds = [],
+}: {
+  account?: string | null;
+  /** Cards on your open Flares: a small flame on the result's art. */
+  flaredCardIds?: string[];
+}) {
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Found | null>(null);
   const [tab, setTab] = useState<SearchTab>("top");
@@ -248,8 +255,21 @@ export function EverythingSearch({ account = null }: { account?: string | null }
                         )}
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">
-                        <span className="truncate font-semibold text-text-primary">
-                          {card.exactName}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="truncate font-semibold text-text-primary">
+                            {card.exactName}
+                          </span>
+                          {/* Already on your Flares, any art of it: the
+                              founder, "maybe just a small rounded rectangle
+                              instead". A marker, not a button. */}
+                          {flaredCardIds.includes(card.id) && (
+                            <span
+                              aria-label="On your Flares"
+                              className="shrink-0 rounded-[6px] bg-accent px-1.5 py-0.5 text-[11px] leading-none font-extrabold text-accent-contrast"
+                            >
+                              Flared
+                            </span>
+                          )}
                         </span>
                         <span className="truncate text-xs text-text-muted">
                           {card.canonicalCardNumber}

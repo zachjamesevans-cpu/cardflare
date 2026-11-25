@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
 import { PRO_ENABLED } from "../pro-enabled";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -197,6 +198,16 @@ export function ProfileScreen() {
 
   /* The list open over the page: the followers or following number. */
   const [people, setPeople] = useState<"followers" | "following" | null>(null);
+  /* Tapping Profile again: the top, the first section, nothing open
+     over it (tab-reset.ts). The section row restarts with a new key. */
+  const profileScroll = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
+  const [tabsKey, setTabsKey] = useState(0);
+  useTabReset(() => {
+    setPeople(null);
+    setDressing(null);
+    setTabsKey((key) => key + 1);
+    (profileScroll.current as unknown as ScrollView | null)?.scrollTo({ y: 0, animated: true });
+  });
 
   /* The wand's two doors - your look, and the Embers shop - when open. */
   /* The profile tour's stops on this screen (tour.tsx). */
@@ -836,6 +847,7 @@ export function ProfileScreen() {
               flares={stillWanted(profile.flares)}
               yours
               onPost={() => openComposer(navigation)}
+              onHistory={() => navigation.navigate("TradeHistory")}
             />
           );
         case "hunts":
@@ -890,6 +902,7 @@ export function ProfileScreen() {
 
   return (
     <Animated.ScrollView
+      ref={profileScroll}
       onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: pull } } }], {
         useNativeDriver: true,
       })}
@@ -1075,7 +1088,7 @@ export function ProfileScreen() {
             Showcase, Trades, Embers. Everything that used to stack down
             this screen, then sat behind a row of doors, slides in place
             now; the header and the circles above stay put. */}
-        <ProfileTabs panes={panes} onChange={onTab} />
+        <ProfileTabs key={tabsKey} panes={panes} onChange={onTab} />
         {/* A new player's first visit: four stops, once. */}
         <ProfileTour />
       </View>

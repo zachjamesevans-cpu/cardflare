@@ -15,6 +15,7 @@ export interface Art {
   imageUrl: string;
   label: string;
   variants: string[];
+  printingIds?: string[];
 }
 
 /**

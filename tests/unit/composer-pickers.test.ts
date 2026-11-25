@@ -16,23 +16,23 @@ const app = read("mobile/src/screens/flare-composer.tsx");
 const web = read("src/components/flares/flare-composer.tsx");
 
 describe("the printing", () => {
-  it("is a row that opens a list down, with each printing's art", () => {
-    expect(app).toContain('label="Printing"');
-    expect(app).toContain("<PrintingSheet");
-    expect(web).toContain('label="Printing"');
-    expect(web).toContain("<PrintingSheet");
-    const appSheets = read("mobile/src/composer-sheets.tsx");
-    expect(appSheets).toContain('label="Any printing"');
-    expect(appSheets).toMatch(/art=\{\s*<CardImage imageUrl=\{printing\.imageUrl\}/);
-    const webSheets = read("src/components/flares/composer-sheets.tsx");
-    expect(webSheets).toContain('label="Any printing"');
-    expect(webSheets).toContain("printing.imageUrl &&");
+  /* The founder (2026-11-25): "just the swipe is needed on this screen".
+     Each art is its own card, so the editor has nothing to pick: no
+     Printing row, no art pictures. */
+  it("is not chosen in the editor at all, on either platform", () => {
+    for (const source of [app, web]) {
+      expect(source).not.toContain('label="Printing"');
+      expect(source).not.toContain("<ArtChoice");
+      expect(source).not.toContain("<PrintingSheet");
+    }
   });
 
   it("no longer scrolls sideways or drops down", () => {
     const editor = app.slice(app.indexOf("function CardEditor("));
-    expect(editor.slice(0, editor.indexOf("Copies needed"))).not.toContain(
-      "horizontal",
+    expect(editor.slice(0, editor.indexOf("<Stepper"))).not.toContain("horizontal");
+    const webEditor = web.slice(web.indexOf("function CardEditor("));
+    expect(webEditor.slice(0, webEditor.indexOf("<Stepper"))).not.toContain(
+      "overflow-x-auto",
     );
     expect(web).not.toContain('<option value="">Any printing</option>');
   });
@@ -119,5 +119,24 @@ describe("no offering in the composer", () => {
     expect(read("src/components/flares/draft.ts")).toMatch(
       /Always a want now[\s\S]{0,80}intent: "want",/,
     );
+  });
+});
+
+describe("the card editor, kept quiet", () => {
+  it("has no Make cover or Remove; the row orders and removes", () => {
+    for (const source of [app, web]) {
+      const editor = source.slice(source.indexOf("function CardEditor("));
+      const body = editor.slice(0, editor.indexOf("\n}\n"));
+      expect(body).not.toContain("Make cover");
+      expect(body).not.toMatch(/>\s*Remove\s*</);
+      /* "remove the add a note button it's so awkward." */
+      expect(body).not.toContain("Add a note");
+      expect(body).not.toContain("<CardNoteField");
+    }
+    /* The app's row: drop a card on the bin. The website's: the same,
+       and Delete on a focused card. */
+    expect(read("mobile/src/card-tray.tsx")).toContain("Drop a card here to remove it");
+    expect(web).toContain("remove(dragging)");
+    expect(web).toContain('event.key === "Delete"');
   });
 });

@@ -19,6 +19,10 @@ export interface CardArt {
   label: string;
   /** Scrydex's variant names on this art: "normal", "foil". */
   variants: string[];
+  /** Our printings with this art, the first the one a Flare names: each
+      art is its own card to hunt (the founder, "all alternate arts need
+      to be treated as separate cards"). */
+  printingIds: string[];
 }
 
 export function cardArts(
@@ -55,6 +59,7 @@ export function cardArts(
       label:
         names.length > 0 ? names.join(" · ") : (group[0].printingLabel ?? cardName),
       variants: [...new Set(variants)],
+      printingIds: group.map((printing) => printing.id),
     };
   });
 }

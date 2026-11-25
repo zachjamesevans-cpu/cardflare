@@ -1,12 +1,7 @@
 "use client";
 
 import { Sheet } from "@/components/ui/sheet";
-import {
-  AddingToHunt,
-  PickerRow,
-  PrintingSheet,
-} from "@/components/flares/composer-sheets";
-import { CardNoteField } from "@/components/flares/card-note-field";
+import { AddingToHunt } from "@/components/flares/composer-sheets";
 import {
   useEffect,
   useState,
@@ -15,7 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Plus, Star, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+
+import { variantName } from "@/lib/cards/price-shape";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -31,9 +29,7 @@ import {
   saveDraft,
   type Draft,
   type DraftCard,
-  changePrinting,
   keyOf,
-  lineKey,
   withCardFirst,
 } from "@/components/flares/draft";
 import { Button, buttonStyles } from "@/components/ui/button";
@@ -42,7 +38,7 @@ import { Textarea } from "@/components/ui/controls";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
-import { printingLabel, type CardResult } from "@/lib/cards/schema";
+import type { CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
 import { draftSummary, MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
 import { publishPostAction } from "@/lib/flares/publish-actions";
@@ -96,6 +92,11 @@ export function FlareComposer(props: {
   initialHuntId: string | null;
   /** "Post a Flare for it" on a card page arrives with the card. */
   initialCard?: CardResult | null;
+  /** The art it was flared from: a line of its own. */
+  initialPrinting?: string | null;
+  /** The cards and arts already on your Flares: a small flame on a tile
+      that would be a second Flare for one (the founder, 2026-11-25). */
+  flared?: { cardId: string; printingId: string | null }[];
   /** A row at the foot of the compose step: the room's open-to-trades switch. */
   footer?: ReactNode;
 }) {
@@ -132,6 +133,8 @@ function ComposerBody({
   room,
   initialHuntId,
   initialCard = null,
+  initialPrinting = null,
+  flared = [],
   footer,
 }: {
   viewer: ComposerViewer;
@@ -142,13 +145,19 @@ function ComposerBody({
   room: ComposerRoom | null;
   initialHuntId: string | null;
   initialCard?: CardResult | null;
+  initialPrinting?: string | null;
+  flared?: { cardId: string; printingId: string | null }[];
   footer?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Draft>(() => {
     const loaded = loadDraft() ?? EMPTY_DRAFT;
     /* A card handed in goes first, as a want; the rest of the draft stays. */
     const saved: Draft = initialCard
-      ? { ...loaded, intent: "want", cards: withCardFirst(loaded.cards, initialCard) }
+      ? {
+          ...loaded,
+          intent: "want",
+          cards: withCardFirst(loaded.cards, initialCard, initialPrinting),
+        }
       : loaded;
     if (initialHuntId && hunts.some((hunt) => hunt.id === initialHuntId)) {
       return {
@@ -164,6 +173,7 @@ function ComposerBody({
   /** The line key being dragged, while a tile is in the air. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [posted, setPosted] = useState<{
     posted: number;
     huntId: string | null;
@@ -198,13 +208,6 @@ function ComposerBody({
     patch({ cards: next });
   };
 
-  const makeCover = (key: string) => {
-    const item = draft.cards.find((entry) => keyOf(entry) === key);
-    if (!item) return;
-    patch({
-      cards: [item, ...draft.cards.filter((entry) => keyOf(entry) !== key)],
-    });
-  };
   const remove = (key: string) => {
     patch({ cards: draft.cards.filter((item) => keyOf(item) !== key) });
     if (editing === key) setEditing(null);
@@ -248,6 +251,18 @@ function ComposerBody({
       clearDraft();
       setDraft(EMPTY_DRAFT);
       setEditing(null);
+      /*
+       * Every card went up: straight to the Feed, the Flare at its top.
+       * The founder (2026-11-25): "when you post a flare, it should
+       * immediately automatically take you to the main feed with your
+       * flare there, no need to have that entire secondary menu." A post
+       * that only partly went up stays here, so its summary is read.
+       */
+      if (result.posted === result.total) {
+        router.push("/feed");
+        router.refresh();
+        return;
+      }
       setPosted({
         posted: result.posted,
         huntId: result.huntId,
@@ -432,6 +447,13 @@ function ComposerBody({
                    * buttons did, and the label says so.
                    */
                   onKeyDown={(event) => {
+                    /* The keyboard's way to remove, now the editor has
+                       no Remove button (the bin is the pointer's). */
+                    if (event.key === "Delete" || event.key === "Backspace") {
+                      event.preventDefault();
+                      remove(key);
+                      return;
+                    }
                     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
                     event.preventDefault();
                     reorder(key, index + (event.key === "ArrowLeft" ? -1 : 1));
@@ -439,7 +461,7 @@ function ComposerBody({
                   aria-pressed={active}
                   aria-label={`${item.card.exactName}, card ${index + 1} of ${
                     draft.cards.length
-                  }. Drag to reorder, or use the arrow keys.`}
+                  }. Drag to reorder, or use the arrow keys; Delete removes it.`}
                   className={cn(
                     "block h-[84px] w-[60px] cursor-grab overflow-hidden rounded-[6px] border bg-elevated transition-[box-shadow] active:cursor-grabbing",
                     active
@@ -463,6 +485,22 @@ function ComposerBody({
                   quantity={item.quantity}
                   className="pointer-events-none absolute top-1 left-1"
                 />
+                {/* Already on your Flares: the same card, and this art or
+                    any. A marker, never a button. */}
+                {flared.some(
+                  (out) =>
+                    out.cardId === item.card.id &&
+                    (out.printingId === null ||
+                      item.printingId === null ||
+                      out.printingId === item.printingId),
+                ) && (
+                  <span
+                    aria-label="On your Flares"
+                    className="pointer-events-none absolute top-1 right-1 rounded-[4px] bg-accent px-1 py-px text-[8px] leading-tight font-extrabold text-accent-contrast"
+                  >
+                    Flared
+                  </span>
+                )}
                 {index === 0 && (
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-surface/90 py-0.5 text-center text-[9px] font-bold tracking-wider text-text-secondary uppercase">
                     Cover
@@ -471,7 +509,29 @@ function ComposerBody({
               </li>
             );
           })}
-          <li className="shrink-0">
+          {/* While a card is in the air, the bin: drop it here to
+              remove it. It replaced the editor's Remove button, as the
+              app's row has it (mobile/src/card-tray.tsx). */}
+          {dragging ? (
+            <li
+              className="shrink-0"
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                remove(dragging);
+                setDragging(null);
+              }}
+            >
+              <span className="flex h-[84px] w-[60px] flex-col items-center justify-center gap-1 rounded-[6px] border border-dashed border-danger/70 text-danger">
+                <Trash2 className="size-5" aria-hidden="true" />
+                <span className="text-[10px] font-semibold">Remove</span>
+              </span>
+            </li>
+          ) : null}
+          <li className={cn("shrink-0", dragging && "hidden")}>
             <button
               type="button"
               onClick={() => setStep("pick")}
@@ -510,20 +570,8 @@ function ComposerBody({
             <CardEditor
               onDone={() => setEditing(null)}
               item={editingCard}
-              index={draft.cards.findIndex(
-                (item) => keyOf(item) === keyOf(editingCard),
-              )}
-              count={draft.cards.length}
               copiesLabel={copiesLabel}
-              onPrinting={(printingId) => {
-                const key = keyOf(editingCard);
-                patch({ cards: changePrinting(draft.cards, key, printingId) });
-                setEditing(lineKey(editingCard.card.id, printingId));
-              }}
               onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
-              onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
-              onCover={() => makeCover(keyOf(editingCard))}
-              onRemove={() => remove(keyOf(editingCard))}
             />
           )}
         </Sheet>
@@ -610,87 +658,75 @@ function ComposerBody({
   );
 }
 
-/** One card's own settings: which printing, how many, and where it sits. */
+/**
+ * One card's own settings, kept to what a line needs: the founder, "it
+ * is ALL over the place ... so much info", then "just the swipe is
+ * needed on this screen". The art and its name, how many copies, Done;
+ * step to the next card. Each art is its own card already, so there is
+ * nothing to pick here. The order and removing live in the row: drag a
+ * card to the front for the cover, onto the bin to remove it. The app's
+ * editor is the same (mobile/src/screens/flare-composer.tsx).
+ */
 function CardEditor({
   item,
-  index,
-  count,
   copiesLabel,
-  onPrinting,
   onQuantity,
-  onNote,
-  onCover,
-  onRemove,
   onDone,
 }: {
   onDone: () => void;
   item: DraftCard;
-  index: number;
-  count: number;
   copiesLabel: string;
-  onPrinting: (printingId: string | null) => void;
   onQuantity: (quantity: number) => void;
-  onNote: (note: string) => void;
-  onCover: () => void;
-  onRemove: () => void;
 }) {
   const printing = chosenPrinting(item);
-  /* Any printing or this one is a choice even with one printing. */
-  const hasChoice = item.card.printings.length > 0;
-  const [choosingPrinting, setChoosingPrinting] = useState(false);
+
+  /* One choice per picture: a foil and a normal sharing an image are one
+     art, as on the card page's carousel. */
+  const arts: { imageUrl: string; label: string; printingId: string }[] = [];
+  for (const entry of item.card.printings) {
+    if (!entry.imageUrl || arts.some((art) => art.imageUrl === entry.imageUrl))
+      continue;
+    arts.push({
+      imageUrl: entry.imageUrl,
+      label: entry.variantType ? variantName(entry.variantType) : "Standard",
+      printingId: entry.id,
+    });
+  }
+  const chosen = item.printingId
+    ? item.card.printings.find((entry) => entry.id === item.printingId)
+    : undefined;
+  const chosenArt = chosen
+    ? arts.find((art) => art.imageUrl === chosen.imageUrl)
+    : undefined;
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col items-center gap-2 text-center">
-        <span className="block h-[184px] w-[132px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
+        <span className="block h-[224px] w-[160px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
           {printing?.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={printing.imageUrl} alt="" className="size-full object-contain" />
           )}
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="truncate font-semibold text-text-primary">
+          <p className="truncate text-lg font-extrabold text-text-primary">
             {item.card.exactName}
           </p>
-          <p className="font-mono text-xs text-text-muted">
-            {item.card.canonicalCardNumber}
-          </p>
-          <p className="text-xs text-text-secondary">
-            {index === 0 ? "The cover" : `Card ${index + 1} of ${count}`}
+          <p className="text-sm text-text-muted">
+            {[
+              item.card.canonicalCardNumber,
+              chosenArt ? chosenArt.label : arts.length > 1 ? "Any art" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </div>
 
-      {/* Which printing: one row saying which, the list down in a sheet
-          with each version's art. The app's composer is the same. */}
-      {hasChoice ? (
-        <>
-          <PickerRow
-            label="Printing"
-            value={
-              printing && item.printingId
-                ? (printingLabel(printing, item.card.exactName) ?? "This printing")
-                : "Any printing"
-            }
-            onClick={() => setChoosingPrinting(true)}
-          />
-          <PrintingSheet
-            open={choosingPrinting}
-            name={item.card.exactName}
-            printings={item.card.printings.map((entry) => ({
-              id: entry.id,
-              label: printingLabel(entry, item.card.exactName) ?? "This printing",
-              imageUrl: entry.imageUrl,
-            }))}
-            value={item.printingId}
-            onPick={onPrinting}
-            onClose={() => setChoosingPrinting(false)}
-          />
-        </>
-      ) : null}
-
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">{copiesLabel}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-text-primary">
+          {copiesLabel === "Copies needed" ? "Copies" : copiesLabel}
+        </span>
         <Stepper
           value={item.quantity}
           min={1}
@@ -698,39 +734,6 @@ function CardEditor({
           label={`copies of ${item.card.exactName}`}
           onChange={onQuantity}
         />
-      </div>
-
-      {/* Why this card: shown under it when it is opened, and on Wanted
-          near you, where it is how a holder picks who to message. */}
-      <CardNoteField
-        value={item.cardNote ?? ""}
-        onChange={onNote}
-        cardName={item.card.exactName}
-      />
-
-      {/*
-       * "Move left" and "Move right" are gone: the founder asked for a
-       * drag instead, and they described the data structure rather than
-       * the thing anybody wanted - two taps per position, three round
-       * trips to bring the last card of four to the front.
-       */}
-      <div className="flex flex-wrap gap-2">
-        {index !== 0 && (
-          <Button type="button" variant="secondary" size="sm" onClick={onCover}>
-            <Star className="size-4" aria-hidden="true" />
-            Make cover
-          </Button>
-        )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          className="ml-auto"
-        >
-          <Trash2 className="size-4" aria-hidden="true" />
-          Remove
-        </Button>
       </div>
 
       <Button type="button" onClick={onDone}>

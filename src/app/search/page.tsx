@@ -4,6 +4,7 @@ import { SearchPanel } from "@/components/feed/search-panel";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
+import { foundCardsFor, listWants } from "@/lib/players/wants";
 
 export const metadata: Metadata = {
   title: "Search",
@@ -32,10 +33,20 @@ export default async function SearchPage() {
       : viewer.kind === "anonymous"
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
+  /* Your open Flares' cards, for the flame on a result (any art of it). */
+  const flaredCardIds = playerId
+    ? await Promise.all([listWants(playerId), foundCardsFor(playerId)]).then(
+        ([wants, found]) => [
+          ...new Set(
+            wants.filter((want) => !found.has(want.cardId)).map((want) => want.cardId),
+          ),
+        ],
+      )
+    : [];
 
   return (
     <TabPageShell title="Search">
-      <SearchPanel account={playerId} />
+      <SearchPanel account={playerId} flaredCardIds={flaredCardIds} />
     </TabPageShell>
   );
 }

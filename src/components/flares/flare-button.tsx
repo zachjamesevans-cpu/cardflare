@@ -1,6 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { ART_EVENT, shownArtPrinting } from "@/components/cards/card-art-carousel";
 import { Flame, Plus } from "lucide-react";
 
 import { cn } from "@/lib/cn";
@@ -25,9 +28,22 @@ export function FlareButton({
   label: string;
   className?: string;
 }) {
+  /* On a card, the art on show goes with it: each art is its own line
+     in the composer (the founder, "all alternate arts need to be
+     treated as separate cards"). */
+  const [printing, setPrinting] = useState<string | null>(null);
+  useEffect(() => {
+    if (!href.startsWith("/flare?card=")) return;
+    const follow = () => setPrinting(shownArtPrinting);
+    follow();
+    window.addEventListener(ART_EVENT, follow);
+    return () => window.removeEventListener(ART_EVENT, follow);
+  }, [href]);
+  const target =
+    printing && href.startsWith("/flare?card=") ? `${href}&printing=${printing}` : href;
   return (
     <Link
-      href={href}
+      href={target}
       aria-label={label}
       title={label}
       data-spotlight="post-flare"

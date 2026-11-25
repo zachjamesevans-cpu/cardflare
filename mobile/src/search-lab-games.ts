@@ -3,11 +3,10 @@ import { TCG_GAMES, type GameSlug } from "./games";
 /**
  * The games the experiment's Search offers, in the order of TCG_GAMES.
  *
- * `catalog` says whether the card database has that game's cards. It is
- * a checked fact, not a guess: on 2026-11-22 the live search answered
- * every game but Riftbound (asked "the", "jinx", "ahri", "ri": nothing),
- * so Riftbound is drawn as "Coming soon" and cannot be chosen, rather
- * than opening an empty catalogue. Flip it when Riftbound is imported.
+ * `catalog` says whether the card database has that game's cards. Since
+ * the move to Scrydex (2026-11-25) every game has them but Flesh and
+ * Blood, which Scrydex does not carry: it is drawn as "Coming soon" and
+ * cannot be chosen, rather than opening an empty catalogue.
  */
 const NO_CATALOG: ReadonlySet<GameSlug> = new Set(["flesh-and-blood"]);
 
@@ -37,9 +36,4 @@ export function noCardsLine(query: string, game: GameSlug | null): string {
   return name
     ? `No ${name} cards match "${query}".`
     : `No cards match "${query}".`;
-}
-
-/** "+3 printings" under a result with more than one, else null. */
-export function printingsLine(count: number): string | null {
-  return count > 1 ? `+${count - 1} ${count - 1 === 1 ? "printing" : "printings"}` : null;
 }

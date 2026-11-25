@@ -62,6 +62,7 @@ type Handed = {
   name: string;
   cardNumber: string;
   imageUrl: string | null;
+  printingId?: string | null;
 };
 
 const withCardFirst = loadFunction<(draft: Draft, card: Handed, line?: Line) => Draft>(
@@ -89,13 +90,13 @@ const line = (cardId: string, extra: Partial<Line> = {}): Line => ({
 describe("Post a Flare for it carries the card", () => {
   it("the Flare tab takes a card param", () => {
     expect(app).toMatch(
-      /Flare:\s*\|\s*\{\s*hunt\?: string;\s*card\?: \{\s*cardId: string;\s*name: string;\s*cardNumber: string;\s*imageUrl: string \| null;\s*\};\s*\}\s*\|\s*undefined;/,
+      /Flare:\s*\|\s*\{\s*hunt\?: string;\s*card\?: \{\s*cardId: string;\s*name: string;\s*cardNumber: string;\s*imageUrl: string \| null;[\s\S]*?printingId\?: string \| null;\s*\};\s*\}\s*\|\s*undefined;/,
     );
   });
 
   it("the card page hands over its card", () => {
     expect(card).toMatch(
-      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: card\.imageUrl,/,
+      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: arts\[artAt\]\?\.imageUrl \?\? card\.imageUrl,\s*printingId: arts\[artAt\]\?\.printingIds\?\.\[0\] \?\? null,/,
     );
   });
 
@@ -126,21 +127,31 @@ describe("Post a Flare for it carries the card", () => {
     expect(next.items[1]?.quantity).toBe(3);
   });
 
-  it("a card already in the draft moves to the front and nothing else changes", () => {
+  it("another art of a card already in the draft is a line of its own", () => {
+    /* The founder: "all alternate arts need to be treated as separate cards". */
+    const foil = line("c-zoro", { printingId: "foil" });
+    const draft: Draft = { intent: "want", caption: "", items: [foil, line("a")] };
+    const next = withCardFirst(draft, { ...handed, printingId: "alt" });
+    expect(next.items).toHaveLength(3);
+    expect(next.items[0]).toMatchObject({ cardId: "c-zoro", printingId: "alt" });
+    expect(next.items[1]).toBe(foil);
+  });
+
+  it("the same card and art already in the draft moves to the front and nothing else changes", () => {
     const mine = line("c-zoro", { printingId: "alt", quantity: 4 });
     const draft: Draft = {
       intent: "showcase",
       caption: "",
       items: [line("a"), mine, line("b")],
     };
-    const next = withCardFirst(draft, handed);
+    const next = withCardFirst(draft, { ...handed, printingId: "alt" });
     expect(next.items.map((item) => item.cardId)).toEqual(["c-zoro", "a", "b"]);
     expect(next.items[0]).toBe(mine);
     expect(next.intent).toBe("showcase");
     expect(next.items).toHaveLength(3);
 
     const first: Draft = { intent: "want", caption: "", items: [mine, line("a")] };
-    expect(withCardFirst(first, handed)).toBe(first);
+    expect(withCardFirst(first, { ...handed, printingId: "alt" })).toBe(first);
   });
 
   it("survives the draft restore: saved lines stay, the handed card goes first", () => {

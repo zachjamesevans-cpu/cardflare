@@ -137,18 +137,18 @@ describe("the message box", () => {
 });
 
 describe("the Flare tab's list: only the Flares still working", () => {
+  /* The list left the composer (the founder, 2026-11-25); what is left
+     is the composer's flame on a card already out, found ones left off. */
   it("leaves out a card whose every copy is found", () => {
     expect(flarePage).toContain("foundCardsFor(playerId)");
-    expect(flarePage).toContain(
-      '(want) => want.direction === "offering" || !foundCards.has(want.cardId)',
-    );
-    /* Gone, not greyed. */
-    expect(flarePage).not.toContain("found: foundCards");
+    expect(flarePage).toContain("!foundCards.has(want.cardId)");
+    expect(flarePage).not.toContain("<WantEntries");
   });
 
-  it("points at History, where the finished ones went", () => {
-    expect(flarePage).toContain('href="/profile/trades"');
-    expect(flarePage).toMatch(
+  it("points at History from the profile's Flares", () => {
+    const flares = read("src/components/players/profile-flares.tsx");
+    expect(flares).toContain('href="/profile/trades"');
+    expect(flares).toMatch(
       /<History className="size-4" aria-hidden="true" \/>\s+History/,
     );
   });

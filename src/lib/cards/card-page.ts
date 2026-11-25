@@ -50,6 +50,9 @@ export interface CardPage {
     inTradeBinder: boolean;
     onHunt: { huntId: string; name: string } | null;
     wanted: boolean;
+    /** The printings of this card on your Flares; null is "any art". The
+        card's sheet shows "On your Flares" for the art on show. */
+    wantedPrintings: (string | null)[];
   } | null;
   /** The viewer has a postal code, so distances exist. */
   located: boolean;
@@ -364,10 +367,9 @@ export async function cardPage(
       admin.from("hunts").select("id, name").eq("player_id", viewerId),
       admin
         .from("player_wants")
-        .select("id")
+        .select("id, printing_id")
         .eq("player_id", viewerId)
-        .eq("card_id", cardId)
-        .limit(1),
+        .eq("card_id", cardId),
     ]);
     const myHuntIds = new Set((myHunts.data ?? []).map((row) => row.id));
     const onRequest = openRequests.find((row) => myHuntIds.has(row.hunt_id));
@@ -378,6 +380,13 @@ export async function cardPage(
       inTradeBinder: (mine.data ?? []).length > 0,
       onHunt: onHunt ? { huntId: onHunt.id, name: onHunt.name } : null,
       wanted: (myWant.data ?? []).length > 0,
+      wantedPrintings: [
+        ...new Set(
+          ((myWant.data ?? []) as { printing_id: string | null }[]).map(
+            (row) => row.printing_id ?? null,
+          ),
+        ),
+      ],
     };
   }
 
