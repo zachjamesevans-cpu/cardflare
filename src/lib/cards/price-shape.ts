@@ -198,4 +198,4 @@ export function formatChange(percent: number | null): string | null {
 }
 
 /** The line under the prices: where they come from, and how fresh. */
-export const PRICE_SOURCE = "Market prices from Scrydex, for reference.";
+export const PRICE_SOURCE = "Prices from Scrydex";
