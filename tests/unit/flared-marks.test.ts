@@ -44,7 +44,7 @@ describe("already on your Flares", () => {
 
   it("puts On your Flares under a card's name for the art on show", () => {
     expect(read("mobile/src/screens/card.tsx")).toContain(
-      "{onYourFlares ? <FlaredPill /> : null}",
+      "{onYourFlares ? <FlaredTag small={false} /> : null}",
     );
     expect(read("src/components/cards/card-page.tsx")).toContain("<FlaredArtPill");
     expect(read("src/lib/cards/card-page.ts")).toContain("wantedPrintings: [");

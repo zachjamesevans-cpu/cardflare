@@ -729,9 +729,12 @@ const BACKDROP_CLEAR: Keyframe = {
   backgroundColor: "rgb(0 0 0 / 0)",
   backdropFilter: "blur(0px)",
 };
+/* The page behind blurred, not just dimmed: the founder, "instead of
+   this ugly box popping up, the entire background would just blur and
+   the cards would show up". The app's zoom is the same. */
 const BACKDROP_DIM: Keyframe = {
-  backgroundColor: "rgb(0 0 0 / 0.75)",
-  backdropFilter: "blur(2px)",
+  backgroundColor: "rgb(0 0 0 / 0.5)",
+  backdropFilter: "blur(14px)",
 };
 
 export function CardImageZoom({
@@ -1325,11 +1328,12 @@ export function CardImageZoom({
           }, 120);
           go(travelled < 0 ? 1 : -1);
         }}
-        className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] cursor-zoom-out overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/75 backdrop:backdrop-blur-[2px]"
+        className="m-auto max-h-[92dvh] w-[min(92vw,26rem)] cursor-zoom-out overflow-visible border-0 bg-transparent p-0 backdrop:bg-black/50 backdrop:backdrop-blur-[14px]"
       >
         <div
           ref={panel}
-          className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border bg-surface p-4 text-text-primary"
+          /* No box: the words and the card float on the blur. */
+          className="flex flex-col gap-3 p-2 text-text-primary"
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col">

@@ -1327,10 +1327,16 @@ function AppGates() {
               up thing we have now is kind of buns", then yes to this. */}
           <Stack.Screen
             name="Card"
+            /* Only as tall as the card needs, like the composer: the
+               founder, of the dead space under a card, "maybe just
+               shortening the vertical on this". iOS's form sheet, fitted
+               to its contents; a long card still scrolls inside it. */
             options={{
               title: "Card",
               headerShown: false,
-              presentation: "modal",
+              presentation: "formSheet",
+              sheetAllowedDetents: "fitToContents",
+              sheetCornerRadius: 22,
               gestureEnabled: true,
             }}
           >

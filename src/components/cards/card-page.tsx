@@ -73,15 +73,19 @@ export function CardPageView({
           <h1 className="text-xl leading-tight font-extrabold text-text-primary">
             {card.name}
           </h1>
-          <p className="text-sm text-text-secondary">
+          {/* The art on show is on your Flares: a "Flared" tag on the
+              number's own line, so swiping between arts never moves what
+              is below (the founder: "the height changes on the market
+              price"). The app's sheet is the same. */}
+          <p className="flex min-h-5 items-center gap-2 text-sm text-text-secondary">
             {card.number} · {gameShortName(card.game)}
+            {you && you.wantedPrintings.length > 0 && (
+              <FlaredArtPill
+                wantedPrintings={you.wantedPrintings}
+                firstArt={arts[0]?.printingIds ?? []}
+              />
+            )}
           </p>
-          {you && you.wantedPrintings.length > 0 && (
-            <FlaredArtPill
-              wantedPrintings={you.wantedPrintings}
-              firstArt={arts[0]?.printingIds ?? []}
-            />
-          )}
           {standing && (
             <p className="text-sm font-semibold text-text-secondary">{standing}</p>
           )}

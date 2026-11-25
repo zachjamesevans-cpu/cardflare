@@ -235,7 +235,7 @@ describe("the card page", () => {
     /* "You want this" became "On your Flares" under the name, for the
        art on show (flared-mark.tsx). */
     expect(block).not.toContain("You want this");
-    expect(src.card).toContain("{onYourFlares ? <FlaredPill /> : null}");
+    expect(src.card).toContain("{onYourFlares ? <FlaredTag small={false} /> : null}");
     /* "Post a Flare for it" is gone: the Flare button, labelled for this
        card, opens the composer with the card as the draft's first line. */
     expect(src.card).not.toContain('label="Post a Flare for it"');

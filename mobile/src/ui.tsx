@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import {
   useEffect,
@@ -1122,8 +1123,18 @@ export function CardImage({
    * (the width wins) and 262pt alone (the height wins).
    */
   const heightHero = Math.floor(((window.height - 300) * 63) / 88);
-  const hero = Math.min(widthHero, heightHero);
-  const large = shelf ? hero + 2 * (PEEK_WIDTH + PEEK_GAP) : hero;
+  /*
+   * NO BOX: the screen blurs and the cards float on it, a carousel the
+   * width of the screen with the neighbours showing at both edges. The
+   * founder (2026-11-25): "instead of this ugly box popping up, the
+   * entire background would just blur and the cards would show up in a
+   * carousel." The hero takes about seven tenths of the width on a
+   * shelf, so a good piece of each neighbour shows.
+   */
+  const hero = shelf
+    ? Math.min(Math.round(window.width * 0.7), heightHero, 340)
+    : Math.min(widthHero, heightHero);
+  const large = shelf ? window.width : hero;
 
   /*
    * THE SHELF IS A PAGER, not a slideshow.
@@ -1212,6 +1223,7 @@ export function CardImage({
 
       <Modal visible={open} transparent animationType="none" onRequestClose={close}>
         <Animated.View style={[styles.zoomBackdrop, { opacity: fade }]}>
+          <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} pointerEvents="none" />
           {/*
            * THE CLOSER SITS BEHIND, IT DOES NOT WRAP.
            *
@@ -1239,6 +1251,7 @@ export function CardImage({
               <Animated.View
                 style={[
                   styles.zoomPanel,
+                  { width: window.width },
                   {
                     transform: [
                       {
@@ -1395,6 +1408,8 @@ export function CardImage({
                   <View
                     style={{
                       width: large,
+                      /* Out past the panel's side padding, to the screen's edges. */
+                      marginHorizontal: -spacing(4),
                       height: Math.round((hero * 88) / 63),
                     }}
                   >
@@ -1932,26 +1947,22 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   error: { color: colors.danger, fontSize: 14 },
+  /* The screen behind, blurred and darkened (the BlurView under it). */
   zoomBackdrop: {
     flex: 1,
-    backgroundColor: colors.scrim,
+    backgroundColor: "rgba(0,0,0,0.45)",
   },
   zoomFill: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    padding: spacing(5),
+    paddingVertical: spacing(5),
   },
+  /* No panel: no fill, no border. The words and the card float on the
+     blur; only the side padding keeps the words off the edges. */
   zoomPanel: {
-    get backgroundColor() {
-      return colors.surface;
-    },
-    get borderColor() {
-      return colors.border;
-    },
-    borderWidth: 1,
-    borderRadius: radius.card,
-    padding: spacing(4),
+    paddingHorizontal: spacing(4),
+    paddingVertical: spacing(2),
     gap: spacing(3),
     alignItems: "center",
   },

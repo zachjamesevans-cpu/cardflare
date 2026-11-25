@@ -12,7 +12,7 @@ describe("a card opens over the page", () => {
   it("in the app: the Card route is iOS's own sheet, swiped down to close", () => {
     const app = read("mobile/App.tsx");
     expect(app).toMatch(
-      /name="Card"\s*options=\{\{\s*title: "Card",\s*headerShown: false,\s*presentation: "modal",\s*gestureEnabled: true,/,
+      /name="Card"[\s\S]*?options=\{\{\s*title: "Card",\s*headerShown: false,\s*presentation: "formSheet",\s*sheetAllowedDetents: "fitToContents",[\s\S]*?gestureEnabled: true,/,
     );
     const screen = read("mobile/src/screens/card.tsx");
     expect(screen).toContain('accessibilityLabel="Close"');

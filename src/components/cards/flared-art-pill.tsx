@@ -1,6 +1,5 @@
 "use client";
 
-import { Flame } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ART_EVENT, shownArtPrintingIds } from "./card-art-carousel";
@@ -32,9 +31,11 @@ export function FlaredArtPill({
   );
   if (!on) return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2.5 py-1 text-xs font-extrabold text-accent">
-      <Flame className="size-3.5" aria-hidden="true" />
-      On your Flares
+    <span
+      aria-label="This art is on your Flares"
+      className="rounded-[6px] bg-accent px-1.5 py-0.5 text-[11px] leading-none font-extrabold text-accent-contrast"
+    >
+      Flared
     </span>
   );
 }

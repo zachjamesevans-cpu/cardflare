@@ -2,7 +2,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
-import { FlaredPill } from "../flared-mark";
+import { FlaredTag } from "../flared-mark";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
@@ -137,6 +137,8 @@ export function CardScreen({ cardId }: { cardId: string }) {
       <View
         style={{
           flex: 1,
+          /* A sheet fitted to its contents starts at this, not a sliver. */
+          minHeight: 420,
           backgroundColor: colors.surface,
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
@@ -228,12 +230,19 @@ export function CardScreen({ cardId }: { cardId: string }) {
         )}
         <View style={{ alignItems: "center", gap: spacing(1) }}>
           <Title>{name}</Title>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {`${card.number} · ${gameShortName(card.game)}`}
-          </Text>
-          {/* The art on show is on your Flares: it follows the carousel,
-              so another art of the card does not wear it. */}
-          {onYourFlares ? <FlaredPill /> : null}
+          {/* The art on show is on your Flares: a "Flared" tag on the
+              number's own line, following the carousel. On that line, not
+              one of its own, so swiping between arts never moves the
+              prices below (the founder: "the height changes on the market
+              price"). */}
+          <View
+            style={{ flexDirection: "row", alignItems: "center", gap: spacing(2), minHeight: 20 }}
+          >
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+              {`${card.number} · ${gameShortName(card.game)}`}
+            </Text>
+            {onYourFlares ? <FlaredTag small={false} /> : null}
+          </View>
           {/* "12 hunting · 3 have it for trade": the two lists below,
               counted. What a price would say, without one. Same line
               on the website's card page. */}
