@@ -1418,3 +1418,21 @@ html[data-backdrop="black"] {
     opacity: 1;
   }
 }
+
+/*
+ * The first-Flare starter's drifting strip of cards (first-flare-card.tsx):
+ * the strip is drawn twice, so sliding it by half its width loops cleanly.
+ * Motion-reduce stops it in the component itself.
+ */
+@keyframes cf-first-flare-drift {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.cf-first-flare-strip {
+  animation: cf-first-flare-drift linear infinite;
+}
