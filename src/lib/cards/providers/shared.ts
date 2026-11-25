@@ -43,8 +43,8 @@ export function asRecord(value: unknown): Record<string, unknown> | null {
  *
  * Provider records carry things we never display (prices, legality
  * tables, purchase links). Storing them would leave stale figures in the
- * database waiting to be surfaced by accident, and a Scryfall record
- * with its legalities and URIs is several kilobytes per printing.
+ * database waiting to be surfaced by accident, and a record with its
+ * legalities and marketplace links is several kilobytes per printing.
  */
 export function without(
   record: Record<string, unknown>,

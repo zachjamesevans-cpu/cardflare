@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizedCardSchema, type NormalizedCard } from "@/lib/cards/domain";
 import { mergeByCardNumber } from "@/lib/cards/sync";
-import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import {
   printingLabel,
   printingVariantMark,
@@ -18,34 +18,28 @@ import {
  * art only when they have different rarities, and these do not.
  */
 
-const provider = new OptcgApiProvider();
+const odenNamed = (name: string, id: string): NormalizedCard =>
+  normalizedCardSchema.parse({
+    canonicalCardNumber: "EB01-001",
+    exactName: name,
+    cardType: "Leader",
+    colors: ["green", "red"],
+    life: 4,
+    power: 5000,
+    rarity: "L",
+    printings: [
+      {
+        providerExternalId: id,
+        setCode: "EB-01",
+        setName: "Memorial Collection",
+        rarity: "L",
+        name,
+      },
+    ],
+  });
 
-const oden = (over: Record<string, unknown> = {}) => ({
-  card_set_id: "EB01-001",
-  card_name: "Kouzuki Oden",
-  set_id: "EB-01",
-  set_name: "Memorial Collection",
-  rarity: "L",
-  card_type: "Leader",
-  card_color: "Green Red",
-  life: "4",
-  card_power: "5000",
-  card_image_id: "EB01-001",
-  card_image: "https://optcgapi.com/media/static/Card_Images/EB01-001.jpg",
-  ...over,
-});
-
-const spr = oden({
-  card_name: "Kouzuki Oden (SPR)",
-  card_image_id: "EB01-001_p1",
-  card_image: "https://optcgapi.com/media/static/Card_Images/EB01-001_p1.jpg",
-});
-
-function normalize(record: unknown) {
-  const result = provider.normalizeCard(record, "set");
-  if (!result.ok) throw new Error(`expected to normalise: ${result.failure.reason}`);
-  return result.card;
-}
+const oden = () => odenNamed("Kouzuki Oden", "EB01-001:normal");
+const spr = odenNamed("Kouzuki Oden (SPR)", "EB01-001:spr");
 
 describe("a card whose printings are named differently", () => {
   /*
@@ -53,16 +47,12 @@ describe("a card whose printings are named differently", () => {
    * and that is not a basis for anything.
    */
   it("takes the base name, whichever printing arrived first", () => {
-    expect(mergeByCardNumber([normalize(spr), normalize(oden())])[0]!.exactName).toBe(
-      "Kouzuki Oden",
-    );
-    expect(mergeByCardNumber([normalize(oden()), normalize(spr)])[0]!.exactName).toBe(
-      "Kouzuki Oden",
-    );
+    expect(mergeByCardNumber([spr, oden()])[0]!.exactName).toBe("Kouzuki Oden");
+    expect(mergeByCardNumber([oden(), spr])[0]!.exactName).toBe("Kouzuki Oden");
   });
 
   it("keeps each printing's own name verbatim", () => {
-    const merged = mergeByCardNumber([normalize(oden()), normalize(spr)]);
+    const merged = mergeByCardNumber([oden(), spr]);
 
     expect(merged[0]!.printings.map((p) => p.name).sort()).toEqual([
       "Kouzuki Oden",
@@ -71,7 +61,7 @@ describe("a card whose printings are named differently", () => {
   });
 
   it("still merges them into one card", () => {
-    const merged = mergeByCardNumber([normalize(oden()), normalize(spr)]);
+    const merged = mergeByCardNumber([oden(), spr]);
 
     expect(merged).toHaveLength(1);
     expect(merged[0]!.printings).toHaveLength(2);

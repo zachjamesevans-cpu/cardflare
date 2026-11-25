@@ -29,20 +29,11 @@ export function cardImagesEnabled(): boolean {
  * practical: an allow-list, never a wildcard.
  */
 export const ALLOWED_IMAGE_HOSTS = [
-  "optcgapi.com",
-  "www.optcgapi.com",
-  /* The four public catalogues' picture hosts. Listed by hand rather
-     than imported from the provider registry, because this file ships
-     to the browser and the registry drags the adapters with it;
-     tests/unit/catalogue-providers.test.ts holds the two lists equal. */
-  "cards.scryfall.io",
-  "assets.tcgdex.net",
-  "legendstory-production-s3-public.s3.amazonaws.com",
-  "storage.googleapis.com",
-  "cmsassets.rgpub.io",
-  "cards.lorcast.io",
-  /* Scrydex, the one source from 2026-11-25. The hosts above serve the
-     cards imported before it until those are deleted. */
+  /* Scrydex, the one card source from 2026-11-25. Listed by hand rather
+     than imported from the provider registry, because this file ships to
+     the browser and the registry drags the adapter with it;
+     tests/unit/catalogue-providers.test.ts checks the registry's hosts
+     are all here. */
   "images.scrydex.com",
 ] as const;
 

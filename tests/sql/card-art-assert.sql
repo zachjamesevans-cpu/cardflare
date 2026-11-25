@@ -17,7 +17,7 @@ where id = '44444444-4444-4444-4444-444444444442';
 \echo '--- a provider URL is still accepted ---'
 do $$ begin
   update public.card_printings
-     set image_url = 'https://optcgapi.com/images/OP01-025.png'
+     set image_url = 'https://images.scrydex.com/onepiece/OP01-025.png'
    where id = '44444444-4444-4444-4444-444444444441';
   raise notice 'https still accepted, as it should be';
 end $$;
@@ -60,7 +60,7 @@ end $$;
 \echo '--- plain http is still refused ---'
 do $$ begin
   update public.card_printings
-     set image_url = 'http://optcgapi.com/images/OP01-025.png'
+     set image_url = 'http://images.scrydex.com/onepiece/OP01-025.png'
    where id = '44444444-4444-4444-4444-444444444442';
   raise exception 'plain http was accepted';
 exception

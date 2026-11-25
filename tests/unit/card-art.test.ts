@@ -56,14 +56,19 @@ describe("isHostedCardArt", () => {
     expect(isHostedCardArt("/api/card-artichoke/x.png")).toBe(false);
   });
 
-  it.each([null, undefined, "", "https://optcgapi.com/x.png"])("refuses %j", (url) => {
-    expect(isHostedCardArt(url)).toBe(false);
-  });
+  it.each([null, undefined, "", "https://images.scrydex.com/x.png"])(
+    "refuses %j",
+    (url) => {
+      expect(isHostedCardArt(url)).toBe(false);
+    },
+  );
 });
 
 describe("isRenderableImageUrl", () => {
   it("still accepts an allow-listed provider over https", () => {
-    expect(isRenderableImageUrl("https://optcgapi.com/images/OP01-025.png")).toBe(true);
+    expect(
+      isRenderableImageUrl("https://images.scrydex.com/onepiece/OP01-025.png"),
+    ).toBe(true);
   });
 
   it("still refuses a host nobody allow-listed", () => {
@@ -71,7 +76,9 @@ describe("isRenderableImageUrl", () => {
   });
 
   it("still refuses plain http", () => {
-    expect(isRenderableImageUrl("http://optcgapi.com/images/OP01-025.png")).toBe(false);
+    expect(
+      isRenderableImageUrl("http://images.scrydex.com/onepiece/OP01-025.png"),
+    ).toBe(false);
   });
 
   it("now accepts art we host ourselves", () => {

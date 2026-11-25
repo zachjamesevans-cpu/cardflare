@@ -1,14 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderHttp, ProviderHttpError } from "@/lib/cards/providers/http";
-import {
-  OptcgApiProvider,
-  OPTCGAPI_ENDPOINTS,
-} from "@/lib/cards/providers/optcgapi/adapter";
-import {
-  MAPPING_STATUS,
-  MAPPING_VERIFIED_ON,
-} from "@/lib/cards/providers/optcgapi/mapping";
 
 /** Never sleeps, so backoff is exercised without the wall-clock cost. */
 const noSleep = () => Promise.resolve();
@@ -23,7 +15,7 @@ function jsonResponse(body: unknown, status = 200) {
 let fetchMock: ReturnType<typeof vi.fn>;
 
 function client(overrides = {}) {
-  return new ProviderHttp("https://optcgapi.com", {
+  return new ProviderHttp("https://api.scrydex.com", {
     sleep: noSleep,
     spacingMs: 1,
     fetchImpl: fetchMock as unknown as typeof fetch,
@@ -39,7 +31,7 @@ describe("ProviderHttp", () => {
   it("returns parsed JSON on success", async () => {
     fetchMock.mockResolvedValue(jsonResponse([{ card_name: "Luffy" }]));
 
-    await expect(client().getJson("/api/allSetCards/")).resolves.toEqual([
+    await expect(client().getJson("/onepiece/v1/cards")).resolves.toEqual([
       { card_name: "Luffy" },
     ]);
   });
@@ -47,7 +39,7 @@ describe("ProviderHttp", () => {
   it("identifies itself so the operator can see who is calling", async () => {
     fetchMock.mockResolvedValue(jsonResponse([]));
 
-    await client().getJson("/api/allSetCards/");
+    await client().getJson("/onepiece/v1/cards");
 
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
     expect((init.headers as Record<string, string>)["user-agent"]).toContain(
@@ -56,13 +48,13 @@ describe("ProviderHttp", () => {
   });
 
   /*
-   * A free service asked not to be hammered. Retrying something that will
-   * never succeed is how that request gets ignored by accident.
+   * Every request costs a credit. Retrying something that will never
+   * succeed spends them for nothing.
    */
   it("does not retry a permanent failure", async () => {
     fetchMock.mockResolvedValue(jsonResponse({ detail: "nope" }, 404));
 
-    await expect(client().getJson("/api/allSetCards/")).rejects.toBeInstanceOf(
+    await expect(client().getJson("/onepiece/v1/cards")).rejects.toBeInstanceOf(
       ProviderHttpError,
     );
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -95,7 +87,7 @@ describe("ProviderHttp", () => {
       .mockResolvedValueOnce(jsonResponse({}, 429))
       .mockResolvedValueOnce(jsonResponse([{ ok: true }]));
 
-    await expect(client().getJson("/api/allSetCards/")).resolves.toEqual([
+    await expect(client().getJson("/onepiece/v1/cards")).resolves.toEqual([
       { ok: true },
     ]);
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -106,14 +98,14 @@ describe("ProviderHttp", () => {
       .mockRejectedValueOnce(new Error("ECONNRESET"))
       .mockResolvedValueOnce(jsonResponse([]));
 
-    await expect(client().getJson("/api/allSetCards/")).resolves.toEqual([]);
+    await expect(client().getJson("/onepiece/v1/cards")).resolves.toEqual([]);
   });
 
   it("gives up after the attempt limit rather than looping", async () => {
     fetchMock.mockResolvedValue(jsonResponse({}, 500));
 
     await expect(
-      client({ maxAttempts: 3 }).getJson("/api/allSetCards/"),
+      client({ maxAttempts: 3 }).getJson("/onepiece/v1/cards"),
     ).rejects.toBeInstanceOf(ProviderHttpError);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
@@ -130,7 +122,7 @@ describe("ProviderHttp", () => {
         return Promise.resolve();
       },
     })
-      .getJson("/api/allSetCards/")
+      .getJson("/onepiece/v1/cards")
       .catch(() => {});
 
     expect(waits).toEqual([20, 40, 80]);
@@ -144,7 +136,7 @@ describe("ProviderHttp", () => {
     for (const path of [
       "https://evil.example/steal",
       "//evil.example/steal",
-      "http://optcgapi.com/api/",
+      "http://api.scrydex.com/onepiece/v1/cards",
     ]) {
       await expect(client().getJson(path)).rejects.toThrow(/origin/i);
     }
@@ -165,86 +157,11 @@ describe("ProviderHttp", () => {
 
     const http = client();
     await Promise.all([
-      http.getJson("/api/allSetCards/"),
-      http.getJson("/api/allSTCards/"),
-      http.getJson("/api/allPromoCards/"),
+      http.getJson("/onepiece/v1/cards"),
+      http.getJson("/onepiece/v1/expansions"),
+      http.getJson("/pokemon/v1/cards"),
     ]);
 
     expect(peak).toBe(1);
-  });
-});
-
-describe("the mapping gate", () => {
-  /*
-   * The gate held while nothing had been observed, and was released on
-   * 2 August 2026 against a real /api/allSetCards/ record. Both halves matter:
-   * "verified" is only meaningful if it carries the date somebody checked.
-   */
-  it("is verified, and records when", () => {
-    expect(MAPPING_STATUS).toBe("verified");
-    expect(MAPPING_VERIFIED_ON).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-  });
-
-  it("keeps normalisation free of the network, so fixtures alone can test it", () => {
-    const provider = new OptcgApiProvider();
-
-    expect(
-      provider.normalizeCard({ card_set_id: "OP01-001", card_name: "Zoro" }).ok,
-    ).toBe(true);
-  });
-});
-
-/*
- * Found by pointing the endpoint list at the live API: a documented endpoint
- * 404d. Before this, that took the whole sync down and imported nothing —
- * while the other endpoints had perfectly good data sitting there.
- *
- * The endpoint that originally 404d was `/api/allPromoCards/`, a path inferred
- * from the naming of its neighbours; the real one is `/api/allPromos/`. This
- * test no longer names it, because the guarantee is about any endpoint being
- * unreachable, and pinning it to a path meant the test quietly stopped
- * exercising anything the moment the path was corrected.
- */
-describe("a missing endpoint", () => {
-  it("does not abandon the rest of the catalog", async () => {
-    const missing = OPTCGAPI_ENDPOINTS.promoCards;
-
-    fetchMock = vi.fn(async (url: string) =>
-      String(url).includes(missing)
-        ? jsonResponse({ detail: "Not Found" }, 404)
-        : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
-    );
-
-    const provider = new OptcgApiProvider({
-      sleep: noSleep,
-      spacingMs: 1,
-      fetchImpl: fetchMock as unknown as typeof fetch,
-    });
-
-    const { cards, failures } = await provider.fetchCards();
-
-    expect(cards.length).toBeGreaterThan(0);
-    expect(failures.some((f) => f.reason.includes(missing))).toBe(true);
-  });
-
-  /* Every other group still has to reach the caller, not just one of them. */
-  it("still imports the endpoints that answered", async () => {
-    fetchMock = vi.fn(async (url: string) =>
-      String(url).includes(OPTCGAPI_ENDPOINTS.promoCards)
-        ? jsonResponse({ detail: "Not Found" }, 404)
-        : jsonResponse([{ card_set_id: "OP01-024", card_name: "Monkey D. Luffy" }]),
-    );
-
-    const { cards } = await new OptcgApiProvider({
-      sleep: noSleep,
-      spacingMs: 1,
-      fetchImpl: fetchMock as unknown as typeof fetch,
-    }).fetchCards();
-
-    // set and starter deck answered; promos did not.
-    expect(cards).toHaveLength(2);
-    expect(new Set(cards.map((card) => card.printings[0]!.source))).toEqual(
-      new Set(["set", "starter-deck"]),
-    );
   });
 });

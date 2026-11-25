@@ -33,7 +33,7 @@ const run = (fields: Record<string, string>) =>
 
 const SUMMARY = {
   runId: "run-1",
-  provider: "optcgapi",
+  provider: "scrydex",
   mode: "sample" as const,
   recordsSeen: 5,
   cardsUpserted: 3,

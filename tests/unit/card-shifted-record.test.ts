@@ -1,54 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
-
-import shifted from "../fixtures/optcgapi/shiftedRecord.json";
+import { normalizationFailure, normalizedCardSchema } from "@/lib/cards/domain";
 
 /**
- * A real rejected record from the 2 August 2026 full sync, kept verbatim.
+ * A source once sent a Leader shifted by one field: its power in `life`
+ * ("5000"), its traits in the power column. The data was wrong at source,
+ * and the only correct outcome was to skip the record.
  *
- * The provider's row is shifted by one field:
- *
- *   life         "5000"                      — a power
- *   card_power   "Straw Hat Crew Dressrosa"  — traits
- *   sub_types    "Ranged"                    — an attribute
- *   attribute    null
- *
- * Nothing here is a mapping error on our side. A correctly-formed record from
- * the same endpoint has life "5", card_power "5000", sub_types a trait list
- * and attribute an attribute. The data is wrong at source, and the only
- * correct outcome is to skip the record.
- *
- * This file exists so nobody "fixes" the rejection by raising the life
+ * This file exists so nobody "fixes" such a rejection by raising the life
  * ceiling. The message reads `life: Too big: expected number to be <=99`,
- * which invites exactly that — and it would import a Leader with 5000 life,
- * no power, and an attribute sitting in its trait list.
+ * which invites exactly that — and it would import a Leader with 5000 life.
  */
-const provider = new OptcgApiProvider();
+const leader = {
+  canonicalCardNumber: "P-001",
+  exactName: "Monkey.D.Luffy",
+  cardType: "Leader",
+};
 
-describe("a record whose fields are shifted at source", () => {
-  it("is rejected rather than imported wrong", () => {
-    const result = provider.normalizeCard(shifted, "promo");
-
-    expect(result.ok).toBe(false);
-  });
-
+describe("a record whose life is impossible", () => {
   it("is rejected because the life is impossible, and says so", () => {
-    const result = provider.normalizeCard(shifted, "promo");
-    if (result.ok) throw new Error("expected the record to be rejected");
+    const parsed = normalizedCardSchema.safeParse({ ...leader, life: 5000 });
 
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+
+    const result = normalizationFailure(
+      { ...leader, life: 5000 },
+      "P-001",
+      parsed.error,
+    );
+    if (result.ok) throw new Error("expected the record to be rejected");
     expect(result.failure.reason).toMatch(/life/);
-  });
-
-  /* Kept whole, which is how the shift was diagnosed in the first place. */
-  it("keeps the payload so the shift is visible in the admin console", () => {
-    const result = provider.normalizeCard(shifted, "promo");
-    if (result.ok) throw new Error("expected the record to be rejected");
-
-    expect(result.failure.raw).toMatchObject({
-      life: "5000",
-      card_power: "Straw Hat Crew Dressrosa",
-    });
   });
 
   /*
@@ -56,14 +38,11 @@ describe("a record whose fields are shifted at source", () => {
    * already generous; a value in the thousands can only be a power.
    */
   it("still accepts a plausible life", () => {
-    const result = provider.normalizeCard(
-      { ...shifted, life: "5", card_power: "5000" },
-      "promo",
-    );
+    const parsed = normalizedCardSchema.safeParse({ ...leader, life: 5, power: 5000 });
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.card.life).toBe(5);
-    expect(result.card.power).toBe(5000);
+    expect(parsed.success).toBe(true);
+    if (!parsed.success) return;
+    expect(parsed.data.life).toBe(5);
+    expect(parsed.data.power).toBe(5000);
   });
 });

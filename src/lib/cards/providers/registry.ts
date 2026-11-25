@@ -6,9 +6,8 @@ import { SCRYDEX_IMAGE_HOST, SCRYDEX_KEY, ScrydexProvider } from "./scrydex/adap
  * Which public catalogue each game is imported from, and what the
  * admin needs to know to type a set code into it.
  *
- * One Piece is deliberately absent: it has its own sync (optcgapi) and
- * its own by-hand importer, both older than this table, and moving it
- * here would be churn for nothing.
+ * Every game it lists comes from Scrydex. Flesh and Blood, which Scrydex
+ * does not carry, has no entry.
  *
  * Free of server-only imports so the admin form can render the list
  * and the tests can read it.

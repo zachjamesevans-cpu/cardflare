@@ -5,9 +5,9 @@ import { revalidatePath } from "next/cache";
 import { getViewer } from "@/lib/auth/session";
 import { text } from "@/lib/form-value";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { MappingUnverifiedError, OptcgApiProvider } from "./providers/optcgapi/adapter";
 import { catalogueSource, providerForGame } from "./providers/registry";
 import { cleanSetCode } from "./providers/shared";
+import { ScrydexProvider } from "./providers/scrydex/adapter";
 import { activeSyncRun, syncCards } from "./sync";
 import { fullSyncPermitted, parseSyncMode, type SyncActionState } from "./sync-state";
 
@@ -29,7 +29,7 @@ import { fullSyncPermitted, parseSyncMode, type SyncActionState } from "./sync-s
  * A ceiling on how often the provider can be pulled, even by an admin.
  *
  * Small: a sync is a deliberate, occasional act, and a stuck retry loop
- * against a free courtesy service is exactly what gets access withdrawn.
+ * against a metered API spends credits for nothing.
  */
 const SYNC_MAX = 4;
 const SYNC_WINDOW_MS = 15 * 60 * 1000;
@@ -90,7 +90,8 @@ export async function syncCatalogAction(
     return { status: "error", message: GENERIC_ERROR };
   }
 
-  const provider = new OptcgApiProvider();
+  // The console's sync form names no game: this button is One Piece.
+  const provider = new ScrydexProvider("one-piece");
 
   try {
     const summary = await syncCards(provider, { mode });
@@ -114,17 +115,13 @@ export async function syncCatalogAction(
     // Configuration panel says so rather than showing the previous success.
     revalidatePath("/admin");
 
-    if (error instanceof MappingUnverifiedError) {
-      return { status: "failed", message: error.message };
-    }
-
     console.error("Catalog sync failed", error);
 
     return {
       status: "failed",
       message:
         "The sync failed part-way. Nothing was deleted, and re-running is safe. " +
-        "check the runtime logs and card_sync_failures for the reason.",
+        "Check the runtime logs and card_sync_failures for the reason.",
     };
   }
 }
@@ -137,9 +134,8 @@ export async function syncCatalogAction(
  * never by anything the request names. The set code is the only free
  * text, and it is shaped before it can reach a request path.
  *
- * Full mode, always: a set is already the unit of "a sample", and the
- * two catalogues that can take the whole game (Flesh and Blood,
- * Riftbound) are a few thousand cards, which fits.
+ * Full mode, always: a set is already the unit of "a sample", and a
+ * blank set code pulls the whole game.
  */
 export async function importCatalogueSetAction(
   _previous: SyncActionState,

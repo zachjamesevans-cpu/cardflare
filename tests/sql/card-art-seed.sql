@@ -10,7 +10,7 @@ insert into public.cards
    provider_key)
 values
   ('33333333-3333-3333-3333-333333333331', 'OP01-025', 'OP01025',
-   'Roronoa Zoro', 'roronoa zoro', 'optcgapi'),
+   'Roronoa Zoro', 'roronoa zoro', 'scrydex'),
   ('33333333-3333-3333-3333-333333333332', 'OP17-001', 'OP17001',
    'Spoiler Leader', 'spoiler leader', 'kaizoku');
 
@@ -19,8 +19,8 @@ insert into public.card_printings
 values
   -- The arrangement that exists today: a provider's own https URL.
   ('44444444-4444-4444-4444-444444444441',
-   '33333333-3333-3333-3333-333333333331', 'optcgapi', 'OP01-025-1',
-   'OP01', 'https://optcgapi.com/images/OP01-025.png'),
+   '33333333-3333-3333-3333-333333333331', 'scrydex', 'OP01-025-1',
+   'OP01', 'https://images.scrydex.com/onepiece/OP01-025.png'),
   -- A printing with no art at all, which stays legal.
   ('44444444-4444-4444-4444-444444444442',
    '33333333-3333-3333-3333-333333333332', 'kaizoku', 'OP17-001-1',

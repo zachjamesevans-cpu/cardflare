@@ -1,64 +1,43 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizedCardSchema, type NormalizedCard } from "@/lib/cards/domain";
 import { mergeByCardNumber } from "@/lib/cards/sync";
-import { OptcgApiProvider } from "@/lib/cards/providers/optcgapi/adapter";
 import { printingLabel, type CardPrinting } from "@/lib/cards/schema";
 
 /**
  * A base art and an alternate art of the same card.
  *
- * Both come from `/api/allSetCards/` with the same `card_set_id`, so they are
- * one gameplay identity — and they are two different physical cards, which is
- * the whole substance of a trade. Shaped on the observed set record.
+ * They share a card number, so they are one gameplay identity — and they are
+ * two different physical cards, which is the whole substance of a trade.
  */
+const perona = (printing: Record<string, unknown>): NormalizedCard =>
+  normalizedCardSchema.parse({
+    canonicalCardNumber: "OP12-034",
+    exactName: "Perona",
+    cardType: "Character",
+    colors: ["purple"],
+    cost: 2,
+    power: 3000,
+    counter: 1000,
+    rarity: "C",
+    printings: [{ setCode: "OP12", setName: "Legacy of the Master", ...printing }],
+  });
+
 const base = {
-  card_set_id: "OP12-034",
-  card_name: "Perona",
-  set_id: "OP12",
-  set_name: "Legacy of the Master",
+  providerExternalId: "OP12-034:normal",
   rarity: "C",
-  card_color: "Purple",
-  card_type: "Character",
-  card_cost: "2",
-  card_power: "3000",
-  counter_amount: 1000,
-  card_image_id: "OP12-034",
-  card_image: "https://optcgapi.com/media/static/Card_Images/OP12-034.jpg",
+  imageUrl: "https://images.scrydex.com/onepiece/OP12-034/large",
 };
 
 const alternate = {
-  ...base,
+  providerExternalId: "OP12-034:altArt",
   rarity: "SR",
-  card_image_id: "OP12-034_p1",
-  card_image: "https://optcgapi.com/media/static/Card_Images/OP12-034_p1.jpg",
-};
-
-const provider = new OptcgApiProvider();
-const normalize = (record: unknown) => {
-  const result = provider.normalizeCard(record, "set");
-  if (!result.ok) throw new Error(`expected to normalise: ${result.failure.reason}`);
-  return result.card;
+  imageUrl: "https://images.scrydex.com/onepiece/OP12-034A/large",
 };
 
 describe("an alternate art", () => {
-  it("keys separately from the base printing", () => {
-    expect(normalize(base).printings[0]!.providerExternalId).not.toBe(
-      normalize(alternate).printings[0]!.providerExternalId,
-    );
-  });
-
-  /*
-   * Rarity is on the printing as well as the card. Merging keeps the first
-   * card's rarity, so without a per-printing copy the alternate art's is lost
-   * the moment the two records collapse into one card.
-   */
-  it("keeps its own rarity", () => {
-    expect(normalize(base).printings[0]!.rarity).toBe("C");
-    expect(normalize(alternate).printings[0]!.rarity).toBe("SR");
-  });
-
   it("survives the merge as a second printing of one card", () => {
-    const merged = mergeByCardNumber([normalize(base), normalize(alternate)]);
+    const merged = mergeByCardNumber([perona(base), perona(alternate)]);
 
     expect(merged).toHaveLength(1);
     expect(merged[0]!.canonicalCardNumber).toBe("OP12-034");
@@ -67,7 +46,7 @@ describe("an alternate art", () => {
   });
 
   it("keeps its own artwork", () => {
-    const merged = mergeByCardNumber([normalize(base), normalize(alternate)]);
+    const merged = mergeByCardNumber([perona(base), perona(alternate)]);
     const urls = merged[0]!.printings.map((p) => p.imageUrl);
 
     expect(new Set(urls).size).toBe(2);
@@ -75,12 +54,12 @@ describe("an alternate art", () => {
 
   /* Re-importing the same two records must not grow the printing list. */
   it("does not duplicate when the sync runs twice", () => {
-    const once = mergeByCardNumber([normalize(base), normalize(alternate)]);
+    const once = mergeByCardNumber([perona(base), perona(alternate)]);
     const twice = mergeByCardNumber([
-      normalize(base),
-      normalize(alternate),
-      normalize(base),
-      normalize(alternate),
+      perona(base),
+      perona(alternate),
+      perona(base),
+      perona(alternate),
     ]);
 
     expect(twice[0]!.printings).toHaveLength(once[0]!.printings.length);

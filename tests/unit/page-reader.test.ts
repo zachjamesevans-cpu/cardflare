@@ -215,7 +215,7 @@ beforeEach(() => {
     "fetch",
     vi.fn(async (url: unknown, init: RequestInit) => {
       const href = String(url);
-      if (href.startsWith("https://optcgapi.com/")) {
+      if (href.startsWith("https://images.scrydex.com/")) {
         return new Response(PNG, { headers: { "content-type": "image/png" } });
       }
       const body = JSON.parse(String(init.body)) as Sent;
@@ -373,8 +373,8 @@ describe("the exact printing", () => {
   });
   const zoroWithAlt = () =>
     card("zoro", "Roronoa Zoro", "OP06-118", [
-      art("https://optcgapi.com/base.png"),
-      art("https://optcgapi.com/alt.png", {
+      art("https://images.scrydex.com/base.png"),
+      art("https://images.scrydex.com/alt.png", {
         variantType: "Alternate Art",
         rarity: "SR",
       }),
@@ -439,8 +439,12 @@ describe("the exact printing", () => {
 
   it("settles a collector number two cards share by the pictures", async () => {
     catalogue["monkey.d.luffy"] = [
-      card("luffy-a", "Monkey.D.Luffy", "P-001", [art("https://optcgapi.com/a.png")]),
-      card("luffy-b", "Monkey.D.Luffy", "P-001", [art("https://optcgapi.com/b.png")]),
+      card("luffy-a", "Monkey.D.Luffy", "P-001", [
+        art("https://images.scrydex.com/a.png"),
+      ]),
+      card("luffy-b", "Monkey.D.Luffy", "P-001", [
+        art("https://images.scrydex.com/b.png"),
+      ]),
     ];
     anthropicRead = (slots) =>
       slots.map((slot) =>
@@ -461,8 +465,12 @@ describe("the exact printing", () => {
 
   it("keeps a shared number open when the pictures match neither", async () => {
     catalogue["monkey.d.luffy"] = [
-      card("luffy-a", "Monkey.D.Luffy", "P-001", [art("https://optcgapi.com/a.png")]),
-      card("luffy-b", "Monkey.D.Luffy", "P-001", [art("https://optcgapi.com/b.png")]),
+      card("luffy-a", "Monkey.D.Luffy", "P-001", [
+        art("https://images.scrydex.com/a.png"),
+      ]),
+      card("luffy-b", "Monkey.D.Luffy", "P-001", [
+        art("https://images.scrydex.com/b.png"),
+      ]),
     ];
     anthropicRead = (slots) =>
       slots.map((slot) =>

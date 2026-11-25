@@ -31,10 +31,7 @@ import { Card } from "@/components/ui/card";
 import { requireAdmin } from "@/lib/auth/session";
 import { pagesScannedLately } from "@/lib/cards/scan-bench";
 import { catalogBySet, failuresForRun } from "@/lib/cards/health";
-import {
-  DON_EXCLUSION,
-  OptcgApiProvider,
-} from "@/lib/cards/providers/optcgapi/adapter";
+import { ScrydexProvider } from "@/lib/cards/providers/scrydex/adapter";
 import { countCards, countPrintingImages } from "@/lib/cards/search";
 import { latestSyncRun } from "@/lib/cards/sync";
 import { countParticipants } from "@/lib/events/participants";
@@ -193,7 +190,8 @@ export default async function AdminPage() {
   const vendors = stores.length - gameStores;
   const upcomingShows = runningShows.length;
 
-  const providerName = new OptcgApiProvider().displayName;
+  // Naming the source needs no network and no credentials.
+  const providerName = new ScrydexProvider("one-piece").displayName;
 
   // Depends on which run was last, so it cannot join the batch above.
   const [setCoverage, failures, wentWrong] = await Promise.all([
@@ -355,7 +353,7 @@ export default async function AdminPage() {
           </h2>
           <p className="text-sm text-text-secondary">
             Imports One Piece cards from {providerName} so search has something to find.
-            Card data only. No prices, and no artwork is copied. {DON_EXCLUSION}
+            Card data and image links only. No prices are imported.
           </p>
         </div>
 
@@ -366,11 +364,10 @@ export default async function AdminPage() {
         <div className="flex flex-col gap-1.5">
           <h3 className="text-lg font-bold text-text-primary">Other games</h3>
           <p className="text-sm text-text-secondary">
-            Magic, Pokémon, Flesh and Blood, Riftbound and Lorcana come in from their
-            public catalogues: one set at a time here, or every set at once from the
-            terminal with npm run cards:import. Every card lands under its own game, so
-            a room scanned in from a Riftbound screen searches Riftbound cards and
-            nothing else.
+            Magic, Pokémon, Riftbound, Lorcana and Gundam come in from Scrydex too: one
+            set at a time here, or every set at once from the terminal with npm run
+            cards:import. Every card lands under its own game, so a room scanned in from
+            a Riftbound screen searches Riftbound cards and nothing else.
           </p>
         </div>
 
