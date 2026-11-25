@@ -22,6 +22,17 @@ describe("already on your Flares", () => {
     expect(read("mobile/src/screens/hub.tsx")).toContain("setMyFlares(wants)");
   });
 
+  /* "that little flare icon ... is awful ... maybe just a small rounded
+     rectangle instead": a green "Flared" tag, not a round flame. */
+  it("is a Flared tag, not a round icon", () => {
+    const tag = read("mobile/src/flared-mark.tsx");
+    expect(tag).toContain("export function FlaredTag(");
+    expect(tag).not.toContain("export function FlaredMark(");
+    expect(read("mobile/src/screens/search-lab.tsx")).toContain(
+      '<FlaredTag style={{ position: "absolute", bottom: 5, right: 5 }} />',
+    );
+  });
+
   it("marks a search result, any art of it, on both platforms", () => {
     expect(read("mobile/src/screens/search-lab.tsx")).toContain(
       "{cardFlared(hit.id) ? (",
@@ -40,7 +51,7 @@ describe("already on your Flares", () => {
   });
 
   it("flames a composer tile already out", () => {
-    expect(read("mobile/src/card-tray.tsx")).toContain("{item.flared ? (");
+    expect(read("mobile/src/card-tray.tsx")).toContain("<FlaredTag small");
     expect(read("src/components/flares/flare-composer.tsx")).toContain(
       'aria-label="On your Flares"',
     );

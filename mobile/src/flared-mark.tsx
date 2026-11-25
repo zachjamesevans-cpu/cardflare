@@ -4,29 +4,40 @@ import { Text, View, type ViewStyle } from "react-native";
 import { colors, spacing } from "./theme";
 
 /**
- * "Already on your Flares": a small green flame, never a button. On a
- * search result's art, on a tile in the composer's row (my-flares.ts).
+ * "Already on your Flares": a small cardflare-green rounded rectangle
+ * saying "Flared", never a button. The founder (2026-11-25), of the round
+ * flame that came first: "that little flare icon ... is awful ... maybe
+ * just a small rounded rectangle instead." It pairs with the dark
+ * printings badge on a search result (same height and rounding); on the
+ * composer's small tiles it comes smaller.
  */
-export function FlaredMark({ size = 20, style }: { size?: number; style?: ViewStyle }) {
+export function FlaredTag({ small = false, style }: { small?: boolean; style?: ViewStyle }) {
   return (
     <View
       pointerEvents="none"
       accessibilityLabel="On your Flares"
       style={[
         {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
+          height: small ? 14 : 20,
+          paddingHorizontal: small ? 4 : 6,
+          borderRadius: small ? 4 : 6,
           backgroundColor: colors.accent,
           alignItems: "center",
           justifyContent: "center",
-          borderWidth: 1.5,
-          borderColor: colors.canvas,
         },
         style,
       ]}
     >
-      <Ionicons name="flame" size={Math.round(size * 0.6)} color={colors.accentContrast} />
+      <Text
+        maxFontSizeMultiplier={1.2}
+        style={{
+          color: colors.accentContrast,
+          fontSize: small ? 8 : 11,
+          fontWeight: "800",
+        }}
+      >
+        Flared
+      </Text>
     </View>
   );
 }

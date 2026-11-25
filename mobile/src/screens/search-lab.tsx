@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { FlaredMark } from "../flared-mark";
+import { FlaredTag } from "../flared-mark";
 import { cardFlared, useMyFlares } from "../my-flares";
 import { useTabReset } from "../tab-reset";
 import { useNavigation } from "@react-navigation/native";
@@ -575,7 +575,7 @@ function Results({
                         "it'll have a logo or something when you search for
                         it that you already have it on your list." */}
                     {cardFlared(hit.id) ? (
-                      <FlaredMark style={{ position: "absolute", top: 5, right: 5 }} />
+                      <FlaredTag style={{ position: "absolute", bottom: 5, right: 5 }} />
                     ) : null}
                     {/* How many printings, on the card itself: the founder,
                         "a small icon with number of printings on the card
@@ -593,7 +593,8 @@ function Results({
                           gap: 3,
                           paddingHorizontal: 6,
                           height: 20,
-                          borderRadius: 999,
+                          /* The Flared tag's rounding: the two pair up. */
+                          borderRadius: 6,
                           backgroundColor: "rgba(0,0,0,0.78)",
                         }}
                       >

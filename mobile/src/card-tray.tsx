@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { FlaredMark } from "./flared-mark";
+import { FlaredTag } from "./flared-mark";
 import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -545,7 +545,7 @@ function TileFace({
         </Text>
       </View>
       {item.flared ? (
-        <FlaredMark size={16} style={{ position: "absolute", top: 3, right: 3 }} />
+        <FlaredTag small style={{ position: "absolute", top: 3, right: 3 }} />
       ) : null}
       {/* The copies: the one quantity tag, in the corner the count always had. */}
       <QuantityBadge

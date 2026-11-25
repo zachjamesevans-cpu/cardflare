@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Flame, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
 
@@ -482,9 +482,9 @@ function ComposerBody({
                 ) && (
                   <span
                     aria-label="On your Flares"
-                    className="pointer-events-none absolute top-1 right-1 flex size-4 items-center justify-center rounded-full border border-canvas bg-accent text-accent-contrast"
+                    className="pointer-events-none absolute top-1 right-1 rounded-[4px] bg-accent px-1 py-px text-[8px] leading-tight font-extrabold text-accent-contrast"
                   >
-                    <Flame className="size-2.5" aria-hidden="true" />
+                    Flared
                   </span>
                 )}
                 {index === 0 && (
