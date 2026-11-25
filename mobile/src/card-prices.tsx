@@ -1,19 +1,21 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
-import { Animated, ScrollView, Text, View } from "react-native";
+import { Animated, Text, View } from "react-native";
 
 import type { CardPrices } from "./api";
 import { loadCardPrices, peekCardPrices, savedCardPrices } from "./price-cache";
 import { Tap } from "./ui";
-import { colors, radius, spacing } from "./theme";
+import { colors, spacing } from "./theme";
 
 /**
- * MARKET PRICE, on the app's card screen: the website's panel
- * (src/components/cards/card-prices.tsx), the same order and words.
- * One printing at a time - its near-mint price large with the week's
- * move beside it, the range under it, then the other conditions and
- * the top graded prices as small chips. Loaded after the card, so the
- * screen never waits on it.
+ * MARKET PRICE, on the app's card sheet, kept quiet: the founder
+ * (2026-11-25), "kind of too much info ... cleaner overall." The price
+ * of the art on show (the carousel names the printing, so no chips
+ * repeat it) large with the week's move, the range in one muted line,
+ * and every condition and grade folded under "All prices". No box.
+ * Chips come back only when the art on show has two priced printings.
+ * The website's panel is the same (src/components/cards/card-prices.tsx).
+ * Loaded after the card, so the screen never waits on it.
  */
 
 /** "$6.13". The website's formatPrice. */
@@ -32,7 +34,7 @@ export function formatChange(percent: number | null): string | null {
   return `${percent > 0 ? "+" : "−"}${Math.abs(percent).toFixed(1)}%`;
 }
 
-export const PRICE_SOURCE = "Market prices from Scrydex, for reference.";
+export const PRICE_SOURCE = "Prices from Scrydex";
 
 function updatedLabel(iso: string): string {
   const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
@@ -121,6 +123,7 @@ export function CardPricesPanel({
         <Animated.View style={{ opacity: fade, gap: spacing(2) }}>
           <Panel
             prices={prices}
+            showing={showing ? showing.split("|") : null}
             at={Math.min(at, prices.printings.length - 1)}
             onPick={(index) => {
               setAt(index);
@@ -136,14 +139,21 @@ export function CardPricesPanel({
 
 function Panel({
   prices,
+  showing,
   at,
   onPick,
 }: {
   prices: Extract<CardPrices, { state: "ok" }>;
+  /** The variants of the art on show, or null when there is no carousel. */
+  showing: string[] | null;
   at: number;
   onPick: (index: number) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const printing = prices.printings[at];
+  const choices = prices.printings
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => !showing || showing.includes(entry.variant));
   const top = printing.graded[0];
   const headline =
     printing.market !== null
@@ -151,12 +161,17 @@ function Panel({
       : { value: top?.market ?? 0, caption: top ? `${top.company} ${top.grade}` : null };
   const change = formatChange(printing.change7);
   const up = (printing.change7 ?? 0) > 0;
+  const range =
+    printing.low !== null && printing.high !== null
+      ? `${formatPrice(printing.low, printing.currency)} – ${formatPrice(printing.high, printing.currency)}`
+      : null;
+  const more = printing.conditions.length > 1 || printing.graded.length > 0;
 
   return (
     <>
-      {prices.printings.length > 1 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: spacing(2) }}>
-          {prices.printings.map((entry, index) => {
+      {choices.length > 1 ? (
+        <View style={{ flexDirection: "row", gap: 6 }}>
+          {choices.map(({ entry, index }) => {
             const on = index === at;
             return (
               <Tap
@@ -166,26 +181,23 @@ function Panel({
                 accessibilityState={{ selected: on }}
                 accessibilityLabel={entry.label}
                 style={{
-                  height: 34,
-                  justifyContent: "center",
-                  paddingHorizontal: spacing(3.5),
+                  paddingHorizontal: spacing(3),
+                  paddingVertical: 5,
                   borderRadius: 999,
-                  borderWidth: 1,
-                  borderColor: on ? colors.accent : colors.border,
-                  backgroundColor: on ? colors.accent : colors.surface,
+                  backgroundColor: on ? colors.textPrimary : colors.elevated,
                 }}
               >
-                <Text style={{ color: on ? colors.accentContrast : colors.textPrimary, fontSize: 14, fontWeight: "700" }}>
+                <Text style={{ color: on ? colors.canvas : colors.textSecondary, fontSize: 12, fontWeight: "700" }}>
                   {entry.label}
                 </Text>
               </Tap>
             );
           })}
-        </ScrollView>
+        </View>
       ) : null}
 
-      <View style={box()}>
-        <View style={{ flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", gap: spacing(2.5) }}>
+      <View style={{ gap: 2 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing(2.5) }}>
           <Text style={{ color: colors.textPrimary, fontSize: 32, fontWeight: "800", letterSpacing: -0.5 }}>
             {formatPrice(headline.value, printing.currency)}
           </Text>
@@ -195,144 +207,117 @@ function Panel({
             </Text>
           ) : null}
           {change ? (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 4,
-                paddingHorizontal: spacing(2),
-                paddingVertical: 3,
-                borderRadius: 999,
-                backgroundColor: up ? colors.accentTint : "rgba(255,143,143,0.15)",
-              }}
-            >
-              <Ionicons name={up ? "trending-up" : "trending-down"} size={13} color={up ? colors.accent : colors.danger} />
-              <Text style={{ color: up ? colors.accent : colors.danger, fontSize: 12, fontWeight: "800" }}>
-                {`${change} · 7d`}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+              <Ionicons name={up ? "trending-up" : "trending-down"} size={15} color={up ? colors.accent : colors.danger} />
+              <Text style={{ color: up ? colors.accent : colors.danger, fontSize: 14, fontWeight: "800" }}>
+                {change}
               </Text>
+              <Text style={{ color: colors.textMuted, fontSize: 14, fontWeight: "600" }}>7d</Text>
             </View>
           ) : null}
         </View>
-        <Text style={{ color: colors.textSecondary, fontSize: 14 }}>
-          {[
-            printing.market !== null ? "Near mint" : "No ungraded sales",
-            printing.low !== null ? `Low ${formatPrice(printing.low, printing.currency)}` : null,
-            printing.high !== null ? `High ${formatPrice(printing.high, printing.currency)}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
+        <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+          {[printing.market !== null ? "Near mint" : "No ungraded sales", range].filter(Boolean).join(" · ")}
         </Text>
-
-        {printing.conditions.length > 1 ? (
-          <Chips label="By condition">
-            {printing.conditions.map((entry) => (
-              <Chip key={entry.condition} name={entry.condition} value={formatPrice(entry.market, printing.currency)} />
-            ))}
-          </Chips>
-        ) : null}
-        {printing.graded.length > 0 ? (
-          <Chips label="Graded">
-            {printing.graded.map((entry) => (
-              <Chip
-                key={`${entry.company}-${entry.grade}`}
-                name={`${entry.company} ${entry.grade}`}
-                value={formatPrice(entry.market, printing.currency)}
-              />
-            ))}
-          </Chips>
-        ) : null}
       </View>
 
-      <Text style={{ color: colors.textMuted, fontSize: 12, lineHeight: 17 }}>
-        {`${PRICE_SOURCE} Updated ${updatedLabel(prices.fetchedAt)}.`}
+      {more ? (
+        <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
+          <Tap
+            onPress={() => setOpen((was) => !was)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+            style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing(3) }}
+          >
+            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>All prices</Text>
+            <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.textSecondary} />
+          </Tap>
+          {open ? (
+            <View style={{ gap: spacing(4), paddingBottom: spacing(3) }}>
+              {printing.conditions.length > 1 ? (
+                <PriceList label="By condition">
+                  {printing.conditions.map((entry) => (
+                    <PriceRow key={entry.condition} name={entry.condition} value={formatPrice(entry.market, printing.currency)} />
+                  ))}
+                </PriceList>
+              ) : null}
+              {printing.graded.length > 0 ? (
+                <PriceList label="Graded">
+                  {printing.graded.map((entry) => (
+                    <PriceRow
+                      key={`${entry.company}-${entry.grade}`}
+                      name={`${entry.company} ${entry.grade}`}
+                      value={formatPrice(entry.market, printing.currency)}
+                    />
+                  ))}
+                </PriceList>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
+      <Text
+        style={{
+          color: colors.textMuted,
+          fontSize: 12,
+          ...(more ? {} : { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }),
+        }}
+      >
+        {`${PRICE_SOURCE} · updated ${updatedLabel(prices.fetchedAt)}`}
       </Text>
     </>
   );
 }
 
 /**
- * While prices load: the panel's own shape and size - the chips, the
- * price, the range, two rows of chips - so nothing below it moves when
- * the figures land.
+ * While prices load: the panel's own shape - the price, the range, the
+ * "All prices" row - so nothing below it moves when the figures land.
  */
 function PricesSkeleton() {
   const bar = (width: number, height: number) => (
     <View style={{ width, height, borderRadius: 6, backgroundColor: colors.elevated }} />
   );
-  const pills = (count: number) => (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-      {Array.from({ length: count }, (_, index) => (
-        <View
-          key={index}
-          style={{ width: 82, height: 30, borderRadius: 999, backgroundColor: colors.elevated }}
-        />
-      ))}
-    </View>
-  );
   return (
     <View style={{ gap: spacing(2) }} accessibilityLabel="Loading prices">
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>
-        {[70, 92, 120].map((width) => (
-          <View
-            key={width}
-            style={{ width, height: 34, borderRadius: 999, backgroundColor: colors.elevated }}
-          />
-        ))}
-      </View>
-      <View style={box()}>
+      <View style={{ gap: spacing(1.5) }}>
         {bar(130, 38)}
-        {bar(220, 16)}
-        <View style={{ gap: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }}>
-          {bar(90, 11)}
-          {pills(4)}
-        </View>
-        <View style={{ gap: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }}>
-          {bar(60, 11)}
-          {pills(4)}
-        </View>
+        {bar(180, 16)}
       </View>
-      {bar(260, 12)}
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: spacing(3) }}>
+        {bar(80, 16)}
+      </View>
+      {bar(190, 12)}
     </View>
   );
 }
 
-function Chips({ label, children }: { label: string; children: React.ReactNode }) {
+/** Each condition or grade: a two-column list, name left, price right. */
+function PriceList({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <View style={{ gap: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }}>
+    <View style={{ gap: spacing(1) }}>
       <Text style={{ color: colors.textMuted, fontSize: 11, fontWeight: "700", letterSpacing: 1.3, textTransform: "uppercase" }}>
         {label}
       </Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>{children}</View>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", columnGap: spacing(6) }}>{children}</View>
     </View>
   );
 }
 
-function Chip({ name, value }: { name: string; value: string }) {
+function PriceRow({ name, value }: { name: string; value: string }) {
   return (
     <View
       style={{
+        /* Half the row less half the gap: two columns, a lone one too. */
+        width: "46%",
         flexDirection: "row",
+        justifyContent: "space-between",
         alignItems: "baseline",
-        gap: 6,
-        paddingHorizontal: spacing(2.5),
         paddingVertical: 5,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
       }}
     >
-      <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>{name}</Text>
-      <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "800" }}>{value}</Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 14 }}>{name}</Text>
+      <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: "700" }}>{value}</Text>
     </View>
   );
 }
-
-const box = () => ({
-  gap: spacing(3),
-  padding: spacing(4),
-  borderRadius: radius.control,
-  borderWidth: 1,
-  borderColor: colors.border,
-  backgroundColor: colors.surface,
-});

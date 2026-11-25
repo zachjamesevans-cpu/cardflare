@@ -10,6 +10,10 @@ import { cn } from "@/lib/cn";
 export const ART_EVENT = "cf-card-art";
 export const VARIANT_EVENT = "cf-card-variant";
 
+/** The variants of the art on show now, for a prices panel that mounts
+    after the carousel said so (it streams in later). */
+export let shownArtVariants: string[] | null = null;
+
 /**
  * A card's artworks, swiped one at a time (src/lib/cards/card-arts.ts):
  * the founder, "for alt arts, you should be able to swipe between them
@@ -41,6 +45,7 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
 
   /* Tell the prices which art is on show. */
   useEffect(() => {
+    shownArtVariants = arts[at]?.variants ?? null;
     window.dispatchEvent(
       new CustomEvent(ART_EVENT, { detail: arts[at]?.variants ?? [] }),
     );

@@ -124,10 +124,10 @@ describe("the price panel on both platforms", () => {
       expect(app, words).toContain(words);
     }
     expect(read("src/lib/cards/price-shape.ts")).toContain(
-      'export const PRICE_SOURCE = "Market prices from Scrydex, for reference.";',
+      'export const PRICE_SOURCE = "Prices from Scrydex";',
     );
     expect(app).toContain(
-      'export const PRICE_SOURCE = "Market prices from Scrydex, for reference.";',
+      'export const PRICE_SOURCE = "Prices from Scrydex";',
     );
     expect(read("src/app/cards/[cardId]/page.tsx")).toContain("<CardPricesSection");
     expect(read("mobile/src/screens/card.tsx")).toContain(

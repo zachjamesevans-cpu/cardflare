@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-import { ART_EVENT, VARIANT_EVENT } from "./card-art-carousel";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { ART_EVENT, shownArtVariants, VARIANT_EVENT } from "./card-art-carousel";
+import { ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
 
 import {
   formatChange,
@@ -14,13 +14,19 @@ import {
 import { cn } from "@/lib/cn";
 
 /**
- * MARKET PRICE, on a card's page: one printing at a time, its near-mint
- * price large with the week's move beside it, the range under it, then
- * the other conditions and the top graded prices as small chips. The
- * app's card screen draws the same (mobile/src/card-prices.tsx).
+ * MARKET PRICE, on a card's page, kept quiet: the founder (2026-11-25),
+ * "kind of too much info ... cleaner overall." The price of the art on
+ * show (the carousel names the printing, so no chips repeat it) large
+ * with the week's move, the range in one muted line, and everything
+ * else - each condition, each grade - folded under "All prices". No
+ * box: it sits on the page like a post. Chips come back only when the
+ * art on show has two priced printings (a foil and a normal sharing a
+ * picture). The app's card sheet draws the same (mobile/src/card-prices.tsx).
  */
 export function CardPricesPanel({ prices }: { prices: CardPrices }) {
   const [at, setAt] = useState(0);
+  /* The variants of the art on show; null before the carousel says. */
+  const [artVariants, setArtVariants] = useState<string[] | null>(null);
 
   /* Follow the art carousel: the printing of the art on show
      (card-art-carousel.tsx). */
@@ -28,11 +34,16 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
     if (prices.state !== "ok") return;
     const onArt = (event: Event) => {
       const variants = (event as CustomEvent<string[]>).detail ?? [];
+      setArtVariants(variants.length > 0 ? variants : null);
       const index = prices.printings.findIndex((printing) =>
         variants.includes(printing.variant),
       );
       if (index >= 0) setAt(index);
     };
+    /* The carousel may have said so before this panel streamed in. */
+    if (shownArtVariants?.length) {
+      onArt(new CustomEvent(ART_EVENT, { detail: shownArtVariants }));
+    }
     window.addEventListener(ART_EVENT, onArt);
     return () => window.removeEventListener(ART_EVENT, onArt);
   }, [prices]);
@@ -50,6 +61,10 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
   }
 
   const printing = prices.printings[Math.min(at, prices.printings.length - 1)];
+  /* The printings the toggle offers: those of the art on show. */
+  const choices = prices.printings
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => !artVariants || artVariants.includes(entry.variant));
   /* Near mint leads; a printing sold only graded leads with its top grade. */
   const top = printing.graded[0];
   const headline =
@@ -61,12 +76,17 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
         };
   const change = formatChange(printing.change7);
   const up = (printing.change7 ?? 0) > 0;
+  const range =
+    printing.low !== null && printing.high !== null
+      ? `${formatPrice(printing.low, printing.currency)} – ${formatPrice(printing.high, printing.currency)}`
+      : null;
+  const more = printing.conditions.length > 1 || printing.graded.length > 0;
 
   return (
     <PricesFrame>
-      {prices.printings.length > 1 && (
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1" role="tablist">
-          {prices.printings.map((entry, index) => (
+      {choices.length > 1 && (
+        <div className="flex gap-1.5" role="tablist">
+          {choices.map(({ entry, index }) => (
             <button
               key={entry.variant}
               type="button"
@@ -74,16 +94,15 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
               aria-selected={index === at}
               onClick={() => {
                 setAt(index);
-                /* Slide the carousel to this printing's art. */
                 window.dispatchEvent(
                   new CustomEvent(VARIANT_EVENT, { detail: entry.variant }),
                 );
               }}
               className={cn(
-                "shrink-0 cursor-pointer rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
+                "cursor-pointer rounded-full px-3 py-1 text-xs font-bold transition-colors",
                 index === at
-                  ? "border-accent bg-accent text-accent-contrast"
-                  : "border-border bg-surface text-text-primary hover:border-border-strong",
+                  ? "bg-text-primary text-canvas"
+                  : "bg-elevated text-text-secondary hover:text-text-primary",
               )}
             >
               {entry.label}
@@ -92,9 +111,9 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-4">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="font-display text-3xl font-extrabold tracking-tight text-text-primary">
+      <div className="flex flex-col gap-0.5">
+        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="font-display text-3xl font-extrabold tracking-tight text-text-primary tabular-nums">
             {formatPrice(headline.value, printing.currency)}
           </span>
           {headline.caption && (
@@ -105,54 +124,69 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
           {change && (
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold",
-                up ? "bg-accent/15 text-accent" : "bg-danger/15 text-danger",
+                "inline-flex items-center gap-1 text-sm font-bold",
+                up ? "text-accent" : "text-danger",
               )}
             >
               {up ? (
-                <TrendingUp className="size-3.5" aria-hidden="true" />
+                <TrendingUp className="size-4" aria-hidden="true" />
               ) : (
-                <TrendingDown className="size-3.5" aria-hidden="true" />
+                <TrendingDown className="size-4" aria-hidden="true" />
               )}
-              {change} · 7d
+              {change}
+              <span className="font-semibold text-text-muted">7d</span>
             </span>
           )}
         </div>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-text-muted">
           {printing.market !== null ? "Near mint" : "No ungraded sales"}
-          {printing.low !== null &&
-            ` · Low ${formatPrice(printing.low, printing.currency)}`}
-          {printing.high !== null &&
-            ` · High ${formatPrice(printing.high, printing.currency)}`}
+          {range && ` · ${range}`}
         </p>
-
-        {printing.conditions.length > 1 && (
-          <Chips label="By condition">
-            {printing.conditions.map((entry) => (
-              <Chip
-                key={entry.condition}
-                name={entry.condition}
-                value={formatPrice(entry.market, printing.currency)}
-              />
-            ))}
-          </Chips>
-        )}
-
-        {printing.graded.length > 0 && (
-          <Chips label="Graded">
-            {printing.graded.map((entry) => (
-              <Chip
-                key={`${entry.company}-${entry.grade}`}
-                name={`${entry.company} ${entry.grade}`}
-                value={formatPrice(entry.market, printing.currency)}
-              />
-            ))}
-          </Chips>
-        )}
       </div>
 
-      <p className="text-xs text-text-muted">
-        {PRICE_SOURCE} Updated {updatedLabel(prices.fetchedAt)}.
+      {more && (
+        <details className="group border-t border-border">
+          <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-sm font-semibold text-text-secondary hover:text-text-primary [&::-webkit-details-marker]:hidden">
+            All prices
+            <ChevronDown
+              className="size-4 transition-transform group-open:rotate-180"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="flex flex-col gap-4 pb-3">
+            {printing.conditions.length > 1 && (
+              <PriceList label="By condition">
+                {printing.conditions.map((entry) => (
+                  <PriceRow
+                    key={entry.condition}
+                    name={entry.condition}
+                    value={formatPrice(entry.market, printing.currency)}
+                  />
+                ))}
+              </PriceList>
+            )}
+            {printing.graded.length > 0 && (
+              <PriceList label="Graded">
+                {printing.graded.map((entry) => (
+                  <PriceRow
+                    key={`${entry.company}-${entry.grade}`}
+                    name={`${entry.company} ${entry.grade}`}
+                    value={formatPrice(entry.market, printing.currency)}
+                  />
+                ))}
+              </PriceList>
+            )}
+          </div>
+        </details>
+      )}
+
+      <p
+        className={cn(
+          "text-xs text-text-muted",
+          !more && "border-t border-border pt-3",
+        )}
+      >
+        {PRICE_SOURCE} · updated {updatedLabel(prices.fetchedAt)}
       </p>
     </PricesFrame>
   );
@@ -174,62 +208,42 @@ export function PricesFrame({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * While the prices load: the panel's own shape and size - the chips,
- * the price, the range, two rows of chips - so nothing below it moves
- * when the figures land. The app's placeholder is the same.
+ * While the prices load: the panel's own shape - the price, the range,
+ * the "All prices" row - so nothing below it moves when the figures
+ * land. The app's placeholder is the same.
  */
 export function CardPricesSkeleton() {
-  const pills = (
-    <div className="flex flex-wrap gap-2">
-      {[0, 1, 2, 3].map((index) => (
-        <span key={index} className="h-7 w-20 animate-pulse rounded-full bg-elevated" />
-      ))}
-    </div>
-  );
   return (
     <PricesFrame>
-      <div className="flex gap-2 pb-1">
-        {["w-16", "w-24", "w-32"].map((width) => (
-          <span
-            key={width}
-            className={`h-8 ${width} animate-pulse rounded-full bg-elevated`}
-          />
-        ))}
-      </div>
-      <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-4">
+      <div className="flex flex-col gap-1.5">
         <span className="h-9 w-32 animate-pulse rounded-md bg-elevated" />
-        <span className="h-4 w-56 animate-pulse rounded-md bg-elevated" />
-        <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-          <span className="h-3 w-24 rounded bg-elevated" />
-          {pills}
-        </div>
-        <div className="flex flex-col gap-1.5 border-t border-border pt-3">
-          <span className="h-3 w-16 rounded bg-elevated" />
-          {pills}
-        </div>
+        <span className="h-4 w-44 animate-pulse rounded-md bg-elevated" />
       </div>
-      <span className="h-3 w-64 rounded bg-elevated" />
+      <div className="flex items-center justify-between border-t border-border py-3">
+        <span className="h-4 w-20 rounded bg-elevated" />
+      </div>
+      <span className="h-3 w-48 rounded bg-elevated" />
     </PricesFrame>
   );
 }
 
-function Chips({ label, children }: { label: string; children: React.ReactNode }) {
+function PriceList({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+    <div className="flex flex-col gap-1">
       <p className="text-[11px] font-semibold tracking-[0.12em] text-text-muted uppercase">
         {label}
       </p>
-      <div className="flex flex-wrap gap-2">{children}</div>
+      <div className="grid grid-cols-2 gap-x-6">{children}</div>
     </div>
   );
 }
 
-function Chip({ name, value }: { name: string; value: string }) {
+function PriceRow({ name, value }: { name: string; value: string }) {
   return (
-    <span className="inline-flex items-baseline gap-1.5 rounded-full border border-border bg-surface px-2.5 py-1 text-sm">
-      <span className="font-semibold text-text-secondary">{name}</span>
-      <span className="font-bold text-text-primary tabular-nums">{value}</span>
-    </span>
+    <div className="flex items-baseline justify-between py-1 text-sm">
+      <span className="text-text-secondary">{name}</span>
+      <span className="font-semibold text-text-primary tabular-nums">{value}</span>
+    </div>
   );
 }
 
