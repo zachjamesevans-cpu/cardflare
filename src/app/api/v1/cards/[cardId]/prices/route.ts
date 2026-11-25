@@ -34,7 +34,12 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
       headers:
         prices.state === "unavailable"
           ? { "cache-control": "no-store" }
-          : { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" },
+          : prices.state === "none"
+            ? /* "No price" is kept an hour, not twelve: it can be wrong. */
+              { "cache-control": "public, s-maxage=3600" }
+            : {
+                "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400",
+              },
     },
   );
 }
