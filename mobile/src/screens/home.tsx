@@ -622,6 +622,11 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   /* Tapping Feed (or Nearby) again: back to the top (tab-reset.ts). */
   const feedScroll = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
   useTabReset(() => feedScroll.current?.scrollTo({ y: 0, animated: true }));
+  /* Arrived from posting a Flare: the top, where it is (hub.tsx). */
+  const arrival = useRoute<RouteProp<TabParams, "Feed">>().params?.posted;
+  useEffect(() => {
+    if (arrival) feedScroll.current?.scrollTo({ y: 0, animated: false });
+  }, [arrival]);
   const [me, setMe] = useState<Me | null>(null);
   /* Whether `me` came from the server this visit, not from last
      open's saved copy: the "Room open" banner trusts nothing older. */

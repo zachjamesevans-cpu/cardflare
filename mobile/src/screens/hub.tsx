@@ -1,4 +1,6 @@
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import { navigationRef } from "../navigation-ref";
+import { StackActions } from "@react-navigation/native";
 import { setMyFlares } from "../my-flares";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -313,10 +315,24 @@ export function HubScreen() {
       huntSignal={openInto?.n}
       initialCard={openWith}
       resetSignal={resetSignal}
-      onPosted={(rows) => {
+      onPosted={(rows, complete) => {
         /* On the list at once; the re-read confirms it a moment later. */
         setWants((current) => [...rows, ...(current ?? [])]);
         void loadWants();
+        /*
+         * Straight to the Feed, your Flare at its top: the founder, "when
+         * you post a flare, it should immediately automatically take you
+         * to the main feed with your flare there, no need to have that
+         * entire secondary menu." Everything opened over the tabs closes
+         * (the composer, a card sheet under it). A post that only partly
+         * went up stays, so its "2 of 3 went up" is read.
+         */
+        if (!complete) return false;
+        if ((navigationRef.getRootState()?.index ?? 0) > 0) {
+          navigationRef.dispatch(StackActions.popToTop());
+        }
+        navigation.navigate("Tabs", { screen: "Feed", params: { posted: Date.now() } } as never);
+        return true;
       }}
     />
   );

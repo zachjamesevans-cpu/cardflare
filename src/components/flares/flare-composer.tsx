@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
@@ -172,6 +173,7 @@ function ComposerBody({
   /** The line key being dragged, while a tile is in the air. */
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const [posted, setPosted] = useState<{
     posted: number;
     huntId: string | null;
@@ -249,6 +251,18 @@ function ComposerBody({
       clearDraft();
       setDraft(EMPTY_DRAFT);
       setEditing(null);
+      /*
+       * Every card went up: straight to the Feed, the Flare at its top.
+       * The founder (2026-11-25): "when you post a flare, it should
+       * immediately automatically take you to the main feed with your
+       * flare there, no need to have that entire secondary menu." A post
+       * that only partly went up stays here, so its summary is read.
+       */
+      if (result.posted === result.total) {
+        router.push("/feed");
+        router.refresh();
+        return;
+      }
       setPosted({
         posted: result.posted,
         huntId: result.huntId,

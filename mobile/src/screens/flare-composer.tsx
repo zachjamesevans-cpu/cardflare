@@ -206,7 +206,7 @@ export function FlareComposer({
    * cards the instant the post lands rather than after a re-read. The
    * founder: "The second I hit post, it needs to be visible in flares."
    */
-  onPosted?: (rows: Me["wants"]) => void;
+  onPosted?: (rows: Me["wants"], complete: boolean) => boolean | void;
   /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
@@ -507,7 +507,13 @@ export function FlareComposer({
       const postedItems = wentUp
         ? draft.items.filter((item) => wentUp.has(item.cardId))
         : draft.items;
-      onPosted?.(
+      /* Every card went up (or an older server, which posts all or
+         nothing): the screen around may leave for the Feed at once. */
+      const complete =
+        result.total === undefined ||
+        result.posted === undefined ||
+        result.posted === result.total;
+      const left = onPosted?.(
         postedItems.map((item) => ({
           id: `just-posted:${keyOf(item)}`,
           cardId: item.cardId,
@@ -525,12 +531,16 @@ export function FlareComposer({
           postedAt: null,
           postedBoards: [],
         })),
+        complete,
       );
       void loadHunts();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
         () => {},
       );
-      setPosted({
+      /* Gone to the Feed: no "Posted" panel behind it. The founder
+         (2026-11-25): "when you post a flare, it should immediately
+         automatically take you to the main feed with your flare there". */
+      if (!left) setPosted({
         postId: result.postId ?? null,
         summary:
           result.total !== undefined && result.posted !== undefined
