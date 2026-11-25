@@ -16,11 +16,16 @@ const app = read("mobile/src/screens/flare-composer.tsx");
 const web = read("src/components/flares/flare-composer.tsx");
 
 describe("the printing", () => {
-  it("is a row that opens a list down, with each printing's art", () => {
-    expect(app).toContain('label="Printing"');
-    expect(app).toContain("<PrintingSheet");
-    expect(web).toContain('label="Printing"');
-    expect(web).toContain("<PrintingSheet");
+  /* The founder (2026-11-25), of the card editor: "it is ALL over the
+     place ... so much info." The printing is now the card's arts as
+     pictures in the editor itself, "Any" first; no row, no second sheet. */
+  it("is the card's arts as pictures, Any first, on both platforms", () => {
+    expect(app).toContain('label="Any"');
+    expect(app).toContain("<ArtChoice");
+    expect(app).not.toContain('label="Printing"');
+    expect(web).toContain('label="Any"');
+    expect(web).toContain("<ArtChoice");
+    expect(web).not.toContain('label="Printing"');
     const appSheets = read("mobile/src/composer-sheets.tsx");
     expect(appSheets).toContain('label="Any printing"');
     expect(appSheets).toMatch(/art=\{\s*<CardImage imageUrl=\{printing\.imageUrl\}/);
@@ -31,8 +36,10 @@ describe("the printing", () => {
 
   it("no longer scrolls sideways or drops down", () => {
     const editor = app.slice(app.indexOf("function CardEditor("));
-    expect(editor.slice(0, editor.indexOf("Copies needed"))).not.toContain(
-      "horizontal",
+    expect(editor.slice(0, editor.indexOf("<Stepper"))).not.toContain("horizontal");
+    const webEditor = web.slice(web.indexOf("function CardEditor("));
+    expect(webEditor.slice(0, webEditor.indexOf("<Stepper"))).not.toContain(
+      "overflow-x-auto",
     );
     expect(web).not.toContain('<option value="">Any printing</option>');
   });
@@ -119,5 +126,22 @@ describe("no offering in the composer", () => {
     expect(read("src/components/flares/draft.ts")).toMatch(
       /Always a want now[\s\S]{0,80}intent: "want",/,
     );
+  });
+});
+
+describe("the card editor, kept quiet", () => {
+  it("has no Make cover or Remove; the row orders and removes", () => {
+    for (const source of [app, web]) {
+      const editor = source.slice(source.indexOf("function CardEditor("));
+      const body = editor.slice(0, editor.indexOf("\n}\n"));
+      expect(body).not.toContain("Make cover");
+      expect(body).not.toMatch(/>\s*Remove\s*</);
+      expect(body).toContain("Add a note");
+    }
+    /* The app's row: drop a card on the bin. The website's: the same,
+       and Delete on a focused card. */
+    expect(read("mobile/src/card-tray.tsx")).toContain("Drop a card here to remove it");
+    expect(web).toContain("remove(dragging)");
+    expect(web).toContain('event.key === "Delete"');
   });
 });

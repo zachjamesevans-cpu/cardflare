@@ -1,6 +1,4 @@
 import {
-  PickerRow,
-  PrintingSheet,
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
@@ -218,6 +216,8 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /* The card row is being rearranged: the page holds still (card-tray.tsx). */
+  const [rearranging, setRearranging] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
@@ -570,6 +570,7 @@ export function FlareComposer({
 
   return (
     <ScrollView
+      scrollEnabled={!rearranging}
       contentContainerStyle={{
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
@@ -698,6 +699,14 @@ export function FlareComposer({
                   if (moved) next.splice(to, 0, moved);
                   setItems(next);
                 }}
+                /* Pulled out of the row: gone. It replaced the editor's
+                   Remove button (card-tray.tsx). */
+                onRearrange={setRearranging}
+                onRemove={(index) => {
+                  const gone = draft.items[index];
+                  setItems(draft.items.filter((_, at) => at !== index));
+                  if (gone && editing === keyOf(gone)) setEditing(null);
+                }}
               />
 
               {editing && draft.items.some((item) => keyOf(item) === editing) ? (
@@ -719,8 +728,6 @@ export function FlareComposer({
                         <CardEditor
                           onDone={() => setEditing(null)}
                           item={item}
-                          index={index}
-                          count={draft.items.length}
                           intent={draft.intent}
                           onChange={(next) => {
                             /* A printing change re-keys the line; landing on
@@ -757,18 +764,6 @@ export function FlareComposer({
                               );
                             }
                             setEditing(target);
-                          }}
-                          onCover={() =>
-                            setItems([
-                              item,
-                              ...draft.items.filter((entry) => entry !== item),
-                            ])
-                          }
-                          onRemove={() => {
-                            setItems(
-                              draft.items.filter((entry) => keyOf(entry) !== key),
-                            );
-                            setEditing(null);
                           }}
                         />
                       );
@@ -923,91 +918,91 @@ function artFor(item: DraftItem): string | null {
   return item.imageUrl;
 }
 
-/** One tray card, opened: printing, copies, order, remove. */
+/**
+ * One tray card, opened, kept to what a line needs: the founder, "it is
+ * ALL over the place ... so much info." The art, large, with its name
+ * under it; the card's other arts as small pictures to tap (only when
+ * there are any); how many copies; a note, folded away until wanted;
+ * Done. Order and removing live in the row itself: drag a card to the
+ * front to make it the cover, pull it out of the row to remove it.
+ */
 function CardEditor({
   item,
-  index,
-  count,
   intent,
   onChange,
-  onCover,
-  onRemove,
   onDone,
 }: {
   item: DraftItem | null;
-  index: number;
-  count: number;
   intent: "want" | "showcase";
   onChange: (next: DraftItem) => void;
-  onCover: () => void;
-  onRemove: () => void;
   onDone: () => void;
 }) {
-  const [choosingPrinting, setChoosingPrinting] = useState(false);
+  const [noting, setNoting] = useState(false);
   if (!item) return null;
-  const options: { id: string | null; label: string }[] = [
-    { id: null, label: "Any printing" },
-    ...item.printings.map((printing) => ({
-      id: printing.id,
-      label: printing.label ?? "Standard printing",
-    })),
-  ];
-  /* The overlay is the panel; this is only what goes in it. */
+
+  /* One choice per picture: a foil and a normal sharing an image are
+     one art (as on the card sheet's carousel). */
+  const arts: { imageUrl: string; label: string; printingId: string }[] = [];
+  for (const printing of item.printings) {
+    if (!printing.imageUrl || arts.some((art) => art.imageUrl === printing.imageUrl)) continue;
+    arts.push({
+      imageUrl: printing.imageUrl,
+      label: artName(printing.label),
+      printingId: printing.id,
+    });
+  }
+  const chosen = item.printingId
+    ? item.printings.find((printing) => printing.id === item.printingId)
+    : undefined;
+  const chosenArt = chosen ? arts.find((art) => art.imageUrl === chosen.imageUrl) : undefined;
+  const showNote = noting || Boolean(item.cardNote);
+
   return (
-    <View style={{ gap: spacing(3) }}>
+    <View style={{ gap: spacing(4) }}>
       <View style={{ alignItems: "center", gap: spacing(2) }}>
         <CardImage
           imageUrl={artFor(item)}
-          width={132}
+          width={160}
           name={item.name}
           cardNumber={item.cardNumber}
-          caption={
-            item.printingId
-              ? (item.printings.find((printing) => printing.id === item.printingId)
-                  ?.label ?? null)
-              : null
-          }
         />
         <View style={{ alignItems: "center", gap: 2 }}>
           <Text
-            numberOfLines={2}
-            style={{
-              color: colors.textPrimary,
-              fontWeight: "700",
-              fontSize: 16,
-              textAlign: "center",
-            }}
+            numberOfLines={1}
+            style={{ color: colors.textPrimary, fontWeight: "800", fontSize: 17 }}
           >
             {item.name}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {`${item.cardNumber} · ${index === 0 ? "Cover" : `Card ${index + 1} of ${count}`}`}
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            {[item.cardNumber, chosen ? artName(chosen.label) : arts.length > 1 ? "Any art" : null]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
         </View>
       </View>
 
-      {/* Which printing: one row saying which, the list down in a sheet.
-          The founder: "it feels weird to scroll left when everywhere else
-          on the app you scroll down to change printing." */}
-      {item.printings.length > 0 ? (
-        <PickerRow
-          label="Printing"
-          value={
-            options.find((option) => option.id === item.printingId)?.label ??
-            "Any printing"
-          }
-          onPress={() => setChoosingPrinting(true)}
-        />
-      ) : null}
-      {choosingPrinting ? (
-        <PrintingSheet
-          name={item.name}
-          cardNumber={item.cardNumber}
-          printings={item.printings}
-          value={item.printingId}
-          onPick={(printingId) => onChange({ ...item, printingId })}
-          onClose={() => setChoosingPrinting(false)}
-        />
+      {/* The card's arts, as pictures: tap one to want that art. "Any"
+          first, for a player who would take whichever comes. */}
+      {arts.length > 1 ? (
+        /* Wrapped, never scrolled sideways: the founder, "it feels weird to
+           scroll left when everywhere else on the app you scroll down". */
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+          <ArtChoice
+            label="Any"
+            imageUrl={null}
+            on={!item.printingId}
+            onPress={() => onChange({ ...item, printingId: null })}
+          />
+          {arts.map((art) => (
+            <ArtChoice
+              key={art.imageUrl}
+              label={art.label}
+              imageUrl={art.imageUrl}
+              on={chosenArt?.imageUrl === art.imageUrl}
+              onPress={() => onChange({ ...item, printingId: art.printingId })}
+            />
+          ))}
+        </View>
       ) : null}
 
       <View
@@ -1018,8 +1013,8 @@ function CardEditor({
           gap: spacing(2),
         }}
       >
-        <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
-          {intent === "want" ? "Copies needed" : "Copies available"}
+        <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: "600" }}>
+          {intent === "want" ? "Copies" : "Copies available"}
         </Text>
         <Stepper
           value={item.quantity}
@@ -1030,21 +1025,93 @@ function CardEditor({
         />
       </View>
 
-      {/* Why this card: shown under it when it is opened, and on Wanted
-          near you, where it is how a holder picks who to message. */}
-      <CardNoteField
-        value={item.cardNote ?? ""}
-        onChange={(cardNote) => onChange({ ...item, cardNote })}
-        cardName={item.name}
-      />
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
-        {index > 0 ? <SmallAction label="Make cover" onPress={onCover} /> : null}
-        <SmallAction label="Remove" onPress={onRemove} danger />
-      </View>
+      {/* Why this card: folded to one link, since most never write one. */}
+      {showNote ? (
+        <CardNoteField
+          value={item.cardNote ?? ""}
+          onChange={(cardNote) => onChange({ ...item, cardNote })}
+          cardName={item.name}
+        />
+      ) : (
+        <Tap
+          onPress={() => setNoting(true)}
+          accessibilityRole="button"
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
+        >
+          <Ionicons name="add" size={16} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
+            Add a note
+          </Text>
+        </Tap>
+      )}
 
       <Button label="Done" onPress={onDone} />
     </View>
+  );
+}
+
+/**
+ * A printing's art in a word or two, the card sheet's names: "Alt Art",
+ * "Foil", "Third Anniversary". The search's label is the whole line
+ * ("OP12 · Super Rare · Alt Art · Super Rare · altArt"); its last piece
+ * is the art's own name when it has one.
+ */
+export function artName(label: string | null): string {
+  const last = (label ?? "").split("·").pop()?.trim() ?? "";
+  if (!/^[a-z][A-Za-z0-9]*$/.test(last)) return "Standard";
+  return last.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (first) => first.toUpperCase());
+}
+
+/** One art to tap in the editor: the picture, outlined when it is the one. */
+function ArtChoice({
+  label,
+  imageUrl,
+  on,
+  onPress,
+}: {
+  label: string;
+  imageUrl: string | null;
+  on: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Tap
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: on }}
+      accessibilityLabel={label === "Any" ? "Any art" : label}
+      style={{ alignItems: "center", gap: 4, width: 56 }}
+    >
+      <View
+        style={{
+          width: 52,
+          height: 72,
+          borderRadius: 6,
+          borderWidth: 2,
+          borderColor: on ? colors.accent : "transparent",
+          backgroundColor: colors.elevated,
+          overflow: "hidden",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {imageUrl ? (
+          <RemoteImage uri={imageUrl} style={{ width: "100%", height: "100%" }} />
+        ) : (
+          <Ionicons name="albums-outline" size={20} color={colors.textSecondary} />
+        )}
+      </View>
+      <Text
+        numberOfLines={1}
+        style={{
+          color: on ? colors.accent : colors.textMuted,
+          fontSize: 10,
+          fontWeight: "700",
+        }}
+      >
+        {label}
+      </Text>
+    </Tap>
   );
 }
 
@@ -1172,41 +1239,6 @@ function CardOverlay({
         </Pressable>
       </KeyboardAvoidingView>
     </Modal>
-  );
-}
-
-function SmallAction({
-  label,
-  onPress,
-  danger = false,
-}: {
-  label: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Tap
-      onPress={onPress}
-      accessibilityLabel={label}
-      style={{
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        paddingHorizontal: spacing(3),
-        paddingVertical: spacing(1.5),
-      }}
-    >
-      <Text
-        style={{
-          color: danger ? colors.danger : colors.textSecondary,
-          fontSize: 12,
-          fontWeight: "700",
-        }}
-      >
-        {label}
-      </Text>
-    </Tap>
   );
 }
 

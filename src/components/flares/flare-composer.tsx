@@ -1,11 +1,7 @@
 "use client";
 
 import { Sheet } from "@/components/ui/sheet";
-import {
-  AddingToHunt,
-  PickerRow,
-  PrintingSheet,
-} from "@/components/flares/composer-sheets";
+import { AddingToHunt } from "@/components/flares/composer-sheets";
 import { CardNoteField } from "@/components/flares/card-note-field";
 import {
   useEffect,
@@ -15,7 +11,9 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Plus, Star, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Layers, Plus, Trash2 } from "lucide-react";
+
+import { variantName } from "@/lib/cards/price-shape";
 
 import { CardPicker } from "@/components/flares/card-picker";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
@@ -42,7 +40,7 @@ import { Textarea } from "@/components/ui/controls";
 import { QuantityBadge } from "@/components/ui/quantity-badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
-import { printingLabel, type CardResult } from "@/lib/cards/schema";
+import type { CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
 import { draftSummary, MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
 import { publishPostAction } from "@/lib/flares/publish-actions";
@@ -206,13 +204,6 @@ function ComposerBody({
     patch({ cards: next });
   };
 
-  const makeCover = (key: string) => {
-    const item = draft.cards.find((entry) => keyOf(entry) === key);
-    if (!item) return;
-    patch({
-      cards: [item, ...draft.cards.filter((entry) => keyOf(entry) !== key)],
-    });
-  };
   const remove = (key: string) => {
     patch({ cards: draft.cards.filter((item) => keyOf(item) !== key) });
     if (editing === key) setEditing(null);
@@ -440,6 +431,13 @@ function ComposerBody({
                    * buttons did, and the label says so.
                    */
                   onKeyDown={(event) => {
+                    /* The keyboard's way to remove, now the editor has
+                       no Remove button (the bin is the pointer's). */
+                    if (event.key === "Delete" || event.key === "Backspace") {
+                      event.preventDefault();
+                      remove(key);
+                      return;
+                    }
                     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
                     event.preventDefault();
                     reorder(key, index + (event.key === "ArrowLeft" ? -1 : 1));
@@ -447,7 +445,7 @@ function ComposerBody({
                   aria-pressed={active}
                   aria-label={`${item.card.exactName}, card ${index + 1} of ${
                     draft.cards.length
-                  }. Drag to reorder, or use the arrow keys.`}
+                  }. Drag to reorder, or use the arrow keys; Delete removes it.`}
                   className={cn(
                     "block h-[84px] w-[60px] cursor-grab overflow-hidden rounded-[6px] border bg-elevated transition-[box-shadow] active:cursor-grabbing",
                     active
@@ -479,7 +477,29 @@ function ComposerBody({
               </li>
             );
           })}
-          <li className="shrink-0">
+          {/* While a card is in the air, the bin: drop it here to
+              remove it. It replaced the editor's Remove button, as the
+              app's row has it (mobile/src/card-tray.tsx). */}
+          {dragging ? (
+            <li
+              className="shrink-0"
+              onDragOver={(event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                remove(dragging);
+                setDragging(null);
+              }}
+            >
+              <span className="flex h-[84px] w-[60px] flex-col items-center justify-center gap-1 rounded-[6px] border border-dashed border-danger/70 text-danger">
+                <Trash2 className="size-5" aria-hidden="true" />
+                <span className="text-[10px] font-semibold">Remove</span>
+              </span>
+            </li>
+          ) : null}
+          <li className={cn("shrink-0", dragging && "hidden")}>
             <button
               type="button"
               onClick={() => setStep("pick")}
@@ -518,10 +538,6 @@ function ComposerBody({
             <CardEditor
               onDone={() => setEditing(null)}
               item={editingCard}
-              index={draft.cards.findIndex(
-                (item) => keyOf(item) === keyOf(editingCard),
-              )}
-              count={draft.cards.length}
               copiesLabel={copiesLabel}
               onPrinting={(printingId) => {
                 const key = keyOf(editingCard);
@@ -530,8 +546,6 @@ function ComposerBody({
               }}
               onQuantity={(quantity) => patchCard(keyOf(editingCard), { quantity })}
               onNote={(cardNote) => patchCard(keyOf(editingCard), { cardNote })}
-              onCover={() => makeCover(keyOf(editingCard))}
-              onRemove={() => remove(keyOf(editingCard))}
             />
           )}
         </Sheet>
@@ -618,87 +632,102 @@ function ComposerBody({
   );
 }
 
-/** One card's own settings: which printing, how many, and where it sits. */
+/**
+ * One card's own settings, kept to what a line needs: the founder, "it
+ * is ALL over the place ... so much info." The art and its name; the
+ * card's other arts as small pictures to tap; copies; a note folded away
+ * until wanted; Done. The order and removing live in the row: drag a
+ * card to the front for the cover, onto the bin to remove it. The app's
+ * editor is the same (mobile/src/screens/flare-composer.tsx).
+ */
 function CardEditor({
   item,
-  index,
-  count,
   copiesLabel,
   onPrinting,
   onQuantity,
   onNote,
-  onCover,
-  onRemove,
   onDone,
 }: {
   onDone: () => void;
   item: DraftCard;
-  index: number;
-  count: number;
   copiesLabel: string;
   onPrinting: (printingId: string | null) => void;
   onQuantity: (quantity: number) => void;
   onNote: (note: string) => void;
-  onCover: () => void;
-  onRemove: () => void;
 }) {
   const printing = chosenPrinting(item);
-  /* Any printing or this one is a choice even with one printing. */
-  const hasChoice = item.card.printings.length > 0;
-  const [choosingPrinting, setChoosingPrinting] = useState(false);
+  const [noting, setNoting] = useState(false);
+
+  /* One choice per picture: a foil and a normal sharing an image are one
+     art, as on the card page's carousel. */
+  const arts: { imageUrl: string; label: string; printingId: string }[] = [];
+  for (const entry of item.card.printings) {
+    if (!entry.imageUrl || arts.some((art) => art.imageUrl === entry.imageUrl))
+      continue;
+    arts.push({
+      imageUrl: entry.imageUrl,
+      label: entry.variantType ? variantName(entry.variantType) : "Standard",
+      printingId: entry.id,
+    });
+  }
+  const chosen = item.printingId
+    ? item.card.printings.find((entry) => entry.id === item.printingId)
+    : undefined;
+  const chosenArt = chosen
+    ? arts.find((art) => art.imageUrl === chosen.imageUrl)
+    : undefined;
+  const showNote = noting || Boolean(item.cardNote);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col items-center gap-2 text-center">
-        <span className="block h-[184px] w-[132px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
+        <span className="block h-[224px] w-[160px] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
           {printing?.imageUrl && (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={printing.imageUrl} alt="" className="size-full object-contain" />
           )}
         </span>
         <div className="flex min-w-0 flex-col gap-0.5">
-          <p className="truncate font-semibold text-text-primary">
+          <p className="truncate text-lg font-extrabold text-text-primary">
             {item.card.exactName}
           </p>
-          <p className="font-mono text-xs text-text-muted">
-            {item.card.canonicalCardNumber}
-          </p>
-          <p className="text-xs text-text-secondary">
-            {index === 0 ? "The cover" : `Card ${index + 1} of ${count}`}
+          <p className="text-sm text-text-muted">
+            {[
+              item.card.canonicalCardNumber,
+              chosenArt ? chosenArt.label : arts.length > 1 ? "Any art" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         </div>
       </div>
 
-      {/* Which printing: one row saying which, the list down in a sheet
-          with each version's art. The app's composer is the same. */}
-      {hasChoice ? (
-        <>
-          <PickerRow
-            label="Printing"
-            value={
-              printing && item.printingId
-                ? (printingLabel(printing, item.card.exactName) ?? "This printing")
-                : "Any printing"
-            }
-            onClick={() => setChoosingPrinting(true)}
+      {/* The card's arts, as pictures: click one to want that art. "Any"
+          first, for a player who would take whichever comes. */}
+      {arts.length > 1 && (
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Art">
+          <ArtChoice
+            label="Any"
+            imageUrl={null}
+            on={!item.printingId}
+            onClick={() => onPrinting(null)}
           />
-          <PrintingSheet
-            open={choosingPrinting}
-            name={item.card.exactName}
-            printings={item.card.printings.map((entry) => ({
-              id: entry.id,
-              label: printingLabel(entry, item.card.exactName) ?? "This printing",
-              imageUrl: entry.imageUrl,
-            }))}
-            value={item.printingId}
-            onPick={onPrinting}
-            onClose={() => setChoosingPrinting(false)}
-          />
-        </>
-      ) : null}
+          {arts.map((art) => (
+            <ArtChoice
+              key={art.imageUrl}
+              label={art.label}
+              imageUrl={art.imageUrl}
+              on={chosenArt?.imageUrl === art.imageUrl}
+              onClick={() => onPrinting(art.printingId)}
+            />
+          ))}
+        </div>
+      )}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-text-secondary">{copiesLabel}</span>
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-semibold text-text-primary">
+          {copiesLabel === "Copies needed" ? "Copies" : copiesLabel}
+        </span>
         <Stepper
           value={item.quantity}
           min={1}
@@ -708,43 +737,74 @@ function CardEditor({
         />
       </div>
 
-      {/* Why this card: shown under it when it is opened, and on Wanted
-          near you, where it is how a holder picks who to message. */}
-      <CardNoteField
-        value={item.cardNote ?? ""}
-        onChange={onNote}
-        cardName={item.card.exactName}
-      />
-
-      {/*
-       * "Move left" and "Move right" are gone: the founder asked for a
-       * drag instead, and they described the data structure rather than
-       * the thing anybody wanted - two taps per position, three round
-       * trips to bring the last card of four to the front.
-       */}
-      <div className="flex flex-wrap gap-2">
-        {index !== 0 && (
-          <Button type="button" variant="secondary" size="sm" onClick={onCover}>
-            <Star className="size-4" aria-hidden="true" />
-            Make cover
-          </Button>
-        )}
-        <Button
+      {/* Why this card: folded to one link, since most never write one. */}
+      {showNote ? (
+        <CardNoteField
+          value={item.cardNote ?? ""}
+          onChange={onNote}
+          cardName={item.card.exactName}
+        />
+      ) : (
+        <button
           type="button"
-          variant="ghost"
-          size="sm"
-          onClick={onRemove}
-          className="ml-auto"
+          onClick={() => setNoting(true)}
+          className="flex cursor-pointer items-center gap-1.5 self-start text-sm font-bold text-accent hover:underline"
         >
-          <Trash2 className="size-4" aria-hidden="true" />
-          Remove
-        </Button>
-      </div>
+          <Plus className="size-4" aria-hidden="true" />
+          Add a note
+        </button>
+      )}
 
       <Button type="button" onClick={onDone}>
         Done
       </Button>
     </div>
+  );
+}
+
+/** One art to click in the editor: the picture, outlined when it is the one. */
+function ArtChoice({
+  label,
+  imageUrl,
+  on,
+  onClick,
+}: {
+  label: string;
+  imageUrl: string | null;
+  on: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={on}
+      aria-label={label === "Any" ? "Any art" : label}
+      onClick={onClick}
+      className="flex w-14 shrink-0 cursor-pointer flex-col items-center gap-1"
+    >
+      <span
+        className={cn(
+          "flex h-[72px] w-[52px] items-center justify-center overflow-hidden rounded-[6px] border-2 bg-elevated",
+          on ? "border-accent" : "border-transparent hover:border-border-strong",
+        )}
+      >
+        {imageUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={imageUrl} alt="" className="size-full object-cover" />
+        ) : (
+          <Layers className="size-5 text-text-secondary" aria-hidden="true" />
+        )}
+      </span>
+      <span
+        className={cn(
+          "w-full truncate text-center text-[10px] font-bold",
+          on ? "text-accent" : "text-text-muted",
+        )}
+      >
+        {label}
+      </span>
+    </button>
   );
 }
 
