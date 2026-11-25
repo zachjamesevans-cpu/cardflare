@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, MapPin } from "lucide-react";
 
 import {
   FeedList,
@@ -182,22 +182,38 @@ export default async function NearbyPage() {
       {/* The room with nobody in it yet: said, with the two ways to
           change that, post or look further. Under any "wanted" rows,
           since those are trades too. */}
-      {!plan.ask && plan.posts === 0 && (
-        <Card className="flex flex-col gap-3">
-          <h2 className="font-semibold text-text-primary">No Flares near you yet</h2>
-          <p className="text-sm text-text-secondary">
-            {`Nobody within ${miles ?? 50} miles has a Flare up right now. Post one and players around you will see it here.`}
+      {/*
+       * Nothing near: one empty state, centred and unboxed, not a box and
+       * an explainer under it. The founder (2026-11-25), of this tab:
+       * "weird to have those text blocks then more text between them."
+       * The app's NearbyEmpty is the same.
+       */}
+      {!plan.ask && plan.posts === 0 ? (
+        <div className="flex flex-col items-center gap-3 px-4 py-8 text-center">
+          <span className="flex size-14 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <MapPin className="size-6" aria-hidden="true" />
+          </span>
+          <h2 className="text-xl font-extrabold text-text-primary">
+            Nothing near you yet
+          </h2>
+          <p className="max-w-sm text-[15px] text-text-secondary">
+            {`When players within ${miles ?? 50} miles post Flares or put binders up for trade, they show up here.`}
           </p>
-          <Link href="/flare" className={buttonStyles("primary", "sm")}>
-            Post a Flare
-          </Link>
+          <div className="mt-2 flex w-full max-w-sm flex-col gap-2">
+            <Link href="/flare" className={buttonStyles("primary")}>
+              Post a Flare
+            </Link>
+            <Link href="/profile" className={buttonStyles("secondary")}>
+              Put a binder up
+            </Link>
+          </div>
           {(miles ?? 50) < 100 && <LookFurtherButton />}
-        </Card>
+        </div>
+      ) : (
+        /* The explainer, for a screen that has not filled up yet: see
+           HowItWorks. Counted over the whole list, as the app counts. */
+        items.length < 3 && <HowItWorks />
       )}
-
-      {/* The explainer, for a screen that has not filled up yet: see
-          HowItWorks. Counted over the whole list, as the app counts. */}
-      {items.length < 3 && <HowItWorks />}
     </Shell>
   );
 }

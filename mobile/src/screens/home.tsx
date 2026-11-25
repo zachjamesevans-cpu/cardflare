@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
 import { FirstFlareCard } from "../first-flare-card";
@@ -646,6 +646,8 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   const tab: FeedTab = mode;
   /* Nearby's reach in miles, from the server; null until it says. */
   const [nearbyMiles, setNearbyMiles] = useState<number | null>(null);
+  /* Traders near you, once counted: the empty state says the right thing. */
+  const [tradersCount, setTradersCount] = useState<number | null>(null);
   /* How this player wants the Feed drawn. Anything this build does not
      recognise reads as the original card - see feedViewFrom. */
   const view = feedViewFrom(me?.player.feedView);
@@ -1289,6 +1291,13 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
     const shownKeys = feedKeys(shown);
     return (
       <View style={{ gap: spacing(4) }}>
+        {/*
+         * Where, then who, then what: the distance first, as the tab's one
+         * filter; traders near you under it (the UI experiment,
+         * src/ui-experiment.ts); the Flares after. No boxes - the founder,
+         * of this tab: "weird to have those text blocks then more text
+         * between them." The store banner above all of it stays first.
+         */}
         {plan ? (
           <NearbyHeader
             miles={nearbyMiles}
@@ -1298,6 +1307,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
             }}
           />
         ) : null}
+        {plan && UI_EXPERIMENT && !plan.ask ? <TradersStrip onCount={setTradersCount} /> : null}
         {/* Nothing here works without a place, so the ask comes first. */}
         {plan?.ask ? (
           <View ref={tourLocation} collapsable={false}>
@@ -2017,26 +2027,22 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 change that - post, or look further. Under any "wanted"
                 rows, since those are trades too. */}
             {!guest && feedReady && tab === "nearby" && plan && !plan.ask && plan.posts === 0 && (
-              <Card>
-                <Title>No Flares near you yet</Title>
-                <Body>
-                  {`Nobody within ${nearbyMiles ?? 50} miles has a Flare up right now. Post one and players around you will see it here.`}
-                </Body>
-                <Button
-                  label="Post a Flare"
-                  onPress={() => openComposer(navigation)}
-                />
-                {(nearbyMiles ?? 50) < 100 ? (
-                  <Button
-                    label="Look within 100 miles"
-                    variant="secondary"
-                    onPress={() => {
-                      setNearbyMiles(100);
-                      void setLocalRadius(100).then(() => load(() => true));
-                    }}
-                  />
-                ) : null}
-              </Card>
+              <NearbyEmpty
+                miles={nearbyMiles ?? 50}
+                /* Nobody trading near either: the one empty state for the
+                   whole tab. Traders showing above: only the Flares'. */
+                nobodyAtAll={!UI_EXPERIMENT || tradersCount === 0}
+                onPost={() => openComposer(navigation)}
+                onBinder={() => navigation.navigate("Tabs", { screen: "Profile" } as never)}
+                onWider={
+                  (nearbyMiles ?? 50) < 100
+                    ? () => {
+                        setNearbyMiles(100);
+                        void setLocalRadius(100).then(() => load(() => true));
+                      }
+                    : undefined
+                }
+              />
             )}
       </View>
     );
@@ -2149,10 +2155,6 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
             never joined by itself (src/youre-here.tsx). */}
         <YoureHereBanner />
 
-        {/* Traders near you, above the Flares: the UI experiment only
-            (src/ui-experiment.ts). The store banner above stays first, so
-            being IN a store outranks being near people. */}
-        {UI_EXPERIMENT && mode === "nearby" && !guest ? <TradersStrip /> : null}
 
         {/*
          * A guest's first screen says what this is and offers the two
@@ -2273,3 +2275,55 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   );
 }
 
+/**
+ * The Nearby tab with nothing in it: one empty state, centred and
+ * unboxed, not a box for traders and another for Flares. With traders
+ * showing above, only "No Flares near you yet" and the way to post one.
+ */
+function NearbyEmpty({
+  miles,
+  nobodyAtAll,
+  onPost,
+  onBinder,
+  onWider,
+}: {
+  miles: number;
+  nobodyAtAll: boolean;
+  onPost: () => void;
+  onBinder: () => void;
+  onWider?: () => void;
+}) {
+  return (
+    <View style={{ alignItems: "center", gap: spacing(3), paddingVertical: spacing(8), paddingHorizontal: spacing(4) }}>
+      <View
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: colors.accentTint,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Ionicons name="location" size={26} color={colors.accent} />
+      </View>
+      <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "800", textAlign: "center" }}>
+        {nobodyAtAll ? "Nothing near you yet" : "No Flares near you yet"}
+      </Text>
+      <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
+        {nobodyAtAll
+          ? `When players within ${miles} miles post Flares or put binders up for trade, they show up here.`
+          : `Nobody within ${miles} miles has a Flare up right now. Post one and they'll see it.`}
+      </Text>
+      <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(2) }}>
+        <Button label="Post a Flare" onPress={onPost} />
+        {nobodyAtAll ? <Button label="Put a binder up" variant="secondary" onPress={onBinder} /> : null}
+      </View>
+      {onWider ? (
+        <Tap onPress={onWider} accessibilityRole="button" hitSlop={8}>
+          <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>Look within 100 miles</Text>
+        </Tap>
+      ) : null}
+    </View>
+  );
+}

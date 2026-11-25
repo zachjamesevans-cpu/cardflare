@@ -77,7 +77,7 @@ describe("shipped on, with an off switch on both ends", () => {
     expect(app).toContain("component={UI_EXPERIMENT ? SearchLabScreen : SearchScreen}");
     expect(app).toMatch(/\{UI_EXPERIMENT \? \(\s*<Stack\.Screen\s*name="Traders"/);
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      '{UI_EXPERIMENT && mode === "nearby" && !guest ? <TradersStrip /> : null}',
+      "{plan && UI_EXPERIMENT && !plan.ask ? <TradersStrip onCount={setTradersCount} /> : null}",
     );
     /* Only the experiment's own path goes to the local server. */
     expect(read("mobile/src/api.ts")).toContain(

@@ -1,7 +1,6 @@
-import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
 
 import type { StackParams } from "../App";
@@ -9,7 +8,7 @@ import { setNearbyMatching } from "./api";
 import { TraderRow, TradersNotice } from "./trader-row";
 import { useTraders } from "./traders";
 import { Tap } from "./ui";
-import { colors, radius, spacing } from "./theme";
+import { colors, spacing } from "./theme";
 
 /** How many traders the Nearby tab shows before "See all". */
 const STRIP_COUNT = 3;
@@ -20,27 +19,33 @@ const STRIP_COUNT = 3;
  * trade, those with cards you hunt first, and the door to all of them.
  * Below it the Nearby tab is exactly what it was: Flares near you.
  */
-export function TradersStrip() {
+export function TradersStrip({
+  onCount,
+}: {
+  /** How many traders are near, once known: the Flares' empty state reads it. */
+  onCount?: (count: number) => void;
+} = {}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const filters = useMemo(() => ({ radius: null, game: null, matchingOnly: false }), []);
   const { view, reload, askLocation } = useTraders(filters);
   const traders = view.state === "ok" ? view.traders : [];
+  useEffect(() => {
+    if (view.state === "ok") onCount?.(view.traders.length);
+  }, [view, onCount]);
 
+  /* Nobody near: nothing here. The tab's one empty state below says it,
+     with the Flares, instead of a box saying it twice. */
+  if (view.state === "ok" && traders.length === 0) return null;
+
+  /*
+   * No box: a section like Search's, its heading and the rows on the page.
+   * The founder (2026-11-25), of the Nearby tab: "weird to have those text
+   * blocks then more text between them."
+   */
   return (
-    <View
-      style={{
-        borderRadius: radius.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
-        paddingHorizontal: spacing(4),
-        paddingTop: spacing(4),
-        paddingBottom: spacing(1),
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
-        <Ionicons name="people" size={18} color={colors.accent} />
-        <Text accessibilityRole="header" style={{ flex: 1, color: colors.textPrimary, fontSize: 18, fontWeight: "800" }}>
+    <View style={{ gap: spacing(1) }}>
+      <View style={{ flexDirection: "row", alignItems: "baseline", gap: spacing(2) }}>
+        <Text accessibilityRole="header" style={{ flex: 1, color: colors.textPrimary, fontSize: 19, fontWeight: "800" }}>
           Traders near you
         </Text>
         {traders.length > 0 ? (
@@ -49,12 +54,9 @@ export function TradersStrip() {
           </Tap>
         ) : null}
       </View>
-      {view.state === "ok" && traders.length > 0 ? (
-        <Text style={{ color: colors.textMuted, fontSize: 12, marginTop: 2 }}>
-          {`${traders.length} within ${view.radius} mi`}
-          {traders.some((trader) => trader.matchCount > 0)
-            ? ` · ${traders.filter((trader) => trader.matchCount > 0).length} have cards you hunt`
-            : ""}
+      {view.state === "ok" && traders.some((trader) => trader.matchCount > 0) ? (
+        <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+          {`${traders.filter((trader) => trader.matchCount > 0).length} have cards you hunt`}
         </Text>
       ) : null}
       <TradersNotice

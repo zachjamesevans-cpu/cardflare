@@ -62,7 +62,10 @@ describe("the Nearby tab is a trade room", () => {
     /* Posts near you are drawn by the same branch as Following's, so
        compact or classic carries over. */
     expect(home.match(/view === "compact" \?/g)).toHaveLength(1);
-    expect(home).toContain("<Title>No Flares near you yet</Title>");
+    /* One unboxed empty state (NearbyEmpty), not a Card. */
+    expect(home).toContain(
+      '{nobodyAtAll ? "Nothing near you yet" : "No Flares near you yet"}',
+    );
     expect(home).not.toContain("<StoreRow");
     expect(home).not.toContain("All nights ›");
   });
