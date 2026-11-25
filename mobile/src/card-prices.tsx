@@ -12,7 +12,8 @@ import { colors, spacing } from "./theme";
  * (2026-11-25), "kind of too much info ... cleaner overall." The price
  * of the art on show (the carousel names the printing, so no chips
  * repeat it) large with the week's move, the range in one muted line,
- * and every condition and grade folded under "All prices". No box.
+ * and every condition, grade and the source folded under a chevron at
+ * the end of the "Market price" heading. No box.
  * Chips come back only when the art on show has two priced printings.
  * The website's panel is the same (src/components/cards/card-prices.tsx).
  * Loaded after the card, so the screen never waits on it.
@@ -59,6 +60,7 @@ export function CardPricesPanel({
      on the phone, then the server's answer (src/price-cache.ts). */
   const [prices, setPrices] = useState<CardPrices | null>(() => peekCardPrices(cardId));
   const [at, setAt] = useState(0);
+  const [open, setOpen] = useState(false);
   /* Faded in only when they arrive after the screen did; prices that
      were already here simply appear with it. */
   const fade = useRef(new Animated.Value(prices ? 1 : 0)).current;
@@ -97,20 +99,55 @@ export function CardPricesPanel({
     if (index >= 0) setAt(index);
   }, [prices, showing]);
 
+  /*
+   * The heading is the fold: a chevron at its end opens every condition,
+   * grade and the source. The founder (2026-11-25): "the 'all prices'
+   * thing should just have a small chevron ... horizontally aligned with
+   * market price ... can just have it all nested." Only with something
+   * to open.
+   */
+  const ok = prices !== null && prices.state === "ok" ? prices : null;
+  const printing = ok ? ok.printings[Math.min(at, ok.printings.length - 1)] : null;
+  const foldable = printing !== null;
+  const heading = (
+    <Text
+      accessibilityRole="header"
+      style={{
+        color: colors.textMuted,
+        fontSize: 12,
+        fontWeight: "700",
+        letterSpacing: 1.6,
+        textTransform: "uppercase",
+      }}
+    >
+      Market price
+    </Text>
+  );
+
+  /* The whole block opens and closes it, not only the chevron: the
+     founder, "clicking anywhere on the market price block should open
+     the chevron". The printing toggle inside keeps its own taps. */
+  const Block = foldable ? Tap : View;
   return (
-    <View style={{ gap: spacing(2) }}>
-      <Text
-        accessibilityRole="header"
-        style={{
-          color: colors.textMuted,
-          fontSize: 12,
-          fontWeight: "700",
-          letterSpacing: 1.6,
-          textTransform: "uppercase",
-        }}
-      >
-        Market price
-      </Text>
+    <Block
+      {...(foldable
+        ? {
+            onPress: () => setOpen((was) => !was),
+            accessibilityRole: "button" as const,
+            accessibilityLabel: open
+              ? "Market price, hide all prices"
+              : "Market price, show all prices",
+            accessibilityState: { expanded: open },
+          }
+        : {})}
+      style={{ gap: spacing(2) }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        {heading}
+        {foldable ? (
+          <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.textMuted} />
+        ) : null}
+      </View>
       {prices === null ? (
         <PricesSkeleton />
       ) : prices.state !== "ok" ? (
@@ -123,6 +160,7 @@ export function CardPricesPanel({
         <Animated.View style={{ opacity: fade, gap: spacing(2) }}>
           <Panel
             prices={prices}
+            open={open}
             showing={showing ? showing.split("|") : null}
             at={Math.min(at, prices.printings.length - 1)}
             onPick={(index) => {
@@ -133,23 +171,25 @@ export function CardPricesPanel({
           />
         </Animated.View>
       )}
-    </View>
+    </Block>
   );
 }
 
 function Panel({
   prices,
+  open,
   showing,
   at,
   onPick,
 }: {
   prices: Extract<CardPrices, { state: "ok" }>;
+  /** The heading's chevron is open: the conditions, grades and source. */
+  open: boolean;
   /** The variants of the art on show, or null when there is no carousel. */
   showing: string[] | null;
   at: number;
   onPick: (index: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const printing = prices.printings[at];
   const choices = prices.printings
     .map((entry, index) => ({ entry, index }))
@@ -165,7 +205,6 @@ function Panel({
     printing.low !== null && printing.high !== null
       ? `${formatPrice(printing.low, printing.currency)} – ${formatPrice(printing.high, printing.currency)}`
       : null;
-  const more = printing.conditions.length > 1 || printing.graded.length > 0;
 
   return (
     <>
@@ -221,58 +260,40 @@ function Panel({
         </Text>
       </View>
 
-      {more ? (
-        <View style={{ borderTopWidth: 1, borderTopColor: colors.border }}>
-          <Tap
-            onPress={() => setOpen((was) => !was)}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: open }}
-            style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: spacing(3) }}
-          >
-            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "600" }}>All prices</Text>
-            <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.textSecondary} />
-          </Tap>
-          {open ? (
-            <View style={{ gap: spacing(4), paddingBottom: spacing(3) }}>
-              {printing.conditions.length > 1 ? (
-                <PriceList label="By condition">
-                  {printing.conditions.map((entry) => (
-                    <PriceRow key={entry.condition} name={entry.condition} value={formatPrice(entry.market, printing.currency)} />
-                  ))}
-                </PriceList>
-              ) : null}
-              {printing.graded.length > 0 ? (
-                <PriceList label="Graded">
-                  {printing.graded.map((entry) => (
-                    <PriceRow
-                      key={`${entry.company}-${entry.grade}`}
-                      name={`${entry.company} ${entry.grade}`}
-                      value={formatPrice(entry.market, printing.currency)}
-                    />
-                  ))}
-                </PriceList>
-              ) : null}
-            </View>
+      {/* Folded under the heading's chevron: every condition, every
+          grade, and where the figures come from. */}
+      {open ? (
+        <View style={{ gap: spacing(4), paddingTop: spacing(2) }}>
+          {printing.conditions.length > 1 ? (
+            <PriceList label="By condition">
+              {printing.conditions.map((entry) => (
+                <PriceRow key={entry.condition} name={entry.condition} value={formatPrice(entry.market, printing.currency)} />
+              ))}
+            </PriceList>
           ) : null}
+          {printing.graded.length > 0 ? (
+            <PriceList label="Graded">
+              {printing.graded.map((entry) => (
+                <PriceRow
+                  key={`${entry.company}-${entry.grade}`}
+                  name={`${entry.company} ${entry.grade}`}
+                  value={formatPrice(entry.market, printing.currency)}
+                />
+              ))}
+            </PriceList>
+          ) : null}
+          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+            {`${PRICE_SOURCE} · updated ${updatedLabel(prices.fetchedAt)}`}
+          </Text>
         </View>
       ) : null}
-
-      <Text
-        style={{
-          color: colors.textMuted,
-          fontSize: 12,
-          ...(more ? {} : { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }),
-        }}
-      >
-        {`${PRICE_SOURCE} · updated ${updatedLabel(prices.fetchedAt)}`}
-      </Text>
     </>
   );
 }
 
 /**
- * While prices load: the panel's own shape - the price, the range, the
- * "All prices" row - so nothing below it moves when the figures land.
+ * While prices load: the panel's own shape - the price and the range -
+ * so nothing below it moves when the figures land.
  */
 function PricesSkeleton() {
   const bar = (width: number, height: number) => (
@@ -284,10 +305,7 @@ function PricesSkeleton() {
         {bar(130, 38)}
         {bar(180, 16)}
       </View>
-      <View style={{ borderTopWidth: 1, borderTopColor: colors.border, paddingVertical: spacing(3) }}>
-        {bar(80, 16)}
-      </View>
-      {bar(190, 12)}
+
     </View>
   );
 }

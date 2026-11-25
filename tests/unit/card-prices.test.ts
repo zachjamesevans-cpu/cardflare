@@ -143,3 +143,17 @@ describe("the price panel on both platforms", () => {
     );
   });
 });
+
+describe("the price block is the fold", () => {
+  /* "the 'all prices' thing should just have a small chevron ...
+     horizontally aligned with market price", then "clicking anywhere on
+     the market price block should open the chevron". */
+  it("opens from anywhere on the block, with no All prices row, on both", () => {
+    const app = read("mobile/src/card-prices.tsx");
+    expect(app).not.toMatch(/>\s*All prices\s*</);
+    expect(app).toContain("const Block = foldable ? Tap : View;");
+    const web = read("src/components/cards/card-prices.tsx");
+    expect(web).not.toMatch(/>\s*All prices\s*</);
+    expect(web).toContain('aria-controls="card-prices-all"');
+  });
+});

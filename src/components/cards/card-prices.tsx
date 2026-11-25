@@ -25,6 +25,7 @@ import { cn } from "@/lib/cn";
  */
 export function CardPricesPanel({ prices }: { prices: CardPrices }) {
   const [at, setAt] = useState(0);
+  const [open, setOpen] = useState(false);
   /* The variants of the art on show; null before the carousel says. */
   const [artVariants, setArtVariants] = useState<string[] | null>(null);
 
@@ -80,10 +81,72 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
     printing.low !== null && printing.high !== null
       ? `${formatPrice(printing.low, printing.currency)} – ${formatPrice(printing.high, printing.currency)}`
       : null;
-  const more = printing.conditions.length > 1 || printing.graded.length > 0;
-
   return (
-    <PricesFrame>
+    /*
+     * The whole block is the fold: a tap anywhere on it opens every
+     * condition, grade and the source, and a chevron at the heading's end
+     * says so. The founder (2026-11-25): "the 'all prices' thing should
+     * just have a small chevron ... horizontally aligned with market
+     * price", then "clicking anywhere on the market price block should
+     * open the chevron". The app's panel is the same.
+     */
+    <section className="flex flex-col gap-2" aria-labelledby="card-prices">
+      <button
+        type="button"
+        onClick={() => setOpen((was) => !was)}
+        aria-expanded={open}
+        aria-controls="card-prices-all"
+        className="flex w-full cursor-pointer flex-col gap-2 text-left"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span
+            id="card-prices"
+            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+          >
+            Market price
+          </span>
+          <ChevronDown
+            className={cn(
+              "size-4 text-text-muted transition-transform",
+              open && "rotate-180",
+            )}
+            aria-hidden="true"
+          />
+        </span>
+        <span className="flex flex-col gap-0.5">
+          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+            <span className="font-display text-3xl font-extrabold tracking-tight text-text-primary tabular-nums">
+              {formatPrice(headline.value, printing.currency)}
+            </span>
+            {headline.caption && (
+              <span className="text-sm font-semibold text-text-secondary">
+                {headline.caption}
+              </span>
+            )}
+            {change && (
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 text-sm font-bold",
+                  up ? "text-accent" : "text-danger",
+                )}
+              >
+                {up ? (
+                  <TrendingUp className="size-4" aria-hidden="true" />
+                ) : (
+                  <TrendingDown className="size-4" aria-hidden="true" />
+                )}
+                {change}
+                <span className="font-semibold text-text-muted">7d</span>
+              </span>
+            )}
+          </span>
+          <span className="text-sm text-text-muted">
+            {printing.market !== null ? "Near mint" : "No ungraded sales"}
+            {range && ` · ${range}`}
+          </span>
+        </span>
+      </button>
+
       {choices.length > 1 && (
         <div className="flex gap-1.5" role="tablist">
           {choices.map(({ entry, index }) => (
@@ -111,84 +174,36 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-0.5">
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <span className="font-display text-3xl font-extrabold tracking-tight text-text-primary tabular-nums">
-            {formatPrice(headline.value, printing.currency)}
-          </span>
-          {headline.caption && (
-            <span className="text-sm font-semibold text-text-secondary">
-              {headline.caption}
-            </span>
+      {open && (
+        <div id="card-prices-all" className="flex flex-col gap-4">
+          {printing.conditions.length > 1 && (
+            <PriceList label="By condition">
+              {printing.conditions.map((entry) => (
+                <PriceRow
+                  key={entry.condition}
+                  name={entry.condition}
+                  value={formatPrice(entry.market, printing.currency)}
+                />
+              ))}
+            </PriceList>
           )}
-          {change && (
-            <span
-              className={cn(
-                "inline-flex items-center gap-1 text-sm font-bold",
-                up ? "text-accent" : "text-danger",
-              )}
-            >
-              {up ? (
-                <TrendingUp className="size-4" aria-hidden="true" />
-              ) : (
-                <TrendingDown className="size-4" aria-hidden="true" />
-              )}
-              {change}
-              <span className="font-semibold text-text-muted">7d</span>
-            </span>
+          {printing.graded.length > 0 && (
+            <PriceList label="Graded">
+              {printing.graded.map((entry) => (
+                <PriceRow
+                  key={`${entry.company}-${entry.grade}`}
+                  name={`${entry.company} ${entry.grade}`}
+                  value={formatPrice(entry.market, printing.currency)}
+                />
+              ))}
+            </PriceList>
           )}
+          <p className="text-xs text-text-muted">
+            {PRICE_SOURCE} · updated {updatedLabel(prices.fetchedAt)}
+          </p>
         </div>
-        <p className="text-sm text-text-muted">
-          {printing.market !== null ? "Near mint" : "No ungraded sales"}
-          {range && ` · ${range}`}
-        </p>
-      </div>
-
-      {more && (
-        <details className="group border-t border-border">
-          <summary className="flex cursor-pointer list-none items-center justify-between py-3 text-sm font-semibold text-text-secondary hover:text-text-primary [&::-webkit-details-marker]:hidden">
-            All prices
-            <ChevronDown
-              className="size-4 transition-transform group-open:rotate-180"
-              aria-hidden="true"
-            />
-          </summary>
-          <div className="flex flex-col gap-4 pb-3">
-            {printing.conditions.length > 1 && (
-              <PriceList label="By condition">
-                {printing.conditions.map((entry) => (
-                  <PriceRow
-                    key={entry.condition}
-                    name={entry.condition}
-                    value={formatPrice(entry.market, printing.currency)}
-                  />
-                ))}
-              </PriceList>
-            )}
-            {printing.graded.length > 0 && (
-              <PriceList label="Graded">
-                {printing.graded.map((entry) => (
-                  <PriceRow
-                    key={`${entry.company}-${entry.grade}`}
-                    name={`${entry.company} ${entry.grade}`}
-                    value={formatPrice(entry.market, printing.currency)}
-                  />
-                ))}
-              </PriceList>
-            )}
-          </div>
-        </details>
       )}
-
-      <p
-        className={cn(
-          "text-xs text-text-muted",
-          !more && "border-t border-border pt-3",
-        )}
-      >
-        {PRICE_SOURCE} · updated {updatedLabel(prices.fetchedAt)}
-      </p>
-    </PricesFrame>
+    </section>
   );
 }
 
@@ -208,9 +223,9 @@ export function PricesFrame({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * While the prices load: the panel's own shape - the price, the range,
- * the "All prices" row - so nothing below it moves when the figures
- * land. The app's placeholder is the same.
+ * While the prices load: the panel's own shape - the price and the range
+ * - so nothing below it moves when the figures land. The app's
+ * placeholder is the same.
  */
 export function CardPricesSkeleton() {
   return (
@@ -219,10 +234,6 @@ export function CardPricesSkeleton() {
         <span className="h-9 w-32 animate-pulse rounded-md bg-elevated" />
         <span className="h-4 w-44 animate-pulse rounded-md bg-elevated" />
       </div>
-      <div className="flex items-center justify-between border-t border-border py-3">
-        <span className="h-4 w-20 rounded bg-elevated" />
-      </div>
-      <span className="h-3 w-48 rounded bg-elevated" />
     </PricesFrame>
   );
 }
