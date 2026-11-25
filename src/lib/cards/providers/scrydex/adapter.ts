@@ -181,7 +181,9 @@ export class ScrydexProvider implements CardDataProvider {
   /** English, paper sets only, newest first (Scrydex's own order). */
   async fetchSets(): Promise<ProviderSet[]> {
     requireCredentials();
-    const sets = await this.all("expansions?q=language_code:EN");
+    /* Every set, filtered here: Scrydex's q filter answers nothing for
+       some games' sets (Lorcana), though each set says its language. */
+    const sets = await this.all("expansions");
     return sets.flatMap((raw) => {
       const set = asRecord(raw);
       const id = asString(set?.id);
