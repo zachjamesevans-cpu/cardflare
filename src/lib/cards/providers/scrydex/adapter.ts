@@ -1,4 +1,5 @@
 import {
+  normalizeName,
   normalizationFailure,
   normalizedCardSchema,
   type CardDataProvider,
@@ -324,6 +325,19 @@ export class ScrydexProvider implements CardDataProvider {
     });
 
     if (!parsed.success) return normalizationFailure(input, id, parsed.error);
+    /* A name with no letters or digits ("_____", an Unhinged card) cannot
+       be searched for, and the database refuses it: one card refused, not
+       its whole set. */
+    if (!normalizeName(parsed.data.exactName)) {
+      return {
+        ok: false,
+        failure: {
+          providerExternalId: id,
+          reason: "exactName: nothing searchable",
+          raw: null,
+        },
+      };
+    }
     return { ok: true, card: parsed.data };
   }
 
