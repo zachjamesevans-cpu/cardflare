@@ -1311,7 +1311,17 @@ function AppGates() {
               options={{ title: "Traders near you" }}
             />
           ) : null}
-          <Stack.Screen name="Card" options={{ title: "Card" }}>
+          {/* A card opens over the screen it came from, the background
+              dimmed, never as a screen of its own (screens/card.tsx). */}
+          <Stack.Screen
+            name="Card"
+            options={{
+              title: "Card",
+              headerShown: false,
+              presentation: "transparentModal",
+              animation: "fade",
+            }}
+          >
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>
           <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>

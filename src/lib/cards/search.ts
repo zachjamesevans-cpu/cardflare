@@ -1,9 +1,33 @@
 import "server-only";
 
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { compactCardNumber } from "./domain";
 import type { CardPrinting, CardResult } from "./schema";
 
 export const SEARCH_LIMIT = 20;
+
+/**
+ * A search that IS a card number answers with that card and nothing else.
+ *
+ * The founder (2026-11-25): "when i type in op12-034, it pulls up a bunch
+ * of other cards? should really only show the exact card when I search
+ * for it for all tcg's." The search ranks the exact card first, then
+ * fills the list with near numbers (OP10-034, SV1-10, BLB-100). When the
+ * whole query matches a card's number exactly - spacing, case and dashes
+ * aside, so "op12034" counts - only those cards are kept. A partial
+ * number ("OP12") or a name still gets the full ranked list.
+ */
+export function exactNumberOnly<T extends { canonical_card_number: string }>(
+  query: string,
+  rows: readonly T[],
+): T[] {
+  const asked = compactCardNumber(query);
+  if (!/\d/.test(asked) || asked.length < 3) return [...rows];
+  const exact = rows.filter(
+    (row) => compactCardNumber(row.canonical_card_number) === asked,
+  );
+  return exact.length > 0 ? exact : [...rows];
+}
 
 /** Optional narrowing. These filter a search; they never identify a card. */
 export interface CardSearchFilters {
@@ -66,7 +90,7 @@ export async function searchCards(
     return [];
   }
 
-  const rows = (data ?? []) as unknown as SearchRow[];
+  const rows = exactNumberOnly(query, (data ?? []) as unknown as SearchRow[]);
   if (rows.length === 0) return [];
 
   const [printings, games] = await Promise.all([

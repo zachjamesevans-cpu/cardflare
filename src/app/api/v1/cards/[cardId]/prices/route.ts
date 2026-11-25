@@ -24,5 +24,17 @@ export async function GET(_request: Request, { params }: Params): Promise<Respon
   );
   if (limited) return limited;
 
-  return Response.json({ prices: await cardPrices(id.data) });
+  const prices = await cardPrices(id.data);
+  return Response.json(
+    { prices },
+    {
+      /* The edge keeps an answer for the same twelve hours the server's
+         Scrydex cache does, so a card anyone has opened answers from the
+         nearest edge at once. A failed read is not kept. */
+      headers:
+        prices.state === "unavailable"
+          ? { "cache-control": "no-store" }
+          : { "cache-control": "public, s-maxage=43200, stale-while-revalidate=86400" },
+    },
+  );
 }

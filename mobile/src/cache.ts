@@ -72,6 +72,9 @@ export const CACHE_TTL = {
   room: 5 * 60 * 1000,
   /* A shop's address and phone number. */
   store: 7 * 24 * 60 * 60 * 1000,
+  /* A card's market prices (Scrydex): twelve hours, the server's own
+     cache, so a card seen before shows its prices the instant it opens. */
+  prices: 12 * 60 * 60 * 1000,
   /* Somebody else's profile, as last seen: painted at once on the next
      open while the fresh one loads. A day: names and shelves move. */
   peek: 24 * 60 * 60 * 1000,

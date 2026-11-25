@@ -1,8 +1,11 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
@@ -48,6 +51,11 @@ export function aboutMiles(miles: number): string {
 }
 
 export function CardScreen({ cardId }: { cardId: string }) {
+  /* Prices are asked for the moment the card is opened, beside the card
+     itself, not after it has drawn (src/price-cache.ts). */
+  useEffect(() => {
+    void loadCardPrices(cardId);
+  }, [cardId]);
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);
@@ -108,6 +116,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
 
   if (!page) {
     return (
+      <CardOverlay>
       <View
         style={{
           flex: 1,
@@ -131,6 +140,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
           <Loading />
         )}
       </View>
+      </CardOverlay>
     );
   }
 
@@ -142,6 +152,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const artWidth = Math.min(240, screenWidth - gutter * 2);
 
   return (
+    <CardOverlay>
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.canvas }}
       contentContainerStyle={{
@@ -315,6 +326,77 @@ export function CardScreen({ cardId }: { cardId: string }) {
         )}
       </Section>
     </ScrollView>
+    </CardOverlay>
+  );
+}
+
+/**
+ * A card opens OVER the screen it was tapped on, never as a screen of its
+ * own: the founder, "the card should not open a separate screen.
+ * background should fade", everywhere a card opens. The route is a
+ * transparent modal that fades in (App.tsx); this draws the dimmed
+ * backdrop - a tap on it closes - and the sheet the card sits on.
+ */
+function CardOverlay({ children }: { children: ReactNode }) {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={{ flex: 1 }}>
+      <Pressable
+        onPress={() => navigation.goBack()}
+        accessibilityRole="button"
+        accessibilityLabel="Close card"
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.72)",
+        }}
+      />
+      <View
+        style={{
+          flex: 1,
+          /* Enough of the screen beneath shows, dimmed, to read as over
+             it, and to tap away. */
+          marginTop: insets.top + spacing(14),
+          borderTopLeftRadius: radius.panel,
+          borderTopRightRadius: radius.panel,
+          borderWidth: 1,
+          borderBottomWidth: 0,
+          borderColor: colors.border,
+          backgroundColor: colors.canvas,
+          overflow: "hidden",
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "flex-end",
+            paddingHorizontal: spacing(2),
+            paddingTop: spacing(2),
+          }}
+        >
+          <Tap
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+            accessibilityLabel="Close"
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: colors.elevated,
+            }}
+          >
+            <Ionicons name="close" size={20} color={colors.textPrimary} />
+          </Tap>
+        </View>
+        {children}
+      </View>
+    </View>
   );
 }
 

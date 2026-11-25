@@ -4,7 +4,7 @@ import { AccessibilityInfo, Animated, Easing, Image, Text, View } from "react-na
 
 import { FIRST_FLARE, FIRST_FLARE_CARDS, FIRST_FLARE_SECONDS } from "./first-flare";
 import { Button } from "./ui";
-import { colors, radius, spacing } from "./theme";
+import { colors, gutter, spacing } from "./theme";
 
 /** One card in the drifting strip, and the gap after it. */
 const ART_W = 96;
@@ -50,13 +50,17 @@ export function FirstFlareCard({ onPost }: { onPost: () => void }) {
   const strip = [...FIRST_FLARE_CARDS, ...FIRST_FLARE_CARDS];
 
   return (
+    /* No box: the Feed's posts have none, so neither does this - the
+       founder, "since our posts don't have rounded rectangles around
+       them, why not just apply the same logic here". It reaches past the
+       Feed's gutter to both screen edges, so the cards flow in from the
+       very sides, and a hairline closes it like a post. */
     <View
       style={{
-        borderRadius: radius.card,
-        borderWidth: 1,
-        borderColor: colors.border,
-        backgroundColor: colors.surface,
+        marginHorizontal: -gutter,
         overflow: "hidden",
+        borderBottomWidth: 1,
+        borderBottomColor: colors.border,
       }}
     >
       <View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}>
@@ -64,7 +68,6 @@ export function FirstFlareCard({ onPost }: { onPost: () => void }) {
           style={{
             flexDirection: "row",
             gap: GAP,
-            paddingHorizontal: GAP,
             paddingTop: spacing(3),
             opacity: 0.3,
             transform: [{ translateX: drift }],
@@ -79,13 +82,22 @@ export function FirstFlareCard({ onPost }: { onPost: () => void }) {
           ))}
         </Animated.View>
         <LinearGradient
-          colors={["rgba(0,0,0,0.15)", "rgba(0,0,0,0.75)", "rgba(0,0,0,0.92)"]}
+          colors={["rgba(0,0,0,0.1)", "rgba(0,0,0,0.78)", "rgba(0,0,0,1)"]}
           locations={[0, 0.55, 1]}
           style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0 }}
         />
       </View>
 
-      <View style={{ minHeight: 230, justifyContent: "flex-end", padding: spacing(5), gap: spacing(3) }}>
+      <View
+        style={{
+          minHeight: 230,
+          justifyContent: "flex-end",
+          paddingHorizontal: gutter,
+          paddingTop: spacing(5),
+          paddingBottom: spacing(5),
+          gap: spacing(3),
+        }}
+      >
         <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontSize: 24, fontWeight: "800", letterSpacing: -0.3 }}>
           {FIRST_FLARE.headline}
         </Text>
