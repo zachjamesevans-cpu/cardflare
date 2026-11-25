@@ -338,6 +338,17 @@ export function pickBasePrinting(
     const byPromo = Number(a.isPromo === true) - Number(b.isPromo === true);
     if (byPromo !== 0) return byPromo;
 
+    /* Never an alt art when the card has a plain face, and Scrydex's
+       "normal" print before its foils: every Scrydex printing names its
+       variant, so the mark below cannot tell them apart (2026-11-25). */
+    const alt = (printing: CardPrinting) =>
+      Number(/alt/i.test(printing.variantType ?? ""));
+    const byAlt = alt(a) - alt(b);
+    if (byAlt !== 0) return byAlt;
+    const byPlain =
+      Number(b.variantType === "normal") - Number(a.variantType === "normal");
+    if (byPlain !== 0) return byPlain;
+
     const marked = (printing: CardPrinting) =>
       Number(
         printing.variantType !== null ||
