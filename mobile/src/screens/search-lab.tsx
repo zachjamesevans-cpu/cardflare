@@ -71,8 +71,10 @@ const GRID_GAP = spacing(2.5);
  * actual game, with the classic cardflare green as the logo color."
  * Made from the logos Wikipedia and Wikimedia Commons host, recoloured
  * offline to the accent (#cefc84): a one-colour logo flat, a many-colour
- * one as a green duotone so its outlines stay legible. Riftbound has no
- * logo file there yet, so its tile is its name.
+ * one as a green duotone so its outlines stay legible. Riftbound (Riot's
+ * own lockup) and Gundam (Scrydex's copy of Bandai's, enlarged with its
+ * edge re-sharpened) are flat green; the founder found the plain-name
+ * tiles "awful" (2026-11-25).
  */
 const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
   "one-piece": require("../../assets/games/one-piece.png"),
@@ -80,6 +82,8 @@ const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
   mtg: require("../../assets/games/mtg.png"),
   lorcana: require("../../assets/games/lorcana.png"),
   "flesh-and-blood": require("../../assets/games/flesh-and-blood.png"),
+  riftbound: require("../../assets/games/riftbound.png"),
+  gundam: require("../../assets/games/gundam.png"),
 };
 
 type Answer<T> =
@@ -338,8 +342,21 @@ function GameChips({
         soon: !entry.catalog,
       })),
     ];
+  /* The chosen game's chip is always in sight: picked from a tile (Gundam
+     is the last chip) it would otherwise sit off the right edge. */
+  const row = useRef<ScrollView>(null);
+  const where = useRef(new Map<string, { x: number; width: number }>());
+  const { width: screen } = useWindowDimensions();
+  const reveal = useCallback(() => {
+    const spot = where.current.get(game ?? "all");
+    if (!spot) return;
+    row.current?.scrollTo({ x: Math.max(0, spot.x + spot.width / 2 - screen / 2), animated: true });
+  }, [game, screen]);
+  useEffect(reveal, [reveal]);
+
   return (
     <ScrollView
+      ref={row}
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: gutter, gap: spacing(2) }}
@@ -347,8 +364,15 @@ function GameChips({
       {chips.map((chip) => {
         const on = chip.value === game;
         return (
-          <Tap
+          <View
             key={chip.key}
+            onLayout={(event) => {
+              const { x, width } = event.nativeEvent.layout;
+              where.current.set(chip.key, { x, width });
+              if (on) reveal();
+            }}
+          >
+          <Tap
             disabled={chip.soon}
             onPress={() => onChoose(chip.value)}
             accessibilityRole="button"
@@ -384,6 +408,7 @@ function GameChips({
               </Text>
             ) : null}
           </Tap>
+          </View>
         );
       })}
     </ScrollView>
