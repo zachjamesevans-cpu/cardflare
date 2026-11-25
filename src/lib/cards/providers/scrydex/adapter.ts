@@ -115,6 +115,25 @@ function bounded(value: unknown, min: number, max: number): number | null {
   return parsed !== null && parsed >= min && parsed <= max ? parsed : null;
 }
 
+/**
+ * One id per printing. A card can list two variants under one name (two
+ * alt arts, each "altArt"); the second and later get ":2", ":3", in the
+ * order Scrydex lists them, so the ids stay stable from one import to
+ * the next and the upsert never meets the same row twice.
+ */
+export function uniquePrintings<T extends { providerExternalId: string }>(
+  printings: readonly T[],
+): T[] {
+  const count = new Map<string, number>();
+  return printings.map((printing) => {
+    const seen = (count.get(printing.providerExternalId) ?? 0) + 1;
+    count.set(printing.providerExternalId, seen);
+    return seen === 1
+      ? printing
+      : { ...printing, providerExternalId: `${printing.providerExternalId}:${seen}` };
+  });
+}
+
 export class ScrydexProvider implements CardDataProvider {
   readonly providerKey = SCRYDEX_KEY;
   readonly displayName = "Scrydex (scrydex.com)";
@@ -186,6 +205,7 @@ export class ScrydexProvider implements CardDataProvider {
 
     const cards: NormalizedCard[] = [];
     const failures: NormalizationFailure[] = [];
+    const seen = new Set<string>();
     for (const code of codes) {
       const raw = await this.all(
         `expansions/${encodeURIComponent(code)}/cards`,
@@ -194,8 +214,13 @@ export class ScrydexProvider implements CardDataProvider {
       progress(`${code}: ${raw.length} card(s) from Scrydex`);
       for (const record of raw) {
         const result = this.normalizeCard(record);
-        if (result.ok) cards.push(result.card);
-        else failures.push(result.failure);
+        if (!result.ok) failures.push(result.failure);
+        /* A card listed twice in one answer is one card: the upsert
+           refuses to touch a row twice in a statement. */
+        else if (!seen.has(result.card.canonicalCardNumber)) {
+          seen.add(result.card.canonicalCardNumber);
+          cards.push(result.card);
+        }
       }
     }
     return { cards, failures };
@@ -291,7 +316,9 @@ export class ScrydexProvider implements CardDataProvider {
         )?.slice(0, 4000) ?? null,
       providerExternalId: id,
       rawMetadata: without(record, [...DROPPED_FIELDS, "variants"]),
-      printings: variants.length > 0 ? variants.map(printing) : [printing(null)],
+      printings: uniquePrintings(
+        variants.length > 0 ? variants.map(printing) : [printing(null)],
+      ),
     });
 
     if (!parsed.success) return normalizationFailure(input, id, parsed.error);
