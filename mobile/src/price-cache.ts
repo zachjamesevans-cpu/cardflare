@@ -34,8 +34,9 @@ export function loadCardPrices(cardId: string): Promise<CardPrices> {
   asked.set(cardId, { at: Date.now(), promise });
 
   void promise.then(async (prices) => {
-    /* A failed ask is not kept: the next open tries again. */
-    if (prices.state === "unavailable") {
+    /* A failed ask is not kept, and "no price" stays off the disk: the
+       next open tries again. */
+    if (prices.state !== "ok") {
       asked.delete(cardId);
       return;
     }

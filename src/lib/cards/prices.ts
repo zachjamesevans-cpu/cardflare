@@ -27,17 +27,23 @@ export async function cardPrices(cardId: string): Promise<CardPrices> {
   if (!key || !team) return { state: "unavailable" };
 
   const admin = getSupabaseAdmin();
-  const [{ data: card }, { data: printings }] = await Promise.all([
-    admin
-      .from("cards")
-      .select("game, provider_key, provider_external_id")
-      .eq("id", cardId)
-      .maybeSingle(),
-    admin
-      .from("card_printings")
-      .select("id, variant_type, provider_key")
-      .eq("card_id", cardId),
-  ]);
+  const [{ data: card, error: cardError }, { data: printings, error: printingsError }] =
+    await Promise.all([
+      admin
+        .from("cards")
+        .select("game, provider_key, provider_external_id")
+        .eq("id", cardId)
+        .maybeSingle(),
+      admin
+        .from("card_printings")
+        .select("id, variant_type, provider_key")
+        .eq("card_id", cardId),
+    ]);
+
+  /* A read that failed is not "no price": it is said as unavailable, which
+     nothing caches. Said as "none", it was kept at the edge for twelve
+     hours and Perona showed no price on 2026-11-25. */
+  if (cardError || printingsError) return { state: "unavailable" };
 
   const segment = card ? SCRYDEX_GAMES[card.game as GameSlug] : undefined;
   if (

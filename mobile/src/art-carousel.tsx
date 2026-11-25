@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import {
+  Animated,
   ScrollView,
   Text,
   View,
@@ -19,14 +20,19 @@ export interface Art {
 /**
  * A card's artworks, swiped one at a time: the founder (2026-11-25), "for
  * alt arts, you should be able to swipe between them like a carousel ...
- * for all tcg's." Each page is the full width of the sheet with the art
- * centred, so a swipe moves one art; a tap still opens it large. Under
+ * for all tcg's", then "an actual carousel - you'll see the card on the
+ * right loaded, then you can swipe into the alt arts." The art on show is
+ * centred and full size; the next one peeks in at the right, smaller,
+ * and grows into the middle as it is swiped to. A tap opens it large. Under
  * it, the art's name and a dot per art. One art, no dots and nothing to
  * swipe. The website's card page has the same carousel.
  *
  * `index` is controlled, so the price chips below can move it, and a
  * swipe reports the page it settled on.
  */
+/** The space between two arts on the rail. */
+const GAP = 14;
+
 export function ArtCarousel({
   arts,
   name,
@@ -46,16 +52,21 @@ export function ArtCarousel({
 }) {
   const rail = useRef<ScrollView>(null);
   const shown = useRef(index);
+  const x = useRef(new Animated.Value(0)).current;
+  /* One art and the gap after it: a swipe moves exactly one. */
+  const step = artWidth + GAP;
+  /* The first art centred; the next one peeks in at the right. */
+  const side = (pageWidth - artWidth) / 2;
 
   /* Moved from outside (a price chip): slide there. */
   useEffect(() => {
     if (index === shown.current) return;
     shown.current = index;
-    rail.current?.scrollTo({ x: index * pageWidth, animated: true });
-  }, [index, pageWidth]);
+    rail.current?.scrollTo({ x: index * step, animated: true });
+  }, [index, step]);
 
   const settle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const page = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    const page = Math.round(event.nativeEvent.contentOffset.x / step);
     const next = Math.max(0, Math.min(arts.length - 1, page));
     if (next !== shown.current) {
       shown.current = next;
@@ -67,29 +78,43 @@ export function ArtCarousel({
   const artHeight = Math.round((artWidth * 88) / 63);
   return (
     <View style={{ alignItems: "center", gap: spacing(2) }}>
-      <ScrollView
+      <Animated.ScrollView
         ref={rail}
         horizontal
-        pagingEnabled
         scrollEnabled={several}
+        snapToInterval={step}
+        decelerationRate="fast"
+        disableIntervalMomentum
         showsHorizontalScrollIndicator={false}
         onMomentumScrollEnd={settle}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x } } }], {
+          useNativeDriver: true,
+        })}
+        contentContainerStyle={{ paddingHorizontal: side, gap: GAP }}
         /* Exactly the art's height: a horizontal rail inside the page's
            scroll otherwise stretched to fill the sheet. */
         style={{ width: pageWidth, height: artHeight, flexGrow: 0 }}
       >
-        {arts.map((art) => (
-          <View key={art.imageUrl} style={{ width: pageWidth, alignItems: "center" }}>
-            <CardImage
-              imageUrl={art.imageUrl}
-              width={artWidth}
-              name={name}
-              cardNumber={cardNumber}
-              caption={art.label}
-            />
-          </View>
-        ))}
-      </ScrollView>
+        {arts.map((art, at) => {
+          /* The art in the middle full size; its neighbours a little
+             smaller and dimmer, growing in as they are swiped to. */
+          const range = [(at - 1) * step, at * step, (at + 1) * step];
+          const scale = x.interpolate({ inputRange: range, outputRange: [0.88, 1, 0.88], extrapolate: "clamp" });
+          const opacity = x.interpolate({ inputRange: range, outputRange: [0.6, 1, 0.6], extrapolate: "clamp" });
+          return (
+            <Animated.View key={art.imageUrl} style={{ width: artWidth, transform: [{ scale }], opacity }}>
+              <CardImage
+                imageUrl={art.imageUrl}
+                width={artWidth}
+                name={name}
+                cardNumber={cardNumber}
+                caption={art.label}
+              />
+            </Animated.View>
+          );
+        })}
+      </Animated.ScrollView>
       {several ? (
         <View style={{ alignItems: "center", gap: spacing(1.5) }}>
           <Text style={{ color: colors.textSecondary, fontSize: 13, fontWeight: "600" }}>

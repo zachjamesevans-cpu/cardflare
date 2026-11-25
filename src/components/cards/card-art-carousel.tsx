@@ -24,10 +24,19 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
   const [at, setAt] = useState(0);
   const several = arts.length > 1;
 
+  /* One art and the gap after it, measured: a swipe moves exactly one. */
+  const step = () => {
+    const el = rail.current;
+    const first = el?.children[0] as HTMLElement | undefined;
+    const second = el?.children[1] as HTMLElement | undefined;
+    return first && second
+      ? second.offsetLeft - first.offsetLeft
+      : (el?.clientWidth ?? 1);
+  };
+
   const go = (index: number) => {
     const next = Math.max(0, Math.min(arts.length - 1, index));
-    const el = rail.current;
-    if (el) el.scrollTo({ left: next * el.clientWidth, behavior: "smooth" });
+    rail.current?.scrollTo({ left: next * step(), behavior: "smooth" });
   };
 
   /* Tell the prices which art is on show. */
@@ -56,7 +65,7 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
 
   return (
     <div className="flex w-full flex-col items-center gap-2">
-      <div className="relative w-full">
+      <div className="@container relative w-full">
         <div
           ref={rail}
           tabIndex={several ? 0 : -1}
@@ -69,21 +78,27 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
           }}
           onScroll={(event) => {
             const el = event.currentTarget;
-            const index = Math.round(el.scrollLeft / el.clientWidth);
+            const index = Math.round(el.scrollLeft / step());
             if (index !== at) setAt(index);
           }}
-          className="flex snap-x snap-mandatory [scrollbar-width:none] overflow-x-auto [&::-webkit-scrollbar]:hidden"
+          /* The art on show centred, the next one peeking in at the right
+             (the founder: "you'll see the card on the right loaded, then
+             you can swipe into the alt arts"). */
+          className="flex snap-x snap-mandatory [scrollbar-width:none] gap-3.5 overflow-x-auto px-[calc(50cqw-min(7.5rem,32cqw))] [&::-webkit-scrollbar]:hidden"
         >
-          {arts.map((art) => (
+          {arts.map((art, index) => (
             <div
               key={art.imageUrl}
-              className="flex w-full shrink-0 snap-center justify-center"
+              className={cn(
+                "w-[min(15rem,64cqw)] shrink-0 snap-center transition-[transform,opacity] duration-300",
+                index === at ? "scale-100 opacity-100" : "scale-[0.88] opacity-60",
+              )}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={art.imageUrl}
                 alt={`${name}, ${art.label}`}
-                className="h-auto w-60 rounded-[10px] border border-border bg-elevated"
+                className="h-auto w-full rounded-[10px] border border-border bg-elevated"
               />
             </div>
           ))}
