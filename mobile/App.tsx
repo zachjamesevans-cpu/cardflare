@@ -1,4 +1,6 @@
 import { LaunchView } from "./src/launch-view";
+import { gameShortName } from "./src/games";
+import { GameHubScreen } from "./src/screens/game-hub";
 import { navigationRef } from "./src/navigation-ref";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -154,7 +156,8 @@ export type TabParams = {
   /** `posted`: a Flare just went up; the Feed scrolls to its top. */
   Feed: { tab?: "following" | "nearby"; at?: number; posted?: number } | undefined;
   /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
-  Search: undefined;
+  /** `game`: a hub's "Search Lorcana" lands with that game chosen. */
+  Search: { game?: string; at?: number } | undefined;
   /** One of these two holds the second slot, by LOCAL_ENABLED. */
   Local: undefined;
   /** Flares near you, the stores and the nights: the second slot. */
@@ -294,6 +297,8 @@ export type StackParams = {
   LogTrade: undefined;
   /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
   Card: { cardId: string };
+  /** A game's hub: most hunted, price moves, most searched (game-hub.tsx). */
+  GameHub: { game: string };
   /* The composer, pushed over wherever it was opened (src/open-composer.ts). */
   Compose: TabParams["Flare"];
   /* Traders near you: the UI experiment's list (src/ui-experiment.ts). */
@@ -1337,7 +1342,23 @@ function AppGates() {
           <Stack.Screen
             name="Compose"
             component={HubScreen}
-            options={{ title: "Post a Flare", presentation: "modal", gestureEnabled: true }}
+            /* Only as tall as what is in it, not the whole screen: the
+               founder, "there is no need for this screen to extend so far
+               vertically ... it should slide up just below the preview
+               button." iOS's form sheet, fitted to its contents. */
+            options={{
+              title: "Post a Flare",
+              presentation: "formSheet",
+              sheetAllowedDetents: "fitToContents",
+              sheetGrabberVisible: true,
+              sheetCornerRadius: 22,
+              gestureEnabled: true,
+            }}
+          />
+          <Stack.Screen
+            name="GameHub"
+            component={GameHubScreen}
+            options={({ route }) => ({ title: gameShortName(route.params.game) })}
           />
           <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
             {({ route }) => (

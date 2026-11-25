@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { countCardOpen } from "@/lib/cards/game-hub";
+import { after } from "next/server";
 import Link from "next/link";
 import { Suspense } from "react";
 import { CardPricesSkeleton } from "@/components/cards/card-prices";
@@ -48,6 +50,8 @@ export default async function CardRoute({
 
   const page = await cardPage(cardId, viewerId);
   if (!page) notFound();
+  /* One more look, for the game hubs' "most searched" (game-hub.ts). */
+  after(() => countCardOpen(page.card.cardId));
 
   return (
     <>

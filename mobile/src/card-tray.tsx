@@ -519,31 +519,8 @@ function TileFace({
       }}
     >
       <RemoteImage uri={item.imageUrl} style={{ width: "100%", height: "100%" }} />
-      <View
-        style={{
-          position: "absolute",
-          top: 3,
-          left: 3,
-          minWidth: 18,
-          height: 18,
-          borderRadius: 999,
-          paddingHorizontal: 4,
-          alignItems: "center",
-          justifyContent: "center",
-          backgroundColor: index === 0 ? colors.accent : colors.canvas,
-        }}
-      >
-        <Text
-          maxFontSizeMultiplier={1.3}
-          style={{
-            color: index === 0 ? colors.accentContrast : colors.textPrimary,
-            fontSize: 11,
-            fontWeight: "700",
-          }}
-        >
-          {index + 1}
-        </Text>
-      </View>
+      {/* No 1, 2, 3: the founder, "no need to have a 1, 2, 3 for which
+          card it is". The first is still the cover; drag one there. */}
       {item.flared ? (
         <FlaredTag small style={{ position: "absolute", top: 3, right: 3 }} />
       ) : null}

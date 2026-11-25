@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { GAME_SLUGS } from "@/lib/players/games-catalog";
 import { SearchPanel } from "@/components/feed/search-panel";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
@@ -25,7 +26,14 @@ export const dynamic = "force-dynamic";
  * The account is only whose recent searches to show. A guest searches
  * the same catalogue with this device's own list.
  */
-export default async function SearchPage() {
+export default async function SearchPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ game?: string }>;
+}) {
+  /* "Search Lorcana" on a game's hub: that game's cards only. */
+  const asked = (await searchParams).game;
+  const game = GAME_SLUGS.find((slug) => slug === asked) ?? null;
   const viewer = await getViewer();
   const playerId =
     viewer.kind === "player"
@@ -46,7 +54,7 @@ export default async function SearchPage() {
 
   return (
     <TabPageShell title="Search">
-      <SearchPanel account={playerId} flaredCardIds={flaredCardIds} />
+      <SearchPanel account={playerId} flaredCardIds={flaredCardIds} game={game} />
     </TabPageShell>
   );
 }

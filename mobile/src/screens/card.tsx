@@ -1,9 +1,12 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
+import { CartToast } from "../cart-toast";
+import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
 import { FlaredPill } from "../flared-mark";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
-import { FlareButton } from "../flare-button";
+import { FLARE_BUTTON, FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
@@ -70,6 +73,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
   useEffect(() => setArtAt(0), [cardId]);
   /* Re-render when your Flares arrive, for "On your Flares". */
   useMyFlares();
+  /* The cart (flare-cart.ts), and what the + just added, for its toast. */
+  useFlareCart();
+  const [added, setAdded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -172,6 +178,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
      card, else what the app already holds (my-flares.ts). */
   const shownPrintings = arts[artAt]?.printingIds ?? [];
   const wantedPrintings = page?.you?.wantedPrintings;
+  /* The printing a + adds: the art on show's first; null without arts. */
+  const shownPrinting = arts[artAt]?.printingIds?.[0] ?? null;
+  const shownInCart = inCart(card.cardId, shownPrinting);
   const onYourFlares =
     wantedPrintings !== undefined
       ? wantedPrintings.some(
@@ -368,25 +377,59 @@ export function CardScreen({ cardId }: { cardId: string }) {
     </ScrollView>
     {/* The Flare button, for THIS card: the composer, the card already
         in it (flare-button.tsx). It replaced "Post a Flare for it". */}
+    {/*
+     * The + puts the art on show in your Flare, like a cart, without
+     * sliding the composer up: the founder, "when pressing the + button,
+     * it just has ... similar function to how when you add something to
+     * cart, it just tallies up, then you can view 'full cart'." Already
+     * in it, the + is a ✓ and opens the Flare, pushed inside the sheet
+     * so back returns to this card (open-composer.ts). Each art is its
+     * own card ("all alternate arts need to be treated as separate").
+     */}
     <FlareButton
-      label={`Flare ${name}`}
-      onPress={() =>
-        /* Pushed inside the sheet, so back returns to this very card
-           (src/open-composer.ts). */
-        /* The art on show, as its own line: an alternate art is a
-           different card to hunt (the founder, "all alternate arts
-           need to be treated as separate cards"). */
-        openComposer(navigation, {
-          card: {
-            cardId: card.cardId,
-            name: card.name,
-            cardNumber: card.number,
-            imageUrl: arts[artAt]?.imageUrl ?? card.imageUrl,
-            printingId: arts[artAt]?.printingIds?.[0] ?? null,
-          },
-        })
-      }
+      label={shownInCart ? `View your Flare, ${cartCount()} cards` : `Add ${name} to your Flare`}
+      done={shownInCart}
+      onPress={() => {
+        if (shownInCart) {
+          openComposer(navigation);
+          return;
+        }
+        const art = arts[artAt];
+        void addToCart({
+          cardId: card.cardId,
+          name: card.name,
+          cardNumber: card.number,
+          imageUrl: art?.imageUrl ?? card.imageUrl,
+          printings: arts.flatMap((each) =>
+            (each.printingIds ?? []).map((id) => ({
+              id,
+              label: each.label || null,
+              imageUrl: each.imageUrl,
+            })),
+          ),
+          printingId: shownPrinting,
+          quantity: 1,
+        }).then((outcome) => {
+          if (outcome !== "added") return;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          setAdded(arts.length > 1 && art?.label ? `${card.name} · ${art.label}` : card.name);
+        });
+      }}
       style={{ right: gutter + spacing(1), bottom: insets.bottom + spacing(4) }}
+    />
+    <CartToast
+      line={added}
+      count={cartCount()}
+      onView={() => {
+        setAdded(null);
+        openComposer(navigation);
+      }}
+      onGone={() => setAdded(null)}
+      style={{
+        left: gutter,
+        right: gutter + spacing(1) + FLARE_BUTTON + spacing(3),
+        bottom: insets.bottom + spacing(4) + 4,
+      }}
     />
     </CardOverlay>
   );

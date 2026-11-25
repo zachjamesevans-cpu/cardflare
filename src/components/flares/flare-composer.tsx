@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Plus, Store, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
 
@@ -40,7 +40,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Stepper } from "@/components/ui/stepper";
 import type { CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
-import { draftSummary, MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
+import { MAX_COPIES, mergeItems } from "@/lib/flares/draft-rules";
 import { publishPostAction } from "@/lib/flares/publish-actions";
 import { postSummary } from "@/lib/flares/post-summary";
 
@@ -365,14 +365,20 @@ function ComposerBody({
 
   return (
     <Card className="flex flex-col gap-5 p-4 sm:p-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-bold text-text-primary">Post a Flare</h1>
-        <p className="text-sm text-text-muted">
-          {room
-            ? `Posting to ${room.name} at ${room.storeName}.`
-            : "Posting to your area."}
+      {/*
+       * No title line, no "Posting to your area", no "Cards in this flare
+       * · 5 cards": the founder (2026-11-25), "this screen also has too
+       * much text ... all of this information is conveyed contextually".
+       * The heading stays for a screen reader. Only a room is named,
+       * since a Flare there goes on its board. The app's is the same.
+       */}
+      <h1 className="sr-only">Post a Flare</h1>
+      {room && (
+        <p className="flex items-center gap-1.5 text-sm text-text-secondary">
+          <Store className="size-4" aria-hidden="true" />
+          In {room.name} at {room.storeName}
         </p>
-      </div>
+      )}
 
       {/* No hunt picker: a hunt is built from its own screen, whose "+"
           opens this with the hunt set (AddingToHunt says why). */}
@@ -385,13 +391,6 @@ function ComposerBody({
 
       {/* The cards, in order, with the cover first. */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-semibold text-text-primary">Cards in this flare</h2>
-          <span className="text-xs text-text-muted tabular-nums">
-            {draft.cards.length === 0 ? "None yet" : draftSummary(draft.cards)}
-          </span>
-        </div>
-
         <ul
           aria-label="Cards in this flare"
           className="flex [scrollbar-width:none] gap-2 overflow-x-auto py-1 [&::-webkit-scrollbar]:hidden"
@@ -479,8 +478,8 @@ function ComposerBody({
                   )}
                 </button>
                 {/* The binder's quantity tag, the one every count of
-                    copies wears; the order is the row itself, and the
-                    first wears Cover. */}
+                    copies wears. No Cover strip and no number: the
+                    first card is the cover; drag one there. */}
                 <QuantityBadge
                   quantity={item.quantity}
                   className="pointer-events-none absolute top-1 left-1"
@@ -499,11 +498,6 @@ function ComposerBody({
                     className="pointer-events-none absolute top-1 right-1 rounded-[4px] bg-accent px-1 py-px text-[8px] leading-tight font-extrabold text-accent-contrast"
                   >
                     Flared
-                  </span>
-                )}
-                {index === 0 && (
-                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-surface/90 py-0.5 text-center text-[9px] font-bold tracking-wider text-text-secondary uppercase">
-                    Cover
                   </span>
                 )}
               </li>

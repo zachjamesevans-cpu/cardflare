@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import type { Ref } from "react";
-import { View, type ViewStyle } from "react-native";
+import { Text, View, type ViewStyle } from "react-native";
 
 import { useSpotlightTarget } from "./spotlight";
 import { Tap } from "./ui";
@@ -30,6 +30,8 @@ export function FlareButton({
   style,
   spotlight = false,
   outerRef,
+  done = false,
+  count = 0,
 }: {
   label: string;
   onPress: () => void;
@@ -38,6 +40,10 @@ export function FlareButton({
   spotlight?: boolean;
   /** For a tour that measures the button (the room's). */
   outerRef?: Ref<View>;
+  /** This card's art is in your Flare already: a ✓, and a tap views it. */
+  done?: boolean;
+  /** Cards in your Flare so far, the cart's count (flare-cart.ts). */
+  count?: number;
 }) {
   const target = useSpotlightTarget();
   return (
@@ -68,24 +74,40 @@ export function FlareButton({
           elevation: 8,
         }}
       >
-        <Ionicons name="flame" size={26} color={colors.accentContrast} />
-        {/* The +: a small disc on the flame's shoulder. */}
+        {/* One bold +, nothing else: the founder (2026-11-25), of the
+            flame with a + disc on its shoulder, "still so ugly", then
+            this. The compose button everyone already reads. */}
+        <Ionicons
+          name={done ? "checkmark" : "add"}
+          size={done ? 30 : 34}
+          color={colors.accentContrast}
+        />
+      </Tap>
+      {/* The cart's count, the way a shopping bag wears one. */}
+      {count > 0 ? (
         <View
+          pointerEvents="none"
+          accessibilityLabel={`${count} in your Flare`}
           style={{
             position: "absolute",
-            top: 11,
-            right: 11,
-            width: 17,
-            height: 17,
-            borderRadius: 9,
-            backgroundColor: colors.accentContrast,
+            top: -3,
+            right: -3,
+            minWidth: 22,
+            height: 22,
+            borderRadius: 11,
+            paddingHorizontal: 5,
+            backgroundColor: colors.canvas,
+            borderWidth: 2,
+            borderColor: colors.accent,
             alignItems: "center",
             justifyContent: "center",
           }}
         >
-          <Ionicons name="add" size={14} color={colors.accent} />
+          <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "800" }}>
+            {count > 99 ? "99+" : count}
+          </Text>
         </View>
-      </Tap>
+      ) : null}
     </View>
   );
 }

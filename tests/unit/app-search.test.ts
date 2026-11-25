@@ -107,7 +107,10 @@ describe("the Search tab", () => {
     expect(src.app).toContain('import { SearchScreen } from "./src/screens/search";');
     /* A tab since the founder's five (Feed, Nights, Messages, Search,
        Profile), and only a tab: no second Search route on the stack. */
-    expect(src.app.match(/  Search: undefined;/g)).toHaveLength(1);
+    /* A hub's "Search Lorcana" may hand it a game (game-hub.tsx). */
+    expect(
+      src.app.match(/  Search: \{ game\?: string; at\?: number \} \| undefined;/g),
+    ).toHaveLength(1);
     expect(src.app).toContain('options={{ title: "Search", tabBarLabel: "Search" }}');
     expect(src.app).not.toMatch(/<Stack\.Screen\s+name="Search"/);
     expect(src.app).not.toContain("FindPlayer");
@@ -237,10 +240,8 @@ describe("the card page", () => {
        card, opens the composer with the card as the draft's first line. */
     expect(src.card).not.toContain('label="Post a Flare for it"');
     const button = src.card.slice(src.card.indexOf("<FlareButton"));
-    expect(button).toContain("label={`Flare ${name}`}");
-    expect(button).toMatch(
-      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,/,
-    );
+    expect(button).toContain("`Add ${name} to your Flare`");
+    expect(button).toContain("done={shownInCart}");
   });
 
   it("every section is drawn only when it has rows, led by its count", () => {

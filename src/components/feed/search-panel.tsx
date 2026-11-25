@@ -1,5 +1,6 @@
 "use client";
 
+import type { GameSlug } from "@/lib/players/games-catalog";
 import dynamic from "next/dynamic";
 
 /**
@@ -19,9 +20,13 @@ const EverythingSearch = dynamic(
 export function SearchPanel({
   account = null,
   flaredCardIds = [],
+  game = null,
 }: {
   account?: string | null;
   flaredCardIds?: string[];
+  game?: GameSlug | null;
 }) {
-  return <EverythingSearch account={account} flaredCardIds={flaredCardIds} />;
+  return (
+    <EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />
+  );
 }

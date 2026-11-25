@@ -130,7 +130,7 @@ describe("the spotlight on the Flare button", () => {
     /* The tab bar's Flare button carries the spotlight target now that
        the Feed's + is gone (dock.tsx, flare-button.tsx). */
     expect(read("mobile/src/dock.tsx")).toMatch(
-      /<FlareButton\s+label="Post a Flare"\s+spotlight\s/,
+      /<FlareButton\s+label=\{[\s\S]*?"Post a Flare"\}\s+spotlight\s/,
     );
     expect(read("mobile/src/flare-button.tsx")).toContain(
       "ref={spotlight ? target : outerRef}",

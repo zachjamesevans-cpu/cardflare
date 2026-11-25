@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Clock, Search } from "lucide-react";
+import { Clock, Search, X } from "lucide-react";
 
 import {
   readRecent,
@@ -18,7 +19,7 @@ import { isRenderableImageUrl } from "@/lib/cards/images";
 import { pickBasePrinting, type CardResult } from "@/lib/cards/schema";
 import { cn } from "@/lib/cn";
 import { searchEmpty } from "@/lib/copy/empty-copy";
-import { gameShortName } from "@/lib/players/games-catalog";
+import { gameShortName, TCG_GAMES, type GameSlug } from "@/lib/players/games-catalog";
 import { formatHandle } from "@/lib/players/handle";
 import {
   matchScore,
@@ -91,8 +92,8 @@ interface Found {
 const DEBOUNCE_MS = 250;
 const MIN_CHARS = 2;
 
-async function findCards(query: string): Promise<SearchCard[]> {
-  const response = await searchCardsAction(query);
+async function findCards(query: string, game: string | null): Promise<SearchCard[]> {
+  const response = await searchCardsAction(query, game ? { game } : {});
   return response.status === "ok" ? response.results : [];
 }
 
@@ -121,13 +122,19 @@ const cardScore = (text: string) => (card: SearchCard) =>
 const best = <T,>(items: T[], score: (item: T) => number) =>
   items.reduce((top, item) => Math.max(top, score(item)), 0);
 
+/** Games with no cards in the catalogue yet: a tile, not a link. */
+const NO_CATALOG: ReadonlySet<string> = new Set(["flesh-and-blood"]);
+
 export function EverythingSearch({
   account = null,
   flaredCardIds = [],
+  game = null,
 }: {
   account?: string | null;
-  /** Cards on your open Flares: a small flame on the result's art. */
+  /** Cards on your open Flares: a "Flared" tag on the result. */
   flaredCardIds?: string[];
+  /** Cards from one game only, from its hub's "Search Lorcana". */
+  game?: GameSlug | null;
 }) {
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Found | null>(null);
@@ -163,7 +170,7 @@ export function EverythingSearch({
     const request = ++latest.current;
     timer.current = setTimeout(() => {
       void Promise.all([
-        onlyPlayers ? none<SearchCard>() : quietly(findCards(text)),
+        onlyPlayers ? none<SearchCard>() : quietly(findCards(text, game)),
         quietly(findPlayers(text)),
         onlyPlayers ? none<FoundStore>() : quietly(searchStoresAction(text)),
       ]).then(([cards, players, stores]) => {
@@ -420,6 +427,64 @@ export function EverythingSearch({
                   />
                   <span className="truncate">{item}</span>
                 </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* A game's hub sent you here: its cards only, until this is cleared. */}
+      {game && (
+        <Link
+          href="/search"
+          className="inline-flex items-center gap-1.5 self-start rounded-full bg-accent px-3 py-1.5 text-sm font-bold text-accent-contrast"
+        >
+          {gameShortName(game)}
+          <X className="size-3.5" aria-hidden="true" />
+          <span className="sr-only">Search every game</span>
+        </Link>
+      )}
+
+      {/* Before typing: each game's hub (src/app/games/[game]), its logo
+          in cardflare green, as the app's Search draws them. */}
+      {!typing && !game && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+            Browse by game
+          </h2>
+          <ul className="grid grid-cols-2 gap-2.5">
+            {TCG_GAMES.map((entry) => (
+              <li key={entry.slug}>
+                {NO_CATALOG.has(entry.slug) ? (
+                  /* No cards for it yet (Scrydex does not carry it): said,
+                     not linked to an empty hub. The app's tile is the same. */
+                  <span className="flex aspect-[1.6] flex-col items-center justify-center gap-1 rounded-[var(--radius-card)] border border-border bg-surface p-4 opacity-60">
+                    <Image
+                      src={`/games/${entry.slug}.png`}
+                      alt=""
+                      width={600}
+                      height={260}
+                      className="max-h-[70%] w-auto object-contain"
+                    />
+                    <span className="text-[11px] font-bold text-text-muted">
+                      {entry.shortName} · Coming soon
+                    </span>
+                  </span>
+                ) : (
+                  <Link
+                    href={`/games/${entry.slug}`}
+                    aria-label={`${entry.shortName}: most hunted and searched`}
+                    className="flex aspect-[1.6] items-center justify-center rounded-[var(--radius-card)] border border-border bg-surface p-4 transition-colors hover:border-border-strong"
+                  >
+                    <Image
+                      src={`/games/${entry.slug}.png`}
+                      alt=""
+                      width={600}
+                      height={260}
+                      className="max-h-full w-auto object-contain"
+                    />
+                  </Link>
+                )}
               </li>
             ))}
           </ul>

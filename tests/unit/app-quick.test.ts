@@ -94,10 +94,14 @@ describe("Post a Flare for it carries the card", () => {
     );
   });
 
-  it("the card page hands over its card", () => {
+  /* The card's + is a cart now (flare-cart.ts): it adds the art on show
+     to the draft, and a card already in it opens the Flare. */
+  it("the card page adds the art on show to the cart", () => {
     expect(card).toMatch(
-      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: arts\[artAt\]\?\.imageUrl \?\? card\.imageUrl,\s*printingId: arts\[artAt\]\?\.printingIds\?\.\[0\] \?\? null,/,
+      /void addToCart\(\{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: art\?\.imageUrl \?\? card\.imageUrl,/,
     );
+    expect(card).toContain("printingId: shownPrinting,");
+    expect(card).toMatch(/if \(shownInCart\) \{\s*openComposer\(navigation\);/);
   });
 
   it("the hub reads it once, clears it, and hands it to the composer", () => {

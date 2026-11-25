@@ -2,9 +2,11 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { cartSaved } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -42,7 +44,6 @@ import { CardTray } from "../card-tray";
 import { CardSelectSheet, lineKey, type PickedLine } from "../card-select";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
-import { cardsLabel, copiesLabel } from "../flare-copy";
 import { FlareFeedCard } from "../flare-feed-card";
 import { useTabBarInset } from "../glass";
 import { haveLocationPermission, requestCoords, type Coords } from "../location";
@@ -165,7 +166,6 @@ export function withCardFirst(draft: Draft, card: HandedCard, line?: DraftItem):
   };
 }
 
-type Step = "select" | "compose";
 
 export function FlareComposer({
   target,
@@ -211,6 +211,9 @@ export function FlareComposer({
   footer?: React.ReactNode;
 }) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  /* Opened as the Compose sheet, fitted to its contents (App.tsx). */
+  const inSheet = useRoute().name === "Compose";
+  const insets = useSafeAreaInsets();
   const tabInset = useTabBarInset();
 
   const [draft, setDraft] = useState<Draft>(EMPTY);
@@ -327,6 +330,8 @@ export function FlareComposer({
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void writeCache("composer", draftKey, draft);
+      /* The cart's count is the draft's (flare-cart.ts). */
+      cartSaved(draft.items);
     }, 400);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
@@ -441,9 +446,6 @@ export function FlareComposer({
     setDraft((current) => ({ ...current, ...change }));
   const setItems = (items: DraftItem[]) => patch({ items });
 
-  const copies = draft.items.reduce((sum, item) => sum + item.quantity, 0);
-  /* The preview is a look at the compose step, not a step of its own. */
-  const step: Step = draft.items.length === 0 ? "select" : "compose";
   const chosenHunt = draft.hunt;
   const huntName =
     chosenHunt?.kind === "existing"
@@ -557,6 +559,7 @@ export function FlareComposer({
       setPreviewing(false);
       setEditing(null);
       if (draftKey) void writeCache("composer", draftKey, EMPTY);
+      cartSaved([]);
     } catch (caught) {
       const code = caught instanceof ApiError ? caught.code : "";
       setError(
@@ -587,7 +590,9 @@ export function FlareComposer({
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
         gap: spacing(3),
-        paddingBottom: spacing(4) + tabInset,
+        /* As a sheet (Compose) there is no tab bar under it, only the
+           home indicator; as the tab, clear of the floating bar. */
+        paddingBottom: spacing(4) + (inSheet ? insets.bottom : tabInset),
       }}
       keyboardShouldPersistTaps="handled"
       /* A touch anywhere, or a scroll, closes a Delete left showing on
@@ -623,22 +628,19 @@ export function FlareComposer({
         </Card>
       ) : (
         <Card>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: spacing(2),
-            }}
-          >
-            <Title>Post a Flare</Title>
-            {target.kind === "room" ? (
-              <Muted>{`To room ${target.code}`}</Muted>
-            ) : (
-              <Muted>{LOCAL_ENABLED ? "To friends and nearby" : "To friends"}</Muted>
-            )}
-          </View>
-          <StepStrip step={step} />
+          {/*
+           * No title, no "To friends", no steps and no "Cards in this
+           * flare · 5 cards": the founder (2026-11-25), "this screen also
+           * has too much text ... all of this information is conveyed
+           * contextually". The bar above already says Post a Flare. Only
+           * a room is named, since a Flare there goes on its board.
+           */}
+          {target.kind === "room" ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
+              <Ionicons name="storefront-outline" size={14} color={colors.textSecondary} />
+              <Muted>{`In room ${target.code}`}</Muted>
+            </View>
+          ) : null}
 
           {previewing ? (
             <FlareComposerPreview
@@ -658,24 +660,6 @@ export function FlareComposer({
               {draft.hunt?.kind === "existing" ? (
                 <AddingToHunt name={huntName} onLeave={() => patch({ hunt: null })} />
               ) : null}
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: spacing(2),
-                }}
-              >
-                <Text style={{ color: colors.textPrimary, fontWeight: "700" }}>
-                  Cards in this flare
-                </Text>
-                <Muted>
-                  {draft.items.length > 0
-                    ? `${cardsLabel(draft.items.length)} · ${copiesLabel(copies)}`
-                    : "None yet"}
-                </Muted>
-              </View>
 
               {/* A whole deck at once, from the paste that used to live in
                   Settings. Only on an empty want: once cards are in, the
@@ -857,73 +841,6 @@ export function FlareComposer({
   );
 }
 
-/**
- * Select cards, Compose: where you are in the two. Preview used to be a
- * third; it is an optional look now, reached from Compose, so it is not
- * a place on the strip.
- */
-function StepStrip({ step }: { step: Step }) {
-  const steps: { key: Step; label: string }[] = [
-    { key: "select", label: "Select cards" },
-    { key: "compose", label: "Compose" },
-  ];
-  const at = steps.findIndex((entry) => entry.key === step);
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}>
-      {steps.map((entry, index) => {
-        const done = index < at;
-        const now = index === at;
-        return (
-          <View
-            key={entry.key}
-            style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5) }}
-          >
-            <View
-              style={{
-                width: 18,
-                height: 18,
-                borderRadius: 999,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: now || done ? colors.accent : colors.elevated,
-                borderWidth: 1,
-                borderColor: now || done ? colors.accent : colors.border,
-              }}
-            >
-              {done ? (
-                <Ionicons name="checkmark" size={11} color={colors.accentContrast} />
-              ) : (
-                <Text
-                  maxFontSizeMultiplier={1.3}
-                  style={{
-                    color: now ? colors.accentContrast : colors.textMuted,
-                    fontSize: 11,
-                    fontWeight: "700",
-                  }}
-                >
-                  {index + 1}
-                </Text>
-              )}
-            </View>
-            <Text
-              style={{
-                color: now ? colors.textPrimary : colors.textMuted,
-                fontSize: 12,
-                fontWeight: now ? "700" : "500",
-              }}
-            >
-              {entry.label}
-            </Text>
-            {index < steps.length - 1 ? (
-              <Ionicons name="chevron-forward" size={11} color={colors.textMuted} />
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
 /** Looking for | Offering, one answer for the whole post. */
 /** The art for a tray tile: the chosen printing's, else the lead's. */
 function artFor(item: DraftItem): string | null {
@@ -1027,6 +944,8 @@ function CardEditor({
  * is the art's own name when it has one.
  */
 export function artName(label: string | null): string {
+  /* Already a name ("Alt Art", from a card sheet's carousel). */
+  if (label && !label.includes("·") && /^[A-Z]/.test(label)) return label;
   const last = (label ?? "").split("·").pop()?.trim() ?? "";
   if (!/^[a-z][A-Za-z0-9]*$/.test(last)) return "Standard";
   return last.replace(/([a-z])([A-Z0-9])/g, "$1 $2").replace(/^./, (first) => first.toUpperCase());
