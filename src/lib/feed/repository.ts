@@ -1009,7 +1009,9 @@ function reasonFor(item: FeedItem): string {
     case "shop":
       return "Yours to spend Embers on";
     case "start":
-      return "The Feed cannot answer this one for you";
+      /* No line above the starters: the founder, "delete the 'the feed
+         cannot answer this one for you' text at top" (2026-11-25). */
+      return "";
   }
 }
 

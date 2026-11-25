@@ -66,7 +66,7 @@ export function FeedList({
           header instead - the founder: no separate text between
           cards - and a store's post is a post, so it goes without
           one too. */}
-      {item.kind !== "hunt" && item.kind !== "storePost" && (
+      {item.reason && item.kind !== "hunt" && item.kind !== "storePost" && (
         <p className="-mb-1 text-xs text-text-muted">{item.reason}</p>
       )}
       <Item item={item} view={view} />

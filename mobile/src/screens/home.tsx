@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { FirstFlareCard } from "../first-flare-card";
 import { TradersStrip } from "../traders-strip";
 import { UI_EXPERIMENT } from "../ui-experiment";
 import { type RouteProp, useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
@@ -1474,6 +1475,13 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                       />
                     ) : null}
                   </Card>
+                ) : item.kind === "start" && item.topic === "deck" ? (
+                  /* The second starter is the first Flare now, not a deck
+                     list (src/first-flare-card.tsx). */
+                  <FirstFlareCard
+                    key={`start-${index}`}
+                    onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+                  />
                 ) : item.kind === "start" ? (
                   <Card key={`start-${index}`}>
                     <View

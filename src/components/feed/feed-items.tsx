@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FirstFlareCard } from "@/components/feed/first-flare-card";
 import {
   CalendarClock,
   ClipboardList,
@@ -137,6 +138,9 @@ export function Item({
       </Card>
     );
   }
+
+  /* The second starter is the first Flare now, not a deck list. */
+  if (item.kind === "start" && item.topic === "deck") return <FirstFlareCard />;
 
   if (item.kind === "start") {
     const starter = STARTERS[item.topic];

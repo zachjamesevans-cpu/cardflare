@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { ScrollView, Text, useWindowDimensions, View } from "react-native";
@@ -176,6 +177,10 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ) : null}
         </View>
       </View>
+
+      {/* Market prices from Scrydex, loaded after the card: the
+          website's panel, the same spot (src/card-prices.tsx). */}
+      <CardPricesPanel cardId={card.cardId} />
 
       {/* You: one line per true fact, then the one control. Nothing of
           this when signed out; the server sends `you` as null. */}

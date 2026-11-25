@@ -1768,6 +1768,28 @@ export interface CardPage {
 }
 
 /** The card page. A 404 is "no such card", which the screen says. */
+/** A card's market prices (Scrydex), shaped by src/lib/cards/price-shape.ts. */
+export interface PrintingPrices {
+  printingId: string | null;
+  variant: string;
+  label: string;
+  currency: string;
+  market: number | null;
+  low: number | null;
+  high: number | null;
+  change7: number | null;
+  conditions: { condition: string; market: number }[];
+  graded: { company: string; grade: string; market: number }[];
+}
+
+export type CardPrices =
+  | { state: "ok"; printings: PrintingPrices[]; fetchedAt: string }
+  | { state: "none" }
+  | { state: "unavailable" };
+
+export const getCardPrices = (cardId: string) =>
+  call<{ prices: CardPrices }>("GET", `/api/v1/cards/${encodeURIComponent(cardId)}/prices`);
+
 export const getCardPage = (cardId: string) =>
   call<{ page: CardPage }>("GET", `/api/v1/cards/${encodeURIComponent(cardId)}/page`);
 
