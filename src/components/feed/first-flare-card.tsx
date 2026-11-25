@@ -17,10 +17,14 @@ import {
 export function FirstFlareCard() {
   const strip = [...FIRST_FLARE_CARDS, ...FIRST_FLARE_CARDS];
   return (
-    <section className="relative isolate overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+    /* No box: the Feed's posts have none, so neither does this - the
+       founder, "since our posts don't have rounded rectangles around
+       them, why not just apply the same logic here". The strip runs the
+       column's full width and a hairline closes it, like a post. */
+    <section className="relative isolate overflow-hidden border-b border-border-strong/70">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
         <div
-          className="cf-first-flare-strip flex h-full w-max items-center gap-3 px-3 opacity-30 motion-reduce:animate-none"
+          className="cf-first-flare-strip flex h-full w-max items-center gap-3 opacity-30 motion-reduce:animate-none"
           style={{ animationDuration: `${FIRST_FLARE_SECONDS}s` }}
         >
           {strip.map((card, index) => (
@@ -34,10 +38,10 @@ export function FirstFlareCard() {
             />
           ))}
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/80 to-surface/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-canvas via-canvas/80 to-canvas/20" />
       </div>
 
-      <div className="flex min-h-56 flex-col justify-end gap-3 p-5">
+      <div className="flex min-h-56 flex-col justify-end gap-3 px-3 pt-5 pb-5">
         <h2 className="font-display text-2xl font-extrabold tracking-tight text-text-primary">
           {FIRST_FLARE.headline}
         </h2>
