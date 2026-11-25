@@ -17,7 +17,7 @@ import {
 export function FirstFlareCard() {
   const strip = [...FIRST_FLARE_CARDS, ...FIRST_FLARE_CARDS];
   return (
-    <section className="relative isolate overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface">
+    <section className="relative isolate overflow-hidden rounded-[var(--radius-card)] border border-accent bg-surface">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
         <div
           className="cf-first-flare-strip flex h-full w-max items-center gap-3 px-3 opacity-30 motion-reduce:animate-none"

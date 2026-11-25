@@ -53,8 +53,10 @@ export function FirstFlareCard({ onPost }: { onPost: () => void }) {
     <View
       style={{
         borderRadius: radius.card,
-        borderWidth: 1,
-        borderColor: colors.border,
+        /* The button's green, round the whole card: the founder, "make
+           the color of the ring our cardflare green". */
+        borderWidth: 1.5,
+        borderColor: colors.accent,
         backgroundColor: colors.surface,
         overflow: "hidden",
       }}
