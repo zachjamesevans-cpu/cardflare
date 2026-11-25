@@ -128,14 +128,12 @@ describe("the preview is still there, and optional", () => {
     expect(appPreview).toContain("This is how it will look in the Feed.");
   });
 
-  it("is not a step on the app's strip any more", () => {
-    expect(app).toContain('type Step = "select" | "compose";');
-    const strip = app.slice(app.indexOf("function StepStrip("));
-    const steps = strip.slice(strip.indexOf("const steps"), strip.indexOf("];"));
-    expect(steps).toContain('{ key: "select", label: "Select cards" }');
-    expect(steps).toContain('{ key: "compose", label: "Compose" }');
-    expect(steps).not.toContain("preview");
-    expect(steps.match(/key: "/g)).toHaveLength(2);
+  /* The strip itself is gone (the founder, 2026-11-25: "this screen also
+     has too much text"), so the preview is not a step anywhere. */
+  it("is not a step: there is no step strip any more", () => {
+    expect(app).not.toContain("function StepStrip(");
+    expect(app).not.toContain('"Select cards"');
+    expect(app).not.toContain("Cards in this flare");
   });
 });
 

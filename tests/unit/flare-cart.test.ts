@@ -45,3 +45,20 @@ describe("the Flare as a cart", () => {
     );
   });
 });
+
+describe("the composer says only what the cards do not", () => {
+  it("has no title line, steps, counts or card numbers; a room is named", () => {
+    const app = read("mobile/src/screens/flare-composer.tsx");
+    expect(app).not.toContain("<Title>Post a Flare</Title>");
+    expect(app).not.toContain(
+      '<Muted>{LOCAL_ENABLED ? "To friends and nearby" : "To friends"}</Muted>',
+    );
+    expect(app).toContain("`In room ${target.code}`");
+    expect(read("mobile/src/card-tray.tsx")).not.toContain("{index + 1}");
+    const web = read("src/components/flares/flare-composer.tsx");
+    expect(web).not.toContain("Posting to your area.");
+    expect(web).not.toContain(">Cards in this flare<");
+    expect(web).not.toMatch(/>\s*Cover\s*</);
+    expect(web).toContain("In {room.name} at {room.storeName}");
+  });
+});
