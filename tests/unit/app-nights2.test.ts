@@ -34,6 +34,7 @@ const bring = read("mobile/src/what-to-bring.tsx");
 const players = read("mobile/src/players-going.tsx");
 const details = read("mobile/src/event-details.tsx");
 const fab = read("mobile/src/flare-fab.tsx");
+const flareButton = read("mobile/src/flare-button.tsx");
 const section = read("mobile/src/night-section.tsx");
 const matchesScreen = read("mobile/src/screens/night-matches.tsx");
 const playerScreen = read("mobile/src/screens/night-player.tsx");
@@ -355,15 +356,20 @@ describe("the night's page", () => {
     expect(room).toContain("address={room.store?.address ?? null}");
   });
 
-  it("floats + Flare for a seat in a writable phase, in place of the lime bar", () => {
+  it("floats the Flare button for a seat in a writable phase, in place of the lime bar", () => {
     expect(room).toContain("{joined && writable ? (");
     expect(room).toMatch(
       /const writable =\s*phase === null\s*\? room\.status === "open" \|\| room\.early\s*: phase === "live" \|\| phase === "early";/,
     );
     expect(room).not.toContain("styles.actionBar");
-    expect(fab).toContain("accessibilityLabel={POST_A_FLARE}");
-    expect(fab).toContain('name="add"');
-    expect(fab).toContain("backgroundColor: colors.accent");
+    /* The room's button is the app's one Flare button: a green "+ flame". */
+    expect(fab).toContain("<FlareButton");
+    expect(fab).toContain("label={POST_A_FLARE}");
+    expect(fab).toContain("export const FAB_HEIGHT = FLARE_BUTTON;");
+    expect(flareButton).toContain("accessibilityLabel={label}");
+    expect(flareButton).toContain('name="add"');
+    expect(flareButton).toContain('name="flame"');
+    expect(flareButton).toContain("backgroundColor: colors.accent");
   });
 
   it("divides sections with labels and hairlines, not a card each", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { FlareButton, flareTarget } from "@/components/flares/flare-button";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MapPin, MessageCircle, Search, UserCircle2 } from "lucide-react";
@@ -96,74 +97,85 @@ function isActive(label: string, href: string, pathname: string): boolean {
  */
 export function PlayerTabs({ unread = 0 }: { unread?: number }) {
   const pathname = usePathname();
+  /* The Flare button, above the bar, for whatever this page is. */
+  const flare = flareTarget(pathname);
 
   return (
-    <nav
-      aria-label="Player"
-      /*
-       * A BUBBLE, not a floor. The founder, after looking at Instagram:
-       * "like the bubbles at the bottom instead of having it anchored."
-       * The bar sits in from both sides and floats clear of the bottom
-       * edge, so the page runs underneath it and visibly keeps going.
-       *
-       * `backdrop-blur` is the web's nearest thing to the app's Liquid
-       * Glass: the same job - let the page through - by the only means
-       * a browser has. The translucent surface underneath it is what
-       * keeps the labels readable where the blur is unsupported.
-       */
-      className="fixed inset-x-3 bottom-3.5 z-50 mx-auto max-w-2xl rounded-full border border-border bg-surface/80 shadow-[var(--shadow-panel)] backdrop-blur-xl"
-    >
-      <ul className="flex items-stretch">
-        {TABS.map((tab) => {
-          const active = isActive(tab.label, tab.href, pathname);
-          const Icon = tab.icon;
+    <>
+      {flare && (
+        <FlareButton
+          href={flare.href}
+          label={flare.label}
+          className="fixed right-4 bottom-[5.25rem] z-50 sm:right-[max(1rem,calc(50%-21rem))]"
+        />
+      )}
+      <nav
+        aria-label="Player"
+        /*
+         * A BUBBLE, not a floor. The founder, after looking at Instagram:
+         * "like the bubbles at the bottom instead of having it anchored."
+         * The bar sits in from both sides and floats clear of the bottom
+         * edge, so the page runs underneath it and visibly keeps going.
+         *
+         * `backdrop-blur` is the web's nearest thing to the app's Liquid
+         * Glass: the same job - let the page through - by the only means
+         * a browser has. The translucent surface underneath it is what
+         * keeps the labels readable where the blur is unsupported.
+         */
+        className="fixed inset-x-3 bottom-3.5 z-50 mx-auto max-w-2xl rounded-full border border-border bg-surface/80 shadow-[var(--shadow-panel)] backdrop-blur-xl"
+      >
+        <ul className="flex items-stretch">
+          {TABS.map((tab) => {
+            const active = isActive(tab.label, tab.href, pathname);
+            const Icon = tab.icon;
 
-          const dot = tab.label === "Messages" && unread > 0;
+            const dot = tab.label === "Messages" && unread > 0;
 
-          return (
-            <li key={tab.label} className="flex-1">
-              <Link
-                href={tab.href}
-                aria-current={active ? "page" : undefined}
-                /* Icons only. The founder: "Delete the text below all of
+            return (
+              <li key={tab.label} className="flex-1">
+                <Link
+                  href={tab.href}
+                  aria-current={active ? "page" : undefined}
+                  /* Icons only. The founder: "Delete the text below all of
                    the tabs and tighten up the dock. The icons explain
                    themselves." The name stays for a screen reader. */
-                className={cn(
-                  "flex h-12 items-center justify-center transition-colors active:scale-95",
-                  /* White, not grey, when not chosen: the founder, "can
+                  className={cn(
+                    "flex h-12 items-center justify-center transition-colors active:scale-95",
+                    /* White, not grey, when not chosen: the founder, "can
                      you make their outlines white instead of gray? easier
                      to see". The app's dock is the same. */
-                  active ? "text-accent" : "text-text-primary hover:text-accent",
-                )}
-              >
-                <span className="relative flex items-center justify-center">
-                  <Icon className="size-6.5" aria-hidden="true" />
+                    active ? "text-accent" : "text-text-primary hover:text-accent",
+                  )}
+                >
+                  <span className="relative flex items-center justify-center">
+                    <Icon className="size-6.5" aria-hidden="true" />
 
-                  {/* The count, Instagram's way: the founder, "show you how
+                    {/* The count, Instagram's way: the founder, "show you how
                       many messages you have unread on the taskbar on bottom
                       like how it does with instagram dms". The old dot's
                       neon green, grown into a pill, "9+" past nine. The
                       app's tab bar draws the same (mobile/src/unread-dot.tsx).
                       The ring in the bar's colour keeps it legible. */}
-                  {dot && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] leading-none font-extrabold text-accent-contrast ring-2 ring-surface"
-                    >
-                      {unread > 9 ? "9+" : unread}
-                    </span>
-                  )}
-                </span>
+                    {dot && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-1.5 -right-2.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[10px] leading-none font-extrabold text-accent-contrast ring-2 ring-surface"
+                      >
+                        {unread > 9 ? "9+" : unread}
+                      </span>
+                    )}
+                  </span>
 
-                <span className="sr-only">
-                  {tab.label}
-                  {dot && `, ${unread} unread`}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+                  <span className="sr-only">
+                    {tab.label}
+                    {dot && `, ${unread} unread`}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </>
   );
 }

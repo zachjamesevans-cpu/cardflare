@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openComposer } from "../open-composer";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -257,7 +258,7 @@ export function InboxScreen() {
             <Button
               label={INBOX_EMPTY_ACTION}
               variant="secondary"
-              onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+              onPress={() => openComposer(navigation)}
             />
           </View>
         </Card>

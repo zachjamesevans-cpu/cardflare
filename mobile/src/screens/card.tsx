@@ -1,11 +1,14 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { ArtCarousel } from "../art-carousel";
+import { openComposer } from "../open-composer";
+import { FlareButton } from "../flare-button";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
@@ -57,8 +60,12 @@ export function CardScreen({ cardId }: { cardId: string }) {
     void loadCardPrices(cardId);
   }, [cardId]);
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
+  const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);
+  /* Which art the carousel shows; back to the first on another card. */
+  const [artAt, setArtAt] = useState(0);
+  useEffect(() => setArtAt(0), [cardId]);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -120,7 +127,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
       <View
         style={{
           flex: 1,
-          backgroundColor: colors.canvas,
+          backgroundColor: colors.surface,
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
         }}
@@ -150,27 +157,47 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const name = displayCardName(card.name, card.number);
   /* Large, but never wider than a card reads comfortably. */
   const artWidth = Math.min(240, screenWidth - gutter * 2);
+  /* The arts to swipe; an older server sends only the one. */
+  const arts =
+    card.arts && card.arts.length > 0
+      ? card.arts
+      : card.imageUrl
+        ? [{ imageUrl: card.imageUrl, label: "", variants: [] }]
+        : [];
 
   return (
     <CardOverlay>
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.canvas }}
+      style={{ flex: 1, backgroundColor: colors.surface }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
         gap: spacing(4),
+        /* Room under the last section for the Flare button. */
+        paddingBottom: spacing(24),
       }}
     >
       {/* The card: the art large and centred, tap to read it at full
           size like every other card in the app, then the name, the
           number and the game under it. */}
       <View style={{ alignItems: "center", gap: spacing(3) }}>
-        <CardImage
-          imageUrl={card.imageUrl}
-          width={artWidth}
-          name={name}
-          cardNumber={card.number}
-        />
+        {/* Every art of the card, swiped (art-carousel.tsx); the sheet's
+            full width, past the gutter, so a page is one art. */}
+        {arts.length === 0 ? (
+          <CardImage imageUrl={null} width={artWidth} name={name} cardNumber={card.number} />
+        ) : (
+        <View style={{ marginHorizontal: -gutter }}>
+          <ArtCarousel
+            arts={arts}
+            name={name}
+            cardNumber={card.number}
+            pageWidth={screenWidth}
+            artWidth={artWidth}
+            index={Math.min(artAt, Math.max(0, arts.length - 1))}
+            onIndex={setArtAt}
+          />
+        </View>
+        )}
         <View style={{ alignItems: "center", gap: spacing(1) }}>
           <Title>{name}</Title>
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
@@ -191,7 +218,14 @@ export function CardScreen({ cardId }: { cardId: string }) {
 
       {/* Market prices from Scrydex, loaded after the card: the
           website's panel, the same spot (src/card-prices.tsx). */}
-      <CardPricesPanel cardId={card.cardId} />
+      <CardPricesPanel
+        cardId={card.cardId}
+        variants={arts[artAt]?.variants}
+        onPick={(variant) => {
+          const at = arts.findIndex((art) => art.variants.includes(variant));
+          if (at >= 0) setArtAt(at);
+        }}
+      />
 
       {/* You: one line per true fact, then the one control. Nothing of
           this when signed out; the server sends `you` as null. */}
@@ -214,31 +248,15 @@ export function CardScreen({ cardId }: { cardId: string }) {
             </Tap>
           ) : null}
           {you.wanted ? <Fact>You want this</Fact> : null}
-          <Button
-            label="Post a Flare for it"
-            /* The card goes with it, as the draft's first line: the
-               founder, "Should autofill as the first flare." */
-            onPress={() =>
-              navigation.navigate("Tabs", {
-                screen: "Flare",
-                params: {
-                  card: {
-                    cardId: card.cardId,
-                    name: card.name,
-                    cardNumber: card.number,
-                    imageUrl: card.imageUrl,
-                  },
-                },
-              })
-            }
-          />
         </View>
       ) : null}
 
-      <Section heading={located ? "Who has it near you" : "Who has it"}>
-        {holders.length === 0 ? (
-          <Muted>Nobody with it in a binder up for trade yet.</Muted>
-        ) : (
+      {/* Each list only when it has someone in it, led by how many: no
+          line that only says "nobody". The founder: "i don't like all
+          that text at the bottom". */}
+      {holders.length > 0 ? (
+      <Section heading={countHeading(holders.length, "player has it", "players have it", located ? "near you" : null)}>
+        {(
           holders.map((holder, index) => (
             <HolderRow
               key={holder.player.playerId}
@@ -249,11 +267,11 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
 
-      <Section heading="Who is hunting it">
-        {hunters.length === 0 ? (
-          <Muted>Nobody is hunting it yet.</Muted>
-        ) : (
+      {hunters.length > 0 ? (
+      <Section heading={countHeading(hunters.length, "player hunting it", "players hunting it", null)}>
+        {(
           hunters.map((hunter, index) => (
             <Row
               key={`${hunter.player.playerId}-${hunter.postId ?? hunter.huntId ?? index}`}
@@ -290,11 +308,11 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
 
-      <Section heading={located ? "In the case nearby" : "In the case"}>
-        {stores.length === 0 ? (
-          <Muted>No store near you has it listed.</Muted>
-        ) : (
+      {stores.length > 0 ? (
+      <Section heading={countHeading(stores.length, "store has it", "stores have it", located ? "nearby" : null)}>
+        {(
           stores.map((store, index) => (
             <Row
               key={store.storeId}
@@ -325,77 +343,73 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ))
         )}
       </Section>
+      ) : null}
     </ScrollView>
+    {/* The Flare button, for THIS card: the composer, the card already
+        in it (flare-button.tsx). It replaced "Post a Flare for it". */}
+    <FlareButton
+      label={`Flare ${name}`}
+      onPress={() =>
+        /* Pushed inside the sheet, so back returns to this very card
+           (src/open-composer.ts). */
+        openComposer(navigation, {
+          card: {
+            cardId: card.cardId,
+            name: card.name,
+            cardNumber: card.number,
+            imageUrl: card.imageUrl,
+          },
+        })
+      }
+      style={{ right: gutter + spacing(1), bottom: insets.bottom + spacing(4) }}
+    />
     </CardOverlay>
   );
 }
 
 /**
- * A card opens OVER the screen it was tapped on, never as a screen of its
- * own: the founder, "the card should not open a separate screen.
- * background should fade", everywhere a card opens. The route is a
- * transparent modal that fades in (App.tsx); this draws the dimmed
- * backdrop - a tap on it closes - and the sheet the card sits on.
+ * The card's sheet: iOS draws it (App.tsx presents this route as its own
+ * modal sheet, the screen behind receding and dimmed, a swipe down to
+ * close); this adds the grab handle that says it can be pulled down, and
+ * a close button for anyone who would rather tap.
  */
 function CardOverlay({ children }: { children: ReactNode }) {
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1 }}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        accessibilityRole="button"
-        accessibilityLabel="Close card"
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.72)",
-        }}
-      />
+    /* The sheet in the app's surface colour, a step up from the black
+       canvas, so it reads as lifted off the screen receding behind it. */
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
+        <View
+          accessibilityElementsHidden
+          style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong }}
+        />
+      </View>
       <View
         style={{
-          flex: 1,
-          /* Enough of the screen beneath shows, dimmed, to read as over
-             it, and to tap away. */
-          marginTop: insets.top + spacing(14),
-          borderTopLeftRadius: radius.panel,
-          borderTopRightRadius: radius.panel,
-          borderWidth: 1,
-          borderBottomWidth: 0,
-          borderColor: colors.border,
-          backgroundColor: colors.canvas,
-          overflow: "hidden",
+          position: "absolute",
+          top: spacing(2),
+          right: spacing(2),
+          zIndex: 1,
         }}
       >
-        <View
+        <Tap
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+          accessibilityLabel="Close"
           style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            paddingHorizontal: spacing(2),
-            paddingTop: spacing(2),
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.elevated,
           }}
         >
-          <Tap
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            accessibilityLabel="Close"
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.elevated,
-            }}
-          >
-            <Ionicons name="close" size={20} color={colors.textPrimary} />
-          </Tap>
-        </View>
-        {children}
+          <Ionicons name="close" size={19} color={colors.textPrimary} />
+        </Tap>
       </View>
+      {children}
     </View>
   );
 }
@@ -406,6 +420,16 @@ function Fact({ children }: { children: ReactNode }) {
 }
 
 /** A heading, then its rows or its one honest empty line. */
+/** "3 players have it near you", "1 player hunting it". */
+function countHeading(
+  count: number,
+  one: string,
+  many: string,
+  where: string | null,
+): string {
+  return [String(count), count === 1 ? one : many, where].filter(Boolean).join(" ");
+}
+
 function Section({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <View style={{ gap: spacing(2) }}>

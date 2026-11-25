@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openComposer } from "../open-composer";
 import { PRO_ENABLED } from "../pro-enabled";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -834,7 +835,7 @@ export function ProfileScreen() {
             <ProfileFlares
               flares={stillWanted(profile.flares)}
               yours
-              onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+              onPost={() => openComposer(navigation)}
             />
           );
         case "hunts":
@@ -849,10 +850,7 @@ export function ProfileScreen() {
               yours
               bare
               onAdd={(huntId) =>
-                navigation.navigate("Tabs", {
-                  screen: "Flare",
-                  params: { hunt: huntId },
-                })
+                openComposer(navigation, { hunt: huntId })
               }
               onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}
               onChanged={() => void load()}

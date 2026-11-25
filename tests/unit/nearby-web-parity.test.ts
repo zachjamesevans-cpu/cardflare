@@ -112,7 +112,7 @@ describe("the bar: Feed, Nearby, Messages, Search, Profile on both", () => {
 });
 
 describe("Nearby's header", () => {
-  it("has the way into a store's room at the top left, where the Feed has its +", () => {
+  it("has the way into a store's room at the top left, where the Feed's + was", () => {
     expect(app.home).toContain(
       'left={tab === "nearby" ? <NightsCodeButton /> : undefined}',
     );
@@ -122,9 +122,11 @@ describe("Nearby's header", () => {
     expect(app.nights).toContain("label={SCAN_OR_CODE}");
     expect(web.codeSheet).toContain("aria-label={SCAN_OR_CODE}");
     expect(web.codeSheet).toContain('href="/room"');
-    /* The + stays the Feed's. */
+    /* Posting is neither header's: it is the Flare button above the tab
+       bar, on every page (flare-button.tsx). */
     expect(web.page).not.toContain('href="/flare"\n              aria-label');
-    expect(web.feed).toContain('aria-label="Post a Flare"');
+    expect(web.feed).not.toContain('href="/flare"');
+    expect(web.dock).toContain("<FlareButton");
   });
 
   it("keeps the bell on the right, as the Feed does", () => {

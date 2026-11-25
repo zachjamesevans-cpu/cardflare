@@ -1,13 +1,13 @@
-import { Ionicons } from "@expo/vector-icons";
 import type { Ref } from "react";
-import { Text, View } from "react-native";
+import type { View } from "react-native";
+
+import { FLARE_BUTTON, FlareButton } from "./flare-button";
 
 import { POST_A_FLARE } from "./night-copy";
 import { colors, gutter, spacing } from "./theme";
-import { Tap } from "./ui";
 
 /** The button's own height, for whatever has to clear it: the undo toast. */
-export const FAB_HEIGHT = 48;
+export const FAB_HEIGHT = FLARE_BUTTON;
 
 /**
  * "+ Flare", floating bottom right above the dock: the website's
@@ -27,42 +27,16 @@ export function FlareFab({
 }: {
   onPress: () => void;
   bottom: number;
-  /** The room tour's last stop rings this (tour.tsx). */
   tourRef?: Ref<View>;
 }) {
+  /* The same "+ flame" as everywhere else (flare-button.tsx), so a room
+     posts through the one button the rest of the app has. */
   return (
-    /* The place on the outside: Tap puts its style on an inner view, and
-       the tour needs a view of its own to measure. */
-    <View
-      ref={tourRef}
-      collapsable={false}
-      pointerEvents="box-none"
-      style={{ position: "absolute", right: gutter + spacing(2), bottom }}
-    >
-    <Tap
+    <FlareButton
+      label={POST_A_FLARE}
       onPress={onPress}
-      accessibilityLabel={POST_A_FLARE}
-      style={{
-        height: FAB_HEIGHT,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: spacing(1),
-        paddingLeft: spacing(3),
-        paddingRight: spacing(4),
-        borderRadius: FAB_HEIGHT / 2,
-        backgroundColor: colors.accent,
-        shadowColor: colors.canvas,
-        shadowOpacity: 0.45,
-        shadowRadius: 10,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 6,
-      }}
-    >
-      <Ionicons name="add" size={22} color={colors.accentContrast} />
-      <Text style={{ color: colors.accentContrast, fontSize: 15, fontWeight: "800" }}>
-        Flare
-      </Text>
-    </Tap>
-    </View>
+      outerRef={tourRef}
+      style={{ right: gutter + spacing(2), bottom }}
+    />
   );
 }

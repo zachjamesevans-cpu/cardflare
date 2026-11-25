@@ -1731,6 +1731,8 @@ export interface CardPage {
     number: string;
     game: string;
     imageUrl: string | null;
+    /** Every distinct artwork, the lead first: the sheet's carousel. Older servers omit it. */
+    arts?: { imageUrl: string; label: string; variants: string[] }[];
   };
   /** Null when signed out. */
   you: {

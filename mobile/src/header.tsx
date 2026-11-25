@@ -73,12 +73,17 @@ export function AppHeader({
   title,
   left,
   right,
+  inSheet = false,
 }: {
   title: ReactNode;
   left?: ReactNode;
   right?: ReactNode;
+  /** In an iOS sheet: the status bar is not above it, so no room for it. */
+  inSheet?: boolean;
 }) {
-  const insets = useSafeAreaInsets();
+  const safe = useSafeAreaInsets();
+  /* A sheet starts below the status bar; a little room for its handle. */
+  const insets = inSheet ? { top: 10 } : safe;
 
   return (
     <View
@@ -175,6 +180,7 @@ export function StackHeader({
   return (
     <AppHeader
       title={titleOf(options.headerTitle, options.title, route.name)}
+      inSheet={options.presentation === "modal" || options.presentation === "formSheet"}
       left={
         back ? (
           <HeaderButton

@@ -25,6 +25,7 @@ const room = read("mobile/src/screens/room.tsx");
 const header = read("mobile/src/night-header.tsx");
 const composer = read("mobile/src/screens/flare-composer.tsx");
 const fab = read("mobile/src/flare-fab.tsx");
+const flareButton = read("mobile/src/flare-button.tsx");
 const app = read("mobile/App.tsx");
 
 /** The night's screen, from the header to the end of the component. */
@@ -207,7 +208,7 @@ describe("the profile popup", () => {
 });
 
 describe("the one button", () => {
-  it("is the floating + Flare, carrying whether you are open to trades, and the bar is gone", () => {
+  it("is the floating Flare button, carrying whether you are open to trades, and the bar is gone", () => {
     const foot = joined.slice(joined.indexOf("<FlareFab"));
     expect(foot).toContain(
       'navigation.navigate("PostFlare", { code, openToTrades: youOpen })',
@@ -216,8 +217,10 @@ describe("the one button", () => {
     expect(room).not.toContain("styles.actionBar");
     expect(room).not.toContain("ACTION_BAR_HEIGHT");
     expect(room).not.toContain('label="Post a Flare"');
-    expect(fab).toContain("accessibilityLabel={POST_A_FLARE}");
-    expect(fab).toContain('position: "absolute"');
+    expect(fab).toContain("<FlareButton");
+    expect(fab).toContain("label={POST_A_FLARE}");
+    expect(flareButton).toContain("accessibilityLabel={label}");
+    expect(flareButton).toContain('position: "absolute"');
     /* The undo rides above the floating button. */
     expect(joined).toContain("bottom={FAB_HEIGHT + bottomClear + spacing(6)}");
     /* One mention of the toggle on the whole screen: the guest row. */

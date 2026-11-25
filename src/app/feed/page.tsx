@@ -10,7 +10,7 @@ import {
   HowItWorks,
   LiveRoomBanner,
 } from "@/components/feed/feed-list";
-import { Plus, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { belongsToTab } from "@/lib/feed/repository";
@@ -113,14 +113,8 @@ function Shell({
       leading={
         playerId ? (
           <>
-            <Link
-              href="/flare"
-              aria-label="Post a Flare"
-              className={HEADER_BUTTON}
-              data-spotlight="post-flare"
-            >
-              <Plus className={HEADER_ICON} aria-hidden="true" />
-            </Link>
+            {/* No + up here any more: posting is the Flare button above
+                the tab bar, on every page (flare-button.tsx). */}
             {tour && <PostSpotlight />}
           </>
         ) : undefined

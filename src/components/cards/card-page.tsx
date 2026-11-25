@@ -1,11 +1,11 @@
 import Link from "next/link";
+import { CardArtCarousel } from "@/components/cards/card-art-carousel";
 import type { ReactNode } from "react";
 import { Crosshair, Layers, Search, Store } from "lucide-react";
 
 import { MessageButton } from "@/components/players/message-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
-import { buttonStyles } from "@/components/ui/button";
 import { isRenderableImageUrl } from "@/lib/cards/images";
 import type { CardPage, CardPagePlayer } from "@/lib/cards/card-page";
 import { demandLine } from "@/lib/cards/demand-copy";
@@ -27,6 +27,20 @@ import { gameShortName } from "@/lib/players/games-catalog";
  * has a postal code, because without one there is no distance to
  * sort by and the words would promise one.
  */
+/**
+ * "3 players have it near you": a list is shown only when it has someone
+ * in it, led by how many (the founder: "i don't like all that text at the
+ * bottom"). The app's card sheet says the same.
+ */
+function countHeading(
+  count: number,
+  one: string,
+  many: string,
+  where: string | null,
+): string {
+  return [String(count), count === 1 ? one : many, where].filter(Boolean).join(" ");
+}
+
 export function CardPageView({
   page,
   viewerId,
@@ -43,28 +57,24 @@ export function CardPageView({
   const { card, you, located, holders, hunters, stores } = page;
   const standing = demandLine(page.demand);
   const href = `/cards/${card.cardId}`;
-  const art =
-    imagesEnabled && isRenderableImageUrl(card.imageUrl) ? card.imageUrl : null;
+  /* Only arts this site may draw (the image allow-list). */
+  const arts = (card.arts ?? []).filter((entry) =>
+    isRenderableImageUrl(entry.imageUrl),
+  );
 
   return (
     <div className="flex w-full flex-col gap-5">
-      {/* The card: the art down the left, one aligned column beside it,
-          the round 16b shape (88 x 123). */}
-      <div className="flex items-stretch gap-3">
-        <span className="block h-[7.75rem] w-[5.5rem] shrink-0 overflow-hidden rounded-[8px] border border-border bg-elevated">
-          {art && (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={art} alt="" className="size-full object-cover" />
-          )}
-        </span>
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
+      {/* The card: every art of it, swiped (card-art-carousel.tsx), then
+          the name, number and game centred under it - the app's sheet. */}
+      <div className="flex flex-col items-center gap-3">
+        <CardArtCarousel arts={imagesEnabled ? arts : []} name={card.name} />
+        <div className="flex flex-col items-center gap-1 text-center">
           <h1 className="text-xl leading-tight font-extrabold text-text-primary">
             {card.name}
           </h1>
-          <p className="text-sm text-text-secondary">{card.number}</p>
-          <p className="text-sm text-text-muted">{gameShortName(card.game)}</p>
-          {/* "12 hunting · 3 have it for trade": the two lists below,
-              counted. What a price would say, without one. */}
+          <p className="text-sm text-text-secondary">
+            {card.number} · {gameShortName(card.game)}
+          </p>
           {standing && (
             <p className="text-sm font-semibold text-text-secondary">{standing}</p>
           )}
@@ -120,12 +130,6 @@ export function CardPageView({
                 )}
               </ul>
             )}
-            <Link
-              href={`/flare?card=${encodeURIComponent(card.cardId)}`}
-              className={buttonStyles("secondary", "sm")}
-            >
-              Post a Flare for it
-            </Link>
           </>
         ) : (
           <Link
@@ -138,124 +142,137 @@ export function CardPageView({
       </section>
 
       {/* Who has it: binders up for trade, nearest first. */}
-      <section className="flex flex-col gap-2" aria-labelledby="card-holders">
-        <h2
-          id="card-holders"
-          className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
-        >
-          {located ? "Who has it near you" : "Who has it"}
-        </h2>
-        {holders.length === 0 ? (
-          <p className="text-sm text-text-muted">
-            Nobody with it in a binder up for trade yet.
-          </p>
-        ) : (
-          <ul className="flex flex-col">
-            {holders.map(({ player, milesLabel }) => (
-              <li
-                key={player.playerId}
-                className="flex items-center gap-3 border-t border-border first:border-t-0"
-              >
-                <PlayerRow player={player} line={milesLabel} />
-                {viewerId && viewerId !== player.playerId && (
-                  <MessageButton playerId={player.playerId} className="shrink-0" />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {holders.length > 0 && (
+        <section className="flex flex-col gap-2" aria-labelledby="card-holders">
+          <h2
+            id="card-holders"
+            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+          >
+            {countHeading(
+              holders.length,
+              "player has it",
+              "players have it",
+              located ? "near you" : null,
+            )}
+          </h2>
+          {
+            <ul className="flex flex-col">
+              {holders.map(({ player, milesLabel }) => (
+                <li
+                  key={player.playerId}
+                  className="flex items-center gap-3 border-t border-border first:border-t-0"
+                >
+                  <PlayerRow player={player} line={milesLabel} />
+                  {viewerId && viewerId !== player.playerId && (
+                    <MessageButton playerId={player.playerId} className="shrink-0" />
+                  )}
+                </li>
+              ))}
+            </ul>
+          }
+        </section>
+      )}
 
       {/* Who is hunting it: an open Flare, or a card on a public hunt.
           The row opens the hunt when it is one; a Flare has no page of
           its own on the website, so its row opens the hunter's Flares. */}
-      <section className="flex flex-col gap-2" aria-labelledby="card-hunters">
-        <h2
-          id="card-hunters"
-          className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
-        >
-          Who is hunting it
-        </h2>
-        {hunters.length === 0 ? (
-          <p className="text-sm text-text-muted">Nobody is hunting it yet.</p>
-        ) : (
-          <ul className="flex flex-col">
-            {hunters.map((row) => {
-              const to = row.huntId
-                ? `/hunts/${row.huntId}`
-                : `/p/${row.player.playerId}?tab=flares`;
-              const facts = [
-                row.milesLabel,
-                `Wants ${row.quantity}`,
-                row.printingLabel,
-              ].filter((fact): fact is string => Boolean(fact));
-              return (
-                <li
-                  key={row.postId ?? row.huntId ?? row.player.playerId}
-                  className="border-t border-border first:border-t-0"
-                >
-                  <PlayerRow player={row.player} line={facts.join(" · ")} href={to} />
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+      {hunters.length > 0 && (
+        <section className="flex flex-col gap-2" aria-labelledby="card-hunters">
+          <h2
+            id="card-hunters"
+            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+          >
+            {countHeading(
+              hunters.length,
+              "player hunting it",
+              "players hunting it",
+              null,
+            )}
+          </h2>
+          {
+            <ul className="flex flex-col">
+              {hunters.map((row) => {
+                const to = row.huntId
+                  ? `/hunts/${row.huntId}`
+                  : `/p/${row.player.playerId}?tab=flares`;
+                const facts = [
+                  row.milesLabel,
+                  `Wants ${row.quantity}`,
+                  row.printingLabel,
+                ].filter((fact): fact is string => Boolean(fact));
+                return (
+                  <li
+                    key={row.postId ?? row.huntId ?? row.player.playerId}
+                    className="border-t border-border first:border-t-0"
+                  >
+                    <PlayerRow player={row.player} line={facts.join(" · ")} href={to} />
+                  </li>
+                );
+              })}
+            </ul>
+          }
+        </section>
+      )}
 
       {/* In the case: stores with it on the shelf or in the counter's
           synced singles, nearest first. */}
-      <section className="flex flex-col gap-2" aria-labelledby="card-stores">
-        <h2
-          id="card-stores"
-          className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
-        >
-          {located ? "In the case nearby" : "In the case"}
-        </h2>
-        {stores.length === 0 ? (
-          <p className="text-sm text-text-muted">No store near you has it listed.</p>
-        ) : (
-          <ul className="flex flex-col">
-            {stores.map((store) => {
-              const where = [
-                store.city,
-                store.miles !== null
-                  ? `About ${Math.max(1, Math.round(store.miles))} mi`
-                  : null,
-              ].filter((fact): fact is string => Boolean(fact));
-              return (
-                <li
-                  key={store.storeId}
-                  className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0"
-                >
-                  <Store
-                    className="size-5 shrink-0 text-text-muted"
-                    aria-hidden="true"
-                  />
-                  <Link
-                    href={`/s/${store.storeId}`}
-                    className="flex min-w-0 flex-1 flex-col underline-offset-4 hover:underline"
+      {stores.length > 0 && (
+        <section className="flex flex-col gap-2" aria-labelledby="card-stores">
+          <h2
+            id="card-stores"
+            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+          >
+            {countHeading(
+              stores.length,
+              "store has it",
+              "stores have it",
+              located ? "nearby" : null,
+            )}
+          </h2>
+          {
+            <ul className="flex flex-col">
+              {stores.map((store) => {
+                const where = [
+                  store.city,
+                  store.miles !== null
+                    ? `About ${Math.max(1, Math.round(store.miles))} mi`
+                    : null,
+                ].filter((fact): fact is string => Boolean(fact));
+                return (
+                  <li
+                    key={store.storeId}
+                    className="flex items-center gap-3 border-t border-border py-2.5 first:border-t-0"
                   >
-                    <span className="truncate font-semibold text-text-primary">
-                      {store.name}
-                    </span>
-                    {where.length > 0 && (
-                      <span className="truncate text-xs text-text-muted">
-                        {where.join(" · ")}
+                    <Store
+                      className="size-5 shrink-0 text-text-muted"
+                      aria-hidden="true"
+                    />
+                    <Link
+                      href={`/s/${store.storeId}`}
+                      className="flex min-w-0 flex-1 flex-col underline-offset-4 hover:underline"
+                    >
+                      <span className="truncate font-semibold text-text-primary">
+                        {store.name}
                       </span>
-                    )}
-                  </Link>
-                  <Badge
-                    tone={store.inCase ? "accent" : "neutral"}
-                    className="shrink-0"
-                  >
-                    {store.inCase ? "In the case" : "Counter has it"}
-                  </Badge>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+                      {where.length > 0 && (
+                        <span className="truncate text-xs text-text-muted">
+                          {where.join(" · ")}
+                        </span>
+                      )}
+                    </Link>
+                    <Badge
+                      tone={store.inCase ? "accent" : "neutral"}
+                      className="shrink-0"
+                    >
+                      {store.inCase ? "In the case" : "Counter has it"}
+                    </Badge>
+                  </li>
+                );
+              })}
+            </ul>
+          }
+        </section>
+      )}
     </div>
   );
 }

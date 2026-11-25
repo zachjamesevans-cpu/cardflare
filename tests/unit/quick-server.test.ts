@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { withCardFirst, type DraftCard } from "@/components/flares/draft";
+import { flareTarget } from "@/components/flares/flare-button";
 import type { CardResult } from "@/lib/cards/schema";
 
 const read = (path: string) => readFileSync(path, "utf8");
@@ -87,7 +88,7 @@ describe("the iOS notification service extension", () => {
   });
 });
 
-describe("Post a Flare for it carries the card (website)", () => {
+describe("the Flare button carries the card (website)", () => {
   const card = (id: string): CardResult =>
     ({
       id,
@@ -113,9 +114,17 @@ describe("Post a Flare for it carries the card (website)", () => {
     expect(out[0]?.quantity).toBe(3);
   });
 
-  it("is wired from the card page through /flare?card=", () => {
-    expect(read("src/components/cards/card-page.tsx")).toContain(
-      "href={`/flare?card=${encodeURIComponent(card.cardId)}`}",
+  it("is wired from the Flare button on a card through /flare?card=", () => {
+    /* A card's page and the card modal both post the card from the Flare
+       button (flare-button.tsx), not a "Post a Flare for it" link. */
+    const id = "0b5e6a2c-1f3d-4c7e-9a8b-2d4f6e8a0c1e";
+    expect(flareTarget(`/cards/${id}`)).toEqual({
+      href: `/flare?card=${id}`,
+      label: "Flare this card",
+    });
+    expect(flareTarget("/feed")).toEqual({ href: "/flare", label: "Post a Flare" });
+    expect(read("src/components/cards/card-modal.tsx")).toContain(
+      "href={`/flare?card=${cardId}`}",
     );
     const page = read("src/app/flare/page.tsx");
     expect(page).toContain("cardResultById(card)");

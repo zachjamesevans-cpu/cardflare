@@ -1,0 +1,91 @@
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import type { Ref } from "react";
+import { View, type ViewStyle } from "react-native";
+
+import { useSpotlightTarget } from "./spotlight";
+import { Tap } from "./ui";
+import { colors } from "./theme";
+
+/** The button's diameter, in points. */
+export const FLARE_BUTTON = 58;
+
+/**
+ * THE FLARE BUTTON: one cardflare-green "+ flame", always in the same
+ * corner, and always "post a Flare" - for whatever is on screen. The
+ * founder (2026-11-25): "maybe we can have a persistent cardflare green
+ * '+ flame icon' everywhere on the app. its contextual." On a card it
+ * flares that card; on a hunt, for that hunt; anywhere else it opens the
+ * composer. It replaced the Feed's + and a card's "Post a Flare for it",
+ * so posting has one door. The website draws the same (src/components/flares/flare-button.tsx).
+ * A room's Flare button is this one too (flare-fab.tsx).
+ *
+ * The label says what THIS tap will do ("Flare Perona"), for VoiceOver,
+ * because the glyph cannot. It is also what the new-player spotlight
+ * rings (spotlight.tsx), the way it rang the Feed's +.
+ */
+export function FlareButton({
+  label,
+  onPress,
+  style,
+  spotlight = false,
+  outerRef,
+}: {
+  label: string;
+  onPress: () => void;
+  style?: ViewStyle;
+  /** Ring this one in the first-run spotlight (only the tab bar's). */
+  spotlight?: boolean;
+  /** For a tour that measures the button (the room's). */
+  outerRef?: Ref<View>;
+}) {
+  const target = useSpotlightTarget();
+  return (
+    <View
+      ref={spotlight ? target : outerRef}
+      collapsable={false}
+      pointerEvents="box-none"
+      style={[{ position: "absolute" }, style]}
+    >
+      <Tap
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          onPress();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        style={{
+          width: FLARE_BUTTON,
+          height: FLARE_BUTTON,
+          borderRadius: FLARE_BUTTON / 2,
+          backgroundColor: colors.accent,
+          alignItems: "center",
+          justifyContent: "center",
+          shadowColor: colors.accent,
+          shadowOpacity: 0.45,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 4 },
+          elevation: 8,
+        }}
+      >
+        <Ionicons name="flame" size={26} color={colors.accentContrast} />
+        {/* The +: a small disc on the flame's shoulder. */}
+        <View
+          style={{
+            position: "absolute",
+            top: 11,
+            right: 11,
+            width: 17,
+            height: 17,
+            borderRadius: 9,
+            backgroundColor: colors.accentContrast,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Ionicons name="add" size={14} color={colors.accent} />
+        </View>
+      </Tap>
+    </View>
+  );
+}

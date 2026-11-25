@@ -1,11 +1,11 @@
 import { LaunchView } from "./src/launch-view";
+import { navigationRef } from "./src/navigation-ref";
 import { Ionicons } from "@expo/vector-icons";
 import {
   DarkTheme,
   NavigationContainer,
   type LinkingOptions,
   type Theme,
-  createNavigationContainerRef,
 } from "@react-navigation/native";
 import {
   createBottomTabNavigator,
@@ -291,6 +291,8 @@ export type StackParams = {
   LogTrade: undefined;
   /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
   Card: { cardId: string };
+  /* The composer, pushed over wherever it was opened (src/open-composer.ts). */
+  Compose: TabParams["Flare"];
   /* Traders near you: the UI experiment's list (src/ui-experiment.ts). */
   Traders: undefined;
   /**
@@ -801,7 +803,7 @@ class StartupGuard extends Component<
  * open. Two entry points: a tap that wakes a cold app is read once the
  * navigator is ready, a tap while running arrives through the listener.
  */
-const navigationRef = createNavigationContainerRef<StackParams>();
+/* Shared, so a screen can navigate after it has closed (src/navigation-ref.ts). */
 
 /**
  * Links that open the app, and where they land.
@@ -1311,19 +1313,29 @@ function AppGates() {
               options={{ title: "Traders near you" }}
             />
           ) : null}
-          {/* A card opens over the screen it came from, the background
-              dimmed, never as a screen of its own (screens/card.tsx). */}
+          {/* A card opens as iOS's own sheet over the screen it came from:
+              it slides up, the screen behind recedes and dims, and a swipe
+              down closes it (screens/card.tsx). The founder: "the whole pop
+              up thing we have now is kind of buns", then yes to this. */}
           <Stack.Screen
             name="Card"
             options={{
               title: "Card",
               headerShown: false,
-              presentation: "transparentModal",
-              animation: "fade",
+              presentation: "modal",
+              gestureEnabled: true,
             }}
           >
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>
+          {/* The composer is a sheet over wherever it was opened - over a
+              card's sheet it stacks on it - so a swipe down or back lands
+              exactly there (src/open-composer.ts). */}
+          <Stack.Screen
+            name="Compose"
+            component={HubScreen}
+            options={{ title: "Post a Flare", presentation: "modal", gestureEnabled: true }}
+          />
           <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
             {({ route }) => (
               <FlareComposer

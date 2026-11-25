@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cardArts, type CardArt } from "./card-arts";
 import type { CardDemand } from "@/lib/cards/demand-copy";
 import { printingLabel } from "@/lib/cards/schema";
 import { milesApart, pointForPostalCode, type Point } from "@/lib/geo/zip";
@@ -41,6 +42,8 @@ export interface CardPage {
     number: string;
     game: string;
     imageUrl: string | null;
+    /** Every distinct artwork, the lead first: the carousel (card-arts.ts). */
+    arts: CardArt[];
   };
   /** Null when signed out. */
   you: {
@@ -378,14 +381,15 @@ export async function cardPage(
     };
   }
 
-  const base = printings.find((printing) => printing.imageUrl) ?? null;
+  const arts = cardArts(printings, card.exact_name);
   return {
     card: {
       cardId: card.id,
       name: card.exact_name,
       number: card.canonical_card_number,
       game: card.game,
-      imageUrl: base?.imageUrl ?? null,
+      imageUrl: arts[0]?.imageUrl ?? null,
+      arts,
     },
     you,
     located: viewerPoint !== null,

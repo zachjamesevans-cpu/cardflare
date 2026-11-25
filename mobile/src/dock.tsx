@@ -1,4 +1,5 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { openComposer } from "./open-composer";
 import Animated, {
   interpolate,
   makeMutable,
@@ -7,6 +8,12 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { TAB_BAR } from "./glass";
+import { useEffect, useState } from "react";
+import { AppState, View } from "react-native";
+
+import { storedAccessToken } from "./api";
+import { FLARE_BUTTON, FlareButton } from "./flare-button";
+import { gutter, spacing } from "./theme";
 
 /**
  * The tab bar, smaller while you scroll down - the way Instagram's does.
@@ -40,7 +47,15 @@ export function DockTabBar(props: BottomTabBarProps) {
     ],
   }));
 
+  const route = props.state.routes[props.state.index]?.name;
+  const signedIn = useSignedIn();
+  /* The Flare button rides above the bar on every tab but the ones where
+     it would only be in the way: Messages (its own composer) and the
+     Flare composer itself. Never for a guest: posting needs an account. */
+  const flare = signedIn && route !== undefined && !NO_FLARE_BUTTON.has(route);
+
   return (
+    <>
     <Animated.View
       pointerEvents="box-none"
       style={[
@@ -60,5 +75,52 @@ export function DockTabBar(props: BottomTabBarProps) {
     >
       <BottomTabBar {...props} />
     </Animated.View>
+    {flare ? (
+      /* A box of its own above the bar: a touch outside its parent's
+         bounds never lands on iOS, so the button is not a child of the
+         bar's box. */
+      <View
+        pointerEvents="box-none"
+        style={{
+          position: "absolute",
+          right: gutter + spacing(1),
+          bottom: TAB_BAR.lift + TAB_BAR.height + spacing(3),
+          width: FLARE_BUTTON,
+          height: FLARE_BUTTON,
+        }}
+      >
+        <FlareButton
+          label="Post a Flare"
+          spotlight
+          onPress={() => openComposer(props.navigation)}
+        />
+      </View>
+    ) : null}
+    </>
   );
+}
+
+/** Tabs that carry no Flare button. */
+const NO_FLARE_BUTTON = new Set(["Messages", "Flare", "Local"]);
+
+/** Whether this phone is signed in, looked at again whenever the app returns. */
+function useSignedIn(): boolean {
+  const [signedIn, setSignedIn] = useState(false);
+  useEffect(() => {
+    let live = true;
+    const look = () => {
+      void storedAccessToken().then((token) => {
+        if (live) setSignedIn(Boolean(token));
+      });
+    };
+    look();
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active") look();
+    });
+    return () => {
+      live = false;
+      subscription.remove();
+    };
+  }, []);
+  return signedIn;
 }

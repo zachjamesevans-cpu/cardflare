@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+import { ART_EVENT, VARIANT_EVENT } from "./card-art-carousel";
 import { TrendingDown, TrendingUp } from "lucide-react";
 
 import {
@@ -19,6 +21,21 @@ import { cn } from "@/lib/cn";
  */
 export function CardPricesPanel({ prices }: { prices: CardPrices }) {
   const [at, setAt] = useState(0);
+
+  /* Follow the art carousel: the printing of the art on show
+     (card-art-carousel.tsx). */
+  useEffect(() => {
+    if (prices.state !== "ok") return;
+    const onArt = (event: Event) => {
+      const variants = (event as CustomEvent<string[]>).detail ?? [];
+      const index = prices.printings.findIndex((printing) =>
+        variants.includes(printing.variant),
+      );
+      if (index >= 0) setAt(index);
+    };
+    window.addEventListener(ART_EVENT, onArt);
+    return () => window.removeEventListener(ART_EVENT, onArt);
+  }, [prices]);
 
   if (prices.state !== "ok") {
     return (
@@ -55,7 +72,13 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
               type="button"
               role="tab"
               aria-selected={index === at}
-              onClick={() => setAt(index)}
+              onClick={() => {
+                setAt(index);
+                /* Slide the carousel to this printing's art. */
+                window.dispatchEvent(
+                  new CustomEvent(VARIANT_EVENT, { detail: entry.variant }),
+                );
+              }}
               className={cn(
                 "shrink-0 cursor-pointer rounded-full border px-3 py-1.5 text-sm font-semibold transition-colors",
                 index === at
