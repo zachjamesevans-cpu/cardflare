@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { CardArtCarousel } from "@/components/cards/card-art-carousel";
+import { FlaredArtPill } from "@/components/cards/flared-art-pill";
 import type { ReactNode } from "react";
-import { Crosshair, Layers, Search, Store } from "lucide-react";
+import { Crosshair, Layers, Store } from "lucide-react";
 
 import { MessageButton } from "@/components/players/message-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
@@ -75,6 +76,12 @@ export function CardPageView({
           <p className="text-sm text-text-secondary">
             {card.number} · {gameShortName(card.game)}
           </p>
+          {you && you.wantedPrintings.length > 0 && (
+            <FlaredArtPill
+              wantedPrintings={you.wantedPrintings}
+              firstArt={arts[0]?.printingIds ?? []}
+            />
+          )}
           {standing && (
             <p className="text-sm font-semibold text-text-secondary">{standing}</p>
           )}
@@ -94,7 +101,7 @@ export function CardPageView({
         </h2>
         {you ? (
           <>
-            {(you.inTradeBinder || you.onHunt || you.wanted) && (
+            {(you.inTradeBinder || you.onHunt) && (
               <ul className="flex flex-col gap-1 text-sm text-text-secondary">
                 {you.inTradeBinder && (
                   <li className="flex items-center gap-2">
@@ -117,15 +124,6 @@ export function CardPageView({
                     >
                       On your hunt: {you.onHunt.name}
                     </Link>
-                  </li>
-                )}
-                {you.wanted && (
-                  <li className="flex items-center gap-2">
-                    <Search
-                      className="size-4 shrink-0 text-accent"
-                      aria-hidden="true"
-                    />
-                    You want this
                   </li>
                 )}
               </ul>

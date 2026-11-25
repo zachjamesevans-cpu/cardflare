@@ -2,6 +2,7 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -215,6 +216,8 @@ export function FlareComposer({
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [previewing, setPreviewing] = useState(false);
   const [editing, setEditing] = useState<string | null>(null);
+  /* For the flame on a card already on your Flares (my-flares.ts). */
+  useMyFlares();
   /* The card row is being rearranged: the page holds still (card-tray.tsx). */
   const [rearranging, setRearranging] = useState(false);
   const [picking, setPicking] = useState(false);
@@ -686,6 +689,10 @@ export function FlareComposer({
                   name: item.name,
                   imageUrl: artFor(item),
                   quantity: item.quantity,
+                  /* Already out: the same card, and the same art or any. */
+                  flared: item.printingId
+                    ? artFlared(item.cardId, [item.printingId])
+                    : cardFlared(item.cardId),
                 }))}
                 editing={editing}
                 onEdit={(key) => setEditing(editing === key ? null : key)}

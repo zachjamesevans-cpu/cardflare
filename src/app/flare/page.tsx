@@ -1,30 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame, History } from "lucide-react";
 
 import { Logo } from "@/components/brand/logo";
 import { FlareComposer } from "@/components/flares/flare-composer";
 import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar";
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { WantEntries } from "@/components/players/want-entries";
 import { getViewer } from "@/lib/auth/session";
 import { cardImagesEnabled } from "@/lib/cards/images";
 import { cardResultById } from "@/lib/cards/search";
 import { viewerGames } from "@/lib/players/viewer-games";
 import { playerForUser } from "@/lib/players/accounts";
-import { mergeFlareRows } from "@/lib/players/want-rows";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { huntsFor } from "@/lib/players/hunts";
 import { avatarPathFor, avatarSrc } from "@/lib/players/profile-image";
 import { getPlayerSession } from "@/lib/players/session";
-import {
-  foundCardsFor,
-  listOfferings,
-  listWants,
-  postedCardStores,
-  type PostedWhere,
-} from "@/lib/players/wants";
+import { foundCardsFor, listWants } from "@/lib/players/wants";
 import { nearbySettingsFor } from "@/lib/nearby/settings";
 import { NearbyRow } from "@/components/nearby/nearby-row";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -108,44 +99,35 @@ export default async function FlarePage({
    * draft…" at four to seven seconds: most of it was this page waiting
    * on itself. None of these needs another's answer.
    */
-  const [room, games, [asked, offering, posted, nearby, hunts, poster, foundCards]] =
-    await Promise.all([
-      session ? currentRoomForSession(session.id) : null,
-      viewerGames(),
-      playerId
-        ? Promise.all([
-            listWants(playerId),
-            listOfferings(playerId),
-            postedCardStores(playerId),
-            /* Nearby matching is part of Local. With Local off there is no
+  const [room, games, [asked, nearby, hunts, poster, foundCards]] = await Promise.all([
+    session ? currentRoomForSession(session.id) : null,
+    viewerGames(),
+    playerId
+      ? Promise.all([
+          listWants(playerId),
+          /* Nearby matching is part of Local. With Local off there is no
                feed for a match to land on, so the switch is not asked for
                either: a setting nothing reads is a lie in a form field. */
-            LOCAL_ENABLED ? nearbySettingsFor(playerId) : null,
-            huntsFor(playerId, playerId),
-            composerViewer(
-              playerId,
-              viewer.kind === "player" ? viewer.playerName : "You",
-            ),
-            foundCardsFor(playerId),
-          ])
-        : [
-            null,
-            null,
-            new Map<string, PostedWhere[]>(),
-            null,
-            [],
-            null,
-            new Set<string>(),
-          ],
-    ]);
-  /* One list, both directions: what you are looking for and what you
-     are offering, since you posted both here. Only the Flares still
-     working: a card whose every copy is found has finished, and lives
-     in History with the traded and taken-down ones, under the link at
-     the foot of the list. (Offerings fully answered never reach here.) */
-  const wants = mergeFlareRows(
-    asked && offering ? [...asked, ...offering] : (asked ?? []),
-  ).filter((want) => want.direction === "offering" || !foundCards.has(want.cardId));
+          LOCAL_ENABLED ? nearbySettingsFor(playerId) : null,
+          huntsFor(playerId, playerId),
+          composerViewer(
+            playerId,
+            viewer.kind === "player" ? viewer.playerName : "You",
+          ),
+          foundCardsFor(playerId),
+        ])
+      : [null, null, [], null, new Set<string>()],
+  ]);
+  /*
+   * The list itself is no longer drawn here: the founder (2026-11-25), "i
+   * dont think a flare history is necessary on this screen". Open Flares
+   * live on the profile's Flares, History at its foot. The composer
+   * still hears which cards are out, for the small flame on a tile that
+   * is already on your Flares.
+   */
+  const flared = (asked ?? [])
+    .filter((want) => !foundCards.has(want.cardId))
+    .map((want) => ({ cardId: want.cardId, printingId: want.printingId }));
 
   return (
     <>
@@ -178,6 +160,7 @@ export default async function FlarePage({
               initialHuntId={hunt ?? null}
               initialCard={initialCard}
               initialPrinting={initialPrinting}
+              flared={flared}
             />
           ) : (
             <Card className="flex flex-col gap-3">
@@ -196,51 +179,6 @@ export default async function FlarePage({
                   Enter a code
                 </ButtonLink>
               </div>
-            </Card>
-          )}
-
-          {/*
-           * The standing list, under the composer that feeds it: the
-           * Flares on the account, which every room, store and
-           * show they scan into helps answer. Named for what it is, so
-           * a draft above and a posted Flare below are never confused.
-           */}
-          {wants !== null && (
-            <Card className="flex flex-col">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="flex items-center gap-2 font-semibold text-text-primary">
-                  <Flame className="size-4 text-accent" aria-hidden="true" />
-                  Flares
-                </h2>
-                <span className="text-sm text-text-muted tabular-nums">
-                  {wants.length} {wants.length === 1 ? "card" : "cards"}
-                </span>
-              </div>
-
-              {wants.length === 0 ? (
-                <p className="pt-3 text-sm text-text-secondary">
-                  Post a Flare above and its cards stay here until you find them. Every
-                  room, store and show you scan into helps answer this list.
-                </p>
-              ) : (
-                <WantEntries
-                  code={room?.code ?? ""}
-                  wants={wants.map((want) => ({
-                    ...want,
-                    postedWhere: posted.get(want.cardId) ?? null,
-                  }))}
-                  imagesEnabled={images}
-                />
-              )}
-
-              {/* Where the finished ones went: found, traded, taken down. */}
-              <Link
-                href="/profile/trades"
-                className="mt-3 inline-flex items-center gap-1.5 self-start border-t border-border pt-3 text-sm font-semibold text-text-secondary hover:text-text-primary"
-              >
-                <History className="size-4" aria-hidden="true" />
-                History
-              </Link>
             </Card>
           )}
         </div>

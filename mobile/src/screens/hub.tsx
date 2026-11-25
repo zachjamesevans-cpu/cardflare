@@ -1,32 +1,19 @@
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import { setMyFlares } from "../my-flares";
 import type { RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Text, View } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { View } from "react-native";
 
 import type { StackParams, TabParams } from "../../App";
-import {
-  describeError,
-  dropWant,
-  getMe,
-  getRoom,
-  lastRoom,
-  nudgeWant,
-  onSignedOut,
-  storedAccessToken,
-  type Me,
-  rememberRoom,
-  dropOffering,
-  nudgeOffering,
-} from "../api";
+import { describeError, getMe, getRoom, lastRoom, onSignedOut, storedAccessToken, type Me } from "../api";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { FlareComposer, type HandedCard } from "./flare-composer";
 import type { PostTarget } from "../flare-bits";
-import { Body, Button, Card, Loading, Muted, Tap, Title } from "../ui";
-import { colors, gutter, spacing } from "../theme";
-import { openRoom } from "../open-room";
-import { WantRow } from "../want-row";
+import { Body, Button, Card, Loading, Title } from "../ui";
+import { gutter, spacing } from "../theme";
+
+
 
 type HubTarget = PostTarget | "scan";
 
@@ -272,14 +259,16 @@ export function HubScreen() {
     return settled === null || settled === "scan" ? null : settled;
   }, []);
 
+
   /*
-   * Only the Flares still working. A finished one (every copy found;
-   * traded and taken-down ones the server already leaves off) used to
-   * stay here greyed out under "Found"; the founder: "past flares
-   * should live somewhere, or a flare history of sorts". They live in
-   * History now, behind the link at the foot of this list.
+   * The list is no longer drawn here: the founder (2026-11-25), "i dont
+   * think a flare history is necessary on this screen". Open Flares live
+   * on the Profile's Flares, with History at its foot. What this screen
+   * reads still feeds the "already flared" markers (my-flares.ts).
    */
-  const working = wants?.filter((want) => !want.found) ?? null;
+  useEffect(() => {
+    if (wants !== null) setMyFlares(wants);
+  }, [wants]);
 
   /* Only the first decision ever: every later one has a paint. */
   if (target === null) {
@@ -329,119 +318,6 @@ export function HubScreen() {
         setWants((current) => [...rows, ...(current ?? [])]);
         void loadWants();
       }}
-      footer={
-        working !== null ? (
-          <Card>
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: spacing(2),
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center", gap: spacing(1) }}
-              >
-                <MaterialCommunityIcons name="fire" size={18} color={colors.accent} />
-                <Title>Flares</Title>
-              </View>
-              <Muted>
-                {`${working.length} ${working.length === 1 ? "card" : "cards"}`}
-              </Muted>
-            </View>
-
-            {wantError ? (
-              <Text
-                accessibilityRole="alert"
-                style={{ color: colors.danger, fontSize: 14 }}
-              >
-                {wantError}
-              </Text>
-            ) : null}
-
-            {working.length === 0 ? (
-              <Body>
-                Post a Flare above and its cards stay here until you find them. Every
-                room, store and show you scan into helps answer this list.
-              </Body>
-            ) : (
-              <View>
-                {working.map((want) => (
-                  <WantRow
-                    key={want.id}
-                    want={want}
-                    onNudge={(delta) =>
-                      editWant(() =>
-                        want.direction === "offering"
-                          ? nudgeOffering(want.cardId, delta)
-                          : nudgeWant(want.id, delta),
-                      )
-                    }
-                    /* Gone from the list now, not when the server
-                       answers: "it should delete immediately visually
-                       even if it takes a second for the server to
-                       respond." editWant re-reads after, so a refused
-                       delete comes back, with the error under the list. */
-                    onDrop={() => {
-                      setWants((list) => {
-                        const next = list?.filter((row) => row.id !== want.id) ?? list;
-                        memory.wants = next;
-                        return next;
-                      });
-                      return editWant(() =>
-                        want.direction === "offering"
-                          ? dropOffering(want.cardId)
-                          : dropWant(want.id),
-                      );
-                    }}
-                    /* Remember the room, then open it - the same two
-                       steps the Feed's own buttons take. */
-                    onOpenRoom={(code) => {
-                      void rememberRoom(code.trim().toUpperCase()).then(() =>
-                        openRoom(navigation),
-                      );
-                    }}
-                  />
-                ))}
-              </View>
-            )}
-
-            {/* Where the finished ones went: found, traded, taken down,
-                with who answered each. */}
-            <View
-              style={{
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-                paddingTop: spacing(3),
-              }}
-            >
-              <Tap
-                onPress={() => navigation.navigate("TradeHistory")}
-                accessibilityLabel="Open History"
-                hitSlop={6}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: spacing(1.5),
-                  alignSelf: "flex-start",
-                }}
-              >
-                <Ionicons name="time-outline" size={16} color={colors.textSecondary} />
-                <Text
-                  style={{
-                    color: colors.textSecondary,
-                    fontSize: 14,
-                    fontWeight: "600",
-                  }}
-                >
-                  History
-                </Text>
-              </Tap>
-            </View>
-          </Card>
-        ) : undefined
-      }
     />
   );
 }

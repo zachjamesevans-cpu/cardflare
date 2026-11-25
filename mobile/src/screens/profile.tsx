@@ -847,6 +847,7 @@ export function ProfileScreen() {
               flares={stillWanted(profile.flares)}
               yours
               onPost={() => openComposer(navigation)}
+              onHistory={() => navigation.navigate("TradeHistory")}
             />
           );
         case "hunts":

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { Clock, Search } from "lucide-react";
+import { Clock, Flame, Search } from "lucide-react";
 
 import {
   readRecent,
@@ -121,7 +121,14 @@ const cardScore = (text: string) => (card: SearchCard) =>
 const best = <T,>(items: T[], score: (item: T) => number) =>
   items.reduce((top, item) => Math.max(top, score(item)), 0);
 
-export function EverythingSearch({ account = null }: { account?: string | null }) {
+export function EverythingSearch({
+  account = null,
+  flaredCardIds = [],
+}: {
+  account?: string | null;
+  /** Cards on your open Flares: a small flame on the result's art. */
+  flaredCardIds?: string[];
+}) {
   const [query, setQuery] = useState("");
   const [found, setFound] = useState<Found | null>(null);
   const [tab, setTab] = useState<SearchTab>("top");
@@ -235,7 +242,18 @@ export function EverythingSearch({ account = null }: { account?: string | null }
                     >
                       {/* The art thumb: the row's shape held whether or not
                           a picture exists, so the list never reflows. */}
-                      <span className="block h-14 w-10 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
+                      <span className="relative block h-14 w-10 shrink-0 overflow-hidden rounded-[4px] border border-border bg-elevated">
+                        {/* Already on your Flares, any art of it: the
+                            founder, "it'll have a logo or something when
+                            you search for it". A marker, not a button. */}
+                        {flaredCardIds.includes(card.id) && (
+                          <span
+                            aria-label="On your Flares"
+                            className="absolute top-0.5 right-0.5 z-10 flex size-4 items-center justify-center rounded-full border border-canvas bg-accent text-accent-contrast"
+                          >
+                            <Flame className="size-2.5" aria-hidden="true" />
+                          </span>
+                        )}
                         {isRenderableImageUrl(art) && (
                           /* eslint-disable-next-line @next/next/no-img-element */
                           <img

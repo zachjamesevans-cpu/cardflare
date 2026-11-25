@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Flame, Plus, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
 
@@ -93,6 +93,9 @@ export function FlareComposer(props: {
   initialCard?: CardResult | null;
   /** The art it was flared from: a line of its own. */
   initialPrinting?: string | null;
+  /** The cards and arts already on your Flares: a small flame on a tile
+      that would be a second Flare for one (the founder, 2026-11-25). */
+  flared?: { cardId: string; printingId: string | null }[];
   /** A row at the foot of the compose step: the room's open-to-trades switch. */
   footer?: ReactNode;
 }) {
@@ -130,6 +133,7 @@ function ComposerBody({
   initialHuntId,
   initialCard = null,
   initialPrinting = null,
+  flared = [],
   footer,
 }: {
   viewer: ComposerViewer;
@@ -141,6 +145,7 @@ function ComposerBody({
   initialHuntId: string | null;
   initialCard?: CardResult | null;
   initialPrinting?: string | null;
+  flared?: { cardId: string; printingId: string | null }[];
   footer?: ReactNode;
 }) {
   const [draft, setDraft] = useState<Draft>(() => {
@@ -466,6 +471,22 @@ function ComposerBody({
                   quantity={item.quantity}
                   className="pointer-events-none absolute top-1 left-1"
                 />
+                {/* Already on your Flares: the same card, and this art or
+                    any. A marker, never a button. */}
+                {flared.some(
+                  (out) =>
+                    out.cardId === item.card.id &&
+                    (out.printingId === null ||
+                      item.printingId === null ||
+                      out.printingId === item.printingId),
+                ) && (
+                  <span
+                    aria-label="On your Flares"
+                    className="pointer-events-none absolute top-1 right-1 flex size-4 items-center justify-center rounded-full border border-canvas bg-accent text-accent-contrast"
+                  >
+                    <Flame className="size-2.5" aria-hidden="true" />
+                  </span>
+                )}
                 {index === 0 && (
                   <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-surface/90 py-0.5 text-center text-[9px] font-bold tracking-wider text-text-secondary uppercase">
                     Cover

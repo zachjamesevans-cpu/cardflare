@@ -46,13 +46,13 @@ describe("offerings on the same list", () => {
     expect(wants).toContain('.eq("intent", "showcase")');
     expect(wants).toContain('direction?: "want" | "offering";');
 
-    expect(read("src/app/flare/page.tsx")).toContain("listOfferings(playerId),");
+    /* The Flare page no longer lists them (it lists nothing now). */
+    expect(read("src/app/flare/page.tsx")).not.toContain("listOfferings(");
     expect(read("src/app/api/v1/me/route.ts")).toContain(
       "listOfferings(player.playerId),",
     );
-    expect(read("mobile/src/screens/hub.tsx")).toContain(
-      'want.direction === "offering"',
-    );
+    /* The app's markers count only wants, never offers (my-flares.ts). */
+    expect(read("mobile/src/my-flares.ts")).toContain('want.direction !== "offering"');
   });
 
   it("acts on every open post of the card, on both platforms", () => {

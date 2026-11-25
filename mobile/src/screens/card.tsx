@@ -1,4 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { FlaredPill } from "../flared-mark";
+import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
 import { FlareButton } from "../flare-button";
@@ -66,6 +68,8 @@ export function CardScreen({ cardId }: { cardId: string }) {
   /* Which art the carousel shows; back to the first on another card. */
   const [artAt, setArtAt] = useState(0);
   useEffect(() => setArtAt(0), [cardId]);
+  /* Re-render when your Flares arrive, for "On your Flares". */
+  useMyFlares();
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
 
@@ -164,6 +168,21 @@ export function CardScreen({ cardId }: { cardId: string }) {
       : card.imageUrl
         ? [{ imageUrl: card.imageUrl, label: "", variants: [] }]
         : [];
+  /* "On your Flares" for the art on show: the server's word for this
+     card, else what the app already holds (my-flares.ts). */
+  const shownPrintings = arts[artAt]?.printingIds ?? [];
+  const wantedPrintings = page?.you?.wantedPrintings;
+  const onYourFlares =
+    wantedPrintings !== undefined
+      ? wantedPrintings.some(
+          (printing) =>
+            printing === null ||
+            shownPrintings.length === 0 ||
+            shownPrintings.includes(printing),
+        )
+      : shownPrintings.length > 0
+        ? artFlared(card.cardId, shownPrintings)
+        : cardFlared(card.cardId);
 
   return (
     <CardOverlay>
@@ -203,6 +222,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
           <Text style={{ color: colors.textMuted, fontSize: 13 }}>
             {`${card.number} · ${gameShortName(card.game)}`}
           </Text>
+          {/* The art on show is on your Flares: it follows the carousel,
+              so another art of the card does not wear it. */}
+          {onYourFlares ? <FlaredPill /> : null}
           {/* "12 hunting · 3 have it for trade": the two lists below,
               counted. What a price would say, without one. Same line
               on the website's card page. */}
@@ -247,7 +269,6 @@ export function CardScreen({ cardId }: { cardId: string }) {
               </Text>
             </Tap>
           ) : null}
-          {you.wanted ? <Fact>You want this</Fact> : null}
         </View>
       ) : null}
 

@@ -1,4 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
+import { FlaredMark } from "../flared-mark";
+import { cardFlared, useMyFlares } from "../my-flares";
 import { useTabReset } from "../tab-reset";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -496,6 +498,8 @@ function Results({
   onPlayer: (playerId: string) => void;
   onStore: (storeId: string) => void;
 }) {
+  /* Cards already on your Flares wear a small flame (my-flares.ts). */
+  useMyFlares();
   return (
     <View style={{ gap: spacing(5) }}>
       <View style={{ gap: spacing(3) }}>
@@ -567,6 +571,12 @@ function Results({
                     >
                       <Art uri={card.imageUrl} width={tile} name={hit.name} />
                     </Tap>
+                    {/* Already on your Flares, any art of it: the founder,
+                        "it'll have a logo or something when you search for
+                        it that you already have it on your list." */}
+                    {cardFlared(hit.id) ? (
+                      <FlaredMark style={{ position: "absolute", top: 5, right: 5 }} />
+                    ) : null}
                     {/* How many printings, on the card itself: the founder,
                         "a small icon with number of printings on the card
                         itself, instead of a whole row". One printing, none. */}

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { FlaredMark } from "./flared-mark";
 import { useNavigation } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -84,6 +85,9 @@ export interface TrayItem {
   name: string;
   imageUrl: string | null;
   quantity: number;
+  /** This card and art is already on your Flares: a small flame, so a
+      second Flare for it is not posted by accident. */
+  flared?: boolean;
 }
 
 const clamp = (value: number, low: number, high: number) =>
@@ -540,6 +544,9 @@ function TileFace({
           {index + 1}
         </Text>
       </View>
+      {item.flared ? (
+        <FlaredMark size={16} style={{ position: "absolute", top: 3, right: 3 }} />
+      ) : null}
       {/* The copies: the one quantity tag, in the corner the count always had. */}
       <QuantityBadge
         quantity={item.quantity}

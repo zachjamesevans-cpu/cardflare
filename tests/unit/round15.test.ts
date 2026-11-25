@@ -148,7 +148,7 @@ describe("the Flare tab folds identical rows (audit rough edge)", () => {
     expect(out[0]?.quantity).toBe(3);
   });
 
-  it("is what the Flare tab draws", () => {
-    expect(read("src/app/flare/page.tsx")).toContain("mergeFlareRows(");
+  it("is what the profile's Flares draw, not the Flare tab any more", () => {
+    expect(read("src/app/flare/page.tsx")).not.toContain("mergeFlareRows(");
   });
 });

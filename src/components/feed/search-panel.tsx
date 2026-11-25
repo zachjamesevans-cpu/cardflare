@@ -16,6 +16,12 @@ const EverythingSearch = dynamic(
   { ssr: false },
 );
 
-export function SearchPanel({ account = null }: { account?: string | null }) {
-  return <EverythingSearch account={account} />;
+export function SearchPanel({
+  account = null,
+  flaredCardIds = [],
+}: {
+  account?: string | null;
+  flaredCardIds?: string[];
+}) {
+  return <EverythingSearch account={account} flaredCardIds={flaredCardIds} />;
 }

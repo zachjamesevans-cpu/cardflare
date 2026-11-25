@@ -14,7 +14,7 @@ describe("pages stop waiting on themselves", () => {
   it("the Flare page reads the room, the games and the lists at once", () => {
     const page = read("src/app/flare/page.tsx");
     expect(page).toMatch(
-      /const \[room, games, \[asked, offering, posted, nearby, hunts, poster, foundCards\]\] =\s*await Promise\.all\(\[/,
+      /const \[room, games, \[asked, nearby, hunts, poster, foundCards\]\] =\s*await Promise\.all\(\[/,
     );
     expect(page).not.toContain("const games = await viewerGames();");
   });

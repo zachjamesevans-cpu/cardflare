@@ -7,7 +7,7 @@ import { HeldRing } from "./held-ring";
 import { QuantityBadge } from "./quantity-badge";
 import { PROFILE_INSET } from "./profile-tabs";
 import { colors, spacing } from "./theme";
-import { Button, CardImage, type ZoomCard } from "./ui";
+import { Button, CardImage, Tap, type ZoomCard } from "./ui";
 
 /**
  * A profile's Flares as a grid: the app's half of
@@ -111,6 +111,7 @@ export function ProfileFlares({
   following = false,
   onAsk,
   followButton,
+  onHistory,
 }: {
   flares: ProfileFlare[];
   yours: boolean;
@@ -124,6 +125,9 @@ export function ProfileFlares({
   onAsk?: () => void;
   /** The Follow button, for a visitor who does not follow them yet. */
   followButton?: ReactNode;
+  /** Your past Flares: History, at the foot of your own list. It moved
+      here from the composer (the founder, 2026-11-25). */
+  onHistory?: () => void;
 }) {
   const window = useWindowDimensions();
   /* The grid is as wide as the pane it sits in, measured; until the
@@ -236,6 +240,26 @@ export function ProfileFlares({
           ))}
         </View>
       )}
+      {yours && onHistory ? (
+        <Tap
+          onPress={onHistory}
+          accessibilityRole="button"
+          accessibilityLabel="Open History"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: spacing(1.5),
+            paddingHorizontal: PROFILE_INSET,
+            paddingVertical: spacing(2),
+            alignSelf: "flex-start",
+          }}
+        >
+          <Ionicons name="time-outline" size={17} color={colors.textSecondary} />
+          <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: "700" }}>
+            History
+          </Text>
+        </Tap>
+      ) : null}
     </View>
   );
 }

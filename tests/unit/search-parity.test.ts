@@ -92,9 +92,13 @@ describe("search, from the Feed", () => {
   });
 
   it("the website's Search tab is the combined search, built on the three actions", () => {
-    expect(web.searchPage).toContain("<SearchPanel account={playerId} />");
+    expect(web.searchPage).toContain(
+      "<SearchPanel account={playerId} flaredCardIds={flaredCardIds} />",
+    );
     expect(web.searchPage).toContain("<TabPageShell");
-    expect(web.searchPanel).toContain("<EverythingSearch account={account} />");
+    expect(web.searchPanel).toContain(
+      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} />",
+    );
     /* It reads this device's recents as it draws, so never on the server. */
     expect(web.searchPanel).toContain("{ ssr: false }");
     expect(web.searchPanel).not.toContain("PlayerSearch");
@@ -158,7 +162,6 @@ describe("the card page", () => {
   const SECTIONS = [
     "In your trade binder",
     "On your hunt: ",
-    "You want this",
     "holders.length > 0",
     '"player has it"',
     '"players have it"',

@@ -182,7 +182,9 @@ describe("search", () => {
     expect(web.search).toContain("remember(query)");
     /* Per account. */
     expect(web.search).toContain("recentKey(account)");
-    expect(web.searchPanel).toContain("<EverythingSearch account={account} />");
+    expect(web.searchPanel).toContain(
+      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} />",
+    );
   });
 
   it("touches storage only inside try/catch", () => {

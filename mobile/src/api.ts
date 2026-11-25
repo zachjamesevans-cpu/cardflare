@@ -1736,6 +1736,8 @@ export interface CardPage {
   };
   /** Null when signed out. */
   you: {
+    /** The printings on your Flares; null is "any art". Older servers omit it. */
+    wantedPrintings?: (string | null)[];
     inTradeBinder: boolean;
     onHunt: { huntId: string; name: string } | null;
     wanted: boolean;

@@ -89,11 +89,13 @@ describe("the row on screen", () => {
     expect(row).toMatch(/wantRow: \{[\s\S]*?return colors\.surface;/);
   });
 
-  it("drops the card from the list before the server answers", () => {
+  /* The composer no longer draws the list (the founder, 2026-11-25: "i
+     dont think a flare history is necessary on this screen"); its rows
+     live on the Profile's Flares. */
+  it("is not drawn under the composer any more", () => {
     const hub = read("mobile/src/screens/hub.tsx");
-    expect(hub).toMatch(
-      /onDrop=\{\(\) => \{\s*setWants\(\(list\) => \{[\s\S]*?filter\(\(row\) => row\.id !== want\.id\)[\s\S]*?return editWant\(/,
-    );
+    expect(hub).not.toContain("<WantRow");
+    expect(hub).toContain("setMyFlares(wants)");
   });
 });
 
