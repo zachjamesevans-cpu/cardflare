@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
+import { GAME_LOGO } from "../game-logos";
 import { FlaredTag } from "../flared-mark";
 import { cardFlared, useMyFlares } from "../my-flares";
 import { useTabReset } from "../tab-reset";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -13,10 +14,9 @@ import {
   TextInput,
   useWindowDimensions,
   View,
-  type ImageSourcePropType,
 } from "react-native";
 
-import type { StackParams } from "../../App";
+import type { StackParams, TabParams } from "../../App";
 import {
   lastSearchGame,
   rememberSearchGame,
@@ -66,26 +66,6 @@ import { colors, gutter, radius, spacing } from "../theme";
 const ASPECT = 88 / 63;
 const GRID_GAP = spacing(2.5);
 
-/*
- * Each game's own logo, in cardflare's green: the founder, "the icons for
- * lorcana and other tcgs on this screen should just be the logo of the
- * actual game, with the classic cardflare green as the logo color."
- * Made from the logos Wikipedia and Wikimedia Commons host, recoloured
- * offline to the accent (#cefc84): a one-colour logo flat, a many-colour
- * one as a green duotone so its outlines stay legible. Riftbound (Riot's
- * own lockup) and Gundam (Scrydex's copy of Bandai's, enlarged with its
- * edge re-sharpened) are flat green; the founder found the plain-name
- * tiles "awful" (2026-11-25).
- */
-const GAME_LOGO: Partial<Record<GameSlug, ImageSourcePropType>> = {
-  "one-piece": require("../../assets/games/one-piece.png"),
-  pokemon: require("../../assets/games/pokemon.png"),
-  mtg: require("../../assets/games/mtg.png"),
-  lorcana: require("../../assets/games/lorcana.png"),
-  "flesh-and-blood": require("../../assets/games/flesh-and-blood.png"),
-  riftbound: require("../../assets/games/riftbound.png"),
-  gundam: require("../../assets/games/gundam.png"),
-};
 
 type Answer<T> =
   | { state: "idle" }
@@ -108,6 +88,15 @@ export function SearchLabScreen() {
   const [refreshing, setRefreshing] = useState(false);
   /* Only the newest answer lands: shop wifi lets keystrokes overtake. */
   const asked = useRef(0);
+  /* A hub's "Search Lorcana": that game chosen, the field ready. */
+  const sent = useRoute<RouteProp<TabParams, "Search">>().params;
+  useEffect(() => {
+    const scope = labScope(sent?.game);
+    if (!sent?.at || !scope) return;
+    setGame(scope);
+    void rememberSearchGame(scope);
+    setTimeout(() => field.current?.focus(), 250);
+  }, [sent?.at, sent?.game]);
   /* Tapping Search again: the search as if just opened - nothing typed,
      All games, at the top, keyboard down (tab-reset.ts). */
   const page = useRef<ScrollView>(null);
@@ -313,10 +302,10 @@ export function SearchLabScreen() {
                   key={entry.slug}
                   game={entry}
                   width={Math.floor((width - gutter * 2 - spacing(2.5)) / 2)}
-                  onPress={() => {
-                    choose(entry.slug);
-                    field.current?.focus();
-                  }}
+                  /* Its hub: most hunted, price moves, most searched
+                     (game-hub.tsx). "Search Lorcana" there comes back
+                     here with the game chosen. */
+                  onPress={() => navigation.navigate("GameHub", { game: entry.slug })}
                 />
               ))}
             </View>

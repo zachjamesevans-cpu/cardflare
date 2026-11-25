@@ -2234,6 +2234,18 @@ export type SubscriptionInsert = Omit<
   updated_at?: string;
 };
 
+/** One card's opens on one day: the game hubs' "most searched". */
+export type CardOpensDailyRow = {
+  card_id: string;
+  day: string;
+  opens: number;
+};
+export type CardOpensDailyInsert = {
+  card_id: string;
+  day?: string;
+  opens?: number;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -2323,9 +2335,20 @@ export type Database = {
       card_aliases: Table<CardAliasRow, CardAliasInsert>;
       card_sync_runs: Table<CardSyncRunRow, CardSyncRunInsert>;
       card_sync_failures: Table<CardSyncFailureRow, CardSyncFailureInsert>;
+      card_opens_daily: Table<CardOpensDailyRow, CardOpensDailyInsert>;
     };
     Views: Record<string, never>;
     Functions: {
+      /* Game hubs (20261126090000_game_hubs.sql). */
+      bump_card_open: { Args: { p_card: string }; Returns: undefined };
+      game_hub_opened: {
+        Args: { p_game: string; p_days: number; p_limit: number };
+        Returns: { card_id: string; total: number }[];
+      };
+      game_hub_hunted: {
+        Args: { p_game: string; p_limit: number };
+        Returns: { card_id: string; total: number }[];
+      };
       search_cards: {
         Args: {
           search_query: string;

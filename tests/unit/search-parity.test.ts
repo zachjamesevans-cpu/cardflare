@@ -93,11 +93,11 @@ describe("search, from the Feed", () => {
 
   it("the website's Search tab is the combined search, built on the three actions", () => {
     expect(web.searchPage).toContain(
-      "<SearchPanel account={playerId} flaredCardIds={flaredCardIds} />",
+      "<SearchPanel account={playerId} flaredCardIds={flaredCardIds} game={game} />",
     );
     expect(web.searchPage).toContain("<TabPageShell");
     expect(web.searchPanel).toContain(
-      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} />",
+      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />",
     );
     /* It reads this device's recents as it draws, so never on the server. */
     expect(web.searchPanel).toContain("{ ssr: false }");

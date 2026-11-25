@@ -1,4 +1,6 @@
 import { notFound } from "next/navigation";
+import { countCardOpen } from "@/lib/cards/game-hub";
+import { after } from "next/server";
 import { Suspense } from "react";
 
 import { CardModal } from "@/components/cards/card-modal";
@@ -34,6 +36,8 @@ export default async function CardOverPage({
 
   const page = await cardPage(cardId, viewerId);
   if (!page) notFound();
+  /* One more look, for the game hubs' "most searched" (game-hub.ts). */
+  after(() => countCardOpen(page.card.cardId));
 
   return (
     <CardModal cardId={page.card.cardId}>

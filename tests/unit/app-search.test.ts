@@ -107,7 +107,10 @@ describe("the Search tab", () => {
     expect(src.app).toContain('import { SearchScreen } from "./src/screens/search";');
     /* A tab since the founder's five (Feed, Nights, Messages, Search,
        Profile), and only a tab: no second Search route on the stack. */
-    expect(src.app.match(/  Search: undefined;/g)).toHaveLength(1);
+    /* A hub's "Search Lorcana" may hand it a game (game-hub.tsx). */
+    expect(
+      src.app.match(/  Search: \{ game\?: string; at\?: number \} \| undefined;/g),
+    ).toHaveLength(1);
     expect(src.app).toContain('options={{ title: "Search", tabBarLabel: "Search" }}');
     expect(src.app).not.toMatch(/<Stack\.Screen\s+name="Search"/);
     expect(src.app).not.toContain("FindPlayer");

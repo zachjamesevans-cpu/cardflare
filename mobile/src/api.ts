@@ -1797,6 +1797,27 @@ export const getCardPrices = (cardId: string) =>
 export const getCardPage = (cardId: string) =>
   call<{ page: CardPage }>("GET", `/api/v1/cards/${encodeURIComponent(cardId)}/page`);
 
+/** One card on a game's hub: what put it there, "4 hunting", "+12.3%". */
+export interface HubCard {
+  cardId: string;
+  name: string;
+  number: string;
+  imageUrl: string | null;
+  stat: string;
+  up?: boolean;
+}
+
+/** A game's hub: most hunted, price moves this week, most searched. */
+export interface GameHub {
+  game: string;
+  hunted: HubCard[];
+  movers: HubCard[];
+  searched: HubCard[];
+}
+
+export const getGameHub = (game: string) =>
+  call<{ hub: GameHub }>("GET", `/api/v1/games/${encodeURIComponent(game)}/hub`);
+
 /** One trade, as the room renders it for one viewer - the web's shape. */
 export interface TradeRecord {
   id: string;

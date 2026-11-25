@@ -166,7 +166,7 @@ describe("search", () => {
       'const shown: SearchTab = playersOnly ? "players" : tab;',
     );
     expect(web.search).toContain(
-      "onlyPlayers ? none<SearchCard>() : quietly(findCards(text))",
+      "onlyPlayers ? none<SearchCard>() : quietly(findCards(text, game))",
     );
     expect(web.search).toContain(
       "onlyPlayers ? none<FoundStore>() : quietly(searchStoresAction(text))",
@@ -183,7 +183,7 @@ describe("search", () => {
     /* Per account. */
     expect(web.search).toContain("recentKey(account)");
     expect(web.searchPanel).toContain(
-      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} />",
+      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />",
     );
   });
 
