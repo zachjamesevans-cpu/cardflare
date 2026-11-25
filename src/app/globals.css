@@ -1437,8 +1437,48 @@ html[data-backdrop="black"] {
   animation: cf-first-flare-drift linear infinite;
 }
 
-/* A card opened over the page (card-modal.tsx) fades in, page and all. */
-@keyframes cf-card-modal-in {
+/*
+ * A card opened over the page (card-modal.tsx): the sheet springs up from
+ * the bottom on iOS's own curve (into the middle on a wide screen), the
+ * blur fades in behind it, and both run backwards to close.
+ */
+@keyframes cf-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes cf-sheet-down {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes cf-sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes cf-sheet-sink {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(28px) scale(0.97);
+  }
+}
+@keyframes cf-fade-in {
   from {
     opacity: 0;
   }
@@ -1446,13 +1486,42 @@ html[data-backdrop="black"] {
     opacity: 1;
   }
 }
+@keyframes cf-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 
-.cf-card-modal {
-  animation: cf-card-modal-in 160ms ease-out;
+.cf-sheet-in {
+  animation: cf-sheet-up 420ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.cf-sheet-out {
+  animation: cf-sheet-down 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.cf-sheet-backdrop-in {
+  animation: cf-fade-in 300ms ease-out both;
+}
+.cf-sheet-backdrop-out {
+  animation: cf-fade-out 220ms ease-in both;
+}
+
+@media (min-width: 640px) {
+  .cf-sheet-in {
+    animation: cf-sheet-rise 320ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  }
+  .cf-sheet-out {
+    animation: cf-sheet-sink 200ms ease-in both;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cf-card-modal {
-    animation: none;
+  .cf-sheet-in,
+  .cf-sheet-out,
+  .cf-sheet-backdrop-in,
+  .cf-sheet-backdrop-out {
+    animation-duration: 1ms;
   }
 }

@@ -3,9 +3,8 @@ import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import type { StackParams } from "../../App";
 import {
@@ -120,7 +119,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
       <View
         style={{
           flex: 1,
-          backgroundColor: colors.canvas,
+          backgroundColor: colors.surface,
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
         }}
@@ -154,7 +153,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
   return (
     <CardOverlay>
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.canvas }}
+      style={{ flex: 1, backgroundColor: colors.surface }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
@@ -331,71 +330,48 @@ export function CardScreen({ cardId }: { cardId: string }) {
 }
 
 /**
- * A card opens OVER the screen it was tapped on, never as a screen of its
- * own: the founder, "the card should not open a separate screen.
- * background should fade", everywhere a card opens. The route is a
- * transparent modal that fades in (App.tsx); this draws the dimmed
- * backdrop - a tap on it closes - and the sheet the card sits on.
+ * The card's sheet: iOS draws it (App.tsx presents this route as its own
+ * modal sheet, the screen behind receding and dimmed, a swipe down to
+ * close); this adds the grab handle that says it can be pulled down, and
+ * a close button for anyone who would rather tap.
  */
 function CardOverlay({ children }: { children: ReactNode }) {
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
   return (
-    <View style={{ flex: 1 }}>
-      <Pressable
-        onPress={() => navigation.goBack()}
-        accessibilityRole="button"
-        accessibilityLabel="Close card"
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.72)",
-        }}
-      />
+    /* The sheet in the app's surface colour, a step up from the black
+       canvas, so it reads as lifted off the screen receding behind it. */
+    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+      <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
+        <View
+          accessibilityElementsHidden
+          style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong }}
+        />
+      </View>
       <View
         style={{
-          flex: 1,
-          /* Enough of the screen beneath shows, dimmed, to read as over
-             it, and to tap away. */
-          marginTop: insets.top + spacing(14),
-          borderTopLeftRadius: radius.panel,
-          borderTopRightRadius: radius.panel,
-          borderWidth: 1,
-          borderBottomWidth: 0,
-          borderColor: colors.border,
-          backgroundColor: colors.canvas,
-          overflow: "hidden",
+          position: "absolute",
+          top: spacing(2),
+          right: spacing(2),
+          zIndex: 1,
         }}
       >
-        <View
+        <Tap
+          onPress={() => navigation.goBack()}
+          hitSlop={10}
+          accessibilityLabel="Close"
           style={{
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            paddingHorizontal: spacing(2),
-            paddingTop: spacing(2),
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: colors.elevated,
           }}
         >
-          <Tap
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            accessibilityLabel="Close"
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: colors.elevated,
-            }}
-          >
-            <Ionicons name="close" size={20} color={colors.textPrimary} />
-          </Tap>
-        </View>
-        {children}
+          <Ionicons name="close" size={19} color={colors.textPrimary} />
+        </Tap>
       </View>
+      {children}
     </View>
   );
 }

@@ -1311,15 +1311,17 @@ function AppGates() {
               options={{ title: "Traders near you" }}
             />
           ) : null}
-          {/* A card opens over the screen it came from, the background
-              dimmed, never as a screen of its own (screens/card.tsx). */}
+          {/* A card opens as iOS's own sheet over the screen it came from:
+              it slides up, the screen behind recedes and dims, and a swipe
+              down closes it (screens/card.tsx). The founder: "the whole pop
+              up thing we have now is kind of buns", then yes to this. */}
           <Stack.Screen
             name="Card"
             options={{
               title: "Card",
               headerShown: false,
-              presentation: "transparentModal",
-              animation: "fade",
+              presentation: "modal",
+              gestureEnabled: true,
             }}
           >
             {({ route }) => <CardScreen cardId={route.params.cardId} />}

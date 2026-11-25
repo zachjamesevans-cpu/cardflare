@@ -9,14 +9,13 @@ import { describe, expect, it } from "vitest";
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
 describe("a card opens over the page", () => {
-  it("in the app: the Card route is a fading, see-through modal with a dimmed backdrop", () => {
+  it("in the app: the Card route is iOS's own sheet, swiped down to close", () => {
     const app = read("mobile/App.tsx");
     expect(app).toMatch(
-      /name="Card"\s*options=\{\{\s*title: "Card",\s*headerShown: false,\s*presentation: "transparentModal",\s*animation: "fade",/,
+      /name="Card"\s*options=\{\{\s*title: "Card",\s*headerShown: false,\s*presentation: "modal",\s*gestureEnabled: true,/,
     );
     const screen = read("mobile/src/screens/card.tsx");
-    expect(screen).toContain('accessibilityLabel="Close card"');
-    expect(screen).toContain('backgroundColor: "rgba(0,0,0,0.72)"');
+    expect(screen).toContain('accessibilityLabel="Close"');
     expect(screen.match(/<CardOverlay>/g)?.length).toBe(2);
   });
 
@@ -31,6 +30,9 @@ describe("a card opens over the page", () => {
     expect(modal).toContain('aria-label="Close card"');
     expect(modal).toContain('event.key === "Escape"');
     expect(modal).toContain("router.back()");
+    /* A sheet over a blurred page, pulled down to close. */
+    expect(modal).toContain("backdrop-blur-md");
+    expect(modal).toContain("DRAG_CLOSE_PX");
     expect(existsSync(join(process.cwd(), "src/app/cards/[cardId]/page.tsx"))).toBe(
       true,
     );
