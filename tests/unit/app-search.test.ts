@@ -236,7 +236,7 @@ describe("the card page", () => {
     const button = src.card.slice(src.card.indexOf("<FlareButton"));
     expect(button).toContain("label={`Flare ${name}`}");
     expect(button).toMatch(
-      /navigationRef\.navigate\("Tabs", \{\s*screen: "Flare",\s*params: \{\s*card: \{\s*cardId: card\.cardId,/,
+      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,/,
     );
   });
 

@@ -212,7 +212,7 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     expect(src.huntScreen).toContain("<HuntBinder");
     expect(src.huntScreen).toContain("yours={hunt.yours}");
     expect(src.huntScreen).toContain(
-      'navigation.navigate("Tabs", { screen: "Flare", params: { hunt: id } })',
+      "onAdd={(id) => openComposer(navigation, { hunt: id })}",
     );
     expect(src.huntScreen).toContain(
       'onOwner={() =>\n          navigation.navigate("PlayerProfile", { playerId: hunt.playerId })\n        }',
@@ -280,7 +280,7 @@ describe("the hunt page is the open binder, minus hold to move", () => {
     const add = between(src.page, "<AddPocket", "/>");
     expect(add).toContain("if (hunt.id) onAdd?.(hunt.id);");
     /* The same door the hunt has today: the composer with the hunt chosen. */
-    expect(src.huntScreen).toContain("params: { hunt: id }");
+    expect(src.huntScreen).toContain("openComposer(navigation, { hunt: id })");
     /* No Add cards button under the pages any more. */
     expect(src.page).not.toContain('label="Add cards"');
   });

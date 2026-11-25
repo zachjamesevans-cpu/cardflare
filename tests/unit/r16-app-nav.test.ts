@@ -86,7 +86,8 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     /* The Flare button above the tab bar opens it; the Feed's header
        no longer gets a +. */
     const dock = read("mobile/src/dock.tsx");
-    expect(dock).toContain('onPress={() => props.navigation.navigate("Flare")}');
+    /* Pushed over wherever you are, so back returns there (open-composer.ts). */
+    expect(dock).toContain("onPress={() => openComposer(props.navigation)}");
     const feedHeader = home.slice(
       home.indexOf("<CollapsingHeader"),
       home.indexOf("<Spotlight onOpen"),

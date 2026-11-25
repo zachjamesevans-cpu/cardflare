@@ -136,7 +136,7 @@ describe("the spotlight on the Flare button", () => {
       "ref={spotlight ? target : outerRef}",
     );
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      '<Spotlight onOpen={() => navigation.navigate("Tabs", { screen: "Flare" })} />',
+      "<Spotlight onOpen={() => openComposer(navigation)} />",
     );
     /* Once, and only when queued by the intro. */
     const spot = read("mobile/src/spotlight.tsx");

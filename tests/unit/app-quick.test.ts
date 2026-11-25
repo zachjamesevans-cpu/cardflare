@@ -95,7 +95,7 @@ describe("Post a Flare for it carries the card", () => {
 
   it("the card page hands over its card", () => {
     expect(card).toMatch(
-      /screen: "Flare",\s*params: \{\s*card: \{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: card\.imageUrl,/,
+      /openComposer\(navigation, \{\s*card: \{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: card\.imageUrl,/,
     );
   });
 

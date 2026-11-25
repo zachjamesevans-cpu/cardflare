@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { openComposer } from "../open-composer";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -153,15 +154,12 @@ export function SearchLabScreen() {
   };
 
   const hunt = (card: RecentCard) =>
-    navigation.navigate("Tabs", {
-      screen: "Flare",
-      params: {
-        card: {
-          cardId: card.cardId,
-          name: card.name,
-          cardNumber: card.cardNumber,
-          imageUrl: card.imageUrl,
-        },
+    openComposer(navigation, {
+      card: {
+        cardId: card.cardId,
+        name: card.name,
+        cardNumber: card.cardNumber,
+        imageUrl: card.imageUrl,
       },
     });
 

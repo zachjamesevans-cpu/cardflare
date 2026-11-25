@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { openComposer } from "../open-composer";
 import { FlareButton } from "../flare-button";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
@@ -84,9 +85,7 @@ export function HuntScreen({ huntId }: { huntId: string }) {
       <HuntBinder
         hunt={hunt}
         yours={hunt.yours}
-        onAdd={(id) =>
-          navigation.navigate("Tabs", { screen: "Flare", params: { hunt: id } })
-        }
+        onAdd={(id) => openComposer(navigation, { hunt: id })}
         onChanged={() => void load()}
         onOwner={() =>
           navigation.navigate("PlayerProfile", { playerId: hunt.playerId })
@@ -97,12 +96,7 @@ export function HuntScreen({ huntId }: { huntId: string }) {
         THIS hunt; on somebody else's it is the plain composer. */}
     <FlareButton
       label={hunt.yours ? `Add to ${hunt.name}` : "Post a Flare"}
-      onPress={() =>
-        navigation.navigate(
-          "Tabs",
-          hunt.yours ? { screen: "Flare", params: { hunt: hunt.id } } : { screen: "Flare" },
-        )
-      }
+      onPress={() => openComposer(navigation, hunt.yours ? { hunt: hunt.id } : undefined)}
       style={{ right: gutter + spacing(1), bottom: spacing(10) }}
     />
     </View>

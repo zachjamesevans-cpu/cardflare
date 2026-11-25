@@ -237,7 +237,7 @@ describe("each screen reads the words from the file", () => {
     /* A real destination on each side: the composer that already exists. */
     expect(webInbox).toContain('<ButtonLink href="/flare" variant="secondary">');
     expect(read("src/app/flare/page.tsx")).toContain("<FlareComposer");
-    expect(appInbox).toContain('navigation.navigate("Tabs", { screen: "Flare" })');
+    expect(appInbox).toContain("openComposer(navigation)");
     expect(read("mobile/App.tsx")).toMatch(/\n {2}Flare:\n/);
   });
 

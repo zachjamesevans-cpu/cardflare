@@ -1,4 +1,5 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import { openComposer } from "./open-composer";
 import Animated, {
   interpolate,
   makeMutable,
@@ -91,7 +92,7 @@ export function DockTabBar(props: BottomTabBarProps) {
         <FlareButton
           label="Post a Flare"
           spotlight
-          onPress={() => props.navigation.navigate("Flare")}
+          onPress={() => openComposer(props.navigation)}
         />
       </View>
     ) : null}

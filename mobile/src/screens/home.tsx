@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { openComposer } from "../open-composer";
 import { FirstFlareCard } from "../first-flare-card";
 import { TradersStrip } from "../traders-strip";
 import { UI_EXPERIMENT } from "../ui-experiment";
@@ -1480,7 +1481,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                      list (src/first-flare-card.tsx). */
                   <FirstFlareCard
                     key={`start-${index}`}
-                    onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}
+                    onPost={() => openComposer(navigation)}
                   />
                 ) : item.kind === "start" ? (
                   <Card key={`start-${index}`}>
@@ -2014,7 +2015,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 </Body>
                 <Button
                   label="Post a Flare"
-                  onPress={() => navigation.navigate("Tabs", { screen: "Flare" })}
+                  onPress={() => openComposer(navigation)}
                 />
                 {(nearbyMiles ?? 50) < 100 ? (
                   <Button
@@ -2055,7 +2056,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       />
       {/* A new player's one-time pointer at the +, after the intro. */}
       {guest ? null : (
-        <Spotlight onOpen={() => navigation.navigate("Tabs", { screen: "Flare" })} />
+        <Spotlight onOpen={() => openComposer(navigation)} />
       )}
       {/* A new player's first Nearby: two stops, once (tour.tsx). A stop
           with nothing showing - no matches yet, a ZIP already saved - is

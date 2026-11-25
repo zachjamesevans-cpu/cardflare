@@ -291,6 +291,8 @@ export type StackParams = {
   LogTrade: undefined;
   /** One card, whole: the website's /cards/[cardId]. Reached from a search result. */
   Card: { cardId: string };
+  /* The composer, pushed over wherever it was opened (src/open-composer.ts). */
+  Compose: TabParams["Flare"];
   /* Traders near you: the UI experiment's list (src/ui-experiment.ts). */
   Traders: undefined;
   /**
@@ -1326,6 +1328,14 @@ function AppGates() {
           >
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
           </Stack.Screen>
+          {/* The composer is a sheet over wherever it was opened - over a
+              card's sheet it stacks on it - so a swipe down or back lands
+              exactly there (src/open-composer.ts). */}
+          <Stack.Screen
+            name="Compose"
+            component={HubScreen}
+            options={{ title: "Post a Flare", presentation: "modal", gestureEnabled: true }}
+          />
           <Stack.Screen name="PostFlare" options={{ title: "Post a Flare" }}>
             {({ route }) => (
               <FlareComposer

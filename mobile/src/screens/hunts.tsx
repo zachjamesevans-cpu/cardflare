@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { openComposer } from "../open-composer";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
@@ -111,10 +112,7 @@ export function HuntsScreen({ playerId }: { playerId?: string }) {
              "Add cards" adds to THIS hunt rather than starting a
              fresh one that happens to share a name. */
           onAdd={(huntId) =>
-            navigation.navigate("Tabs", {
-              screen: "Flare",
-              params: { hunt: huntId },
-            })
+            openComposer(navigation, { hunt: huntId })
           }
           /* A row opens the hunt's own screen, the pockets. */
           onOpen={(id) => navigation.navigate("Hunt", { huntId: id })}

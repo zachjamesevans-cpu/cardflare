@@ -46,9 +46,7 @@ describe("the first-Flare starter", () => {
     expect(read("src/components/feed/first-flare-card.tsx")).toContain('href="/flare"');
     const home = read("mobile/src/screens/home.tsx");
     expect(home).toContain('item.kind === "start" && item.topic === "deck" ? (');
-    expect(home).toContain(
-      'onPost={() => navigation.navigate("Tabs", { screen: "Flare" })}',
-    );
+    expect(home).toContain("onPost={() => openComposer(navigation)}");
   });
 
   it("holds still for anyone who asked for less motion", () => {

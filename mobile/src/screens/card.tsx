@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { navigationRef } from "../navigation-ref";
+import { openComposer } from "../open-composer";
 import { FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
@@ -320,40 +320,18 @@ export function CardScreen({ cardId }: { cardId: string }) {
         in it (flare-button.tsx). It replaced "Post a Flare for it". */}
     <FlareButton
       label={`Flare ${name}`}
-      onPress={() => {
-        /*
-         * Close the sheet FIRST, then open the composer once it has gone.
-         * Jumping to the composer while iOS was still presenting the
-         * sheet left the screen behind it shrunk, its top dropped, after
-         * the composer closed - the founder: "it goes back to main menu
-         * and has a layered drop down thing". The timer is a fallback for
-         * a transition that never reports its end.
-         */
-        const flareIt = () =>
-          navigationRef.navigate("Tabs", {
-            screen: "Flare",
-            params: {
-              card: {
-                cardId: card.cardId,
-                name: card.name,
-                cardNumber: card.number,
-                imageUrl: card.imageUrl,
-              },
-            },
-          });
-        let done = false;
-        const once = () => {
-          if (done) return;
-          done = true;
-          unsubscribe();
-          flareIt();
-        };
-        const unsubscribe = navigation.addListener("transitionEnd", (event) => {
-          if (event.data.closing) once();
-        });
-        navigation.goBack();
-        setTimeout(once, 700);
-      }}
+      onPress={() =>
+        /* Pushed inside the sheet, so back returns to this very card
+           (src/open-composer.ts). */
+        openComposer(navigation, {
+          card: {
+            cardId: card.cardId,
+            name: card.name,
+            cardNumber: card.number,
+            imageUrl: card.imageUrl,
+          },
+        })
+      }
       style={{ right: gutter + spacing(1), bottom: insets.bottom + spacing(4) }}
     />
     </CardOverlay>
