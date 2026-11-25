@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Crosshair, Layers, Search, Store } from "lucide-react";
 
 import { MessageButton } from "@/components/players/message-button";
@@ -30,8 +31,11 @@ export function CardPageView({
   page,
   viewerId,
   imagesEnabled,
+  prices,
 }: {
   page: CardPage;
+  /** Market prices, streamed in under the card (card-prices-section.tsx). */
+  prices?: ReactNode;
   /** Null signed out: the You block becomes the way in. */
   viewerId: string | null;
   imagesEnabled: boolean;
@@ -66,6 +70,8 @@ export function CardPageView({
           )}
         </div>
       </div>
+
+      {prices}
 
       {/* You: one line per true fact, then the one control. Signed out,
           the way in, back to this page. */}

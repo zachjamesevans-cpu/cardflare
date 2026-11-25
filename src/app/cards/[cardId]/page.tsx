@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
+import { CardPricesSkeleton } from "@/components/cards/card-prices";
+import { CardPricesSection } from "@/components/cards/card-prices-section";
 import { notFound } from "next/navigation";
 
 import { Logo } from "@/components/brand/logo";
@@ -64,6 +67,12 @@ export default async function CardRoute({
               page={page}
               viewerId={viewerId}
               imagesEnabled={cardImagesEnabled()}
+              prices={
+                /* Streamed: the page never waits on Scrydex. */
+                <Suspense fallback={<CardPricesSkeleton />}>
+                  <CardPricesSection cardId={page.card.cardId} />
+                </Suspense>
+              }
             />
           </Card>
         </div>

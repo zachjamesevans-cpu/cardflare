@@ -68,9 +68,13 @@ to know whether to bring cards or money, so a Flare records whether it
 is answerable by a trade, by cash, or by either. Trade-only is the
 assumed default and is deliberately silent on the board.
 
-**Never a price.** A flag says something about the person standing in the
-room; a number turns CardFlare into a marketplace, which is on the
-out-of-scope list above.
+**Market prices, for reference only.** Until 2026-11-25 this read "Never a
+price". The founder: "integrate the pricing information for each card into
+cardflare." A card's page now shows Scrydex's market prices per printing, by
+condition and by grade. That is reference data about the card, not a listing.
+A Flare still carries no asking price, nobody posts one, and CardFlare takes
+no part in a sale. A flag still says something about the person standing in
+the room, and the marketplace stays on the out-of-scope list above.
 
 ## Parked: profiles and standing
 
@@ -168,7 +172,7 @@ place. So the Feed may carry them. The guards that keep this from becoming a
 shop: they sit BELOW everything derived, they are capped at one item each, and
 they are never the reason a room goes unmentioned.
 
-What has not changed: no compose box for players, no prices on cards, and no
+What has not changed: no compose box for players, no prices on Flares or posts, and no
 item that could be satisfied by post. A quiet Feed is allowed to be short. It
 is not allowed to be empty.
 
