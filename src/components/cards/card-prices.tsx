@@ -150,14 +150,42 @@ export function PricesFrame({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** While the prices load: the panel's shape, quiet. */
+/**
+ * While the prices load: the panel's own shape and size - the chips,
+ * the price, the range, two rows of chips - so nothing below it moves
+ * when the figures land. The app's placeholder is the same.
+ */
 export function CardPricesSkeleton() {
+  const pills = (
+    <div className="flex flex-wrap gap-2">
+      {[0, 1, 2, 3].map((index) => (
+        <span key={index} className="h-7 w-20 animate-pulse rounded-full bg-elevated" />
+      ))}
+    </div>
+  );
   return (
     <PricesFrame>
-      <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-4">
-        <span className="h-8 w-32 animate-pulse rounded-md bg-elevated" />
-        <span className="h-4 w-48 animate-pulse rounded-md bg-elevated" />
+      <div className="flex gap-2 pb-1">
+        {["w-16", "w-24", "w-32"].map((width) => (
+          <span
+            key={width}
+            className={`h-8 ${width} animate-pulse rounded-full bg-elevated`}
+          />
+        ))}
       </div>
+      <div className="flex flex-col gap-3 rounded-[var(--radius-control)] border border-border bg-elevated/60 p-4">
+        <span className="h-9 w-32 animate-pulse rounded-md bg-elevated" />
+        <span className="h-4 w-56 animate-pulse rounded-md bg-elevated" />
+        <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+          <span className="h-3 w-24 rounded bg-elevated" />
+          {pills}
+        </div>
+        <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+          <span className="h-3 w-16 rounded bg-elevated" />
+          {pills}
+        </div>
+      </div>
+      <span className="h-3 w-64 rounded bg-elevated" />
     </PricesFrame>
   );
 }

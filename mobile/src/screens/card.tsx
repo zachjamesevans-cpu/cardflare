@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
@@ -48,6 +49,11 @@ export function aboutMiles(miles: number): string {
 }
 
 export function CardScreen({ cardId }: { cardId: string }) {
+  /* Prices are asked for the moment the card is opened, beside the card
+     itself, not after it has drawn (src/price-cache.ts). */
+  useEffect(() => {
+    void loadCardPrices(cardId);
+  }, [cardId]);
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   const { width: screenWidth } = useWindowDimensions();
   const [page, setPage] = useState<CardPage | null>(null);

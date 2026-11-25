@@ -1,8 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Animated, ScrollView, Text, View } from "react-native";
 
-import { getCardPrices, type CardPrices } from "./api";
+import type { CardPrices } from "./api";
+import { loadCardPrices, peekCardPrices, savedCardPrices } from "./price-cache";
 import { Tap } from "./ui";
 import { colors, radius, spacing } from "./theme";
 
@@ -42,20 +43,38 @@ function updatedLabel(iso: string): string {
 }
 
 export function CardPricesPanel({ cardId }: { cardId: string }) {
-  const [prices, setPrices] = useState<CardPrices | null>(null);
+  /* Prices already in hand draw in the first frame; otherwise the copy
+     on the phone, then the server's answer (src/price-cache.ts). */
+  const [prices, setPrices] = useState<CardPrices | null>(() => peekCardPrices(cardId));
   const [at, setAt] = useState(0);
+  /* Faded in only when they arrive after the screen did; prices that
+     were already here simply appear with it. */
+  const fade = useRef(new Animated.Value(prices ? 1 : 0)).current;
 
   useEffect(() => {
     let live = true;
-    setPrices(null);
+    const show = (next: CardPrices, animate: boolean) => {
+      if (!live) return;
+      setPrices(next);
+      if (animate) {
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }).start();
+      } else fade.setValue(1);
+    };
+    const now = peekCardPrices(cardId);
     setAt(0);
-    getCardPrices(cardId)
-      .then((answer) => live && setPrices(answer.prices))
-      .catch(() => live && setPrices({ state: "unavailable" }));
+    if (now) show(now, false);
+    else {
+      setPrices(null);
+      fade.setValue(0);
+      void savedCardPrices(cardId).then((saved) => {
+        if (saved && live) show(saved, false);
+      });
+    }
+    void loadCardPrices(cardId).then((fresh) => show(fresh, !now));
     return () => {
       live = false;
     };
-  }, [cardId]);
+  }, [cardId, fade]);
 
   return (
     <View style={{ gap: spacing(2) }}>
@@ -72,10 +91,7 @@ export function CardPricesPanel({ cardId }: { cardId: string }) {
         Market price
       </Text>
       {prices === null ? (
-        <View style={box()}>
-          <View style={{ width: 120, height: 30, borderRadius: 6, backgroundColor: colors.elevated }} />
-          <View style={{ width: 190, height: 14, borderRadius: 6, backgroundColor: colors.elevated }} />
-        </View>
+        <PricesSkeleton />
       ) : prices.state !== "ok" ? (
         <Text style={{ color: colors.textMuted, fontSize: 14 }}>
           {prices.state === "none"
@@ -83,7 +99,9 @@ export function CardPricesPanel({ cardId }: { cardId: string }) {
             : "Prices aren't available right now."}
         </Text>
       ) : (
-        <Panel prices={prices} at={Math.min(at, prices.printings.length - 1)} onPick={setAt} />
+        <Animated.View style={{ opacity: fade, gap: spacing(2) }}>
+          <Panel prices={prices} at={Math.min(at, prices.printings.length - 1)} onPick={setAt} />
+        </Animated.View>
       )}
     </View>
   );
@@ -202,6 +220,52 @@ function Panel({
         {`${PRICE_SOURCE} Updated ${updatedLabel(prices.fetchedAt)}.`}
       </Text>
     </>
+  );
+}
+
+/**
+ * While prices load: the panel's own shape and size - the chips, the
+ * price, the range, two rows of chips - so nothing below it moves when
+ * the figures land.
+ */
+function PricesSkeleton() {
+  const bar = (width: number, height: number) => (
+    <View style={{ width, height, borderRadius: 6, backgroundColor: colors.elevated }} />
+  );
+  const pills = (count: number) => (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing(2) }}>
+      {Array.from({ length: count }, (_, index) => (
+        <View
+          key={index}
+          style={{ width: 82, height: 30, borderRadius: 999, backgroundColor: colors.elevated }}
+        />
+      ))}
+    </View>
+  );
+  return (
+    <View style={{ gap: spacing(2) }} accessibilityLabel="Loading prices">
+      <View style={{ flexDirection: "row", gap: spacing(2) }}>
+        {[70, 92, 120].map((width) => (
+          <View
+            key={width}
+            style={{ width, height: 34, borderRadius: 999, backgroundColor: colors.elevated }}
+          />
+        ))}
+      </View>
+      <View style={box()}>
+        {bar(130, 38)}
+        {bar(220, 16)}
+        <View style={{ gap: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }}>
+          {bar(90, 11)}
+          {pills(4)}
+        </View>
+        <View style={{ gap: spacing(1.5), borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing(3) }}>
+          {bar(60, 11)}
+          {pills(4)}
+        </View>
+      </View>
+      {bar(260, 12)}
+    </View>
   );
 }
 
