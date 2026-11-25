@@ -1436,3 +1436,23 @@ html[data-backdrop="black"] {
 .cf-first-flare-strip {
   animation: cf-first-flare-drift linear infinite;
 }
+
+/* A card opened over the page (card-modal.tsx) fades in, page and all. */
+@keyframes cf-card-modal-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.cf-card-modal {
+  animation: cf-card-modal-in 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-card-modal {
+    animation: none;
+  }
+}

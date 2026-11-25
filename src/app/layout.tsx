@@ -63,7 +63,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+  modal,
+}: Readonly<{
+  children: React.ReactNode;
+  /* A card opened over the page (src/app/@modal). */
+  modal: React.ReactNode;
+}>) {
   return (
     <html
       lang="en"
@@ -85,6 +90,7 @@ export default function RootLayout({
           Skip to content
         </a>
         {children}
+        {modal}
         <AnalyticsTracker />
       </body>
     </html>
