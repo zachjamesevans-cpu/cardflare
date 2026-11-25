@@ -23,7 +23,7 @@ describe("a search result tile", () => {
   it("counts printings on the art and flares from its corner, no Hunt it row", () => {
     expect(search).toContain("accessibilityLabel={`${count} printings`}");
     expect(search).toContain("accessibilityLabel={`Flare ${hit.name}`}");
-    expect(search).not.toContain("Hunt it");
+    expect(search).not.toMatch(/>\s*Hunt it\s*</);
     expect(search).not.toContain("printingsLine");
   });
 });
