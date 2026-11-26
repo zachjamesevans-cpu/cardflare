@@ -13,7 +13,10 @@ const DRAG_CLOSE_PX = 110;
 const CLOSE_MS = 220;
 
 /**
- * A card opened over the page it was clicked on, as a sheet: it springs up
+ * A card opened over the page it was clicked on, as a sheet of frosted
+ * glass: the page behind shows through it, blurred (the founder, "a
+ * unified design language where this also kinda blurs into frame"; the
+ * app's frosted.tsx is the same). It springs up
  * from the bottom (into the middle on a wide screen) over the page,
  * blurred and dimmed behind it. The founder: "the whole pop up thing we
  * have now is kind of buns", then yes to a sheet. The app opens cards as
@@ -78,7 +81,7 @@ export function CardModal({
             : undefined
         }
         className={cn(
-          "relative flex max-h-[calc(100dvh-3.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[var(--radius-panel)] border border-border bg-surface shadow-[var(--shadow-panel)] transition-transform duration-200 sm:max-h-[90dvh] sm:rounded-[var(--radius-panel)]",
+          "relative flex max-h-[calc(100dvh-3.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-t-[var(--radius-panel)] border border-white/10 bg-surface/70 shadow-[var(--shadow-panel)] backdrop-blur-2xl transition-transform duration-200 sm:max-h-[90dvh] sm:rounded-[var(--radius-panel)]",
           closing ? "cf-sheet-out" : "cf-sheet-in",
         )}
       >

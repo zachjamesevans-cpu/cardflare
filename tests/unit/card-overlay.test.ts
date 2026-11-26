@@ -12,7 +12,7 @@ describe("a card opens over the page", () => {
   it("in the app: the Card route is iOS's own sheet, swiped down to close", () => {
     const app = read("mobile/App.tsx");
     expect(app).toMatch(
-      /name="Card"[\s\S]*?options=\{\{\s*title: "Card",\s*headerShown: false,\s*presentation: "formSheet",\s*sheetAllowedDetents: "fitToContents",[\s\S]*?gestureEnabled: true,/,
+      /name="Card"[\s\S]*?options=\{\{\s*title: "Card",\s*headerShown: false,[\s\S]*?presentation: "formSheet",\s*sheetAllowedDetents: "fitToContents",[\s\S]*?gestureEnabled: true,/,
     );
     const screen = read("mobile/src/screens/card.tsx");
     expect(screen).toContain('accessibilityLabel="Close"');
@@ -35,6 +35,29 @@ describe("a card opens over the page", () => {
     expect(modal).toContain("DRAG_CLOSE_PX");
     expect(existsSync(join(process.cwd(), "src/app/cards/[cardId]/page.tsx"))).toBe(
       true,
+    );
+  });
+});
+
+describe("sheets stand on frosted glass", () => {
+  /* "a unified design language where this also kinda blurs into frame",
+     then option A: a picture floats on blur, anything you work in stands
+     on frosted glass, pages are solid. */
+  it("frosts the card sheet and the composer sheet, and the website's pop-up", () => {
+    expect(read("mobile/src/frosted.tsx")).toContain(
+      '<BlurView intensity={70} tint="dark"',
+    );
+    expect(read("mobile/src/screens/card.tsx")).toContain("<Frosted />");
+    expect(read("mobile/src/screens/flare-composer.tsx")).toContain(
+      "{inSheet ? <Frosted style={{ bottom: -600 }} /> : null}",
+    );
+    expect(read("mobile/src/header.tsx")).toContain("{inSheet ? <Frosted /> : null}");
+    const app = read("mobile/App.tsx");
+    expect(
+      app.match(/contentStyle: \{ backgroundColor: "transparent" \}/g),
+    ).toHaveLength(2);
+    expect(read("src/components/cards/card-modal.tsx")).toContain(
+      "bg-surface/70 shadow-[var(--shadow-panel)] backdrop-blur-2xl",
     );
   });
 });

@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { Frosted } from "../frosted";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
@@ -139,7 +140,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
           flex: 1,
           /* A sheet fitted to its contents starts at this, not a sliver. */
           minHeight: 420,
-          backgroundColor: colors.surface,
+          backgroundColor: "transparent",
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
         }}
@@ -198,7 +199,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
   return (
     <CardOverlay>
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.surface }}
+      style={{ flex: 1, backgroundColor: "transparent" }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
         paddingVertical: spacing(4),
@@ -455,7 +456,10 @@ function CardOverlay({ children }: { children: ReactNode }) {
   return (
     /* The sheet in the app's surface colour, a step up from the black
        canvas, so it reads as lifted off the screen receding behind it. */
-    <View style={{ flex: 1, backgroundColor: colors.surface }}>
+    /* Frosted glass, not a solid panel (frosted.tsx): the screen it
+       opened over shows through, blurred. */
+    <View style={{ flex: 1 }}>
+      <Frosted />
       <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
         <View
           accessibilityElementsHidden

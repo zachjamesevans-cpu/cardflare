@@ -2,6 +2,7 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { Frosted } from "../frosted";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cartSaved } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
@@ -585,6 +586,7 @@ export function FlareComposer({
 
   return (
     <ScrollView
+      style={inSheet ? { backgroundColor: "transparent" } : undefined}
       scrollEnabled={!rearranging}
       contentContainerStyle={{
         paddingHorizontal: gutter,
@@ -602,6 +604,12 @@ export function FlareComposer({
       }
       onScrollBeginDrag={() => dismissSwipe()}
     >
+      {/* The sheet's frosted glass, behind its contents (frosted.tsx).
+          Inside the scroll, not around it: the fitted sheet measures the
+          scroll view itself. Absolute, so it takes no place in the gap. */}
+      {/* Run on past the contents, so the sheet's last strip under
+          Preview is glass too. */}
+      {inSheet ? <Frosted style={{ bottom: -600 }} /> : null}
       {posted ? (
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
@@ -627,7 +635,9 @@ export function FlareComposer({
           />
         </Card>
       ) : (
-        <Card>
+        /* In the sheet the card's own box goes: its contents stand on
+           the sheet's frosted glass (frosted.tsx). As the tab, a card. */
+        <Card style={inSheet ? sheetCard : undefined}>
           {/*
            * No title, no "To friends", no steps and no "Cards in this
            * flare · 5 cards": the founder (2026-11-25), "this screen also
@@ -1232,3 +1242,10 @@ export function FlareComposerPreview({
     </View>
   );
 }
+
+/** The composer's card, in the sheet: no fill, no border, no padding. */
+const sheetCard = {
+  backgroundColor: "transparent",
+  borderWidth: 0,
+  paddingHorizontal: 0,
+} as const;

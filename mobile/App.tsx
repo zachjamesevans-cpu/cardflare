@@ -1334,6 +1334,8 @@ function AppGates() {
             options={{
               title: "Card",
               headerShown: false,
+              /* See-through, so its frosted glass shows what is behind. */
+              contentStyle: { backgroundColor: "transparent" },
               presentation: "formSheet",
               sheetAllowedDetents: "fitToContents",
               sheetCornerRadius: 22,
@@ -1355,6 +1357,8 @@ function AppGates() {
             options={{
               title: "Post a Flare",
               presentation: "formSheet",
+              /* See-through, so its frosted glass shows what is behind. */
+              contentStyle: { backgroundColor: "transparent" },
               sheetAllowedDetents: "fitToContents",
               sheetGrabberVisible: true,
               sheetCornerRadius: 22,
