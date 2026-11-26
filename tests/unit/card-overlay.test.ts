@@ -47,7 +47,9 @@ describe("sheets stand on frosted glass", () => {
     expect(read("mobile/src/frosted.tsx")).toContain(
       '<BlurView intensity={70} tint="dark"',
     );
-    expect(read("mobile/src/screens/card.tsx")).toContain("<Frosted />");
+    expect(read("mobile/src/screens/card.tsx")).toContain(
+      "<Frosted style={{ bottom: -600 }} />",
+    );
     expect(read("mobile/src/screens/flare-composer.tsx")).toContain(
       "{inSheet ? <Frosted style={{ bottom: -600 }} /> : null}",
     );

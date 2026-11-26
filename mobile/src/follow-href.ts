@@ -1,4 +1,5 @@
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { toTab } from "./to-tab";
 import { Linking } from "react-native";
 
 import type { StackParams } from "../App";
@@ -51,8 +52,8 @@ export async function followHref(
     }
   }
   if (href === "/local" || href.startsWith("/local?")) {
-    if (LOCAL_ENABLED) navigation.navigate("Tabs", { screen: "Local" });
-    else navigation.navigate("Tabs", { screen: "Messages" });
+    if (LOCAL_ENABLED) toTab(navigation, "Local");
+    else toTab(navigation, "Messages");
     return;
   }
   if (href === "/profile/settings") {
@@ -77,7 +78,7 @@ export async function followHref(
     }
   }
   if (href === "/profile") {
-    navigation.navigate("Tabs", { screen: "Profile" });
+    toTab(navigation, "Profile");
     return;
   }
   /* A comment notice names its post: /feed?post=<id>. */
@@ -95,7 +96,7 @@ export async function followHref(
     return;
   }
   if (href === "/feed" || href.startsWith("/feed?")) {
-    navigation.navigate("Tabs", { screen: "Feed" });
+    toTab(navigation, "Feed");
     return;
   }
   /* The notices are a screen behind the Feed's bell, not a tab. */
@@ -106,7 +107,7 @@ export async function followHref(
   /* Nights holds the second tab unless Local has it; with Local on
      there is no Nights tab to land on, and the website has the list. */
   if (href === "/nights" && !LOCAL_ENABLED) {
-    navigation.navigate("Tabs", { screen: "Nights" });
+    toTab(navigation, "Nights");
     return;
   }
   /* Somebody's profile, or a shop. Only the page itself: /p/<id>/binders

@@ -1,4 +1,5 @@
 import { useNavigation, useRoute, type RouteProp } from "@react-navigation/native";
+import { toTab } from "../to-tab";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useState } from "react";
 import { Image, RefreshControl, ScrollView, Text, View } from "react-native";
@@ -82,10 +83,7 @@ export function GameHubScreen() {
         <Button
           label={`Search ${name}`}
           onPress={() =>
-            navigation.navigate("Tabs", {
-              screen: "Search",
-              params: { game, at: Date.now() },
-            } as never)
+            toTab(navigation, "Search", { game, at: Date.now() })
           }
         />
       </View>

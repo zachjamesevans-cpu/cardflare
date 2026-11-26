@@ -459,7 +459,9 @@ function CardOverlay({ children }: { children: ReactNode }) {
     /* Frosted glass, not a solid panel (frosted.tsx): the screen it
        opened over shows through, blurred. */
     <View style={{ flex: 1 }}>
-      <Frosted />
+      {/* Run on past the bottom: the sheet's last strip, under the home
+          indicator, is glass too, not the screen behind showing raw. */}
+      <Frosted style={{ bottom: -600 }} />
       <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
         <View
           accessibilityElementsHidden

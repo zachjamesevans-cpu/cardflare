@@ -86,13 +86,13 @@ describe("the link router", () => {
     ["/e/<code>", 'href.startsWith("/e/")'],
     ["/local?thread=<id>", 'navigation.navigate("LocalThread", { threadId })'],
     /* Round 16: Messages is a tab, and the notices a screen behind the bell. */
-    ["/local", 'navigation.navigate("Tabs", { screen: "Messages" })'],
-    ["/feed", 'navigation.navigate("Tabs", { screen: "Feed" })'],
+    ["/local", 'toTab(navigation, "Messages")'],
+    ["/feed", 'toTab(navigation, "Feed")'],
     ["/inbox", 'navigation.navigate("Inbox")'],
-    ["/profile", 'navigation.navigate("Tabs", { screen: "Profile" })'],
+    ["/profile", 'toTab(navigation, "Profile")'],
     ["/p/<playerId>", 'navigation.navigate("PlayerProfile", { playerId })'],
     ["/s/<storeId>", 'navigation.navigate("StoreProfile", { storeId })'],
-    ["/nights", 'navigation.navigate("Tabs", { screen: "Nights" })'],
+    ["/nights", 'toTab(navigation, "Nights")'],
   ])("opens %s on the phone", (_path, line) => {
     expect(router).toContain(line);
   });

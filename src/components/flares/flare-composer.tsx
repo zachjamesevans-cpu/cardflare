@@ -252,23 +252,18 @@ function ComposerBody({
       setDraft(EMPTY_DRAFT);
       setEditing(null);
       /*
-       * Every card went up: straight to the Feed, the Flare at its top.
-       * The founder (2026-11-25): "when you post a flare, it should
-       * immediately automatically take you to the main feed with your
-       * flare there, no need to have that entire secondary menu." A post
-       * that only partly went up stays here, so its summary is read.
+       * Straight to the Feed, the Flare at its top: the founder
+       * (2026-11-25), "when you post a flare, it should immediately
+       * automatically take you to the main feed with your flare there".
        */
-      if (result.posted === result.total) {
-        router.push("/feed");
-        router.refresh();
-        return;
-      }
-      setPosted({
-        posted: result.posted,
-        huntId: result.huntId,
-        summary: postSummary(result),
-      });
-      setStep("posted");
+      /* Every post goes to the Feed, a partial one too, its note said
+         there: "there is ZERO reason to have a 'see it in the feed'
+         button, truly, or anything after the flare gets posted." */
+      const note = result.posted === result.total ? null : postSummary(result);
+      router.push(
+        note ? `/feed?posted=1&note=${encodeURIComponent(note)}` : "/feed?posted=1",
+      );
+      router.refresh();
     });
   };
 
@@ -290,9 +285,6 @@ function ComposerBody({
           </p>
         )}
         <div className="flex flex-wrap gap-2">
-          <Link href="/feed?tab=mine" className={buttonStyles("primary", "sm")}>
-            See it in the Feed
-          </Link>
           {posted.huntId && (
             <Link
               href={`/hunts/${posted.huntId}`}

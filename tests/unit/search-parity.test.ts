@@ -138,7 +138,7 @@ describe("search, from the Feed", () => {
     expect(app.App).toContain('name="Search"');
     expect(app.App).toContain('title: "Search"');
     expect(app.App).toContain("Card: { cardId: string }");
-    expect(app.home).toContain('navigation.navigate("Tabs", { screen: "Search" })');
+    expect(app.home).toContain('toTab(navigation, "Search")');
     expect(app.search).toContain("searchCards(");
     expect(app.search).toContain("searchPlayersByName(");
     expect(app.search).toContain("searchStores(");

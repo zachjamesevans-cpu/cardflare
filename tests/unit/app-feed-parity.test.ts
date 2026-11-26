@@ -378,7 +378,7 @@ describe("the home screen's furniture", () => {
       /name="Search"\s*(\/\*[^*]*\*\/\s*)?component=\{(UI_EXPERIMENT \? SearchLabScreen : )?SearchScreen\}/,
     );
     expect(read("mobile/src/screens/home.tsx")).toContain(
-      'navigation.navigate("Tabs", { screen: "Search" })',
+      'toTab(navigation, "Search")',
     );
     expect(read("mobile/src/screens/home.tsx")).not.toContain("FindPlayer");
     expect(read("mobile/src/screens/home.tsx")).toContain('label="Find a player"');

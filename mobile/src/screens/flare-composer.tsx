@@ -207,7 +207,7 @@ export function FlareComposer({
    * cards the instant the post lands rather than after a re-read. The
    * founder: "The second I hit post, it needs to be visible in flares."
    */
-  onPosted?: (rows: Me["wants"], complete: boolean) => boolean | void;
+  onPosted?: (rows: Me["wants"], complete: boolean, summary?: string | null) => boolean | void;
   /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
@@ -535,6 +535,16 @@ export function FlareComposer({
           postedBoards: [],
         })),
         complete,
+        /* "2 of 3 went up": said on the Feed, where the post lands. */
+        !complete && result.total !== undefined && result.posted !== undefined
+          ? postSummary({
+              total: result.total,
+              posted: result.posted,
+              alreadyUp: result.alreadyUp,
+              failed: result.failed,
+              atCap: result.atCap,
+            })
+          : null,
       );
       void loadHunts();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -586,7 +596,10 @@ export function FlareComposer({
 
   return (
     <ScrollView
-      style={inSheet ? { backgroundColor: "transparent" } : undefined}
+      /* In the fitted sheet: exactly its contents' height, so the sheet
+         sizes to it. Stacked over a card's sheet it otherwise took a
+         shorter frame than the sheet and the foot was cut off. */
+      style={inSheet ? { backgroundColor: "transparent", flexGrow: 0 } : undefined}
       scrollEnabled={!rearranging}
       contentContainerStyle={{
         paddingHorizontal: gutter,
@@ -624,10 +637,9 @@ export function FlareComposer({
                 : "Your friends see it in the Feed."}
           </Body>
           {posted.summary ? <Muted>{posted.summary}</Muted> : null}
-          <Button
-            label="See it in the Feed"
-            onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
-          />
+          {/* No "See it in the Feed": a post goes to the Feed on its own
+              (hub.tsx). The founder: "there is ZERO reason to have a 'see
+              it in the feed' button". */}
           <Button
             label="Post another Flare"
             variant="secondary"

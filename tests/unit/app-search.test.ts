@@ -114,7 +114,7 @@ describe("the Search tab", () => {
     expect(src.app).toContain('options={{ title: "Search", tabBarLabel: "Search" }}');
     expect(src.app).not.toMatch(/<Stack\.Screen\s+name="Search"/);
     expect(src.app).not.toContain("FindPlayer");
-    expect(src.home).toContain('navigation.navigate("Tabs", { screen: "Search" })');
+    expect(src.home).toContain('toTab(navigation, "Search")');
     /* The list runs under the floating bar, so it pads for it. */
     expect(src.search).toContain("paddingBottom: spacing(4) + tabInset,");
     expect(src.home).not.toContain("FindPlayer");

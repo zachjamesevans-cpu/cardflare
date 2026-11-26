@@ -154,7 +154,9 @@ try {
 export type TabParams = {
   /** `tab` lands the Feed on one of its tabs: Nights sends "nearby". */
   /** `posted`: a Flare just went up; the Feed scrolls to its top. */
-  Feed: { tab?: "following" | "nearby"; at?: number; posted?: number } | undefined;
+  Feed:
+    | { tab?: "following" | "nearby"; at?: number; posted?: number; postedNote?: string }
+    | undefined;
   /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
   /** `game`: a hub's "Search Lorcana" lands with that game chosen. */
   Search: { game?: string; at?: number } | undefined;

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { toTab } from "../to-tab";
 import { PRO_ENABLED } from "../pro-enabled";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -1166,7 +1167,7 @@ function HelpCard() {
         label={REPLAY_TIPS_LABEL}
         onPress={() => {
           void queueTours();
-          navigation.navigate("Tabs", { screen: "Profile" });
+          toTab(navigation, "Profile");
         }}
       />
       <Row label="Contact us" onPress={() => void Linking.openURL(`${API_BASE}/contact`)} />
