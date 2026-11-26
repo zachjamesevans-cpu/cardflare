@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { Frosted } from "../frosted";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
@@ -13,7 +13,7 @@ import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
@@ -200,9 +200,13 @@ export function CardScreen({ cardId }: { cardId: string }) {
     <CardOverlay>
     <ScrollView
       style={{ flex: 1, backgroundColor: "transparent" }}
+      /* Pulled down past the top and let go: closed, like a photo. */
+      onScrollEndDrag={(event) => {
+        if (event.nativeEvent.contentOffset.y < -90) navigation.goBack();
+      }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
+        paddingTop: insets.top + spacing(12),
         gap: spacing(4),
         /* Room under the last section for the Flare button. */
         paddingBottom: spacing(24),
@@ -453,26 +457,18 @@ export function CardScreen({ cardId }: { cardId: string }) {
  */
 function CardOverlay({ children }: { children: ReactNode }) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   return (
-    /* The sheet in the app's surface colour, a step up from the black
-       canvas, so it reads as lifted off the screen receding behind it. */
-    /* Frosted glass, not a solid panel (frosted.tsx): the screen it
-       opened over shows through, blurred. */
+    /* The screen behind, blurred and darkened: the Feed's card zoom
+       (ui.tsx), the same blur and the same dark. No panel, no handle. */
     <View style={{ flex: 1 }}>
-      {/* Run on past the bottom: the sheet's last strip, under the home
-          indicator, is glass too, not the screen behind showing raw. */}
-      <Frosted style={{ bottom: -600 }} />
-      <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
-        <View
-          accessibilityElementsHidden
-          style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong }}
-        />
-      </View>
+      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
       <View
         style={{
           position: "absolute",
-          top: spacing(2),
-          right: spacing(2),
+          top: insets.top + spacing(2),
+          right: spacing(4),
           zIndex: 1,
         }}
       >
@@ -481,15 +477,15 @@ function CardOverlay({ children }: { children: ReactNode }) {
           hitSlop={10}
           accessibilityLabel="Close"
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: colors.elevated,
+            backgroundColor: "rgba(255,255,255,0.14)",
           }}
         >
-          <Ionicons name="close" size={19} color={colors.textPrimary} />
+          <Ionicons name="close" size={20} color={colors.textPrimary} />
         </Tap>
       </View>
       {children}
