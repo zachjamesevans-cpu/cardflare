@@ -99,14 +99,14 @@ export function CardPageView({
       <section className="flex flex-col gap-2" aria-labelledby="card-you">
         <h2
           id="card-you"
-          className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+          className="text-center text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
         >
           You
         </h2>
         {you ? (
           <>
             {(you.inTradeBinder || you.onHunt) && (
-              <ul className="flex flex-col gap-1 text-sm text-text-secondary">
+              <ul className="flex flex-col items-center gap-1 text-sm text-text-secondary">
                 {you.inTradeBinder && (
                   <li className="flex items-center gap-2">
                     <Layers
@@ -136,7 +136,7 @@ export function CardPageView({
         ) : (
           <Link
             href={`/login?next=${encodeURIComponent(href)}`}
-            className="text-sm font-semibold text-accent hover:underline"
+            className="self-center text-sm font-semibold text-accent hover:underline"
           >
             Sign in to see what you have
           </Link>
@@ -148,7 +148,7 @@ export function CardPageView({
         <section className="flex flex-col gap-2" aria-labelledby="card-holders">
           <h2
             id="card-holders"
-            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+            className="text-center text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
           >
             {countHeading(
               holders.length,
@@ -182,7 +182,7 @@ export function CardPageView({
         <section className="flex flex-col gap-2" aria-labelledby="card-hunters">
           <h2
             id="card-hunters"
-            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+            className="text-center text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
           >
             {countHeading(
               hunters.length,
@@ -222,7 +222,7 @@ export function CardPageView({
         <section className="flex flex-col gap-2" aria-labelledby="card-stores">
           <h2
             id="card-stores"
-            className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+            className="text-center text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
           >
             {countHeading(
               stores.length,

@@ -223,7 +223,7 @@ describe("the app's registration and badge", () => {
     expect(appRouter).toMatch(/"\/s\/"/);
     expect(appRouter).toMatch(/navigate\("StoreProfile", \{ storeId \}\)/);
     expect(appRouter).toMatch(/=== "\/nights"/);
-    expect(appRouter).toMatch(/screen: "Nights"/);
+    expect(appRouter).toMatch(/toTab\(navigation, "Nights"\)/);
     /* The website fallback stays last. */
     const fallback = appRouter.lastIndexOf("Linking.openURL(");
     const lastRoute = appRouter.lastIndexOf("navigation.navigate(");

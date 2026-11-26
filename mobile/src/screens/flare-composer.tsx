@@ -2,6 +2,7 @@ import {
   AddingToHunt,
   type HuntChoice,
 } from "../composer-sheets";
+import { Frosted } from "../frosted";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { cartSaved } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
@@ -206,7 +207,7 @@ export function FlareComposer({
    * cards the instant the post lands rather than after a re-read. The
    * founder: "The second I hit post, it needs to be visible in flares."
    */
-  onPosted?: (rows: Me["wants"], complete: boolean) => boolean | void;
+  onPosted?: (rows: Me["wants"], complete: boolean, summary?: string | null) => boolean | void;
   /** The Flare tab's Flares, rendered under the composer. */
   footer?: React.ReactNode;
 }) {
@@ -534,6 +535,16 @@ export function FlareComposer({
           postedBoards: [],
         })),
         complete,
+        /* "2 of 3 went up": said on the Feed, where the post lands. */
+        !complete && result.total !== undefined && result.posted !== undefined
+          ? postSummary({
+              total: result.total,
+              posted: result.posted,
+              alreadyUp: result.alreadyUp,
+              failed: result.failed,
+              atCap: result.atCap,
+            })
+          : null,
       );
       void loadHunts();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(
@@ -585,6 +596,10 @@ export function FlareComposer({
 
   return (
     <ScrollView
+      /* In the fitted sheet: exactly its contents' height, so the sheet
+         sizes to it. Stacked over a card's sheet it otherwise took a
+         shorter frame than the sheet and the foot was cut off. */
+      style={inSheet ? { backgroundColor: "transparent", flexGrow: 0 } : undefined}
       scrollEnabled={!rearranging}
       contentContainerStyle={{
         paddingHorizontal: gutter,
@@ -602,6 +617,12 @@ export function FlareComposer({
       }
       onScrollBeginDrag={() => dismissSwipe()}
     >
+      {/* The sheet's frosted glass, behind its contents (frosted.tsx).
+          Inside the scroll, not around it: the fitted sheet measures the
+          scroll view itself. Absolute, so it takes no place in the gap. */}
+      {/* Run on past the contents, so the sheet's last strip under
+          Preview is glass too. */}
+      {inSheet ? <Frosted style={{ bottom: -600 }} /> : null}
       {posted ? (
         <Card>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(2) }}>
@@ -616,10 +637,9 @@ export function FlareComposer({
                 : "Your friends see it in the Feed."}
           </Body>
           {posted.summary ? <Muted>{posted.summary}</Muted> : null}
-          <Button
-            label="See it in the Feed"
-            onPress={() => navigation.navigate("Tabs", { screen: "Feed" })}
-          />
+          {/* No "See it in the Feed": a post goes to the Feed on its own
+              (hub.tsx). The founder: "there is ZERO reason to have a 'see
+              it in the feed' button". */}
           <Button
             label="Post another Flare"
             variant="secondary"
@@ -627,7 +647,9 @@ export function FlareComposer({
           />
         </Card>
       ) : (
-        <Card>
+        /* In the sheet the card's own box goes: its contents stand on
+           the sheet's frosted glass (frosted.tsx). As the tab, a card. */
+        <Card style={inSheet ? sheetCard : undefined}>
           {/*
            * No title, no "To friends", no steps and no "Cards in this
            * flare · 5 cards": the founder (2026-11-25), "this screen also
@@ -1232,3 +1254,10 @@ export function FlareComposerPreview({
     </View>
   );
 }
+
+/** The composer's card, in the sheet: no fill, no border, no padding. */
+const sheetCard = {
+  backgroundColor: "transparent",
+  borderWidth: 0,
+  paddingHorizontal: 0,
+} as const;

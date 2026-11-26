@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
+import { PostedLine } from "@/components/feed/posted-line";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -207,6 +209,11 @@ export default async function FeedPage({
 
   return (
     <Shell playerId={playerId} unread={unread} tour={tour === "post"}>
+      {/* Just posted: "Your Flare is up", then gone (posted-line.tsx). */}
+      <Suspense fallback={null}>
+        <PostedLine />
+      </Suspense>
+
       {/* A room open at one of your stores, pinned above everything
           derived. */}
       {liveLocal && (

@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { Frosted } from "./frosted";
 import type { BottomTabHeaderProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackHeaderProps } from "@react-navigation/native-stack";
 import type { ComponentProps, ReactNode } from "react";
@@ -90,11 +91,13 @@ export function AppHeader({
       style={{
         paddingTop: insets.top,
         height: insets.top + HEADER.height,
-        backgroundColor: colors.canvas,
+        /* In a sheet, the sheet's frosted glass shows through (frosted.tsx). */
+        backgroundColor: inSheet ? "transparent" : colors.canvas,
         borderBottomWidth: 1,
         borderBottomColor: colors.border,
       }}
     >
+      {inSheet ? <Frosted /> : null}
       <View
         style={{
           position: "absolute",

@@ -40,7 +40,7 @@ describe("the Local switch", () => {
     const inbox = read("mobile/src/screens/inbox.tsx");
     expect(inbox).toContain("followHref(navigation, url)");
     expect(read("mobile/src/follow-href.ts")).toContain(
-      'navigation.navigate("Tabs", { screen: "Messages" });',
+      'toTab(navigation, "Messages");',
     );
     const page = read("src/app/local/page.tsx");
     expect(page).toContain('LOCAL_ENABLED ? "Local" : "Messages"');

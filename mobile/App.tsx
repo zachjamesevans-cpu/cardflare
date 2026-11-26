@@ -154,7 +154,9 @@ try {
 export type TabParams = {
   /** `tab` lands the Feed on one of its tabs: Nights sends "nearby". */
   /** `posted`: a Flare just went up; the Feed scrolls to its top. */
-  Feed: { tab?: "following" | "nearby"; at?: number; posted?: number } | undefined;
+  Feed:
+    | { tab?: "following" | "nearby"; at?: number; posted?: number; postedNote?: string }
+    | undefined;
   /** Search as a tab, Instagram's way: Top, Players, Cards, Stores. */
   /** `game`: a hub's "Search Lorcana" lands with that game chosen. */
   Search: { game?: string; at?: number } | undefined;
@@ -1327,17 +1329,22 @@ function AppGates() {
               up thing we have now is kind of buns", then yes to this. */}
           <Stack.Screen
             name="Card"
-            /* Only as tall as the card needs, like the composer: the
-               founder, of the dead space under a card, "maybe just
-               shortening the vertical on this". iOS's form sheet, fitted
-               to its contents; a long card still scrolls inside it. */
+            /*
+             * No sheet: the card floats on the screen behind, blurred,
+             * the way a card in a Feed post opens. The founder: "notice
+             * how when you click on a card in the feed, it blurs the
+             * background and stuff. thats what i thought you were
+             * building for the other elements, such as when you search a
+             * card." It fades in over everything; the X or a pull down
+             * closes it (card.tsx).
+             */
             options={{
               title: "Card",
               headerShown: false,
-              presentation: "formSheet",
-              sheetAllowedDetents: "fitToContents",
-              sheetCornerRadius: 22,
-              gestureEnabled: true,
+              contentStyle: { backgroundColor: "transparent" },
+              presentation: "transparentModal",
+              animation: "fade",
+              gestureEnabled: false,
             }}
           >
             {({ route }) => <CardScreen cardId={route.params.cardId} />}
@@ -1355,6 +1362,8 @@ function AppGates() {
             options={{
               title: "Post a Flare",
               presentation: "formSheet",
+              /* See-through, so its frosted glass shows what is behind. */
+              contentStyle: { backgroundColor: "transparent" },
               sheetAllowedDetents: "fitToContents",
               sheetGrabberVisible: true,
               sheetCornerRadius: 22,

@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { toTab } from "../to-tab";
 import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
 import { FirstFlareCard } from "../first-flare-card";
@@ -621,11 +622,16 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
   /* Tapping Feed (or Nearby) again: back to the top (tab-reset.ts). */
   const feedScroll = useRef<React.ComponentRef<typeof Animated.ScrollView>>(null);
-  useTabReset(() => feedScroll.current?.scrollTo({ y: 0, animated: true }));
+  /* The list's top is -headerRoom, not 0: it starts under the floating
+     header (contentOffset below). 0 left the first post half under it. */
+  const toTop = (animated: boolean) =>
+    feedScroll.current?.scrollTo({ y: -headerRoom, animated });
+  useTabReset(() => toTop(true));
   /* Arrived from posting a Flare: the top, where it is (hub.tsx). */
-  const arrival = useRoute<RouteProp<TabParams, "Feed">>().params?.posted;
+  const arrivalParams = useRoute<RouteProp<TabParams, "Feed">>().params;
+  const arrival = arrivalParams?.posted;
   useEffect(() => {
-    if (arrival) feedScroll.current?.scrollTo({ y: 0, animated: false });
+    if (arrival) toTop(false);
   }, [arrival]);
   const [me, setMe] = useState<Me | null>(null);
   /* Whether `me` came from the server this visit, not from last
@@ -1023,6 +1029,36 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
     },
     [loadOnce],
   );
+
+  /*
+   * Arrived from posting: a line at the top says the Flare is going up,
+   * then that it is up, so the Feed never sits there looking unchanged.
+   * The founder: "there should be some type of loading thing or visual
+   * context that your flare is posting so you're not like wtf where is
+   * my flare." The fresh read is the one that brings the post in.
+   */
+  const [posting, setPosting] = useState<"posting" | "up" | null>(null);
+  /* The latest load, read when the post arrives: the line's timers do not
+     restart every time the Feed's own loader is rebuilt. */
+  const loadRef = useRef(load);
+  loadRef.current = load;
+  useEffect(() => {
+    if (!arrival) return;
+    let live = true;
+    setPosting("posting");
+    void loadRef.current(() => live).finally(() => {
+      if (!live) return;
+      setPosting("up");
+      /* The fresh Feed is in: its top, where the new post is. */
+      toTop(true);
+      setTimeout(() => {
+        if (live) setPosting(null);
+      }, 3200);
+    });
+    return () => {
+      live = false;
+    };
+  }, [arrival]);
 
   useFocusEffect(
     useCallback(() => {
@@ -2019,7 +2055,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 <Button
                   label="Find a player"
                   variant="secondary"
-                  onPress={() => navigation.navigate("Tabs", { screen: "Search" })}
+                  onPress={() => toTab(navigation, "Search")}
                 />
               </Card>
             )}
@@ -2033,7 +2069,7 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                    whole tab. Traders showing above: only the Flares'. */
                 nobodyAtAll={!UI_EXPERIMENT || tradersCount === 0}
                 onPost={() => openComposer(navigation)}
-                onBinder={() => navigation.navigate("Tabs", { screen: "Profile" } as never)}
+                onBinder={() => toTab(navigation, "Profile")}
                 onWider={
                   (nearbyMiles ?? 50) < 100
                     ? () => {
@@ -2057,6 +2093,17 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
        * runs - the two states the platform control never gave us.
        */}
       <PullSpinner pull={pull} hold={hold} refreshing={refreshing} top={headerRoom} />
+
+      {/* Just posted: floating under the header, over the list, so it is
+          seen wherever the list sits (PostingLine). */}
+      {mode === "following" && posting ? (
+        <View
+          pointerEvents="none"
+          style={{ position: "absolute", top: headerRoom + spacing(2), left: gutter, right: gutter, zIndex: 20 }}
+        >
+          <PostingLine state={posting} note={arrivalParams?.postedNote ?? null} />
+        </View>
+      ) : null}
 
       <CollapsingHeader
         state={header}
@@ -2324,6 +2371,45 @@ function NearbyEmpty({
           <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>Look within 100 miles</Text>
         </Tap>
       ) : null}
+    </View>
+  );
+}
+
+/** "Posting your Flare…", then "Your Flare is up": the Feed, just after a post. */
+function PostingLine({ state, note }: { state: "posting" | "up"; note: string | null }) {
+  return (
+    <View
+      accessibilityLiveRegion="polite"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: spacing(2.5),
+        paddingHorizontal: spacing(4),
+        paddingVertical: spacing(3),
+        borderRadius: 14,
+        /* Solid enough to read over the posts it floats on. */
+        backgroundColor: colors.elevated,
+        borderWidth: 1,
+        borderColor: colors.accentMuted,
+        shadowColor: "#000",
+        shadowOpacity: 0.4,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 4 },
+      }}
+    >
+      {state === "posting" ? (
+        <ActivityIndicator size="small" color={colors.accent} />
+      ) : (
+        <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
+      )}
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.accent, fontSize: 15, fontWeight: "800" }}>
+          {state === "posting" ? "Posting your Flare…" : "Your Flare is up"}
+        </Text>
+        {note ? (
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{note}</Text>
+        ) : null}
+      </View>
     </View>
   );
 }

@@ -125,7 +125,7 @@ describe("the tab bar: Feed, Nights, Messages, Search, Profile", () => {
     /* No stack screen called Messages any more: it is the tab. */
     expect(app).not.toMatch(/<Stack\.Screen\s+name="Messages"/);
     expect(href).toContain('navigation.navigate("Inbox");');
-    expect(href).toContain('navigation.navigate("Tabs", { screen: "Messages" });');
+    expect(href).toContain('toTab(navigation, "Messages");');
     expect(href).not.toContain('screen: "Inbox"');
     /* The Inbox's Messages row is gone: Messages has its own tab. */
     expect(inbox).not.toContain('screen: "Messages"');

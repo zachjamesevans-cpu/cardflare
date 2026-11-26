@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation, useRoute } from "@react-navigation/native";
+import { toTab } from "../to-tab";
 import { navigationRef } from "../navigation-ref";
 import { StackActions } from "@react-navigation/native";
 import { setMyFlares } from "../my-flares";
@@ -315,23 +316,25 @@ export function HubScreen() {
       huntSignal={openInto?.n}
       initialCard={openWith}
       resetSignal={resetSignal}
-      onPosted={(rows, complete) => {
+      onPosted={(rows, _complete, summary) => {
         /* On the list at once; the re-read confirms it a moment later. */
         setWants((current) => [...rows, ...(current ?? [])]);
         void loadWants();
         /*
-         * Straight to the Feed, your Flare at its top: the founder, "when
-         * you post a flare, it should immediately automatically take you
-         * to the main feed with your flare there, no need to have that
-         * entire secondary menu." Everything opened over the tabs closes
-         * (the composer, a card sheet under it). A post that only partly
-         * went up stays, so its "2 of 3 went up" is read.
+         * Straight to the Feed, every time: the founder, "there is ZERO
+         * reason to have a 'see it in the feed' button, truly, or anything
+         * after the flare gets posted. should go straight to the feed."
+         * Everything opened over the tabs closes (the composer, a card
+         * sheet under it), and the Feed says it is posting, then that it
+         * is up. A post that only partly went up says so there, in the
+         * same line ("1 was already up"), not in a panel left behind.
+         * BACK to the one tab bar (to-tab.ts): a plain navigate pushed a
+         * second Feed, "the feed is not a slide up menu".
          */
-        if (!complete) return false;
         if ((navigationRef.getRootState()?.index ?? 0) > 0) {
           navigationRef.dispatch(StackActions.popToTop());
         }
-        navigation.navigate("Tabs", { screen: "Feed", params: { posted: Date.now() } } as never);
+        toTab(navigationRef, "Feed", { posted: Date.now(), postedNote: summary ?? undefined });
         return true;
       }}
     />

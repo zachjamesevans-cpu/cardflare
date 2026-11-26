@@ -1,4 +1,5 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
@@ -12,7 +13,7 @@ import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
@@ -139,7 +140,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
           flex: 1,
           /* A sheet fitted to its contents starts at this, not a sliver. */
           minHeight: 420,
-          backgroundColor: colors.surface,
+          backgroundColor: "transparent",
           paddingHorizontal: gutter,
           paddingVertical: spacing(4),
         }}
@@ -198,13 +199,18 @@ export function CardScreen({ cardId }: { cardId: string }) {
   return (
     <CardOverlay>
     <ScrollView
-      style={{ flex: 1, backgroundColor: colors.surface }}
+      style={{ flex: 1, backgroundColor: "transparent" }}
+      /* Pulled down past the top and let go: closed, like a photo. */
+      onScrollEndDrag={(event) => {
+        if (event.nativeEvent.contentOffset.y < -90) navigation.goBack();
+      }}
       contentContainerStyle={{
         paddingHorizontal: gutter,
-        paddingVertical: spacing(4),
+        paddingTop: insets.top + spacing(12),
         gap: spacing(4),
-        /* Room under the last section for the Flare button. */
-        paddingBottom: spacing(24),
+        /* The closing space below fills the screen's rest (flexGrow). */
+        flexGrow: 1,
+        paddingBottom: 0,
       }}
     >
       {/* The card: the art large and centred, tap to read it at full
@@ -270,7 +276,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
       {/* You: one line per true fact, then the one control. Nothing of
           this when signed out; the server sends `you` as null. */}
       {you ? (
-        <View style={{ gap: spacing(2) }}>
+        <View style={{ gap: spacing(2), alignItems: "center" }}>
           {you.inTradeBinder ? <Fact>In your trade binder</Fact> : null}
           {you.onHunt ? (
             <Tap
@@ -383,6 +389,15 @@ export function CardScreen({ cardId }: { cardId: string }) {
         )}
       </Section>
       ) : null}
+      {/* The empty space under the last section closes the card, the way
+          a tap off a photo does: the founder, "you should be able to tap
+          the bottom empty section to close it". It fills whatever room is
+          left, and at least a thumb's height. */}
+      <Pressable
+        accessibilityLabel="Close"
+        onPress={() => navigation.goBack()}
+        style={{ flexGrow: 1, minHeight: spacing(24) }}
+      />
     </ScrollView>
     {/* The Flare button, for THIS card: the composer, the card already
         in it (flare-button.tsx). It replaced "Post a Flare for it". */}
@@ -452,21 +467,18 @@ export function CardScreen({ cardId }: { cardId: string }) {
  */
 function CardOverlay({ children }: { children: ReactNode }) {
   const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   return (
-    /* The sheet in the app's surface colour, a step up from the black
-       canvas, so it reads as lifted off the screen receding behind it. */
-    <View style={{ flex: 1, backgroundColor: colors.surface }}>
-      <View style={{ alignItems: "center", paddingTop: spacing(2) }}>
-        <View
-          accessibilityElementsHidden
-          style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.borderStrong }}
-        />
-      </View>
+    /* The screen behind, blurred and darkened: the Feed's card zoom
+       (ui.tsx), the same blur and the same dark. No panel, no handle. */
+    <View style={{ flex: 1 }}>
+      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
       <View
         style={{
           position: "absolute",
-          top: spacing(2),
-          right: spacing(2),
+          top: insets.top + spacing(2),
+          right: spacing(4),
           zIndex: 1,
         }}
       >
@@ -475,15 +487,15 @@ function CardOverlay({ children }: { children: ReactNode }) {
           hitSlop={10}
           accessibilityLabel="Close"
           style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
+            width: 34,
+            height: 34,
+            borderRadius: 17,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: colors.elevated,
+            backgroundColor: "rgba(255,255,255,0.14)",
           }}
         >
-          <Ionicons name="close" size={19} color={colors.textPrimary} />
+          <Ionicons name="close" size={20} color={colors.textPrimary} />
         </Tap>
       </View>
       {children}
@@ -510,7 +522,10 @@ function countHeading(
 function Section({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <View style={{ gap: spacing(2) }}>
-      <Title>{heading}</Title>
+      {/* Centred like everything above it; the rows stay left, to scan. */}
+      <View style={{ alignItems: "center" }}>
+        <Title>{heading}</Title>
+      </View>
       <View>{children}</View>
     </View>
   );
