@@ -65,3 +65,22 @@ describe("sheets stand on frosted glass", () => {
     ).toHaveLength(2);
   });
 });
+
+describe("a card reads as one centred column", () => {
+  /* "all the text is centered for the card, then market price on left
+     hand side." The price block and the section headings centre; the
+     rows of a list stay left, to scan. */
+  it("centres the price block and the headings, on both", () => {
+    const appPrices = read("mobile/src/card-prices.tsx");
+    expect(appPrices).toContain('justifyContent: "center", gap: 6 }}>');
+    const card = read("mobile/src/screens/card.tsx");
+    expect(card).toContain(
+      '<View style={{ alignItems: "center" }}>\n        <Title>{heading}</Title>',
+    );
+    const webPrices = read("src/components/cards/card-prices.tsx");
+    expect(webPrices).toContain("flex items-center justify-center gap-1.5");
+    expect(read("src/components/cards/card-page.tsx")).toContain(
+      "text-center text-xs font-semibold tracking-[0.14em]",
+    );
+  });
+});

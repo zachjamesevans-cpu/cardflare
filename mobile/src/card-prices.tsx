@@ -142,7 +142,10 @@ export function CardPricesPanel({
         : {})}
       style={{ gap: spacing(2) }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+      {/* Centred, like the card's name and number above it: the founder,
+          "all the text is centered for the card, then market price on
+          left hand side." The chevron sits right after the label. */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
         {heading}
         {foldable ? (
           <Ionicons name={open ? "chevron-up" : "chevron-down"} size={16} color={colors.textMuted} />
@@ -151,7 +154,7 @@ export function CardPricesPanel({
       {prices === null ? (
         <PricesSkeleton />
       ) : prices.state !== "ok" ? (
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
           {prices.state === "none"
             ? "No market price for this card yet."
             : "Prices aren't available right now."}
@@ -209,7 +212,7 @@ function Panel({
   return (
     <>
       {choices.length > 1 ? (
-        <View style={{ flexDirection: "row", gap: 6 }}>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
           {choices.map(({ entry, index }) => {
             const on = index === at;
             return (
@@ -236,7 +239,7 @@ function Panel({
       ) : null}
 
       <View style={{ gap: 2 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: spacing(2.5) }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: spacing(2.5) }}>
           <Text style={{ color: colors.textPrimary, fontSize: 32, fontWeight: "800", letterSpacing: -0.5 }}>
             {formatPrice(headline.value, printing.currency)}
           </Text>
@@ -255,7 +258,7 @@ function Panel({
             </View>
           ) : null}
         </View>
-        <Text style={{ color: colors.textMuted, fontSize: 14 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 14, textAlign: "center" }}>
           {[printing.market !== null ? "Near mint" : "No ungraded sales", range].filter(Boolean).join(" · ")}
         </Text>
       </View>
@@ -282,7 +285,7 @@ function Panel({
               ))}
             </PriceList>
           ) : null}
-          <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+          <Text style={{ color: colors.textMuted, fontSize: 12, textAlign: "center" }}>
             {`${PRICE_SOURCE} · updated ${updatedLabel(prices.fetchedAt)}`}
           </Text>
         </View>
@@ -301,7 +304,7 @@ function PricesSkeleton() {
   );
   return (
     <View style={{ gap: spacing(2) }} accessibilityLabel="Loading prices">
-      <View style={{ gap: spacing(1.5) }}>
+      <View style={{ gap: spacing(1.5), alignItems: "center" }}>
         {bar(130, 38)}
         {bar(180, 16)}
       </View>

@@ -52,7 +52,7 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
   if (prices.state !== "ok") {
     return (
       <PricesFrame>
-        <p className="text-sm text-text-muted">
+        <p className="text-center text-sm text-text-muted">
           {prices.state === "none"
             ? "No market price for this card yet."
             : "Prices aren't available right now."}
@@ -96,9 +96,9 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
         onClick={() => setOpen((was) => !was)}
         aria-expanded={open}
         aria-controls="card-prices-all"
-        className="flex w-full cursor-pointer flex-col gap-2 text-left"
+        className="flex w-full cursor-pointer flex-col items-center gap-2 text-center"
       >
-        <span className="flex items-center justify-between gap-3">
+        <span className="flex items-center justify-center gap-1.5">
           <span
             id="card-prices"
             className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
@@ -114,7 +114,7 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
           />
         </span>
         <span className="flex flex-col gap-0.5">
-          <span className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <span className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
             <span className="font-display text-3xl font-extrabold tracking-tight text-text-primary tabular-nums">
               {formatPrice(headline.value, printing.currency)}
             </span>
@@ -140,7 +140,7 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
               </span>
             )}
           </span>
-          <span className="text-sm text-text-muted">
+          <span className="text-center text-sm text-text-muted">
             {printing.market !== null ? "Near mint" : "No ungraded sales"}
             {range && ` · ${range}`}
           </span>
@@ -148,7 +148,7 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
       </button>
 
       {choices.length > 1 && (
-        <div className="flex gap-1.5" role="tablist">
+        <div className="flex justify-center gap-1.5" role="tablist">
           {choices.map(({ entry, index }) => (
             <button
               key={entry.variant}
@@ -198,7 +198,7 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
               ))}
             </PriceList>
           )}
-          <p className="text-xs text-text-muted">
+          <p className="text-center text-xs text-text-muted">
             {PRICE_SOURCE} · updated {updatedLabel(prices.fetchedAt)}
           </p>
         </div>
@@ -210,10 +210,10 @@ export function CardPricesPanel({ prices }: { prices: CardPrices }) {
 /** The section and its heading, the same as every other on the page. */
 export function PricesFrame({ children }: { children: React.ReactNode }) {
   return (
-    <section className="flex flex-col gap-2" aria-labelledby="card-prices">
+    <section className="flex flex-col items-center gap-2" aria-labelledby="card-prices">
       <h2
         id="card-prices"
-        className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
+        className="text-center text-xs font-semibold tracking-[0.14em] text-text-muted uppercase"
       >
         Market price
       </h2>

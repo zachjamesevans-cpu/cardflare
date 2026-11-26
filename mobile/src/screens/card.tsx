@@ -276,7 +276,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
       {/* You: one line per true fact, then the one control. Nothing of
           this when signed out; the server sends `you` as null. */}
       {you ? (
-        <View style={{ gap: spacing(2) }}>
+        <View style={{ gap: spacing(2), alignItems: "center" }}>
           {you.inTradeBinder ? <Fact>In your trade binder</Fact> : null}
           {you.onHunt ? (
             <Tap
@@ -522,7 +522,10 @@ function countHeading(
 function Section({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <View style={{ gap: spacing(2) }}>
-      <Title>{heading}</Title>
+      {/* Centred like everything above it; the rows stay left, to scan. */}
+      <View style={{ alignItems: "center" }}>
+        <Title>{heading}</Title>
+      </View>
       <View>{children}</View>
     </View>
   );
