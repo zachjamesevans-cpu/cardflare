@@ -85,7 +85,18 @@ export function CardModal({
         >
           <X className="size-5" aria-hidden="true" />
         </button>
-        <div className="overflow-y-auto px-4 pt-16 pb-28 sm:px-6">{children}</div>
+        {/* A click on empty space (not on anything in the card) closes
+            it, as a click on the blur does: the founder, "you should be
+            able to tap the bottom empty section to close it". */}
+        <div
+          className="flex flex-1 flex-col overflow-y-auto px-4 pt-16 sm:px-6"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) close();
+          }}
+        >
+          {children}
+          <div aria-hidden="true" className="min-h-28 flex-1" onClick={close} />
+        </div>
         {/* The Flare button, for THIS card (flare-button.tsx). */}
         <FlareButton
           href={`/flare?card=${cardId}`}
