@@ -13,7 +13,7 @@ import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View, StyleSheet } from "react-native";
+import { ScrollView, Text, useWindowDimensions, View, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import type { StackParams } from "../../App";
@@ -208,8 +208,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
         paddingHorizontal: gutter,
         paddingTop: insets.top + spacing(12),
         gap: spacing(4),
-        /* Room under the last section for the Flare button. */
-        paddingBottom: spacing(24),
+        /* The closing space below fills the screen's rest (flexGrow). */
+        flexGrow: 1,
+        paddingBottom: 0,
       }}
     >
       {/* The card: the art large and centred, tap to read it at full
@@ -388,6 +389,15 @@ export function CardScreen({ cardId }: { cardId: string }) {
         )}
       </Section>
       ) : null}
+      {/* The empty space under the last section closes the card, the way
+          a tap off a photo does: the founder, "you should be able to tap
+          the bottom empty section to close it". It fills whatever room is
+          left, and at least a thumb's height. */}
+      <Pressable
+        accessibilityLabel="Close"
+        onPress={() => navigation.goBack()}
+        style={{ flexGrow: 1, minHeight: spacing(24) }}
+      />
     </ScrollView>
     {/* The Flare button, for THIS card: the composer, the card already
         in it (flare-button.tsx). It replaced "Post a Flare for it". */}
