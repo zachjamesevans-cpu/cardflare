@@ -91,14 +91,12 @@ describe("the add menu is the Flare picker", () => {
     expect(src.select).toContain(
       "<Button label={`Done (${items.length})`} onPress={onClose} />",
     );
-    /* The composer hands it the lines and nothing of the binder's. */
-    expect(src.composer).toContain('from "../card-select";');
-    const open = src.composer.slice(src.composer.indexOf("<CardSelectSheet"));
-    const tag = open.slice(0, open.indexOf("/>"));
-    expect(tag).toContain("visible={picking}");
-    for (const binderOnly of ["above=", "body=", "hitNote=", "footer=", "title="]) {
-      expect(tag, binderOnly).not.toContain(binderOnly);
-    }
+    /* The composer's "Add cards" is the Search screen now (2026-11-27,
+       add-cards.tsx); the picker stays the binder's. */
+    expect(src.composer).not.toContain("<CardSelectSheet");
+    expect(src.composer).toContain(
+      'navigation.dispatch(StackActions.push("AddCards"));',
+    );
     expect(src.composer).not.toContain("function useCardSearch(");
     expect(src.composer).not.toContain("export function CardPicker(");
   });

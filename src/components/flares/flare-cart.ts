@@ -18,7 +18,9 @@ import { addCard, EMPTY_DRAFT, loadDraft, saveDraft } from "./draft";
  * mobile/src/flare-cart.ts is the same.
  */
 
-const CHANGED = "cf-flare-cart";
+/** Fired when the + writes the draft; the composer reloads its cards. */
+export const CART_CHANGED = "cf-flare-cart";
+const CHANGED = CART_CHANGED;
 
 /** The cards in the draft, as card, printing and copies. */
 function lines(): { cardId: string; printingId: string | null; quantity: number }[] {

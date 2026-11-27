@@ -4,10 +4,10 @@ import {
 } from "../composer-sheets";
 import { Frosted } from "../frosted";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { cartSaved } from "../flare-cart";
+import { cartSaved, onCartWritten } from "../flare-cart";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { StackActions, useNavigation, useRoute } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -42,7 +42,7 @@ import {
   storedAccessToken,
 } from "../api";
 import { CardTray } from "../card-tray";
-import { CardSelectSheet, lineKey, type PickedLine } from "../card-select";
+import { lineKey, type PickedLine } from "../card-select";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { FlareFeedCard } from "../flare-feed-card";
@@ -224,7 +224,6 @@ export function FlareComposer({
   useMyFlares();
   /* The card row is being rearranged: the page holds still (card-tray.tsx). */
   const [rearranging, setRearranging] = useState(false);
-  const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [posted, setPosted] = useState<{
     postId: string | null;
@@ -339,6 +338,31 @@ export function FlareComposer({
     };
   }, [draft, restored, draftKey]);
 
+  /*
+   * "Add cards" is the Search screen, the same one as the tab: the art
+   * first, and each card's own + (tap again for another copy). The
+   * founder (2026-11-27), of the old stacked list: "should we make them
+   * the same?" The draft is written first so the + adds to what is on
+   * screen, and what it adds comes back here as it lands.
+   */
+  const addCards = async () => {
+    if (draftKey) {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      await writeCache("composer", draftKey, draft);
+      cartSaved(draft.items);
+    }
+    navigation.dispatch(StackActions.push("AddCards"));
+  };
+  useEffect(
+    () =>
+      onCartWritten((items) => {
+        setDraft((current) => ({ ...current, items }));
+        setPosted(null);
+        setPreviewing(false);
+      }),
+    [],
+  );
+
   /* A hunt's "+" arrives with its id: a want, into that hunt. */
   useEffect(() => {
     if (!initialHuntId) return;
@@ -366,7 +390,6 @@ export function FlareComposer({
     setPosted(null);
     setPreviewing(false);
     setEditing(null);
-    setPicking(false);
 
     let live = true;
     searchCards(initialCard.name)
@@ -393,7 +416,6 @@ export function FlareComposer({
     if (!resetSignal) return;
     setPreviewing(false);
     setEditing(null);
-    setPicking(false);
   }, [resetSignal]);
 
   /* Their hunts, for the name on "Adding to". A guest has none. */
@@ -712,7 +734,7 @@ export function FlareComposer({
                 }))}
                 editing={editing}
                 onEdit={(key) => setEditing(editing === key ? null : key)}
-                onAdd={() => setPicking(true)}
+                onAdd={() => void addCards()}
                 /* Drag replaced "Move left"/"Move right"; the arithmetic
                    is the same splice those buttons did. */
                 onReorder={(from, to) => {
@@ -852,13 +874,6 @@ export function FlareComposer({
 
       {footer}
 
-      <CardSelectSheet
-        visible={picking}
-        target={target}
-        items={draft.items}
-        onChange={setItems}
-        onClose={() => setPicking(false)}
-      />
     </ScrollView>
   );
 }

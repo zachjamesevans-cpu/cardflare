@@ -189,7 +189,6 @@ describe("Post a Flare for it carries the card", () => {
     );
     expect(effect).toContain("setPosted(null);");
     expect(effect).toContain("setPreviewing(false);");
-    expect(effect).toContain("setPicking(false);");
   });
 });
 

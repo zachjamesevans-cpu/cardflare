@@ -119,13 +119,8 @@ describe("Find the card is the Flare picker, for one card", () => {
     expect(sheet).toContain("const line = items.find(");
   });
 
-  it("leaves the Flare composer's picker exactly as it was", () => {
-    const open = src.composer.slice(src.composer.indexOf("<CardSelectSheet"));
-    const tag = open.slice(0, open.indexOf("/>"));
-    expect(tag).toContain("items={draft.items}");
-    expect(tag).toContain("onChange={setItems}");
-    expect(tag).not.toContain("onPickOne");
-    expect(tag).not.toContain("title=");
+  it("keeps the picker's own title; the composer no longer opens it", () => {
+    expect(src.composer).not.toContain("<CardSelectSheet");
     expect(src.select).toContain('title = "Select cards",');
     expect(src.select).toContain(
       "<Button label={`Done (${items.length})`} onPress={onClose} />",

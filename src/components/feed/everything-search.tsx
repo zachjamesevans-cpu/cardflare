@@ -129,7 +129,10 @@ export function EverythingSearch({
   account = null,
   flaredCardIds = [],
   game = null,
+  adding = false,
 }: {
+  /** As "Add cards" from the composer (/search?adding=1): cards only. */
+  adding?: boolean;
   account?: string | null;
   /** Cards on your open Flares: a "Flared" tag on the result. */
   flaredCardIds?: string[];
@@ -153,8 +156,9 @@ export function EverythingSearch({
   const latest = useRef(0);
 
   const { playersOnly } = readQuery(query);
-  /* "@" is a players search, whichever tab was open. */
-  const shown: SearchTab = playersOnly ? "players" : tab;
+  /* "@" is a players search, whichever tab was open; adding cards to a
+     Flare is cards and nothing else. */
+  const shown: SearchTab = adding ? "cards" : playersOnly ? "players" : tab;
 
   const search = (value: string) => {
     setQuery(value);
@@ -170,9 +174,9 @@ export function EverythingSearch({
     const request = ++latest.current;
     timer.current = setTimeout(() => {
       void Promise.all([
-        onlyPlayers ? none<SearchCard>() : quietly(findCards(text, game)),
-        quietly(findPlayers(text)),
-        onlyPlayers ? none<FoundStore>() : quietly(searchStoresAction(text)),
+        onlyPlayers && !adding ? none<SearchCard>() : quietly(findCards(text, game)),
+        adding ? none<FoundPlayer>() : quietly(findPlayers(text)),
+        onlyPlayers || adding ? none<FoundStore>() : quietly(searchStoresAction(text)),
       ]).then(([cards, players, stores]) => {
         if (latest.current !== request) return;
         setFound({
@@ -389,8 +393,10 @@ export function EverythingSearch({
           <TextInput
             value={query}
             onChange={(event) => search(event.target.value)}
-            placeholder="Search cards, players and stores"
-            aria-label="Search cards, players and stores"
+            placeholder={
+              adding ? "Find a card to add" : "Search cards, players and stores"
+            }
+            aria-label={adding ? "Search cards" : "Search cards, players and stores"}
             autoFocus
             enterKeyHint="search"
             className="w-full pl-9"
@@ -492,7 +498,7 @@ export function EverythingSearch({
       )}
 
       {/* Top · Players · Cards · Stores, once there is something to sort. */}
-      {typing && (
+      {typing && !adding && (
         <div
           role="tablist"
           aria-label="Search results"

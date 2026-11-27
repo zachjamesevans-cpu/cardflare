@@ -118,6 +118,19 @@ export function addToCart(line: Line): Promise<{ outcome: "added" | "full"; copi
 
 let queue: Promise<unknown> = Promise.resolve();
 
+/*
+ * An open composer, told when the + wrote to its draft: "Add cards" is
+ * the Search screen now, and its cards' + land here while the composer
+ * waits underneath (screens/add-cards.tsx).
+ */
+const written = new Set<(items: Line[]) => void>();
+export function onCartWritten(listener: (items: Line[]) => void): () => void {
+  written.add(listener);
+  return () => {
+    written.delete(listener);
+  };
+}
+
 async function addOne(line: Line): Promise<{ outcome: "added" | "full"; copies: number }> {
   const key = await draftKey();
   const draft = await readDraft();
@@ -137,6 +150,7 @@ async function addOne(line: Line): Promise<{ outcome: "added" | "full"; copies: 
   const next: SavedDraft = { ...draft, intent: "want", items };
   await writeCache("composer", key, next);
   remember(next.items);
+  written.forEach((listener) => listener(next.items));
   return { outcome: "added", copies: at === -1 ? 1 : items[at].quantity };
 }
 

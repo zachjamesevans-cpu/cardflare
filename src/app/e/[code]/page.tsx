@@ -68,7 +68,6 @@ import { roomViewFor } from "@/lib/events/room-view";
 import { goingState, nightRoster } from "@/lib/events/going";
 import { EMPTY_MATCHES, nightMatches } from "@/lib/events/night-matches";
 import { nightBinderState } from "@/lib/events/night-binders";
-import { viewerGames } from "@/lib/players/viewer-games";
 import { roomTimersForStore } from "@/lib/event-hub/room-timers";
 import { organizerStoresFor } from "@/lib/stores/staff";
 import { publicStore } from "@/lib/stores/public-profile";
@@ -177,19 +176,13 @@ async function RoomBody({
   if (!isSupabaseConfigured()) return <Unavailable />;
 
   /*
-   * Who is looking, what they play and what the code opens: three reads
-   * that do not wait on each other, started together. The account is
+   * Who is looking and what the code opens: two reads that do not wait
+   * on each other, started together. The account is
    * waited for below the 404, where it has always been asked (`ahead`),
    * so a code that opens nothing is still a 404 whatever else failed.
    */
   const accountRead = ahead(getViewer().then(accountIdentity));
-  const [playerGames, resolved] = await Promise.all([
-    viewerGames(),
-    resolveCode(normalized),
-  ]);
-  const games = scannedGame
-    ? [scannedGame, ...playerGames.filter((game) => game !== scannedGame)]
-    : playerGames;
+  const resolved = await resolveCode(normalized);
 
   if (resolved.outcome === "not-found") notFound();
 
@@ -822,8 +815,6 @@ async function RoomBody({
                 <FlareComposer
                   viewer={poster}
                   hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
-                  imagesEnabled={images}
-                  playerGames={games}
                   game={scannedGame}
                   room={{ name: event.name, storeName: event.storeName }}
                   initialHuntId={null}

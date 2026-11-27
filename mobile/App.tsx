@@ -1,5 +1,6 @@
 import { LaunchView } from "./src/launch-view";
 import { gameShortName } from "./src/games";
+import { AddCardsScreen } from "./src/screens/add-cards";
 import { GameHubScreen } from "./src/screens/game-hub";
 import { navigationRef } from "./src/navigation-ref";
 import { Ionicons } from "@expo/vector-icons";
@@ -303,6 +304,8 @@ export type StackParams = {
   GameHub: { game: string };
   /* The composer, pushed over wherever it was opened (src/open-composer.ts). */
   Compose: TabParams["Flare"];
+  /* The composer's "Add cards": the Search screen (screens/add-cards.tsx). */
+  AddCards: undefined;
   /* Traders near you: the UI experiment's list (src/ui-experiment.ts). */
   Traders: undefined;
   /**
@@ -1369,6 +1372,12 @@ function AppGates() {
               sheetCornerRadius: 22,
               gestureEnabled: true,
             }}
+          />
+          <Stack.Screen
+            name="AddCards"
+            component={AddCardsScreen}
+            /* Over the composer, the whole screen: it is Search. */
+            options={{ title: "Add cards", headerShown: false, presentation: "modal" }}
           />
           <Stack.Screen
             name="GameHub"

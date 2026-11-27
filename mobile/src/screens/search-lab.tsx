@@ -73,9 +73,18 @@ type Answer<T> =
   | { state: "error" }
   | { state: "done"; items: T[] };
 
-export function SearchLabScreen() {
+export function SearchLabScreen({
+  adding = false,
+  bottomInset,
+}: {
+  /** As "Add cards" in the composer (add-cards.tsx): cards only. */
+  adding?: boolean;
+  /** Room to keep clear at the foot, where the tab bar would be. */
+  bottomInset?: number;
+} = {}) {
   const navigation = useNavigation<NativeStackNavigationProp<StackParams>>();
-  const tabInset = useTabBarInset();
+  const tabBar = useTabBarInset();
+  const tabInset = bottomInset ?? tabBar;
   const { width } = useWindowDimensions();
   const field = useRef<TextInput>(null);
 
@@ -242,8 +251,8 @@ export function SearchLabScreen() {
           tile={tile}
           query={text}
           game={game}
-          players={players}
-          stores={stores}
+          players={adding ? [] : players}
+          stores={adding ? [] : stores}
           onOpen={open}
           onAllGames={() => choose(null)}
           onRetry={() => void run(text, game)}

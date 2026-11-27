@@ -21,12 +21,20 @@ export function SearchPanel({
   account = null,
   flaredCardIds = [],
   game = null,
+  adding = false,
 }: {
+  /** "Add cards" from the composer: cards only (everything-search.tsx). */
+  adding?: boolean;
   account?: string | null;
   flaredCardIds?: string[];
   game?: GameSlug | null;
 }) {
   return (
-    <EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />
+    <EverythingSearch
+      account={account}
+      flaredCardIds={flaredCardIds}
+      game={game}
+      adding={adding}
+    />
   );
 }

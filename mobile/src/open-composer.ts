@@ -13,8 +13,19 @@ import type { TabParams } from "../App";
  * from the card sheet it lands inside the sheet's own stack.
  */
 export function openComposer(
-  navigation: { dispatch: (action: ReturnType<typeof StackActions.push>) => void },
+  navigation: {
+    dispatch: (
+      action: ReturnType<typeof StackActions.push> | ReturnType<typeof StackActions.popTo>,
+    ) => void;
+    getState?: () => { routes: readonly { name: string }[] } | undefined;
+  },
   params?: TabParams["Flare"],
 ): void {
+  /* One already open underneath (a card opened from "Add cards"): back
+     down to it, never a second composer on top. */
+  if (!params && navigation.getState?.()?.routes.some((route) => route.name === "Compose")) {
+    navigation.dispatch(StackActions.popTo("Compose"));
+    return;
+  }
   navigation.dispatch(StackActions.push("Compose", params));
 }

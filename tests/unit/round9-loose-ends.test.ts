@@ -11,10 +11,12 @@ const read = (path: string) =>
  * drew one person twice, and three sentences that were missing.
  */
 describe("pages stop waiting on themselves", () => {
-  it("the Flare page reads the room, the games and the lists at once", () => {
+  it("the Flare page reads the room and the lists at once", () => {
     const page = read("src/app/flare/page.tsx");
+    /* No games read: they narrowed the old card picker, and "Add cards"
+       is the Search page now (2026-11-27). */
     expect(page).toMatch(
-      /const \[room, games, \[asked, nearby, hunts, poster, foundCards\]\] =\s*await Promise\.all\(\[/,
+      /const \[room, \[asked, nearby, hunts, poster, foundCards\]\] =\s*await Promise\.all\(\[/,
     );
     expect(page).not.toContain("const games = await viewerGames();");
   });

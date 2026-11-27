@@ -10,16 +10,14 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Check, ChevronLeft, ChevronRight, Plus, Store, Trash2 } from "lucide-react";
 
 import { variantName } from "@/lib/cards/price-shape";
 
-import { CardPicker } from "@/components/flares/card-picker";
+import { CART_CHANGED } from "@/components/flares/flare-cart";
 import { FlareComposerPreview } from "@/components/flares/flare-composer-preview";
 import {
-  addCard,
-  lessCard,
   CAPTION_MAX,
   chosenPrinting,
   clearDraft,
@@ -75,15 +73,13 @@ export interface ComposerRoom {
   storeName: string;
 }
 
-type Step = "compose" | "pick" | "preview" | "posted";
+type Step = "compose" | "preview" | "posted";
 
 const subscribeNothing = () => () => {};
 
 export function FlareComposer(props: {
   viewer: ComposerViewer;
   hunts: { id: string; name: string }[];
-  imagesEnabled: boolean;
-  playerGames: readonly string[];
   /** The room's game from a tournament QR, which narrows the search. */
   game?: string | null;
   /** The room the poster is standing in, when they are. */
@@ -127,8 +123,6 @@ export function FlareComposer(props: {
 function ComposerBody({
   viewer,
   hunts,
-  imagesEnabled,
-  playerGames,
   game = null,
   room,
   initialHuntId,
@@ -139,8 +133,6 @@ function ComposerBody({
 }: {
   viewer: ComposerViewer;
   hunts: { id: string; name: string }[];
-  imagesEnabled: boolean;
-  playerGames: readonly string[];
   game?: string | null;
   room: ComposerRoom | null;
   initialHuntId: string | null;
@@ -174,6 +166,7 @@ function ComposerBody({
   const [dragging, setDragging] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const [posted, setPosted] = useState<{
     posted: number;
     huntId: string | null;
@@ -185,6 +178,17 @@ function ComposerBody({
   useEffect(() => {
     saveDraft(draft);
   }, [draft]);
+
+  /* Cards added by a card's + while away on "Add cards" (or in another
+     tab): the draft on disk is the truth for its cards. */
+  useEffect(() => {
+    const reload = () => {
+      const cards = loadDraft()?.cards;
+      if (cards) setDraft((current) => ({ ...current, cards }));
+    };
+    window.addEventListener(CART_CHANGED, reload);
+    return () => window.removeEventListener(CART_CHANGED, reload);
+  }, []);
 
   const patch = (next: Partial<Draft>) =>
     setDraft((current) => ({ ...current, ...next }));
@@ -305,31 +309,6 @@ function ComposerBody({
             Post another
           </Button>
         </div>
-      </Card>
-    );
-  }
-
-  if (step === "pick") {
-    return (
-      <Card className="flex flex-col gap-4 p-4 sm:p-6">
-        <CardPicker
-          imagesEnabled={imagesEnabled}
-          playerGames={playerGames}
-          game={game}
-          cards={draft.cards}
-          onAdd={(card, printing) =>
-            patch({ cards: addCard(draft.cards, card, printing) })
-          }
-          onRemove={remove}
-          onLess={(key) => {
-            const cards = lessCard(draft.cards, key);
-            patch({ cards });
-            if (editing === key && !cards.some((item) => keyOf(item) === key)) {
-              setEditing(null);
-            }
-          }}
-          onDone={() => setStep("compose")}
-        />
       </Card>
     );
   }
@@ -518,14 +497,16 @@ function ComposerBody({
             </li>
           ) : null}
           <li className={cn("shrink-0", dragging && "hidden")}>
-            <button
-              type="button"
-              onClick={() => setStep("pick")}
+            {/* The Search page itself, cards only: the same tiles and the
+                same card, whose + fills this draft (the founder,
+                2026-11-27: "should we make them the same?"). */}
+            <Link
+              href={addCardsHref(pathname, game)}
               className="flex h-[84px] w-[60px] cursor-pointer flex-col items-center justify-center gap-1 rounded-[6px] border border-dashed border-border-strong text-text-secondary transition-colors hover:border-accent hover:text-accent"
             >
               <Plus className="size-5" aria-hidden="true" />
               <span className="text-[10px] font-semibold">Add cards</span>
-            </button>
+            </Link>
           </li>
         </ul>
 
@@ -799,4 +780,12 @@ function CardSteps({
       </button>
     </div>
   );
+}
+
+/** "Add cards": the search, cards only, narrowed to the room's game, and
+    Done back to this composer, on /flare or in a room. */
+function addCardsHref(pathname: string, game: string | null): string {
+  const params = new URLSearchParams({ adding: "1", back: pathname });
+  if (game) params.set("game", game);
+  return `/search?${params.toString()}`;
 }
