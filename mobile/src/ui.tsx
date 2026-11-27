@@ -283,7 +283,7 @@ export interface ZoomHave {
   state: "open" | "offered" | "found";
   /** The viewer already raised a hand on it. */
   youOffered: boolean;
-  /** Opens the post's thread, where the offer is a line: "View offer". */
+  /** Opens your conversation with the poster: "View offer". */
   onViewOffer?: () => void;
   /**
    * Copies the post still wants of it: the most the review lets a pick
@@ -632,7 +632,7 @@ function ZoomHaveForm({
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             {offeredStrip(sent.flareIds.length)}{" "}
           </Text>
-          They will see your name and can message you.
+          It’s in your messages with them.
           {sent.refused.length > 0 ? ` Not taken: ${listOf(sent.refused)}.` : ""}
         </Text>
       </ZoomSaid>
@@ -644,7 +644,7 @@ function ZoomHaveForm({
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             You offered this.{" "}
           </Text>
-          They will see your name and can message you.
+          It’s in your messages with them.
         </Text>
       </ZoomSaid>
     );

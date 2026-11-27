@@ -28,7 +28,7 @@ const between = (source: string, start: string, end: string) => {
  * The audit's rows, as they land on a phone: the Feed's "Tonight"
  * section is "Coming up"; the lobby counts "coming", not "tonight";
  * the early board clears "when the event ends"; the viewer tells an
- * offerer "They will see your name and can message you."; the
+ * offerer "It’s in your messages with them."; the
  * "+1 found" tap beside the stepper is gone from both progress rows,
  * and the meta line carries the card number; and somebody else's post
  * offers "Block" after "Report", in the profile's words.
@@ -73,13 +73,13 @@ describe("the Feed and the room say what the audit asked", () => {
        controls above keep their own line. */
     const viewer = src.ui.slice(src.ui.indexOf("function offeredStrip("));
     expect(viewer).toContain("You offered this.");
-    expect(viewer).toContain("They will see your name and can message you.");
+    expect(viewer).toContain("It’s in your messages with them.");
     expect(viewer).not.toContain("keep an eye out");
     /* The accent holds "You offered this." and the rest follows it. */
     const have = between(viewer, "have?.youOffered", "</ZoomSaid>");
     expect(have).toContain('fontWeight: "600" }}>');
     expect(have.indexOf("You offered this.")).toBeLessThan(
-      have.indexOf("They will see your name and can message you."),
+      have.indexOf("It’s in your messages with them."),
     );
   });
 });

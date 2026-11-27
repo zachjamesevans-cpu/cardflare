@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { openOfferThread } from "../view-offer";
 import { toTab } from "../to-tab";
 import { useTabReset } from "../tab-reset";
 import { openComposer } from "../open-composer";
@@ -1122,13 +1123,21 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * and the count under it moves without a pull.
    */
   const postRef = useCallback(
-    (item: { postId: string; yours: boolean; displayName: string }): PostRef => ({
+    (item: {
+      postId: string;
+      yours: boolean;
+      displayName: string;
+      playerId?: string | null;
+    }): PostRef => ({
       postId: item.postId,
       yours: item.yours,
       posterName: item.displayName,
-      /* An offer is a line in the post's thread (posts.ts offerItems):
-         the post, with its comments, is where it is read and answered. */
-      viewOffer: () => navigation.navigate("FlarePost", { postId: item.postId }),
+      /* An offer is a message in your conversation with the poster now
+         (posts.ts offerItems); a guest's post keeps it in its thread. */
+      viewOffer: () =>
+        item.playerId
+          ? void openOfferThread(navigation, item.playerId)
+          : navigation.navigate("FlarePost", { postId: item.postId }),
       offer: async (items, message) => {
         const result = await offerItemsOnPost(item.postId, items, message);
         /* OFFERED at once. The founder: "immediately visually show that

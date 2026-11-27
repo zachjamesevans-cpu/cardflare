@@ -185,6 +185,8 @@ export async function POST(
           ok: true,
           offered: outcome.offered,
           refused: outcome.refused ?? [],
+          /* The conversation it went to, for "View offer". */
+          threadId: outcome.threadId ?? null,
         })
       : Response.json(
           { error: outcome.reason, refused: outcome.refused ?? [] },
