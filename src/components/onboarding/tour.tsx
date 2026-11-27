@@ -44,6 +44,7 @@ const ROUND: ReadonlySet<string> = new Set([
   "profile:wand",
   "binder:share",
   "binder:settings",
+  "card:add",
 ]);
 
 interface Hole {

@@ -7,6 +7,7 @@ import { FlaredTag } from "../flared-mark";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
+import { Tour, useTourTarget } from "../tour";
 import { FLARE_BUTTON, FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
@@ -184,6 +185,9 @@ export function CardScreen({ cardId }: { cardId: string }) {
   /* The printing a + adds: the art on show's first; null without arts. */
   const shownPrinting = arts[artAt]?.printingIds?.[0] ?? null;
   const shownCopies = copiesInCart(card.cardId, shownPrinting);
+  /* The first card a new player opens: the + and the arts (tour.tsx). */
+  const tourAdd = useTourTarget("card", "add");
+  const tourArts = useTourTarget("card", "arts");
   const onYourFlares =
     wantedPrintings !== undefined
       ? wantedPrintings.some(
@@ -222,7 +226,11 @@ export function CardScreen({ cardId }: { cardId: string }) {
         {arts.length === 0 ? (
           <CardImage imageUrl={null} width={artWidth} name={name} cardNumber={card.number} />
         ) : (
-        <View style={{ marginHorizontal: -gutter }}>
+        <View
+          ref={arts.length > 1 ? tourArts : undefined}
+          collapsable={false}
+          style={{ marginHorizontal: -gutter }}
+        >
           <ArtCarousel
             arts={arts}
             name={name}
@@ -418,6 +426,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
           : `Add ${name} to your Flare`
       }
       copies={shownCopies}
+      outerRef={tourAdd}
       onPress={() => {
         const art = arts[artAt];
         void addToCart({
@@ -458,6 +467,8 @@ export function CardScreen({ cardId }: { cardId: string }) {
         bottom: insets.bottom + spacing(4) + 4,
       }}
     />
+    {/* The first card a new player opens: what the + and the arts do. */}
+    <Tour id="card" />
     </CardOverlay>
   );
 }

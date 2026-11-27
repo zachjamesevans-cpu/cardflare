@@ -76,7 +76,10 @@ export function CardArtCarousel({ arts, name }: { arts: CardArt[]; name: string 
 
   return (
     <div className="flex w-full flex-col items-center gap-2">
-      <div className="@container relative w-full">
+      <div
+        className="@container relative w-full"
+        data-tour={several ? "card:arts" : undefined}
+      >
         <div
           ref={rail}
           tabIndex={several ? 0 : -1}

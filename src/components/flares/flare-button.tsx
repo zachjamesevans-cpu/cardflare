@@ -161,6 +161,7 @@ export function FlareButton({
         }
         title="Add to your Flare"
         data-spotlight="post-flare"
+        data-tour="card:add"
         onClick={() => {
           /* Every click is one more copy ("tap the + button 4 times
              quickly to add 4 copies"); the toast keeps the tally. */

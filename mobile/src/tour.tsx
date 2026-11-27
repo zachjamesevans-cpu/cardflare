@@ -91,6 +91,7 @@ const ROUND: ReadonlySet<string> = new Set([
   "profile:wand",
   "binder:share",
   "binder:settings",
+  "card:add",
 ]);
 
 /** How far a row's ring stays inside the screen's edges. */
