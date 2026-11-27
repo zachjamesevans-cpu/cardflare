@@ -10,7 +10,7 @@ import { addToCart, inCart, useCartCount } from "@/components/flares/flare-cart"
 import { cn } from "@/lib/cn";
 
 /* A tight glow that keeps the edge crisp, not a wide haze over the
-   cards under it, and a bolder + (the founder, 2026-11-27). The app's
+   cards under it (the founder, 2026-11-27). The app's
    matches (mobile/src/flare-button.tsx). */
 const BUTTON =
   "flex size-14 cursor-pointer items-center justify-center rounded-full bg-accent text-accent-contrast shadow-[0_2px_10px_-2px_var(--color-accent)] transition-transform hover:scale-105 active:scale-95";
@@ -96,7 +96,7 @@ export function FlareButton({
         {count > 99 ? "99+" : count}
       </span>
     ) : null;
-  const plus = <Plus className="size-7" strokeWidth={3.25} aria-hidden="true" />;
+  const plus = <Plus className="size-7" strokeWidth={2.75} aria-hidden="true" />;
 
   /* "Added Perona", with the way to the full cart beside it. Drawn at
      the page's top level: inside the card's sheet, whose slide-up
@@ -144,7 +144,7 @@ export function FlareButton({
           className={cn(BUTTON, className)}
         >
           {here ? (
-            <Check className="size-7" strokeWidth={3.25} aria-hidden="true" />
+            <Check className="size-7" strokeWidth={2.75} aria-hidden="true" />
           ) : (
             plus
           )}

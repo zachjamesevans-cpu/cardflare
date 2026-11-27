@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, type Ref } from "react";
 import { Text, View, type ViewStyle } from "react-native";
@@ -115,11 +116,11 @@ export function FlareButton({
         {/* One bold +, nothing else: the founder (2026-11-25), of the
             flame with a + disc on its shoulder, "still so ugly", then
             this. The compose button everyone already reads. */}
-        {done ? (
-          <Tick />
-        ) : (
-          <Plus />
-        )}
+        <Ionicons
+          name={done ? "checkmark" : "add"}
+          size={done ? 30 : 34}
+          color={colors.accentContrast}
+        />
       </Tap>
       </Animated.View>
       {/* The cart's count, the way a shopping bag wears one. */}
@@ -151,32 +152,3 @@ export function FlareButton({
   );
 }
 
-/** A bolder + than the icon font's hairline one: two rounded bars, the
- * weight of the website's (strokeWidth 3.25). The founder (2026-11-27). */
-function Plus() {
-  const bar = { position: "absolute" as const, borderRadius: 2, backgroundColor: colors.accentContrast };
-  return (
-    <View style={{ width: 22, height: 22 }}>
-      <View style={[bar, { left: 0, right: 0, top: 9, height: 4 }]} />
-      <View style={[bar, { top: 0, bottom: 0, left: 9, width: 4 }]} />
-    </View>
-  );
-}
-
-/** The ✓ at the same weight as the +: an L of two 4pt strokes, turned. */
-function Tick() {
-  return (
-    <View
-      style={{
-        width: 11,
-        height: 20,
-        marginTop: -4,
-        borderRightWidth: 4,
-        borderBottomWidth: 4,
-        borderColor: colors.accentContrast,
-        borderBottomRightRadius: 2,
-        transform: [{ rotate: "45deg" }],
-      }}
-    />
-  );
-}
