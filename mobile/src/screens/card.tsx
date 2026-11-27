@@ -80,6 +80,12 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const [added, setAdded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  /* The first card a new player opens: the + and the arts (tour.tsx).
+     Up here with every other hook, above the loading return: below it,
+     the first render after loading had two hooks more than the one
+     before it, and React threw on every card. */
+  const tourAdd = useTourTarget("card", "add");
+  const tourArts = useTourTarget("card", "arts");
 
   /* The card a fresh read has painted, so a slow disk read never
      paints an older page over it. */
@@ -185,9 +191,6 @@ export function CardScreen({ cardId }: { cardId: string }) {
   /* The printing a + adds: the art on show's first; null without arts. */
   const shownPrinting = arts[artAt]?.printingIds?.[0] ?? null;
   const shownCopies = copiesInCart(card.cardId, shownPrinting);
-  /* The first card a new player opens: the + and the arts (tour.tsx). */
-  const tourAdd = useTourTarget("card", "add");
-  const tourArts = useTourTarget("card", "arts");
   const onYourFlares =
     wantedPrintings !== undefined
       ? wantedPrintings.some(
