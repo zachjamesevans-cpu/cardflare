@@ -74,6 +74,11 @@ describe("the app's targets", () => {
       expect(card, key).toContain(`useTourTarget("card", "${key}")`);
     }
     expect(card).toContain("outerRef={tourAdd}");
+    /* Every hook above the loading return: one below it threw "Rendered
+       more hooks than during the previous render" on every card. */
+    expect(card.indexOf('useTourTarget("card", "add")')).toBeLessThan(
+      card.indexOf("  if (!page) {"),
+    );
     /* One art: nothing to swipe, so the stop is passed over. */
     expect(card).toContain("ref={arts.length > 1 ? tourArts : undefined}");
     expect(card).toContain('<Tour id="card" />');

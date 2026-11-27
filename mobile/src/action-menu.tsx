@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
-import { BlurView } from "expo-blur";
+import { FloatBackdrop } from "./float-backdrop";
+import { Frosted } from "./frosted";
 import type { ComponentProps } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "./theme";
@@ -57,14 +58,9 @@ export function DotsButton({
  * the same wash and blur.
  */
 export function SheetBackdrop() {
-  return (
-    <BlurView
-      intensity={30}
-      tint="dark"
-      style={StyleSheet.absoluteFill}
-      pointerEvents="none"
-    />
-  );
+  /* The same blur and dark as the card view and the Feed's zoom
+     (float-backdrop.tsx): one backdrop across the app. */
+  return <FloatBackdrop />;
 }
 
 /** The rows, rising from the bottom the way a phone expects them to. */
@@ -97,10 +93,12 @@ export function ActionSheet({
             borderRadius: radius.card,
             borderWidth: 1,
             borderColor: colors.border,
-            backgroundColor: colors.surface,
             overflow: "hidden",
           }}
         >
+          {/* Frosted glass, not a black box (frosted.tsx): the founder,
+              "we delete all the black box views." */}
+          <Frosted />
           <View
             style={{
               alignSelf: "center",

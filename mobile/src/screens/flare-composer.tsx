@@ -23,7 +23,6 @@ import {
 } from "react-native";
 
 import { dismissSwipe } from "../swipe-delete";
-import { SheetBackdrop } from "../action-menu";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -43,6 +42,7 @@ import {
 } from "../api";
 import { CardTray } from "../card-tray";
 import { lineKey, type PickedLine } from "../card-select";
+import { FloatBackdrop, FloatClose } from "../float-backdrop";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { FlareFeedCard } from "../flare-feed-card";
@@ -54,7 +54,7 @@ import type { PostRef } from "../post-social";
 import { postSummary } from "../post-summary";
 import { RemoteImage } from "../remote-image";
 import { Stepper } from "../stepper";
-import { colors, gutter, radius, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import {
   AsyncButton,
   Body,
@@ -765,52 +765,52 @@ export function FlareComposer({
                     count={draft.items.length}
                     index={draft.items.findIndex((item) => keyOf(item) === editing)}
                     onIndex={(index) => setEditing(keyOf(draft.items[index]))}
-                    renderPage={(index) => {
-                      const item = draft.items[index];
-                      const key = keyOf(item);
-                      return (
-                        <CardEditor
-                          onDone={() => setEditing(null)}
-                          item={item}
-                          intent={draft.intent}
-                          onChange={(next) => {
-                            /* A printing change re-keys the line; landing on
-                               a line already there folds the two into one. */
-                            const target = keyOf(next);
-                            const twin = draft.items.find(
-                              (entry) =>
-                                keyOf(entry) === target && keyOf(entry) !== key,
-                            );
-                            if (twin) {
-                              setItems(
-                                draft.items
-                                  .filter((entry) => keyOf(entry) !== key)
-                                  .map((entry) =>
-                                    keyOf(entry) === target
-                                      ? {
-                                          ...entry,
-                                          quantity: Math.min(
-                                            99,
-                                            entry.quantity + next.quantity,
-                                          ),
-                                          /* Folding keeps a note: the twin's,
-                                             or this one's. */
-                                          cardNote: entry.cardNote || next.cardNote,
-                                        }
-                                      : entry,
-                                  ),
-                              );
-                            } else {
-                              setItems(
-                                draft.items.map((entry) =>
-                                  keyOf(entry) === key ? next : entry,
-                                ),
-                              );
-                            }
-                            setEditing(target);
-                          }}
-                        />
+                    renderPage={(index) => <CardFace item={draft.items[index]} />}
+                  />
+                  {/* Still while the card slides: the founder (2026-11-27),
+                      "id like some static elements, and only the card
+                      moves ... with the quantity updating." The copies
+                      and Done follow whichever card is showing. */}
+                  <EditorControls
+                    onDone={() => setEditing(null)}
+                    item={draft.items.find((item) => keyOf(item) === editing) ?? null}
+                    intent={draft.intent}
+                    onChange={(next) => {
+                      const key = editing;
+                      /* A printing change re-keys the line; landing on
+                         a line already there folds the two into one. */
+                      const target = keyOf(next);
+                      const twin = draft.items.find(
+                        (entry) =>
+                          keyOf(entry) === target && keyOf(entry) !== key,
                       );
+                      if (twin) {
+                        setItems(
+                          draft.items
+                            .filter((entry) => keyOf(entry) !== key)
+                            .map((entry) =>
+                              keyOf(entry) === target
+                                ? {
+                                    ...entry,
+                                    quantity: Math.min(
+                                      99,
+                                      entry.quantity + next.quantity,
+                                    ),
+                                    /* Folding keeps a note: the twin's,
+                                       or this one's. */
+                                    cardNote: entry.cardNote || next.cardNote,
+                                  }
+                                : entry,
+                            ),
+                        );
+                      } else {
+                        setItems(
+                          draft.items.map((entry) =>
+                            keyOf(entry) === key ? next : entry,
+                          ),
+                        );
+                      }
+                      setEditing(target);
                     }}
                   />
                 </CardOverlay>
@@ -897,19 +897,9 @@ function artFor(item: DraftItem): string | null {
  * nothing to pick here. Order and removing live in the row: drag a card
  * to the front to make it the cover, onto the bin to remove it.
  */
-function CardEditor({
-  item,
-  intent,
-  onChange,
-  onDone,
-}: {
-  item: DraftItem | null;
-  intent: "want" | "showcase";
-  onChange: (next: DraftItem) => void;
-  onDone: () => void;
-}) {
-  if (!item) return null;
-
+/** The card being edited: its art, name, number and art name. It is
+    what slides in the pager; the controls stay still below it. */
+function CardFace({ item }: { item: DraftItem }) {
   /* One choice per picture: a foil and a normal sharing an image are
      one art (as on the card sheet's carousel). */
   const arts: { imageUrl: string; label: string; printingId: string }[] = [];
@@ -926,29 +916,45 @@ function CardEditor({
     : undefined;
 
   return (
-    <View style={{ gap: spacing(4) }}>
-      <View style={{ alignItems: "center", gap: spacing(2) }}>
-        <CardImage
-          imageUrl={artFor(item)}
-          width={160}
-          name={item.name}
-          cardNumber={item.cardNumber}
-        />
-        <View style={{ alignItems: "center", gap: 2 }}>
-          <Text
-            numberOfLines={1}
-            style={{ color: colors.textPrimary, fontWeight: "800", fontSize: 17 }}
-          >
-            {item.name}
-          </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-            {[item.cardNumber, chosen ? artName(chosen.label) : arts.length > 1 ? "Any art" : null]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-        </View>
+    <View style={{ alignItems: "center", gap: spacing(2) }}>
+      <CardImage
+        imageUrl={artFor(item)}
+        width={160}
+        name={item.name}
+        cardNumber={item.cardNumber}
+      />
+      <View style={{ alignItems: "center", gap: 2 }}>
+        <Text
+          numberOfLines={1}
+          style={{ color: colors.textPrimary, fontWeight: "800", fontSize: 17 }}
+        >
+          {item.name}
+        </Text>
+        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+          {[item.cardNumber, chosen ? artName(chosen.label) : arts.length > 1 ? "Any art" : null]
+            .filter(Boolean)
+            .join(" · ")}
+        </Text>
       </View>
+    </View>
+  );
+}
 
+/** The copies and Done, for the card on show: still while cards slide. */
+function EditorControls({
+  item,
+  intent,
+  onChange,
+  onDone,
+}: {
+  item: DraftItem | null;
+  intent: "want" | "showcase";
+  onChange: (next: DraftItem) => void;
+  onDone: () => void;
+}) {
+  if (!item) return null;
+  return (
+    <View style={{ gap: spacing(4), paddingHorizontal: spacing(4), paddingBottom: spacing(4) }}>
       <View
         style={{
           flexDirection: "row",
@@ -1086,9 +1092,15 @@ function CardOverlay({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
+  /* On the blur, no box: the card view's look (float-backdrop.tsx). The
+     founder (2026-11-27): "we delete all the black box views." */
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <SheetBackdrop />
+      <FloatBackdrop />
+      <View style={{ position: "absolute", top: insets.top + spacing(2), right: spacing(4), zIndex: 1 }}>
+        <FloatClose onPress={onClose} />
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -1097,17 +1109,7 @@ function CardOverlay({
           onPress={onClose}
           style={{ flex: 1, justifyContent: "center", padding: spacing(4) }}
         >
-          <Pressable
-            onPress={() => {}}
-            style={{
-              maxHeight: "90%",
-              borderRadius: radius.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              overflow: "hidden",
-            }}
-          >
+          <Pressable onPress={() => {}} style={{ maxHeight: "90%" }}>
             <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
           </Pressable>
         </Pressable>

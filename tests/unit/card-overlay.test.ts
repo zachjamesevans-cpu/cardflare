@@ -19,8 +19,8 @@ describe("a card opens over the page", () => {
       /name="Card"[\s\S]*?options=\{\{\s*title: "Card",\s*headerShown: false,[\s\S]*?presentation: "transparentModal",\s*animation: "fade",/,
     );
     const screen = read("mobile/src/screens/card.tsx");
-    expect(screen).toContain('accessibilityLabel="Close"');
-    expect(screen).toContain('<BlurView intensity={40} tint="dark"');
+    expect(screen).toContain("<FloatClose onPress={() => navigation.goBack()} />");
+    expect(screen).toContain("<FloatBackdrop />");
     expect(screen).toContain(
       "if (event.nativeEvent.contentOffset.y < -90) navigation.goBack();",
     );

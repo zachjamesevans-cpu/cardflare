@@ -1,5 +1,4 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, copiesInCart, useFlareCart } from "../flare-cart";
@@ -8,14 +7,14 @@ import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
 import { Tour, useTourTarget } from "../tour";
+import { FloatBackdrop, FloatClose } from "../float-backdrop";
 import { FLARE_BUTTON, FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { ScrollView, Text, useWindowDimensions, View, Pressable } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
@@ -80,6 +79,12 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const [added, setAdded] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  /* The first card a new player opens: the + and the arts (tour.tsx).
+     Up here with every other hook, above the loading return: below it,
+     the first render after loading had two hooks more than the one
+     before it, and React threw on every card. */
+  const tourAdd = useTourTarget("card", "add");
+  const tourArts = useTourTarget("card", "arts");
 
   /* The card a fresh read has painted, so a slow disk read never
      paints an older page over it. */
@@ -185,9 +190,6 @@ export function CardScreen({ cardId }: { cardId: string }) {
   /* The printing a + adds: the art on show's first; null without arts. */
   const shownPrinting = arts[artAt]?.printingIds?.[0] ?? null;
   const shownCopies = copiesInCart(card.cardId, shownPrinting);
-  /* The first card a new player opens: the + and the arts (tour.tsx). */
-  const tourAdd = useTourTarget("card", "add");
-  const tourArts = useTourTarget("card", "arts");
   const onYourFlares =
     wantedPrintings !== undefined
       ? wantedPrintings.some(
@@ -486,8 +488,7 @@ function CardOverlay({ children }: { children: ReactNode }) {
     /* The screen behind, blurred and darkened: the Feed's card zoom
        (ui.tsx), the same blur and the same dark. No panel, no handle. */
     <View style={{ flex: 1 }}>
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
+      <FloatBackdrop />
       <View
         style={{
           position: "absolute",
@@ -496,21 +497,7 @@ function CardOverlay({ children }: { children: ReactNode }) {
           zIndex: 1,
         }}
       >
-        <Tap
-          onPress={() => navigation.goBack()}
-          hitSlop={10}
-          accessibilityLabel="Close"
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(255,255,255,0.14)",
-          }}
-        >
-          <Ionicons name="close" size={20} color={colors.textPrimary} />
-        </Tap>
+        <FloatClose onPress={() => navigation.goBack()} />
       </View>
       {children}
     </View>

@@ -215,11 +215,15 @@ describe("the three dots on the compact card", () => {
 describe("what sits behind a sheet", () => {
   it("is a blur that fades in, on the menu and on the sheets it opens", () => {
     const menu = read("mobile/src/action-menu.tsx");
-    expect(menu).toContain('from "expo-blur"');
-    expect(menu).toContain("<BlurView");
-    expect(menu).toContain("intensity={30}");
-    expect(menu).toContain('tint="dark"');
+    /* One backdrop across the app (float-backdrop.tsx), 2026-11-27. */
+    expect(menu).toContain("return <FloatBackdrop />;");
+    const backdrop = read("mobile/src/float-backdrop.tsx");
+    expect(backdrop).toContain('from "expo-blur"');
+    expect(backdrop).toContain("intensity={FLOAT_BLUR}");
+    expect(backdrop).toContain('tint="dark"');
     expect(menu).toContain("export function SheetBackdrop");
+    /* The menu stands on frosted glass, not a black box. */
+    expect(menu).toContain("<Frosted />");
     expect(menu).toContain('animationType="fade"');
 
     for (const path of [
