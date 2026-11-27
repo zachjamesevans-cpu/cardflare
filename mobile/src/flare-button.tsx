@@ -40,6 +40,7 @@ export function FlareButton({
   outerRef,
   done = false,
   count = 0,
+  copies,
 }: {
   label: string;
   onPress: () => void;
@@ -52,7 +53,11 @@ export function FlareButton({
   done?: boolean;
   /** Cards in your Flare so far, the cart's count (flare-cart.ts). */
   count?: number;
+  /** On a card: copies of the art on show in your Flare, worn as "×4"
+   * in place of the cart's count. */
+  copies?: number;
 }) {
+  const tally = copies ?? count;
   const target = useSpotlightTarget();
 
   /* A card landing in the cart: the button pops and the count bounces,
@@ -61,13 +66,13 @@ export function FlareButton({
   const pop = useSharedValue(1);
   const bump = useSharedValue(1);
   const reduced = useReducedMotion();
-  const last = useRef({ count, done });
+  const last = useRef({ tally, done });
   useEffect(() => {
-    /* A rise in the count (the tab bar's), or this card turning to a ✓
-       (a card's own button, which wears no count). */
-    const rose = count > last.current.count;
+    /* A rise in the count (the tab bar's), in a card's copies (each
+       tap of a card's +), or a ✓ landing. */
+    const rose = tally > last.current.tally;
     const landed = done && !last.current.done;
-    last.current = { count, done };
+    last.current = { tally, done };
     if ((!rose && !landed) || reduced) return;
     pop.value = withSequence(
       withTiming(1.12, { duration: 110 }),
@@ -78,7 +83,7 @@ export function FlareButton({
         withTiming(1.35, { duration: 120 }),
         withSpring(1, { damping: 8, stiffness: 280 }),
       );
-  }, [count, done, reduced, pop, bump]);
+  }, [tally, done, reduced, pop, bump]);
   const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
   const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
 
@@ -123,11 +128,14 @@ export function FlareButton({
         />
       </Tap>
       </Animated.View>
-      {/* The cart's count, the way a shopping bag wears one. */}
-      {count > 0 ? (
+      {/* The cart's count, the way a shopping bag wears one; on a card,
+          this art's copies ("×4"). */}
+      {tally > 0 ? (
         <Animated.View
           pointerEvents="none"
-          accessibilityLabel={`${count} in your Flare`}
+          accessibilityLabel={
+            copies !== undefined ? `${copies} in your Flare` : `${count} in your Flare`
+          }
           style={[bumpStyle, {
             position: "absolute",
             top: -3,
@@ -144,7 +152,7 @@ export function FlareButton({
           }]}
         >
           <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "800" }}>
-            {count > 99 ? "99+" : count}
+            {copies !== undefined ? `×${copies}` : count > 99 ? "99+" : count}
           </Text>
         </Animated.View>
       ) : null}

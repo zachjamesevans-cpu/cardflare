@@ -26,22 +26,42 @@ describe("the Flare as a cart", () => {
     );
   });
 
-  it("a card's + adds without opening anything, then is a ✓", () => {
+  /* The founder (2026-11-27): "you should be able to tap the + button 4
+     times quickly to add 4 copies." It stays a +, wearing "×4". */
+  it("a card's + adds a copy per tap, without opening anything", () => {
     const sheet = read("mobile/src/screens/card.tsx");
     expect(sheet).toContain("<CartToast");
-    expect(sheet).toContain("done={shownInCart}");
+    expect(sheet).toContain("copies={shownCopies}");
+    expect(sheet).not.toContain("done={shownInCart}");
+    expect(read("mobile/src/flare-button.tsx")).toContain("`×${copies}`");
     const button = read("src/components/flares/flare-button.tsx");
     expect(button).toContain("addToCart(cardId, printing)");
     expect(button).toContain("View Flare ({count})");
+    expect(button).toContain("`×${copies}`");
+    expect(button).not.toContain("<Check");
+  });
+
+  it("adds one after another, so fast taps are all counted, on both platforms", () => {
+    for (const path of [
+      "mobile/src/flare-cart.ts",
+      "src/components/flares/flare-cart.ts",
+    ]) {
+      const src = read(path);
+      expect(src).toContain("const run = queue.then(");
+      expect(src).toContain("queue = run.catch(() => undefined);");
+      /* The badge counts copies, like a shopping bag. */
+      expect(src).toMatch(/reduce\(\(sum, line\) => sum \+ line\.quantity, 0\)/);
+    }
+    expect(read("mobile/src/flare-cart.ts")).toContain("quantity: item.quantity + 1");
   });
 
   it("the + elsewhere wears the cart's count and opens the full cart", () => {
     expect(read("mobile/src/dock.tsx")).toContain("count={cartCount()}");
     expect(read("mobile/src/flare-button.tsx")).toContain(
-      '{count > 99 ? "99+" : count}',
+      'count > 99 ? "99+" : count}',
     );
     expect(read("src/components/flares/flare-button.tsx")).toContain(
-      '{count > 99 ? "99+" : count}',
+      'count > 99 ? "99+" : count}',
     );
   });
 });

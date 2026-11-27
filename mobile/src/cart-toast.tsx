@@ -24,13 +24,28 @@ export function CartToast({
   style?: ViewStyle;
 }) {
   const shown = useRef(new Animated.Value(0)).current;
+  const showing = useRef(false);
   useEffect(() => {
-    if (!line) return;
-    shown.setValue(0);
+    if (!line) {
+      showing.current = false;
+      return;
+    }
+    /* Already up (a second tap, "×2"): the words change in place and
+       the clock starts over, without sliding in again. */
+    if (!showing.current) {
+      showing.current = true;
+      shown.setValue(0);
+    }
+    /* Also catches a tap mid fade-out: back to full, and the fade's own
+       end (unfinished) does not clear it. */
     Animated.timing(shown, { toValue: 1, duration: 180, useNativeDriver: true }).start();
     const timer = setTimeout(() => {
       Animated.timing(shown, { toValue: 0, duration: 200, useNativeDriver: true }).start(
-        ({ finished }) => finished && onGone(),
+        ({ finished }) => {
+          if (!finished) return;
+          showing.current = false;
+          onGone();
+        },
       );
     }, 3200);
     return () => clearTimeout(timer);

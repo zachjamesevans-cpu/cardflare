@@ -2,7 +2,7 @@ import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
-import { addToCart, cartCount, inCart, useFlareCart } from "../flare-cart";
+import { addToCart, cartCount, copiesInCart, useFlareCart } from "../flare-cart";
 import { FlaredTag } from "../flared-mark";
 import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
@@ -183,7 +183,7 @@ export function CardScreen({ cardId }: { cardId: string }) {
   const wantedPrintings = page?.you?.wantedPrintings;
   /* The printing a + adds: the art on show's first; null without arts. */
   const shownPrinting = arts[artAt]?.printingIds?.[0] ?? null;
-  const shownInCart = inCart(card.cardId, shownPrinting);
+  const shownCopies = copiesInCart(card.cardId, shownPrinting);
   const onYourFlares =
     wantedPrintings !== undefined
       ? wantedPrintings.some(
@@ -405,19 +405,20 @@ export function CardScreen({ cardId }: { cardId: string }) {
      * The + puts the art on show in your Flare, like a cart, without
      * sliding the composer up: the founder, "when pressing the + button,
      * it just has ... similar function to how when you add something to
-     * cart, it just tallies up, then you can view 'full cart'." Already
-     * in it, the + is a ✓ and opens the Flare, pushed inside the sheet
-     * so back returns to this card (open-composer.ts). Each art is its
-     * own card ("all alternate arts need to be treated as separate").
+     * cart, it just tallies up, then you can view 'full cart'." It stays
+     * a +: every tap is one more copy, worn as "×4" ("you should be able
+     * to tap the + button 4 times quickly to add 4 copies"). The toast's
+     * "View Flare" opens it. Each art is its own card ("all alternate
+     * arts need to be treated as separate").
      */}
     <FlareButton
-      label={shownInCart ? `View your Flare, ${cartCount()} cards` : `Add ${name} to your Flare`}
-      done={shownInCart}
+      label={
+        shownCopies > 0
+          ? `Add another ${name}, ${shownCopies} in your Flare`
+          : `Add ${name} to your Flare`
+      }
+      copies={shownCopies}
       onPress={() => {
-        if (shownInCart) {
-          openComposer(navigation);
-          return;
-        }
         const art = arts[artAt];
         void addToCart({
           cardId: card.cardId,
@@ -433,10 +434,12 @@ export function CardScreen({ cardId }: { cardId: string }) {
           ),
           printingId: shownPrinting,
           quantity: 1,
-        }).then((outcome) => {
+        }).then(({ outcome, copies }) => {
           if (outcome !== "added") return;
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-          setAdded(arts.length > 1 && art?.label ? `${card.name} · ${art.label}` : card.name);
+          if (copies === 1)
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          const what = arts.length > 1 && art?.label ? `${card.name} · ${art.label}` : card.name;
+          setAdded(copies > 1 ? `${what} ×${copies}` : what);
         });
       }}
       style={{ right: gutter + spacing(1), bottom: insets.bottom + spacing(4) }}

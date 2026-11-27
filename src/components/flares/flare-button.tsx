@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Check, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { ART_EVENT, shownArtPrinting } from "@/components/cards/card-art-carousel";
-import { addToCart, inCart, useCartCount } from "@/components/flares/flare-cart";
+import { addToCart, copiesInCart, useCartCount } from "@/components/flares/flare-cart";
 import { cn } from "@/lib/cn";
 
 /* A tight glow that keeps the edge crisp, not a wide haze over the
@@ -70,10 +70,14 @@ export function FlareButton({
      waiting stays still. */
   const buttonRef = useRef<HTMLElement | null>(null);
   const badgeRef = useRef<HTMLSpanElement | null>(null);
-  const last = useRef(count);
+  /* On a card, the copies of the art on show ("×4"); elsewhere the
+     cart's count. Re-read whenever the count moves. */
+  const copies = cardId && browser ? copiesInCart(cardId, printing) : 0;
+  const tally = cardId ? copies : count;
+  const last = useRef(tally);
   useEffect(() => {
-    const rose = count > last.current;
-    last.current = count;
+    const rose = tally > last.current;
+    last.current = tally;
     if (!rose || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const spring = "cubic-bezier(0.34, 1.56, 0.64, 1)";
     buttonRef.current?.animate([{ scale: "1" }, { scale: "1.12" }, { scale: "1" }], {
@@ -84,24 +88,23 @@ export function FlareButton({
       duration: 420,
       easing: spring,
     });
-  }, [count]);
+  }, [tally]);
 
   const badge =
-    count > 0 ? (
+    tally > 0 ? (
       <span
         ref={badgeRef}
         aria-hidden="true"
         className="absolute -top-1 -right-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-accent bg-canvas px-1 text-xs font-extrabold text-accent tabular-nums"
       >
-        {count > 99 ? "99+" : count}
+        {cardId ? `×${copies}` : count > 99 ? "99+" : count}
       </span>
     ) : null;
   const plus = <Plus className="size-7" strokeWidth={2.75} aria-hidden="true" />;
 
   /* "Added Perona", with the way to the full cart beside it. Drawn at
      the page's top level: inside the card's sheet, whose slide-up
-     transform would hold a fixed toast off screen. Kept through the
-     button's turn to a ✓, which is the moment it shows. */
+     transform would hold a fixed toast off screen. */
   const toast =
     added &&
     createPortal(
@@ -122,9 +125,8 @@ export function FlareButton({
       document.body,
     );
 
-  /* Anywhere but a card, or a card already in the cart: open the Flare. */
-  const here = cardId !== null && browser && inCart(cardId, printing);
-  if (!cardId || here) {
+  /* Anywhere but a card: open the Flare, the full cart. */
+  if (!cardId) {
     return (
       <>
         <Link
@@ -132,22 +134,12 @@ export function FlareButton({
             buttonRef.current = node;
           }}
           href="/flare"
-          aria-label={
-            here
-              ? `View your Flare, ${count} cards`
-              : count > 0
-                ? `Your Flare, ${count} cards`
-                : label
-          }
-          title={here ? "In your Flare" : label}
+          aria-label={count > 0 ? `Your Flare, ${count} cards` : label}
+          title={label}
           data-spotlight="post-flare"
           className={cn(BUTTON, className)}
         >
-          {here ? (
-            <Check className="size-7" strokeWidth={2.75} aria-hidden="true" />
-          ) : (
-            plus
-          )}
+          {plus}
           {badge}
         </Link>
         {toast}
@@ -162,12 +154,19 @@ export function FlareButton({
           buttonRef.current = node;
         }}
         type="button"
-        aria-label={`Add this card to your Flare`}
+        aria-label={
+          copies > 0
+            ? `Add another copy, ${copies} in your Flare`
+            : "Add this card to your Flare"
+        }
         title="Add to your Flare"
         data-spotlight="post-flare"
         onClick={() => {
-          void addToCart(cardId, printing).then(({ outcome, name }) => {
-            if (outcome === "added") setAdded(name ?? "Card");
+          /* Every click is one more copy ("tap the + button 4 times
+             quickly to add 4 copies"); the toast keeps the tally. */
+          void addToCart(cardId, printing).then(({ outcome, name, copies: now }) => {
+            if (outcome === "added")
+              setAdded(`${name ?? "Card"}${now && now > 1 ? ` ×${now}` : ""}`);
             /* The card could not be read: the composer, the old way. */
             if (outcome === "failed")
               window.location.assign(
