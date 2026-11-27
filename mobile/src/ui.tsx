@@ -283,6 +283,8 @@ export interface ZoomHave {
   state: "open" | "offered" | "found";
   /** The viewer already raised a hand on it. */
   youOffered: boolean;
+  /** Opens the post's thread, where the offer is a line: "View offer". */
+  onViewOffer?: () => void;
   /**
    * Copies the post still wants of it: the most the review lets a pick
    * rise to. Unknown on an older shelf, where a pick stays at one and
@@ -588,7 +590,10 @@ function ZoomHaveForm({
   onPicks,
   sent,
   onReview,
+  onViewOffer,
 }: {
+  /** The conversation with the poster, once this card is offered. */
+  onViewOffer?: () => void;
   /** The card on screen, or null when it has nothing to offer. */
   have: ZoomHave | null;
   /** What has been added to the offer, across the shelf. */
@@ -701,9 +706,17 @@ function ZoomHaveForm({
        * before that rather than not at all, so nothing under the
        * picture moves when the first card goes in.
        */}
-      <View style={{ opacity: count > 0 ? 1 : 0.45 }}>
-        <Button label={tray} disabled={count === 0} onPress={onReview} />
-      </View>
+      {/* Offered and nothing else picked: the way to the conversation
+          the offer went to, not a dead "Review offer · 0 cards". The
+          founder (2026-11-27): "review offer should be changed once
+          it's offered." */}
+      {count === 0 && (have?.youOffered || sentHere) && onViewOffer ? (
+        <Button label="View offer" onPress={onViewOffer} />
+      ) : (
+        <View style={{ opacity: count > 0 ? 1 : 0.45 }}>
+          <Button label={tray} disabled={count === 0} onPress={onReview} />
+        </View>
+      )}
     </Pressable>
   );
 }
@@ -1580,6 +1593,9 @@ export function CardImage({
                         onPicks={setPicks}
                         sent={sent}
                         onReview={() => setReviewing(true)}
+                        onViewOffer={
+                          have?.onViewOffer ? () => closeThen(have.onViewOffer) : undefined
+                        }
                       />
                     ) : null}
                   </View>
@@ -1981,17 +1997,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  /* Words on the blur, no box: "we delete all the black box views". */
   zoomSaid: {
     alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     gap: spacing(2),
-    paddingHorizontal: spacing(3),
-    paddingVertical: spacing(2),
-    borderRadius: radius.control,
-    get backgroundColor() {
-      return colors.elevated;
-    },
+    paddingHorizontal: spacing(1),
   },
   zoomStep: {
     width: 32,
@@ -2169,10 +2181,15 @@ function ZoomArt({
       style={{ ...box, backgroundColor: colors.canvas }}
     />
   );
-  if (state === "open") return art;
+  /* Offered, opened: the card whole and bright. The OFFERED band sat on
+     its name and type line (the founder, 2026-11-27: "see how there's
+     overlap? fix that"), and the words under the card already say it.
+     A found card keeps its band ("with the green 'found' thing at
+     bottom"). */
+  if (state === "open" || state === "offered") return art;
   return (
     <View style={{ ...box, overflow: "hidden" }}>
-      <View style={{ opacity: state === "offered" ? 0.5 : 1 }}>{art}</View>
+      {art}
       <StateBand state={state} large />
     </View>
   );

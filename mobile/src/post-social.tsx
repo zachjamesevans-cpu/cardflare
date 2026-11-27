@@ -32,6 +32,12 @@ export interface PostRef {
    * the lab) never sends and resolves with nothing.
    */
   offer: (items: OfferItem[], message: string) => Promise<OfferOutcome | void>;
+  /**
+   * The post's thread, where an offer lands as a line: "View offer" on
+   * a card you offered on (the founder, 2026-11-27, "should
+   * be able to view the offer/ conversation from this screen").
+   */
+  viewOffer?: () => void;
 }
 
 /**
@@ -71,6 +77,7 @@ export function haveFor(
     name: card.cardName,
     state: card.state ?? "open",
     youOffered: card.youOffered ?? false,
+    onViewOffer: post.viewOffer,
     onOffer: async (items, note) =>
       (await post.offer(items, note)) ?? { offered: items.length, refused: [] },
   };

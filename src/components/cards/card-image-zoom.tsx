@@ -32,6 +32,7 @@ import { useOpened } from "@/components/ui/use-opened";
 import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
+import { openCommentsOf } from "@/lib/feed/open-comments";
 import { listOf, offerFailureMessage, reviewLabel } from "@/lib/feed/offer-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { CardState } from "@/lib/feed/post-schema";
@@ -252,7 +253,7 @@ function ZoomSaid({ children }: { children: ReactNode }) {
   return (
     <div
       onClick={(event) => event.stopPropagation()}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-[var(--radius-control)] bg-accent/[0.07] px-3 py-2 text-sm text-text-secondary"
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1 py-1 text-sm text-text-secondary"
     >
       {children}
     </div>
@@ -546,7 +547,16 @@ export function useOfferBuild(
  * still be able to make offers or say they have something even if
  * someone already did."
  */
-function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: OfferBuild }) {
+function ZoomHaveBlock({
+  have,
+  offers,
+  onViewOffer,
+}: {
+  have: ZoomHave;
+  offers: OfferBuild;
+  /** Closes the card and opens the post's comments: "View offer". */
+  onViewOffer: () => void;
+}) {
   const sent = offers.sends[have.flareId];
 
   /* The strip: what is already true of this card, if anything. */
@@ -619,6 +629,18 @@ function ZoomHaveBlock({ have, offers }: { have: ZoomHave; offers: OfferBuild })
           className="w-full"
         >
           {reviewLabel(count)}
+        </Button>
+      ) : sent || have.youOffered ? (
+        /* Offered: the way to the thread the offer went to. The founder
+           (2026-11-27): "review offer should be changed once it's
+           offered." The app's zoom is the same (mobile/src/ui.tsx). */
+        <Button
+          type="button"
+          variant="primary"
+          onClick={onViewOffer}
+          className="w-full"
+        >
+          View offer
         </Button>
       ) : (
         <span aria-hidden="true" className="block h-11" />
@@ -891,13 +913,11 @@ export function CardImageZoom({
   const ask = shown ? (shown.ask ?? null) : ownAsk;
   const noteEdit = shown ? (shown.noteEdit ?? null) : null;
   const cardState = shown ? (shown.state ?? "open") : "open";
-  /* Found: black and white; offered: dimmed - the thumbnail's own rule. */
-  const stateArt =
-    cardState === "found"
-      ? "opacity-60 grayscale"
-      : cardState === "offered"
-        ? "opacity-50 grayscale"
-        : "";
+  /* Found: black and white, the thumbnail's own rule. Offered, opened:
+     the card whole and bright, with no band over its name and type line
+     (the founder, 2026-11-27: "see how there's overlap? fix that"); the
+     words under it say it was offered. */
+  const stateArt = cardState === "found" ? "opacity-60 grayscale" : "";
 
   const [warm, setWarm] = useState(false);
   const [sharp, setSharp] = useState(false);
@@ -1465,7 +1485,7 @@ export function CardImageZoom({
             )}
 
             {/* The card's state at its foot, the band every surface uses. */}
-            {cardState !== "open" && (
+            {cardState === "found" && (
               <span
                 className={`pointer-events-none absolute inset-x-0 bottom-0 z-10 py-1.5 text-center text-base font-extrabold tracking-[0.2em] uppercase ${
                   cardState === "found"
@@ -1580,7 +1600,16 @@ export function CardImageZoom({
               is keyed on the shelf position so a half-typed note does not
               ride along to the next card. */}
           {offer && <ZoomOfferBlock key={`offer-${at}`} offer={offer} />}
-          {have && <ZoomHaveBlock have={have} offers={offers} />}
+          {have && (
+            <ZoomHaveBlock
+              have={have}
+              offers={offers}
+              onViewOffer={() => {
+                close();
+                openCommentsOf(have.postId);
+              }}
+            />
+          )}
           {ask && <ZoomAskBlock ask={ask} offers={offers} />}
         </div>
       </dialog>

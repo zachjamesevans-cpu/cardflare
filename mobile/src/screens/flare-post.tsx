@@ -319,6 +319,9 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     postId: post.postId,
     yours: post.yours,
     posterName: post.author.displayName,
+    /* Already on the post: closing the card shows its thread, where the
+       offer is a line. */
+    viewOffer: () => undefined,
     offer: async (items, message) => {
       const result = await offerItemsOnPost(post.postId, items, message);
       const taken = new Set(
