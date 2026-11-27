@@ -549,12 +549,6 @@ function Row({
 
           {versionsOpen && (
             <div className="flex flex-col gap-2 border-t border-border p-3">
-              {onSelect && (
-                <p className="text-xs text-text-muted">
-                  Tap a version to ask for that exact one, or the card above to take any
-                  printing. Tap any picture to see it full size.
-                </p>
-              )}
               <PrintingList
                 card={card}
                 imagesEnabled={imagesEnabled}
