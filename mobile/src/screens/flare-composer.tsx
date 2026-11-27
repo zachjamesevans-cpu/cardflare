@@ -23,7 +23,6 @@ import {
 } from "react-native";
 
 import { dismissSwipe } from "../swipe-delete";
-import { SheetBackdrop } from "../action-menu";
 
 import type { StackParams, TabParams } from "../../App";
 import {
@@ -43,6 +42,7 @@ import {
 } from "../api";
 import { CardTray } from "../card-tray";
 import { lineKey, type PickedLine } from "../card-select";
+import { FloatBackdrop, FloatClose } from "../float-backdrop";
 import { cachedPlayerId, readCache, writeCache } from "../cache";
 import { markFeedStale } from "../feed-refresh";
 import { FlareFeedCard } from "../flare-feed-card";
@@ -54,7 +54,7 @@ import type { PostRef } from "../post-social";
 import { postSummary } from "../post-summary";
 import { RemoteImage } from "../remote-image";
 import { Stepper } from "../stepper";
-import { colors, gutter, radius, spacing } from "../theme";
+import { colors, gutter, spacing } from "../theme";
 import {
   AsyncButton,
   Body,
@@ -1086,9 +1086,15 @@ function CardOverlay({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
+  /* On the blur, no box: the card view's look (float-backdrop.tsx). The
+     founder (2026-11-27): "we delete all the black box views." */
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <SheetBackdrop />
+      <FloatBackdrop />
+      <View style={{ position: "absolute", top: insets.top + spacing(2), right: spacing(4), zIndex: 1 }}>
+        <FloatClose onPress={onClose} />
+      </View>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -1097,17 +1103,7 @@ function CardOverlay({
           onPress={onClose}
           style={{ flex: 1, justifyContent: "center", padding: spacing(4) }}
         >
-          <Pressable
-            onPress={() => {}}
-            style={{
-              maxHeight: "90%",
-              borderRadius: radius.card,
-              borderWidth: 1,
-              borderColor: colors.border,
-              backgroundColor: colors.surface,
-              overflow: "hidden",
-            }}
-          >
+          <Pressable onPress={() => {}} style={{ maxHeight: "90%" }}>
             <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
           </Pressable>
         </Pressable>

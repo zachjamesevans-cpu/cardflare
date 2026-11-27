@@ -87,8 +87,10 @@ describe("a card's own choices", () => {
      you'll change quantity, printing, etc." */
   it("open in an overlay over the blurred page, not inline in the form", () => {
     expect(app).toMatch(/<CardOverlay onClose=\{\(\) => setEditing\(null\)\}>/);
-    expect(app).toContain("<SheetBackdrop />");
-    expect(web).toMatch(/<Sheet\s+open=\{editingCard !== null\}/);
+    /* On the blur with no box, the card view's look (2026-11-27). */
+    expect(app).toContain("<FloatBackdrop />");
+    expect(app).toContain("<FloatClose onPress={onClose} />");
+    expect(web).toMatch(/<Sheet\s+float\s+open=\{editingCard !== null\}/);
     for (const source of [app, web]) expect(source).toMatch(/Done/);
   });
 

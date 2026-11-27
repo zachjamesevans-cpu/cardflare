@@ -1,5 +1,4 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { BlurView } from "expo-blur";
 import * as Haptics from "expo-haptics";
 import { CartToast } from "../cart-toast";
 import { addToCart, cartCount, copiesInCart, useFlareCart } from "../flare-cart";
@@ -8,14 +7,14 @@ import { artFlared, cardFlared, useMyFlares } from "../my-flares";
 import { ArtCarousel } from "../art-carousel";
 import { openComposer } from "../open-composer";
 import { Tour, useTourTarget } from "../tour";
+import { FloatBackdrop, FloatClose } from "../float-backdrop";
 import { FLARE_BUTTON, FlareButton } from "../flare-button";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { loadCardPrices } from "../price-cache";
 import { CardPricesPanel } from "../card-prices";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ScrollView, Text, useWindowDimensions, View, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { ScrollView, Text, useWindowDimensions, View, Pressable } from "react-native";
 
 import type { StackParams } from "../../App";
 import {
@@ -489,8 +488,7 @@ function CardOverlay({ children }: { children: ReactNode }) {
     /* The screen behind, blurred and darkened: the Feed's card zoom
        (ui.tsx), the same blur and the same dark. No panel, no handle. */
     <View style={{ flex: 1 }}>
-      <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0,0,0,0.45)" }]} />
+      <FloatBackdrop />
       <View
         style={{
           position: "absolute",
@@ -499,21 +497,7 @@ function CardOverlay({ children }: { children: ReactNode }) {
           zIndex: 1,
         }}
       >
-        <Tap
-          onPress={() => navigation.goBack()}
-          hitSlop={10}
-          accessibilityLabel="Close"
-          style={{
-            width: 34,
-            height: 34,
-            borderRadius: 17,
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "rgba(255,255,255,0.14)",
-          }}
-        >
-          <Ionicons name="close" size={20} color={colors.textPrimary} />
-        </Tap>
+        <FloatClose onPress={() => navigation.goBack()} />
       </View>
       {children}
     </View>

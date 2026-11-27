@@ -22,7 +22,15 @@ export function Sheet({
   children,
   footer = null,
   className,
+  float = false,
 }: {
+  /**
+   * No box: the content floats on the blur, the card view's look, with a
+   * round X top right. The founder (2026-11-27): "we delete all the
+   * black box views. really a goal is to have a unified design language
+   * across entire app." The title is for screen readers only.
+   */
+  float?: boolean;
   open: boolean;
   onClose: () => void;
   title: string;
@@ -58,30 +66,48 @@ export function Sheet({
            the bottom... Remove that thing entirely, it's jarring. Maybe
            slightly blur the background instead, like fade into it."
            Opacity only: the dialog never slides. */
-        "backdrop:bg-black/30 backdrop:backdrop-blur-md",
+        float
+          ? "backdrop:bg-black/50 backdrop:backdrop-blur-[14px]"
+          : "backdrop:bg-black/30 backdrop:backdrop-blur-md",
         "motion-safe:animate-[cf-sheet-in_var(--duration-base)_var(--ease-out-soft)] motion-safe:backdrop:animate-[cf-sheet-in_var(--duration-base)_var(--ease-out-soft)]",
         className,
       )}
     >
-      <div className="flex max-h-[88dvh] flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface text-text-primary shadow-[var(--shadow-panel)]">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-          <p className="min-w-0 truncate font-semibold">{title}</p>
+      {float ? (
+        <>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-m-1 shrink-0 cursor-pointer rounded-full p-1 text-text-muted hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            className="fixed top-4 right-4 z-10 flex size-9 cursor-pointer items-center justify-center rounded-full bg-white/15 text-text-primary transition-colors hover:bg-white/25"
           >
             <X className="size-5" aria-hidden="true" />
           </button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{open && children}</div>
-        {footer && (
-          <div className="border-t border-border bg-surface px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-            {footer}
+          <div className="max-h-[88dvh] overflow-y-auto p-4 text-text-primary">
+            {open && children}
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="flex max-h-[88dvh] flex-col overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface text-text-primary shadow-[var(--shadow-panel)]">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <p className="min-w-0 truncate font-semibold">{title}</p>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-m-1 shrink-0 cursor-pointer rounded-full p-1 text-text-muted hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none"
+            >
+              <X className="size-5" aria-hidden="true" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">{open && children}</div>
+          {footer && (
+            <div className="border-t border-border bg-surface px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {footer}
+            </div>
+          )}
+        </div>
+      )}
     </dialog>
   );
 }

@@ -516,6 +516,7 @@ function ComposerBody({
             text box right below is quite confusing." The app's overlay
             is the same. */}
         <Sheet
+          float
           open={editingCard !== null}
           onClose={() => setEditing(null)}
           title={editingCard?.card.exactName ?? ""}
