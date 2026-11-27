@@ -75,11 +75,22 @@ describe("the Nearby tab is a trade room", () => {
 describe("Flares near you, from the server", () => {
   const repo = read("src/lib/feed/repository.ts");
 
-  it("files posts by people near you that you do not follow under around", () => {
+  /* Everyone near you, people you follow included (2026-11-27): a
+     friend nine miles away "didnt show in nearby for me". */
+  it("files posts by everyone near you under around, follows tagged", () => {
     expect(repo).toContain('item.around\n          ? "around"');
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(
-      "nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",
+      "nearbyAuthorsFor(playerId, origin, new Set<string>(), reach)",
+    );
+    expect(repo).toContain(
+      "followed: hunt.playerId ? followed.has(hunt.playerId) : false,",
+    );
+    expect(read("mobile/src/flare-feed-card.tsx")).toContain(
+      "{item.followed && !item.yours ? (",
+    );
+    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
+      "{item.followed && !item.yours && (",
     );
   });
 

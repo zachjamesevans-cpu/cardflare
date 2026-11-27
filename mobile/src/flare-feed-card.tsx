@@ -484,6 +484,27 @@ export function FlareFeedCard({
                     YOUR FLARE
                   </Text>
                 ) : null}
+                {/* On Nearby, somebody you follow: their post is here and
+                    on Following, so the tag says which kind of near. */}
+                {item.followed && !item.yours ? (
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 11,
+                      fontWeight: "700",
+                      letterSpacing: 0.6,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      borderRadius: 999,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      overflow: "hidden",
+                    }}
+                  >
+                    FOLLOWING
+                  </Text>
+                ) : null}
                 {/* Not somebody you follow: a new player's suggestion
                     ("Popular in One Piece", read out by VoiceOver). */}
                 {item.suggested && !item.yours ? (

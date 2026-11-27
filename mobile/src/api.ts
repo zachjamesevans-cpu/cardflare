@@ -4162,6 +4162,8 @@ export type FeedItem =
       /** A suggested post for a new player, with why: "Popular in One
           Piece". Drawn as a "Suggested" label in the header. */
       suggested?: string | null;
+      /** On Nearby, from somebody you follow: a "Following" tag. */
+      followed?: boolean;
       storeId?: string | null;
       /** What the poster will do for it: the Trade and Cash chips. */
       acceptsTrade?: boolean;

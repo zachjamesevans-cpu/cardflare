@@ -298,6 +298,13 @@ export function FlareFeedCard({
                     Your Flare
                   </span>
                 )}
+                {/* On Nearby, somebody you follow: their post is here and
+                    on Following, so the tag says which kind of near. */}
+                {item.followed && !item.yours && (
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
+                    Following
+                  </span>
+                )}
                 {/* Not somebody you follow: a new player's suggestion,
                     with why in its title ("Popular in One Piece"). */}
                 {item.suggested && !item.yours && (
