@@ -1126,6 +1126,9 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
       postId: item.postId,
       yours: item.yours,
       posterName: item.displayName,
+      /* An offer is a line in the post's thread (posts.ts offerItems):
+         the post, with its comments, is where it is read and answered. */
+      viewOffer: () => navigation.navigate("FlarePost", { postId: item.postId }),
       offer: async (items, message) => {
         const result = await offerItemsOnPost(item.postId, items, message);
         /* OFFERED at once. The founder: "immediately visually show that

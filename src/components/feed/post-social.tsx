@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useEffectEvent, useRef, useState, useTransition } from "react";
 import { Heart, MessageCircle, PackageCheck } from "lucide-react";
 
 import dynamic from "next/dynamic";
@@ -10,6 +10,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Spinner } from "@/components/ui/spinner";
 import { useOpened } from "@/components/ui/use-opened";
 import { cn } from "@/lib/cn";
+import { OPEN_COMMENTS } from "@/lib/feed/open-comments";
 import {
   addPostCommentAction,
   deletePostCommentAction,
@@ -127,6 +128,19 @@ export function PostSocial({
     }
   };
 
+  /* "View offer" from a card's zoom: open this post's comments, where
+     the offer is a line, and bring them into view. */
+  const commentsButton = useRef<HTMLButtonElement>(null);
+  const onAsk = useEffectEvent((event: Event) => {
+    if ((event as CustomEvent<{ postId: string }>).detail?.postId !== postId) return;
+    if (!open) openThread();
+    commentsButton.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  useEffect(() => {
+    window.addEventListener(OPEN_COMMENTS, onAsk);
+    return () => window.removeEventListener(OPEN_COMMENTS, onAsk);
+  }, []);
+
   const send = () => {
     const body = draft.trim();
     if (!body || sending) return;
@@ -168,6 +182,7 @@ export function PostSocial({
         </button>
         <button
           type="button"
+          ref={commentsButton}
           onClick={openThread}
           aria-expanded={open}
           aria-label={open ? "Hide comments" : "Show comments"}
