@@ -362,10 +362,15 @@ export function FlareFeedCard({
   /* Found cards at the far right (found-last.ts). */
   const cards = [...item.cards].sort(foundLast);
   const completed = item.completed ?? false;
-  /* "28m · nearby": when it went up and how far, beside the name. */
+  /* "28m · 2.1 mi away": when it went up, and how far only on Nearby.
+     The founder (2026-11-27): "no need to have location in the main
+     feed section. that is for people you follow, dont really need to
+     know how close they are to you." */
   const meta = [
     item.postedAt ? agoFrom(item.postedAt) : null,
-    typeof item.milesAway === "number" ? awayLabel(item.milesAway) : null,
+    item.tab === "nearby" && typeof item.milesAway === "number"
+      ? awayLabel(item.milesAway)
+      : null,
   ]
     .filter(Boolean)
     .join(" · ");

@@ -144,7 +144,8 @@ describe("Nearby's sections, in the app's order with the app's words", () => {
         "<LiveRoomBanner",
         "<NearbyHeader miles={miles} />",
         "{plan.ask && (",
-        "<FeedList shown={plan.items} view={view} headings />",
+        "{showsYours && (",
+        "<FeedList shown={plan.items} view={view} headings={!showsYours} />",
         "{!plan.ask && plan.posts === 0 ? (",
         "items.length < 3 && <HowItWorks />",
       ],
@@ -198,19 +199,21 @@ describe("Nearby's sections, in the app's order with the app's words", () => {
 
   /* The founder (2026-11-25): "weird to have those text blocks then more
      text between them." One unboxed empty state, the same words on both. */
-  it("says an empty room is empty, with Post a Flare and a wider look", () => {
+  /* 2026-11-27: no "Post a Flare" (what you post shows under Yours),
+     and "Put a binder up" makes a binder for trade instead of opening the
+     profile and stopping there. */
+  it("says an empty room is empty, with a trade binder and a wider look", () => {
     const line = "miles post Flares or put binders up for trade, they show up here.`";
-    expect(app.home).toContain("? `When players within ${miles} " + line);
+    expect(app.home).toContain("{`When players within ${miles} " + line);
     expect(web.page).toContain("{`When players within ${miles ?? 50} " + line);
     for (const source of [web.page, app.home]) {
-      expect(source).toContain("Nothing near you yet");
+      expect(source).toContain("No other players nearby yet");
     }
-    expect(app.home).toContain('label="Post a Flare"');
-    expect(app.home).toContain('label="Put a binder up"');
-    expect(web.page).toMatch(/<Link href="\/flare"[^>]*>\s*Post a Flare\s*<\/Link>/);
-    expect(web.page).toMatch(
-      /<Link href="\/profile"[^>]*>\s*Put a binder up\s*<\/Link>/,
-    );
+    expect(app.home).not.toContain('label="Post a Flare" onPress={onPost}');
+    expect(app.home).toContain('label="Put a binder up for trade"');
+    expect(app.home).toContain("() => setMakingBinder(true)");
+    expect(web.page).toContain('<CreateBinder trigger="trade" />');
+    expect(web.page).not.toContain('href="/flare"');
     expect(app.home).toContain("Look within 100 miles");
     expect(web.reach).toContain("Look within 100 miles");
     expect(app.home).toContain("(nearbyMiles ?? 50) < 100");

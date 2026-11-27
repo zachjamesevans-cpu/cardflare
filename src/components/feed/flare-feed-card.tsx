@@ -311,7 +311,12 @@ export function FlareFeedCard({
               </Link>
               <span className="shrink-0 text-[13px] text-text-muted">
                 · {agoFrom(item.postedAt)}
-                {typeof item.milesAway === "number" &&
+                {/* How far, on Nearby only: the founder (2026-11-27), the
+                    Feed "is for people you follow, dont really need to
+                    know how close they are to you." */}
+                {"tab" in item &&
+                  item.tab === "nearby" &&
+                  typeof item.milesAway === "number" &&
                   ` · ${awayLabel(item.milesAway)}`}
               </span>
             </span>

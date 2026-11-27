@@ -1,4 +1,5 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { CreateBinderSheet } from "../create-binder-sheet";
 import { openOfferThread } from "../view-offer";
 import { toTab } from "../to-tab";
 import { useTabReset } from "../tab-reset";
@@ -41,7 +42,9 @@ import {
   belongsToTab,
   blockPlayer,
   getFeed,
+  listBinders,
   setLocalRadius,
+  type BinderSummary,
   sectionHeading,
   type FeedEntry,
   type FeedTab,
@@ -674,6 +677,18 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
    * sample shows whole; every action on it is a door to sign-up.
    */
   const [guest, setGuest] = useState(false);
+  /* Your binders up for trade: Nearby's "Yours" (NearbyYours). */
+  const [tradeBinders, setTradeBinders] = useState<BinderSummary[]>([]);
+  const [makingBinder, setMakingBinder] = useState(false);
+  const readTradeBinders = useCallback(() => {
+    if (guest) return;
+    listBinders()
+      .then(({ binders }) => setTradeBinders(binders.filter((binder) => binder.forTrade)))
+      .catch(() => {});
+  }, [guest]);
+  useEffect(() => {
+    readTradeBinders();
+  }, [readTradeBinders]);
   /* Which filter an item belongs under is decided in one place for both
      platforms, version skew and all. See `belongsToTab`. */
   const shownFor = (which: FeedTab) =>
@@ -1333,7 +1348,26 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
        under it: see nearby-plan.ts. */
     const all = shownFor(tab);
     const plan = tab === "nearby" && !guest ? planNearby(all) : null;
-    const shown = plan ? plan.items : all;
+    /*
+     * YOURS, FIRST. Nearby only ever showed other players, so a Flare
+     * posted from here never appeared here - the founder: "when you post
+     * a flare it doesn't even go in this screen so kinda seems
+     * redundant." Your open Flares (the three newest) lead the tab under
+     * "Yours", with your trade binders: what players near you see of you.
+     */
+    const mine = plan
+      ? feed
+          .filter(
+            (item) =>
+              item.kind === "hunt" &&
+              item.yours &&
+              !item.completed &&
+              !hidden.has(item.postId),
+          )
+          .slice(0, 3)
+      : [];
+    const showsYours = plan !== null && !plan.ask && (mine.length > 0 || tradeBinders.length > 0);
+    const shown = plan ? [...mine, ...plan.items] : all;
     const sectionsShown = new Set(shown.map((item) => item.section)).size;
     /* Rows keyed by what they are, not where they sit: see feed-keys.ts. */
     const shownKeys = feedKeys(shown);
@@ -1409,6 +1443,13 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
               </Card>
             )}
 
+            {showsYours ? (
+              <NearbyYours
+                miles={nearbyMiles ?? 50}
+                binders={tradeBinders}
+                onBinder={(binderId) => navigation.navigate("Binder", { binderId })}
+              />
+            ) : null}
             {shown.map((item, index) => {
               const body =
                 item.kind === "nearbyMatch" ? (
@@ -2005,10 +2046,16 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                * none there either.
                */
               const heading =
-                guest || tab === "following" ? null : sectionHeading(item.section);
+                plan && showsYours
+                  ? index === mine.length && plan.items.length > 0
+                    ? "Near you"
+                    : null
+                  : guest || tab === "following"
+                    ? null
+                    : sectionHeading(item.section);
               const opensSection =
                 heading !== null &&
-                sectionsShown > 1 &&
+                (sectionsShown > 1 || (plan !== null && showsYours)) &&
                 (index === 0 || shown[index - 1].section !== item.section);
 
               return (
@@ -2080,8 +2127,10 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 /* Nobody trading near either: the one empty state for the
                    whole tab. Traders showing above: only the Flares'. */
                 nobodyAtAll={!UI_EXPERIMENT || tradersCount === 0}
-                onPost={() => openComposer(navigation)}
-                onBinder={() => toTab(navigation, "Profile")}
+                /* "Put a binder up" opened the Profile and stopped there
+                   (the founder: "doesn't work"). It makes the binder now,
+                   for trade from the start; gone once you have one. */
+                onBinder={tradeBinders.length === 0 ? () => setMakingBinder(true) : undefined}
                 onWider={
                   (nearbyMiles ?? 50) < 100
                     ? () => {
@@ -2300,6 +2349,17 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
         {sharing ? (
           <SharePostSheet post={sharing} onClose={() => setSharing(null)} />
         ) : null}
+        {/* Nearby's "Put a binder up for trade": made here, for trade. */}
+        <CreateBinderSheet
+          visible={makingBinder}
+          forTradeAtFirst
+          onClose={() => setMakingBinder(false)}
+          onCreated={(binderId) => {
+            setMakingBinder(false);
+            readTradeBinders();
+            navigation.navigate("Binder", { binderId });
+          }}
+        />
         <FlareCardsSheet
           open={cardsSheet}
           picks={cardsSheet ? picksFor(cardsSheet.postId) : NO_PICKS}
@@ -2342,14 +2402,13 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
 function NearbyEmpty({
   miles,
   nobodyAtAll,
-  onPost,
   onBinder,
   onWider,
 }: {
   miles: number;
   nobodyAtAll: boolean;
-  onPost: () => void;
-  onBinder: () => void;
+  /** Absent once you have a trade binder. */
+  onBinder?: () => void;
   onWider?: () => void;
 }) {
   return (
@@ -2367,22 +2426,72 @@ function NearbyEmpty({
         <Ionicons name="location" size={26} color={colors.accent} />
       </View>
       <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "800", textAlign: "center" }}>
-        {nobodyAtAll ? "Nothing near you yet" : "No Flares near you yet"}
+        {nobodyAtAll ? "No other players nearby yet" : "No Flares near you yet"}
       </Text>
       <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
-        {nobodyAtAll
-          ? `When players within ${miles} miles post Flares or put binders up for trade, they show up here.`
-          : `Nobody within ${miles} miles has a Flare up right now. Post one and they'll see it.`}
+        {`When players within ${miles} miles post Flares or put binders up for trade, they show up here.`}
       </Text>
-      <View style={{ alignSelf: "stretch", gap: spacing(2), marginTop: spacing(2) }}>
-        <Button label="Post a Flare" onPress={onPost} />
-        {nobodyAtAll ? <Button label="Put a binder up" variant="secondary" onPress={onBinder} /> : null}
-      </View>
+      {/* No "Post a Flare": the + is always on screen, and what you post
+          shows above, under Yours. */}
+      {onBinder ? (
+        <View style={{ alignSelf: "stretch", marginTop: spacing(2) }}>
+          <Button label="Put a binder up for trade" variant="secondary" onPress={onBinder} />
+        </View>
+      ) : null}
       {onWider ? (
         <Tap onPress={onWider} accessibilityRole="button" hitSlop={8}>
           <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>Look within 100 miles</Text>
         </Tap>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * "Yours", at the top of Nearby: what players near you see of you. Your
+ * open Flares follow it in the list; your binders up for trade are rows
+ * here. The founder (2026-11-27): a Flare posted from Nearby "doesn't
+ * even go in this screen". The website's Nearby is the same.
+ */
+function NearbyYours({
+  miles,
+  binders,
+  onBinder,
+}: {
+  miles: number;
+  binders: BinderSummary[];
+  onBinder: (binderId: string) => void;
+}) {
+  return (
+    <View style={{ gap: spacing(2) }}>
+      <Text
+        style={{
+          color: colors.textMuted,
+          fontSize: 12,
+          fontWeight: "600",
+          letterSpacing: 1.4,
+          textTransform: "uppercase",
+        }}
+      >
+        Yours
+      </Text>
+      <Muted>{`Players within ${miles} mi see these.`}</Muted>
+      {binders.map((binder) => (
+        <Tap
+          key={binder.id}
+          onPress={() => onBinder(binder.id)}
+          accessibilityRole="button"
+          accessibilityLabel={`${binder.name}, your trade binder, ${binder.count} cards`}
+          style={{ flexDirection: "row", alignItems: "center", gap: spacing(3), paddingVertical: spacing(1) }}
+        >
+          <Ionicons name="swap-horizontal" size={18} color={colors.accent} />
+          <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
+            {binder.name}
+          </Text>
+          <Muted>{`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}</Muted>
+          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+        </Tap>
+      ))}
     </View>
   );
 }

@@ -74,7 +74,7 @@ describe("the Following tab", () => {
     );
     expect(list).toContain("sectionsShown > 1 &&");
     expect(read("src/app/nearby/page.tsx")).toContain(
-      "<FeedList shown={plan.items} view={view} headings />",
+      "<FeedList shown={plan.items} view={view} headings={!showsYours} />",
     );
   });
 });

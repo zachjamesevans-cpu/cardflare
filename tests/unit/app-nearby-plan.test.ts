@@ -56,7 +56,8 @@ describe("the Nearby tab is a trade room", () => {
     expect(home).toContain(
       'const plan = tab === "nearby" && !guest ? planNearby(all) : null;',
     );
-    expect(home).toContain("const shown = plan ? plan.items : all;");
+    /* Yours first (2026-11-27): your open Flares, then the room. */
+    expect(home).toContain("const shown = plan ? [...mine, ...plan.items] : all;");
     expect(home).toContain("<NearbyHeader");
     expect(home).toContain("void setLocalRadius(miles)");
     /* Posts near you are drawn by the same branch as Following's, so
@@ -64,7 +65,7 @@ describe("the Nearby tab is a trade room", () => {
     expect(home.match(/view === "compact" \?/g)).toHaveLength(1);
     /* One unboxed empty state (NearbyEmpty), not a Card. */
     expect(home).toContain(
-      '{nobodyAtAll ? "Nothing near you yet" : "No Flares near you yet"}',
+      '{nobodyAtAll ? "No other players nearby yet" : "No Flares near you yet"}',
     );
     expect(home).not.toContain("<StoreRow");
     expect(home).not.toContain("All nights ›");

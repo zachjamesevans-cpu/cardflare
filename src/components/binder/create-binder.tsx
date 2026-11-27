@@ -40,12 +40,17 @@ import { cn } from "@/lib/cn";
  */
 export const BINDER_NAME_MAX = 40;
 
-export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
+export function CreateBinder({
+  trigger,
+}: {
+  /** "trade": Nearby's "Put a binder up for trade", the switch on. */
+  trigger: "tile" | "button" | "trade";
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
-  const [forTrade, setForTrade] = useState(false);
+  const [forTrade, setForTrade] = useState(trigger === "trade");
   const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -55,7 +60,7 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
     setOpen(false);
     setName("");
     setCover(DEFAULT_BINDER_COVER);
-    setForTrade(false);
+    setForTrade(trigger === "trade");
     setIsPublic(false);
     setError(null);
   };
@@ -99,6 +104,15 @@ export function CreateBinder({ trigger }: { trigger: "tile" | "button" }) {
           </span>
           <span className="text-[11px] leading-none">New</span>
         </button>
+      ) : trigger === "trade" ? (
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setOpen(true)}
+          className="w-full"
+        >
+          Put a binder up for trade
+        </Button>
       ) : (
         <Button
           type="button"

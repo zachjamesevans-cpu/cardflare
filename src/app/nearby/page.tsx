@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Search, MapPin } from "lucide-react";
+import { ArrowLeftRight, ChevronRight, Search, MapPin } from "lucide-react";
 
 import {
   FeedList,
@@ -8,15 +8,16 @@ import {
   HowItWorks,
   LiveRoomBanner,
 } from "@/components/feed/feed-list";
+import { CreateBinder } from "@/components/binder/create-binder";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { CodeSheet } from "@/components/nights/code-sheet";
 import { Tour } from "@/components/onboarding/tour";
 import { TabPageShell } from "@/components/players/tab-page-shell";
-import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { HEADER_BUTTON, HEADER_ICON } from "@/components/ui/header-button";
 import { getViewer } from "@/lib/auth/session";
+import { listBinders } from "@/lib/binder/binder";
 import { rememberFeed } from "@/lib/feed/memo";
 import { planNearby } from "@/lib/feed/nearby-plan";
 import { belongsToTab, feedRadiusFor, listFeed } from "@/lib/feed/repository";
@@ -129,7 +130,7 @@ export default async function NearbyPage() {
   }
 
   const session = await sessionForPlayer(playerId);
-  const [items, locals, unread, miles, view] = await Promise.all([
+  const [items, locals, unread, miles, view, binders] = await Promise.all([
     /* The Feed's own list, remembered for half a minute, so a tap from
        one tab to the other does not rebuild it. See memo.ts. */
     rememberFeed(playerId, () => listFeed(playerId, session?.id ?? null)),
@@ -142,6 +143,8 @@ export default async function NearbyPage() {
     feedRadiusFor(playerId).catch(() => null),
     /* Compact or classic carries over from the Feed. */
     feedViewFor(playerId),
+    /* Your binders up for trade, under Yours. */
+    listBinders(playerId, playerId).catch(() => []),
   ]);
 
   const liveLocal = locals.find((local) => local.liveNow) ?? null;
@@ -149,6 +152,18 @@ export default async function NearbyPage() {
   /* Nearby is a trade room, not the whole of what the server files
      under it: see nearby-plan.ts. */
   const plan = planNearby(items.filter((item) => belongsToTab(item, "nearby")));
+  /*
+   * YOURS, FIRST: your open Flares (the three newest) and your binders
+   * up for trade, what players near you see of you. Nearby only ever
+   * showed others, so a Flare posted from here never appeared here - the
+   * founder (2026-11-27): "it doesn't even go in this screen". The app's
+   * NearbyYours is the same.
+   */
+  const mine = items
+    .filter((item) => item.kind === "hunt" && item.yours && !item.completed)
+    .slice(0, 3);
+  const tradeBinders = binders.filter((binder) => binder.forTrade);
+  const showsYours = !plan.ask && (mine.length > 0 || tradeBinders.length > 0);
 
   return (
     <Shell playerId={playerId} unread={unread}>
@@ -177,7 +192,42 @@ export default async function NearbyPage() {
         </Card>
       )}
 
-      <FeedList shown={plan.items} view={view} headings />
+      {showsYours && (
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <h2 className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+              Yours
+            </h2>
+            <p className="text-sm text-text-secondary">
+              {`Players within ${miles ?? 50} mi see these.`}
+            </p>
+          </div>
+          {tradeBinders.map((binder) => (
+            <Link
+              key={binder.id}
+              href={`/profile/binders/${binder.id}`}
+              className="flex items-center gap-3 py-1 text-text-primary hover:text-accent"
+            >
+              <ArrowLeftRight className="size-4 text-accent" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate font-semibold">
+                {binder.name}
+              </span>
+              <span className="text-sm text-text-muted">
+                {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
+              </span>
+              <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
+            </Link>
+          ))}
+          {mine.length > 0 && <FeedList shown={mine} view={view} />}
+        </section>
+      )}
+
+      {showsYours && plan.items.length > 0 && (
+        <h2 className="text-xs font-semibold tracking-[0.14em] text-text-muted uppercase">
+          Near you
+        </h2>
+      )}
+      <FeedList shown={plan.items} view={view} headings={!showsYours} />
 
       {/* The room with nobody in it yet: said, with the two ways to
           change that, post or look further. Under any "wanted" rows,
@@ -194,19 +244,21 @@ export default async function NearbyPage() {
             <MapPin className="size-6" aria-hidden="true" />
           </span>
           <h2 className="text-xl font-extrabold text-text-primary">
-            Nothing near you yet
+            No other players nearby yet
           </h2>
           <p className="max-w-sm text-[15px] text-text-secondary">
             {`When players within ${miles ?? 50} miles post Flares or put binders up for trade, they show up here.`}
           </p>
-          <div className="mt-2 flex w-full max-w-sm flex-col gap-2">
-            <Link href="/flare" className={buttonStyles("primary")}>
-              Post a Flare
-            </Link>
-            <Link href="/profile" className={buttonStyles("secondary")}>
-              Put a binder up
-            </Link>
-          </div>
+          {/* No "Post a Flare": the + is always on screen, and what you
+              post shows above, under Yours. "Put a binder up" opened the
+              profile and stopped there (the founder: "doesn't work"); it
+              makes the binder now, for trade, and is gone once you have
+              one. */}
+          {tradeBinders.length === 0 && (
+            <div className="mt-2 flex w-full max-w-sm flex-col gap-2">
+              <CreateBinder trigger="trade" />
+            </div>
+          )}
           {(miles ?? 50) < 100 && <LookFurtherButton />}
         </div>
       ) : (
