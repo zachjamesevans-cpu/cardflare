@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { createPortal } from "react-dom";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Check, Plus } from "lucide-react";
 
 import { ART_EVENT, shownArtPrinting } from "@/components/cards/card-art-carousel";
 import { addToCart, inCart, useCartCount } from "@/components/flares/flare-cart";
 import { cn } from "@/lib/cn";
 
+/* A tight glow that keeps the edge crisp, not a wide haze over the
+   cards under it, and a bolder + (the founder, 2026-11-27). The app's
+   matches (mobile/src/flare-button.tsx). */
 const BUTTON =
-  "flex size-14 cursor-pointer items-center justify-center rounded-full bg-accent text-accent-contrast shadow-[0_6px_22px_-4px_var(--color-accent)] transition-transform hover:scale-105 active:scale-95";
+  "flex size-14 cursor-pointer items-center justify-center rounded-full bg-accent text-accent-contrast shadow-[0_2px_10px_-2px_var(--color-accent)] transition-transform hover:scale-105 active:scale-95";
 
 /**
  * THE FLARE BUTTON: one cardflare-green + in the same corner. The founder
@@ -62,16 +65,38 @@ export function FlareButton({
     return () => window.clearTimeout(timer);
   }, [added]);
 
+  /* A card landing in the cart: the button pops and the count bounces,
+     once, so the add is felt. Only on a rise: a page opening with 3
+     waiting stays still. */
+  const buttonRef = useRef<HTMLElement | null>(null);
+  const badgeRef = useRef<HTMLSpanElement | null>(null);
+  const last = useRef(count);
+  useEffect(() => {
+    const rose = count > last.current;
+    last.current = count;
+    if (!rose || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const spring = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+    buttonRef.current?.animate([{ scale: "1" }, { scale: "1.12" }, { scale: "1" }], {
+      duration: 380,
+      easing: spring,
+    });
+    badgeRef.current?.animate([{ scale: "1" }, { scale: "1.35" }, { scale: "1" }], {
+      duration: 420,
+      easing: spring,
+    });
+  }, [count]);
+
   const badge =
     count > 0 ? (
       <span
+        ref={badgeRef}
         aria-hidden="true"
         className="absolute -top-1 -right-1 flex h-[22px] min-w-[22px] items-center justify-center rounded-full border-2 border-accent bg-canvas px-1 text-xs font-extrabold text-accent tabular-nums"
       >
         {count > 99 ? "99+" : count}
       </span>
     ) : null;
-  const plus = <Plus className="size-7" strokeWidth={2.75} aria-hidden="true" />;
+  const plus = <Plus className="size-7" strokeWidth={3.25} aria-hidden="true" />;
 
   /* "Added Perona", with the way to the full cart beside it. Drawn at
      the page's top level: inside the card's sheet, whose slide-up
@@ -103,6 +128,9 @@ export function FlareButton({
     return (
       <>
         <Link
+          ref={(node) => {
+            buttonRef.current = node;
+          }}
           href="/flare"
           aria-label={
             here
@@ -116,7 +144,7 @@ export function FlareButton({
           className={cn(BUTTON, className)}
         >
           {here ? (
-            <Check className="size-7" strokeWidth={2.75} aria-hidden="true" />
+            <Check className="size-7" strokeWidth={3.25} aria-hidden="true" />
           ) : (
             plus
           )}
@@ -130,6 +158,9 @@ export function FlareButton({
   return (
     <>
       <button
+        ref={(node) => {
+          buttonRef.current = node;
+        }}
         type="button"
         aria-label={`Add this card to your Flare`}
         title="Add to your Flare"

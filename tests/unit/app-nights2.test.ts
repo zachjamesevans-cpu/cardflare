@@ -368,7 +368,9 @@ describe("the night's page", () => {
     expect(fab).toContain("label={POST_A_FLARE}");
     expect(fab).toContain("export const FAB_HEIGHT = FLARE_BUTTON;");
     expect(flareButton).toContain("accessibilityLabel={label}");
-    expect(flareButton).toContain('name={done ? "checkmark" : "add"}');
+    /* A bolder + drawn as two bars, the ✓ once the card is in (2026-11-27). */
+    expect(flareButton).toContain("<Tick />");
+    expect(flareButton).toContain("<Plus />");
     expect(flareButton).not.toContain('name="flame"');
     expect(flareButton).toContain("backgroundColor: colors.accent");
   });
