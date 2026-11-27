@@ -84,7 +84,8 @@ const BOARD_EARLY_LONG =
   "Everyone here is still on their way. Post what you're looking for now, so people know what to bring from home. Flares from players who never make it are cleared when the event ends.";
 const EARLY_PICKER_LINE =
   "Flares from anyone who never shows are cleared when the event ends.";
-const VIEWER_LINE = "They will see your name and can message you.";
+/* An offer is a message now (2026-11-27): the line says where it went. */
+const VIEWER_LINE = "It’s in your messages with them.";
 const CANCEL_EMPTY = "Nobody has joined yet, so this night will be removed. Cancel it?";
 const CANCEL_JOINED = "Players who joined will see it closed. Cancel it?";
 const MERGE_LINE =

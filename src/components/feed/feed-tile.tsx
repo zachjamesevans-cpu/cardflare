@@ -44,11 +44,12 @@ export const TILE_CLASS = {
  */
 export function haveFor(
   card: FeedCard,
-  post: { postId: string; yours: boolean } | undefined,
+  post: { postId: string; yours: boolean; posterId?: string | null } | undefined,
 ): ZoomHave | null {
   if (!post || post.yours || !card.flareId || card.state === "found") return null;
   return {
     postId: post.postId,
+    posterId: post.posterId ?? null,
     flareId: card.flareId,
     state: card.state ?? "open",
     youOffered: card.youOffered ?? false,

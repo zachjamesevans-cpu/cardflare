@@ -1,4 +1,5 @@
 import { useHeaderHeight } from "@react-navigation/elements";
+import { openOfferThread } from "../view-offer";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -319,9 +320,11 @@ export function FlarePostScreen({ postId }: { postId: string }) {
     postId: post.postId,
     yours: post.yours,
     posterName: post.author.displayName,
-    /* Already on the post: closing the card shows its thread, where the
-       offer is a line. */
-    viewOffer: () => undefined,
+    /* The conversation with the poster, where the offer went; a guest's
+       post keeps it in the thread on this screen. */
+    viewOffer: () => {
+      if (post.author.playerId) void openOfferThread(navigation, post.author.playerId);
+    },
     offer: async (items, message) => {
       const result = await offerItemsOnPost(post.postId, items, message);
       const taken = new Set(

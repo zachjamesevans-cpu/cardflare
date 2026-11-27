@@ -191,7 +191,7 @@ export async function offerItemsAction(
   items: { flareId: string; quantity: number }[],
   message: string,
 ): Promise<
-  | { ok: true; offered: number; refused: string[] }
+  | { ok: true; offered: number; refused: string[]; threadId: string | null }
   | { ok: false; message: string; refused: string[] }
 > {
   const player = await viewerPlayer(await getViewer());
@@ -225,7 +225,12 @@ export async function offerItemsAction(
       refused: outcome.refused ?? [],
     };
   }
-  return { ok: true, offered: outcome.offered, refused: outcome.refused ?? [] };
+  return {
+    ok: true,
+    offered: outcome.offered,
+    refused: outcome.refused ?? [],
+    threadId: outcome.threadId ?? null,
+  };
 }
 
 /**

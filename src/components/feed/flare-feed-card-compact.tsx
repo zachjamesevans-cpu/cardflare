@@ -31,7 +31,11 @@ import type { FeedCard, HuntItem } from "@/lib/feed/repository";
 export function FlareFeedCardCompact({ item }: { item: HuntItem }) {
   /* Found cards at the far right, whatever order they arrived in. */
   const cards = [...item.cards].sort(foundLast);
-  const post = { postId: item.postId, yours: item.yours };
+  const post = {
+    postId: item.postId,
+    yours: item.yours,
+    posterId: item.playerId || null,
+  };
   const offering = item.direction === "showcase";
 
   const shelf: ZoomCard[] = cards.map((card) => ({

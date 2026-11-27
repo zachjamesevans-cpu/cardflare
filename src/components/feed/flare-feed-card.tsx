@@ -197,7 +197,11 @@ export function FlareFeedCard({
   const cards = [...item.cards].sort(foundLast);
   const lead = cards[0];
   const single = item.total === 1 && lead;
-  const post = { postId: item.postId, yours: item.yours || preview };
+  const post = {
+    postId: item.postId,
+    yours: item.yours || preview,
+    posterId: item.playerId || null,
+  };
   /* What the menu, the offer button and the offer itself read. */
   const shape = {
     postId: item.postId,

@@ -33,8 +33,8 @@ export interface PostRef {
    */
   offer: (items: OfferItem[], message: string) => Promise<OfferOutcome | void>;
   /**
-   * The post's thread, where an offer lands as a line: "View offer" on
-   * a card you offered on (the founder, 2026-11-27, "should
+   * The conversation with the poster, where an offer lands as a
+   * message: "View offer" on a card you offered on (the founder, 2026-11-27, "should
    * be able to view the offer/ conversation from this screen").
    */
   viewOffer?: () => void;

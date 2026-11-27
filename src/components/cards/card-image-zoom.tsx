@@ -33,6 +33,7 @@ import { CardThumbnail } from "./card-thumbnail";
 import { cardImageAlt, isRenderableImageUrl } from "@/lib/cards/images";
 import { cn } from "@/lib/cn";
 import { openCommentsOf } from "@/lib/feed/open-comments";
+import { openDirectThreadAction } from "@/lib/local/actions";
 import { listOf, offerFailureMessage, reviewLabel } from "@/lib/feed/offer-copy";
 import { offerItemsAction } from "@/lib/feed/post-actions";
 import type { CardState } from "@/lib/feed/post-schema";
@@ -146,6 +147,8 @@ export type ZoomAsk =
 
 export interface ZoomHave {
   postId: string;
+  /** Who posted it: "View offer" opens your conversation with them. */
+  posterId?: string | null;
   flareId: string;
   state: CardState;
   /** The viewer already raised a hand on it. */
@@ -574,15 +577,15 @@ function ZoomHaveBlock({
           <span className="font-medium text-accent">
             {sent.count > 1 ? `You offered ${sent.count} cards.` : "You offered this."}
           </span>{" "}
-          They will see your name and can message you.
+          It’s in your messages with them.
           {sent.notTaken.length > 0 && ` Not taken: ${listOf(sent.notTaken)}.`}
         </p>
       </ZoomSaid>
     ) : have.youOffered ? (
       <ZoomSaid>
         <p>
-          <span className="font-medium text-accent">You offered this.</span> They will
-          see your name and can message you.
+          <span className="font-medium text-accent">You offered this.</span> It’s in
+          your messages with them.
         </p>
       </ZoomSaid>
     ) : null;
@@ -1606,7 +1609,7 @@ export function CardImageZoom({
               offers={offers}
               onViewOffer={() => {
                 close();
-                openCommentsOf(have.postId);
+                void viewOffer(have);
               }}
             />
           )}
@@ -1719,4 +1722,20 @@ function ZoomNoteEditor({
       {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   );
+}
+
+/**
+ * "View offer": the conversation with the poster, where an offer is a
+ * message now (posts.ts offerItems, 2026-11-27). A guest's post has no
+ * Messages; its offer is still a line in the post's comments.
+ */
+async function viewOffer(have: ZoomHave): Promise<void> {
+  if (have.posterId) {
+    const opened = await openDirectThreadAction(have.posterId).catch(() => null);
+    if (opened?.ok) {
+      window.location.assign(`/local?thread=${encodeURIComponent(opened.threadId)}`);
+      return;
+    }
+  }
+  openCommentsOf(have.postId);
 }

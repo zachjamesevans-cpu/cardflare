@@ -1,5 +1,7 @@
 import "server-only";
 
+import { binderOfferBody } from "@/lib/binder/offer-copy";
+import { sendCardsMessage } from "@/lib/local/threads";
 import { huntStartPosts } from "@/lib/feed/hunt-starts";
 import { randomUUID } from "node:crypto";
 
@@ -818,7 +820,8 @@ async function remainingByFlare(context: PostContext): Promise<Map<string, numbe
 }
 
 export type OfferItemsOutcome =
-  | { ok: true; offered: number }
+  /** `threadId`: the conversation the offer went to, when it went to one. */
+  | { ok: true; offered: number; threadId?: string | null }
   | {
       ok: false;
       reason:
@@ -955,22 +958,53 @@ export async function offerItems(
     };
   });
 
+  /*
+   * THE OFFER GOES TO MESSAGES. The founder (2026-11-27), on offers that
+   * landed as a comment on the post while binder offers went to the
+   * pair's conversation: "do you think these offers should go to
+   * messages going forward?", then "yes go". Offers are negotiation, so
+   * they are private, and every offer is in one place for both people:
+   * the cards (in the Flare's printing) drawn in the chat, the note as
+   * the message, and the message's own notification to the poster. The
+   * post still reads OFFERED for everyone else.
+   */
   const first = sent[0];
-  await writeComment(
-    postId,
-    playerId,
-    message.trim() || offeredLine(named),
-    first ? { kind: "offer", flareId: first.flareId } : null,
-  );
-  if (first) {
-    afterResponse(() =>
-      notifyOfferReceived(first.flareId, session.id, displayName, note, {
-        count: offered,
-      }),
+  const flareOf = (flareId: string) => context.flares.find((row) => row.id === flareId);
+  const threadId = context.ownerPlayerId
+    ? await sendCardsMessage(
+        playerId,
+        context.ownerPlayerId,
+        binderOfferBody("Flare", named, note),
+        sent.flatMap((item) => {
+          const flare = flareOf(item.flareId);
+          return flare ? [flare.cardId] : [];
+        }),
+        sent.flatMap((item) => {
+          const flare = flareOf(item.flareId);
+          return flare ? [flare.printingId] : [];
+        }),
+      )
+    : null;
+
+  /* A guest's post has no Messages: the line in its thread and the
+     notice, as before. */
+  if (!threadId) {
+    await writeComment(
+      postId,
+      playerId,
+      message.trim() || offeredLine(named),
+      first ? { kind: "offer", flareId: first.flareId } : null,
     );
+    if (first) {
+      afterResponse(() =>
+        notifyOfferReceived(first.flareId, session.id, displayName, note, {
+          count: offered,
+        }),
+      );
+    }
   }
 
-  return { ok: true, offered, refused };
+  return { ok: true, offered, refused, threadId };
 }
 
 /** Re-exported so the Feed's enrichment and the app route share one door. */
