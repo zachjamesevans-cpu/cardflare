@@ -7,9 +7,7 @@ import { PlayerTabBar, TabBarSpacer } from "@/components/players/player-tab-bar"
 import { ButtonLink } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { getViewer } from "@/lib/auth/session";
-import { cardImagesEnabled } from "@/lib/cards/images";
 import { cardResultById } from "@/lib/cards/search";
-import { viewerGames } from "@/lib/players/viewer-games";
 import { playerForUser } from "@/lib/players/accounts";
 import { currentRoomForSession } from "@/lib/players/current-room";
 import { huntsFor } from "@/lib/players/hunts";
@@ -92,16 +90,14 @@ export default async function FlarePage({
         ? null
         : ((await playerForUser(viewer.user.id))?.id ?? null);
 
-  const images = cardImagesEnabled();
   /*
    * Everything at once. The room, the games and the six reads below
    * used to run one after another, and the audit timed "Loading your
    * draft…" at four to seven seconds: most of it was this page waiting
    * on itself. None of these needs another's answer.
    */
-  const [room, games, [asked, nearby, hunts, poster, foundCards]] = await Promise.all([
+  const [room, [asked, nearby, hunts, poster, foundCards]] = await Promise.all([
     session ? currentRoomForSession(session.id) : null,
-    viewerGames(),
     playerId
       ? Promise.all([
           listWants(playerId),
@@ -152,8 +148,6 @@ export default async function FlarePage({
             <FlareComposer
               viewer={poster}
               hunts={hunts.map((entry) => ({ id: entry.id, name: entry.name }))}
-              imagesEnabled={images}
-              playerGames={games}
               room={
                 room ? { name: room.event.name, storeName: room.event.storeName } : null
               }

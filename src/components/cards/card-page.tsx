@@ -4,6 +4,7 @@ import { FlaredArtPill } from "@/components/cards/flared-art-pill";
 import type { ReactNode } from "react";
 import { Crosshair, Layers, Store } from "lucide-react";
 
+import { Tour } from "@/components/onboarding/tour";
 import { MessageButton } from "@/components/players/message-button";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Badge } from "@/components/ui/card";
@@ -69,6 +70,9 @@ export function CardPageView({
           the name, number and game centred under it - the app's sheet. */}
       <div className="flex flex-col items-center gap-3">
         <CardArtCarousel arts={imagesEnabled ? arts : []} name={card.name} />
+        {/* The first card a new player opens: what the + and the arts
+            do (intro.ts, TOURS.card). The app's sheet is the same. */}
+        <Tour id="card" />
         <div className="flex flex-col items-center gap-1 text-center">
           <h1 className="text-xl leading-tight font-extrabold text-text-primary">
             {card.name}

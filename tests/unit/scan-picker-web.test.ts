@@ -117,9 +117,9 @@ describe("the scan check finds a card with the Flare composer's picker", () => {
   });
 
   it("is presented as the composer presents it: its column, in a Card", () => {
-    expect(composer).toMatch(
-      /<Card className="flex flex-col gap-4 p-4 sm:p-6">\s*<CardPicker/,
-    );
+    /* The composer's "Add cards" is the Search page now (2026-11-27). */
+    expect(composer).not.toContain("<CardPicker");
+    expect(composer).toContain("href={addCardsHref(pathname, game)}");
     expect(viewer).toMatch(
       /<Card className="flex flex-col gap-4 p-4 sm:p-6">\s*<CardPicker/,
     );
@@ -176,7 +176,6 @@ describe("CardPicker's one-card mode", () => {
   it("is chosen by onPickOne, and the composer never passes it", () => {
     expect(picker).toContain("if (props.onPickOne) {");
     expect(composer).not.toContain("onPickOne");
-    expect(composer).toContain("cards={draft.cards}");
   });
 
   it("draws the read name in the field and no quantity tag", async () => {

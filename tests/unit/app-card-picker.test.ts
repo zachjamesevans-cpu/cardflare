@@ -26,12 +26,10 @@ describe("the app card picker", () => {
       "`${hit.printings.length} versions, alt arts and promos`",
     );
     expect(web).toContain("versions, alt arts and promos");
-    expect(composer).toContain(
-      "Tap a version to ask for that exact one, or the card above",
-    );
-    expect(web).toContain(
-      "Tap a version to ask for that exact one, or the card above to take any",
-    );
+    /* No how-to line over the versions: the founder (2026-11-27),
+       "delete that entirely. not needed." */
+    expect(composer).not.toContain("Tap a version to ask for that exact one");
+    expect(web).not.toContain("Tap a version to ask for that exact one");
   });
 
   it("adds the exact version tapped and badges that version, not the card above it", () => {

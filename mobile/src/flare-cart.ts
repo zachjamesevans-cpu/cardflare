@@ -39,7 +39,11 @@ const EMPTY: SavedDraft = {
   acceptsCash: false,
 };
 
-let lines: { cardId: string; printingId: string | null }[] = [];
+/** Copies of one art the + adds up to: the composer's own limit. */
+export const MAX_COPIES = 99;
+
+type Held = { cardId: string; printingId: string | null; quantity: number };
+let lines: Held[] = [];
 let loaded: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const tell = () => listeners.forEach((listener) => listener());
@@ -55,8 +59,14 @@ async function readDraft(): Promise<SavedDraft> {
   return saved && saved.v === 1 && Array.isArray(saved.items) ? saved : EMPTY;
 }
 
-function remember(items: readonly { cardId: string; printingId: string | null }[]): void {
-  lines = items.map((item) => ({ cardId: item.cardId, printingId: item.printingId ?? null }));
+type Saved = { cardId: string; printingId: string | null; quantity?: number };
+
+function remember(items: readonly Saved[]): void {
+  lines = items.map((item) => ({
+    cardId: item.cardId,
+    printingId: item.printingId ?? null,
+    quantity: Math.max(1, item.quantity ?? 1),
+  }));
   tell();
 }
 
@@ -68,7 +78,7 @@ export function loadCart(force = false): Promise<void> {
 }
 
 /** The composer saved its draft: the cart is what it saved. */
-export function cartSaved(items: readonly { cardId: string; printingId: string | null }[]): void {
+export function cartSaved(items: readonly Saved[]): void {
   remember(items);
 }
 
@@ -77,29 +87,71 @@ export function inCart(cardId: string, printingId: string | null): boolean {
   return lines.some((line) => line.cardId === cardId && line.printingId === printingId);
 }
 
-export function cartCount(): number {
-  return lines.length;
+/** Copies of this card and art in the cart; 0 for none. */
+export function copiesInCart(cardId: string, printingId: string | null): number {
+  return (
+    lines.find((line) => line.cardId === cardId && line.printingId === printingId)?.quantity ?? 0
+  );
 }
 
 /**
- * Put a card in the cart, at the end (the first card stays the cover).
- * Already there with the same art: nothing changes, and it says so.
+ * Copies in the cart, the way a shopping bag counts: 4 Peronas and a
+ * Zoro are 5. The founder (2026-11-27) chose copies over cards.
  */
-export async function addToCart(line: Line): Promise<"added" | "already"> {
+export function cartCount(): number {
+  return lines.reduce((sum, line) => sum + line.quantity, 0);
+}
+
+/**
+ * Put a copy in the cart: a new card at the end (the first card stays the
+ * cover), or one more copy of an art already there. The founder
+ * (2026-11-27): "lets say youre building a deck and you need 4x op12-034
+ * peronas. you should be able to tap the + button 4 times quickly to add
+ * 4 copies." Adds run one after another, so four fast taps are four
+ * copies, never two that read the same draft.
+ */
+export function addToCart(line: Line): Promise<{ outcome: "added" | "full"; copies: number }> {
+  const run = queue.then(() => addOne(line));
+  queue = run.catch(() => undefined);
+  return run;
+}
+
+let queue: Promise<unknown> = Promise.resolve();
+
+/*
+ * An open composer, told when the + wrote to its draft: "Add cards" is
+ * the Search screen now, and its cards' + land here while the composer
+ * waits underneath (screens/add-cards.tsx).
+ */
+const written = new Set<(items: Line[]) => void>();
+export function onCartWritten(listener: (items: Line[]) => void): () => void {
+  written.add(listener);
+  return () => {
+    written.delete(listener);
+  };
+}
+
+async function addOne(line: Line): Promise<{ outcome: "added" | "full"; copies: number }> {
   const key = await draftKey();
   const draft = await readDraft();
-  if (
-    draft.items.some(
-      (item) => item.cardId === line.cardId && (item.printingId ?? null) === line.printingId,
-    )
-  ) {
+  const at = draft.items.findIndex(
+    (item) => item.cardId === line.cardId && (item.printingId ?? null) === line.printingId,
+  );
+  if (at !== -1 && draft.items[at].quantity >= MAX_COPIES) {
     remember(draft.items);
-    return "already";
+    return { outcome: "full", copies: draft.items[at].quantity };
   }
-  const next: SavedDraft = { ...draft, intent: "want", items: [...draft.items, line] };
+  const items =
+    at === -1
+      ? [...draft.items, { ...line, quantity: 1 }]
+      : draft.items.map((item, index) =>
+          index === at ? { ...item, quantity: item.quantity + 1 } : item,
+        );
+  const next: SavedDraft = { ...draft, intent: "want", items };
   await writeCache("composer", key, next);
   remember(next.items);
-  return "added";
+  written.forEach((listener) => listener(next.items));
+  return { outcome: "added", copies: at === -1 ? 1 : items[at].quantity };
 }
 
 /** Re-render on any change to the cart; loads it the first time. */

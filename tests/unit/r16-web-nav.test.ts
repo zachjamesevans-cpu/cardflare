@@ -163,13 +163,13 @@ describe("search", () => {
   it("reads '@' as players only, asking for nothing else", () => {
     expect(web.search).toContain("readQuery(value)");
     expect(web.search).toContain(
-      'const shown: SearchTab = playersOnly ? "players" : tab;',
+      'const shown: SearchTab = adding ? "cards" : playersOnly ? "players" : tab;',
     );
     expect(web.search).toContain(
-      "onlyPlayers ? none<SearchCard>() : quietly(findCards(text, game))",
+      "onlyPlayers && !adding ? none<SearchCard>() : quietly(findCards(text, game))",
     );
     expect(web.search).toContain(
-      "onlyPlayers ? none<FoundStore>() : quietly(searchStoresAction(text))",
+      "onlyPlayers || adding ? none<FoundStore>() : quietly(searchStoresAction(text))",
     );
   });
 
@@ -182,9 +182,7 @@ describe("search", () => {
     expect(web.search).toContain("remember(query)");
     /* Per account. */
     expect(web.search).toContain("recentKey(account)");
-    expect(web.searchPanel).toContain(
-      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />",
-    );
+    expect(web.searchPanel).toMatch(/<EverythingSearch\s+account=\{account\}/);
   });
 
   it("touches storage only inside try/catch", () => {

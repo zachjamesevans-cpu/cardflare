@@ -241,7 +241,7 @@ describe("the card page", () => {
     expect(src.card).not.toContain('label="Post a Flare for it"');
     const button = src.card.slice(src.card.indexOf("<FlareButton"));
     expect(button).toContain("`Add ${name} to your Flare`");
-    expect(button).toContain("done={shownInCart}");
+    expect(button).toContain("copies={shownCopies}");
   });
 
   it("every section is drawn only when it has rows, led by its count", () => {

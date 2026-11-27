@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { GAME_SLUGS } from "@/lib/players/games-catalog";
 import { SearchPanel } from "@/components/feed/search-panel";
+import { AddCardsBar } from "@/components/flares/add-cards-bar";
 import { TabPageShell } from "@/components/players/tab-page-shell";
 import { getViewer } from "@/lib/auth/session";
 import { playerForUser } from "@/lib/players/accounts";
@@ -29,10 +30,20 @@ export const dynamic = "force-dynamic";
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ game?: string }>;
+  searchParams: Promise<{ game?: string; adding?: string; back?: string }>;
 }) {
   /* "Search Lorcana" on a game's hub: that game's cards only. */
-  const asked = (await searchParams).game;
+  const params = await searchParams;
+  const asked = params.game;
+  /* "Add cards" from the composer: the same search, cards only, with
+     Done back to the Flare (add-cards-bar.tsx). */
+  const adding = params.adding === "1";
+  /* Back to the composer it came from: /flare or a room. A path on this
+     site only, never another origin. */
+  const back =
+    params.back?.startsWith("/") && !params.back.startsWith("//")
+      ? params.back
+      : "/flare";
   const game = GAME_SLUGS.find((slug) => slug === asked) ?? null;
   const viewer = await getViewer();
   const playerId =
@@ -53,8 +64,19 @@ export default async function SearchPage({
     : [];
 
   return (
-    <TabPageShell title="Search">
-      <SearchPanel account={playerId} flaredCardIds={flaredCardIds} game={game} />
+    <TabPageShell title={adding ? "Add cards" : "Search"}>
+      {adding && (
+        <h1 className="text-center text-lg font-extrabold text-text-primary">
+          Add cards
+        </h1>
+      )}
+      <SearchPanel
+        account={playerId}
+        flaredCardIds={flaredCardIds}
+        game={game}
+        adding={adding}
+      />
+      {adding && <AddCardsBar href={back} />}
     </TabPageShell>
   );
 }

@@ -95,13 +95,13 @@ describe("Post a Flare for it carries the card", () => {
   });
 
   /* The card's + is a cart now (flare-cart.ts): it adds the art on show
-     to the draft, and a card already in it opens the Flare. */
+     to the draft, one more copy for each tap (2026-11-27). */
   it("the card page adds the art on show to the cart", () => {
     expect(card).toMatch(
       /void addToCart\(\{\s*cardId: card\.cardId,\s*name: card\.name,\s*cardNumber: card\.number,\s*imageUrl: art\?\.imageUrl \?\? card\.imageUrl,/,
     );
     expect(card).toContain("printingId: shownPrinting,");
-    expect(card).toMatch(/if \(shownInCart\) \{\s*openComposer\(navigation\);/);
+    expect(card).not.toContain("shownInCart");
   });
 
   it("the hub reads it once, clears it, and hands it to the composer", () => {
@@ -189,7 +189,6 @@ describe("Post a Flare for it carries the card", () => {
     );
     expect(effect).toContain("setPosted(null);");
     expect(effect).toContain("setPreviewing(false);");
-    expect(effect).toContain("setPicking(false);");
   });
 });
 

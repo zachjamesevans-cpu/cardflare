@@ -1,7 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import type { Ref } from "react";
+import { useEffect, useRef, type Ref } from "react";
 import { Text, View, type ViewStyle } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 
 import { useSpotlightTarget } from "./spotlight";
 import { Tap } from "./ui";
@@ -32,6 +40,7 @@ export function FlareButton({
   outerRef,
   done = false,
   count = 0,
+  copies,
 }: {
   label: string;
   onPress: () => void;
@@ -44,8 +53,40 @@ export function FlareButton({
   done?: boolean;
   /** Cards in your Flare so far, the cart's count (flare-cart.ts). */
   count?: number;
+  /** On a card: copies of the art on show in your Flare, worn as "×4"
+   * in place of the cart's count. */
+  copies?: number;
 }) {
+  const tally = copies ?? count;
   const target = useSpotlightTarget();
+
+  /* A card landing in the cart: the button pops and the count bounces,
+     once, so the add is felt. The founder (2026-11-27) chose it. Only
+     on a rise: opening the app with 3 waiting stays still. */
+  const pop = useSharedValue(1);
+  const bump = useSharedValue(1);
+  const reduced = useReducedMotion();
+  const last = useRef({ tally, done });
+  useEffect(() => {
+    /* A rise in the count (the tab bar's), in a card's copies (each
+       tap of a card's +), or a ✓ landing. */
+    const rose = tally > last.current.tally;
+    const landed = done && !last.current.done;
+    last.current = { tally, done };
+    if ((!rose && !landed) || reduced) return;
+    pop.value = withSequence(
+      withTiming(1.12, { duration: 110 }),
+      withSpring(1, { damping: 9, stiffness: 260 }),
+    );
+    if (rose)
+      bump.value = withSequence(
+        withTiming(1.35, { duration: 120 }),
+        withSpring(1, { damping: 8, stiffness: 280 }),
+      );
+  }, [tally, done, reduced, pop, bump]);
+  const popStyle = useAnimatedStyle(() => ({ transform: [{ scale: pop.value }] }));
+  const bumpStyle = useAnimatedStyle(() => ({ transform: [{ scale: bump.value }] }));
+
   return (
     <View
       ref={spotlight ? target : outerRef}
@@ -53,6 +94,7 @@ export function FlareButton({
       pointerEvents="box-none"
       style={[{ position: "absolute" }, style]}
     >
+      <Animated.View style={popStyle}>
       <Tap
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -67,11 +109,13 @@ export function FlareButton({
           backgroundColor: colors.accent,
           alignItems: "center",
           justifyContent: "center",
+          /* A tight glow that keeps the edge crisp, not a wide haze
+             over the cards under it (the founder, 2026-11-27). */
           shadowColor: colors.accent,
-          shadowOpacity: 0.45,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 4 },
-          elevation: 8,
+          shadowOpacity: 0.4,
+          shadowRadius: 6,
+          shadowOffset: { width: 0, height: 2 },
+          elevation: 6,
         }}
       >
         {/* One bold +, nothing else: the founder (2026-11-25), of the
@@ -83,12 +127,16 @@ export function FlareButton({
           color={colors.accentContrast}
         />
       </Tap>
-      {/* The cart's count, the way a shopping bag wears one. */}
-      {count > 0 ? (
-        <View
+      </Animated.View>
+      {/* The cart's count, the way a shopping bag wears one; on a card,
+          this art's copies ("×4"). */}
+      {tally > 0 ? (
+        <Animated.View
           pointerEvents="none"
-          accessibilityLabel={`${count} in your Flare`}
-          style={{
+          accessibilityLabel={
+            copies !== undefined ? `${copies} in your Flare` : `${count} in your Flare`
+          }
+          style={[bumpStyle, {
             position: "absolute",
             top: -3,
             right: -3,
@@ -101,13 +149,14 @@ export function FlareButton({
             borderColor: colors.accent,
             alignItems: "center",
             justifyContent: "center",
-          }}
+          }]}
         >
           <Text style={{ color: colors.accent, fontSize: 12, fontWeight: "800" }}>
-            {count > 99 ? "99+" : count}
+            {copies !== undefined ? `×${copies}` : count > 99 ? "99+" : count}
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
     </View>
   );
 }
+

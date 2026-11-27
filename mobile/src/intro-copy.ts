@@ -66,8 +66,13 @@ export const INTRO_LOOK = "Look around first";
  */
 export const INTRO_BINDER = "Add a binder";
 
-/** The one line beside the highlighted + on a first visit to the Feed. */
-export const SPOTLIGHT_LINE = "Tap here to post a Flare: the cards you’re hunting.";
+/**
+ * The one line beside the highlighted + on a first visit to the Feed.
+ * The + is your Flare as a cart now (flare-cart.ts): cards go in from
+ * any card's +, and are posted from here (2026-11-27).
+ */
+export const SPOTLIGHT_LINE =
+  "Your Flare: the cards you’re hunting. Add them from any card, then post from here.";
 export const SPOTLIGHT_DISMISS = "Got it";
 
 /*
@@ -96,7 +101,7 @@ export const REPLAY_LABEL = "Replay the intro";
  * always ends it; a stop with nothing to point at is passed over; and
  * Settings -> Help -> "Replay tips" queues them all again.
  */
-export type TourId = "profile" | "room" | "binder" | "nearby";
+export type TourId = "profile" | "room" | "binder" | "nearby" | "card";
 
 export interface TourStop {
   key: string;
@@ -140,6 +145,19 @@ export const TOURS: Record<TourId, readonly TourStop[]> = {
       line: "People near you who want cards you have. Message them right from here.",
     },
     { key: "location", line: "Add your ZIP to see who’s close." },
+  ],
+  /* The first card a new player opens. Its + is a cart, and a second
+     tap is another copy, which nobody would guess (2026-11-27). The
+     arts stop is passed over on a card with one art. */
+  card: [
+    {
+      key: "add",
+      line: "Tap + to add this card to your Flare. Tap again for more copies.",
+    },
+    {
+      key: "arts",
+      line: "Swipe for other arts. Each one is its own card, with its own price.",
+    },
   ],
 };
 

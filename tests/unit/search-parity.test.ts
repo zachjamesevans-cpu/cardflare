@@ -68,7 +68,7 @@ const app = {
 describe("search, from the Feed", () => {
   it("one field, the same placeholder, autofocused, after two characters, on both", () => {
     for (const source of [web.search, app.search]) {
-      expect(source).toContain('placeholder="Search cards, players and stores"');
+      expect(source).toContain('"Search cards, players and stores"');
       /* Nothing matched: both read the shared words, by the open tab
          (tests/unit/empty-copy-parity.test.ts holds the words). */
       expect(source).toContain("searchEmpty(shown, {");
@@ -92,13 +92,11 @@ describe("search, from the Feed", () => {
   });
 
   it("the website's Search tab is the combined search, built on the three actions", () => {
-    expect(web.searchPage).toContain(
-      "<SearchPanel account={playerId} flaredCardIds={flaredCardIds} game={game} />",
-    );
+    expect(web.searchPage).toMatch(/<SearchPanel\s+account=\{playerId\}/);
+    /* "Add cards" from the composer: the same page, cards only. */
+    expect(web.searchPage).toContain("adding={adding}");
     expect(web.searchPage).toContain("<TabPageShell");
-    expect(web.searchPanel).toContain(
-      "<EverythingSearch account={account} flaredCardIds={flaredCardIds} game={game} />",
-    );
+    expect(web.searchPanel).toMatch(/<EverythingSearch\s+account=\{account\}/);
     /* It reads this device's recents as it draws, so never on the server. */
     expect(web.searchPanel).toContain("{ ssr: false }");
     expect(web.searchPanel).not.toContain("PlayerSearch");

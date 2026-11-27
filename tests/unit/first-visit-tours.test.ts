@@ -17,8 +17,8 @@ const ROOT = resolve(import.meta.dirname, "../..");
 const read = (path: string) => readFileSync(resolve(ROOT, path), "utf8");
 
 describe("the tours", () => {
-  it("are four, three or four stops each", () => {
-    expect(TOUR_IDS).toEqual(["profile", "room", "binder", "nearby"]);
+  it("are five, four stops at most each", () => {
+    expect(TOUR_IDS).toEqual(["profile", "room", "binder", "nearby", "card"]);
     expect(TOURS.profile.map((stop) => stop.key)).toEqual([
       "binders",
       "share",
@@ -32,6 +32,12 @@ describe("the tours", () => {
       "settings",
     ]);
     expect(TOURS.nearby.map((stop) => stop.key)).toEqual(["wanted", "location"]);
+    /* The first card opened: the + is a cart, and a second tap is
+       another copy (2026-11-27). */
+    expect(TOURS.card.map((stop) => stop.key)).toEqual(["add", "arts"]);
+    expect(TOURS.card[0].line).toBe(
+      "Tap + to add this card to your Flare. Tap again for more copies.",
+    );
     for (const id of TOUR_IDS) expect(TOURS[id].length).toBeLessThanOrEqual(4);
     expect(tourCount(0, 3)).toBe("1 of 3");
   });
@@ -63,6 +69,14 @@ describe("the app's targets", () => {
     for (const key of ["wanted", "location"]) {
       expect(home, key).toContain(`useTourTarget("nearby", "${key}")`);
     }
+    const card = read("mobile/src/screens/card.tsx");
+    for (const key of ["add", "arts"]) {
+      expect(card, key).toContain(`useTourTarget("card", "${key}")`);
+    }
+    expect(card).toContain("outerRef={tourAdd}");
+    /* One art: nothing to swipe, so the stop is passed over. */
+    expect(card).toContain("ref={arts.length > 1 ? tourArts : undefined}");
+    expect(card).toContain('<Tour id="card" />');
   });
 
   it("show each tour on its own screen, the binder's only while it is empty", () => {
@@ -107,6 +121,13 @@ describe("the website's targets", () => {
     expect(local).toContain('tour="nearby:location"');
     expect(local).toContain('<Tour id="nearby" />');
     expect(read("src/app/e/[code]/page.tsx")).toContain('<Tour id="room" />');
+    expect(read("src/components/flares/flare-button.tsx")).toContain(
+      'data-tour="card:add"',
+    );
+    expect(read("src/components/cards/card-art-carousel.tsx")).toContain(
+      'data-tour={several ? "card:arts" : undefined}',
+    );
+    expect(read("src/components/cards/card-page.tsx")).toContain('<Tour id="card" />');
   });
 });
 

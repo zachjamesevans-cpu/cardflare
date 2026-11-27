@@ -530,10 +530,6 @@ export function CardSelectSheet({
                               gap: spacing(2),
                             }}
                           >
-                            <Muted>
-                              Tap a version to ask for that exact one, or the card above
-                              to take any printing. Tap any picture to see it full size.
-                            </Muted>
                             {hit.printings.map((printing) => {
                               const line = items.find(
                                 (item) =>
