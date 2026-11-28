@@ -479,7 +479,7 @@ function ZoomOfferForm({ offer }: { offer: ZoomOffer }) {
   if (offer.own) {
     return (
       <ZoomSaid>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1, textAlign: "center" }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             {offer.early ? "You've got them. " : "You offered. "}
           </Text>
@@ -618,7 +618,7 @@ function ZoomHaveForm({
   if (have?.state === "found") {
     strip = (
       <ZoomSaid>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1, textAlign: "center" }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>Found. </Text>
           This one already traded.
         </Text>
@@ -628,7 +628,7 @@ function ZoomHaveForm({
     /* This card went in the last send: say so, and count the cards. */
     strip = (
       <ZoomSaid>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1, textAlign: "center" }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             {offeredStrip(sent.flareIds.length)}{" "}
           </Text>
@@ -640,7 +640,7 @@ function ZoomHaveForm({
   } else if (have?.youOffered) {
     strip = (
       <ZoomSaid>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1, textAlign: "center" }}>
           <Text style={{ color: colors.accent, fontWeight: "600" }}>
             You offered this.{" "}
           </Text>
@@ -1997,7 +1997,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  /* Words on the blur, no box: "we delete all the black box views". */
+  /* Words on the blur, no box: "we delete all the black box views";
+     centred like the card's name above them (the founder, 2026-11-27:
+     "the text for you offered this isn't centered"). */
   zoomSaid: {
     alignSelf: "stretch",
     flexDirection: "row",

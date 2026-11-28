@@ -256,7 +256,7 @@ function ZoomSaid({ children }: { children: ReactNode }) {
   return (
     <div
       onClick={(event) => event.stopPropagation()}
-      className="flex flex-wrap items-center gap-x-3 gap-y-2 px-1 py-1 text-sm text-text-secondary"
+      className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2 px-1 py-1 text-center text-sm text-text-secondary"
     >
       {children}
     </div>
