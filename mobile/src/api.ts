@@ -2675,6 +2675,8 @@ export interface BinderCard {
 export interface Binder {
   /** The binder's uuid. */
   id: string;
+  /** The account's Trades binder: always for trade, never deleted. */
+  isDefault?: boolean;
   /** What the owner called it. */
   name: string;
   /** Up for trade: public, and its cards are there to be traded. */
@@ -2703,6 +2705,8 @@ export interface Binder {
 export interface BinderSummary {
   id: string;
   name: string;
+  /** The account's Trades binder: always for trade, never deleted. */
+  isDefault?: boolean;
   forTrade: boolean;
   isPublic: boolean;
   count: number;

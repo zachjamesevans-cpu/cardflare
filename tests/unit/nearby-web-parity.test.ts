@@ -210,9 +210,12 @@ describe("Nearby's sections, in the app's order with the app's words", () => {
       expect(source).toContain("No other players nearby yet");
     }
     expect(app.home).not.toContain('label="Post a Flare" onPress={onPost}');
-    expect(app.home).toContain('label="Put a binder up for trade"');
-    expect(app.home).toContain("() => setMakingBinder(true)");
-    expect(web.page).toContain('<CreateBinder trigger="trade" />');
+    /* Nothing to make: every account has a Trades binder (binder.ts),
+       and an empty one is the next step, on both. */
+    for (const source of [app.home, web.page]) {
+      expect(source).toContain("Add cards to your Trades binder");
+      expect(source).not.toContain("Put a binder up");
+    }
     expect(web.page).not.toContain('href="/flare"');
     expect(app.home).toContain("Look within 100 miles");
     expect(web.reach).toContain("Look within 100 miles");

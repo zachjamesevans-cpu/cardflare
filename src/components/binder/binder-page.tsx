@@ -627,6 +627,16 @@ export function BinderView({
       {/* Your own binder, still empty: three stops, once (onboarding/tour).
           A binder with cards in it does not need "tap a pocket". */}
       <Tour id="binder" when={binder.yours && binder.count === 0} />
+      {/* What a binder up for trade does, said where the cards go in: the
+          founder (2026-11-27), the Trades binder "is where we will explain
+          that." The app's binder says the same. */}
+      {binder.yours && binder.forTrade && (
+        <p className="text-center text-sm text-text-secondary">
+          {binder.count === 0
+            ? "Cards you add here are matched with players near you who are hunting them."
+            : "Matched with players near you who are hunting these cards."}
+        </p>
+      )}
       <div
         className="cfa-bg-binder-page relative overflow-hidden rounded-[var(--radius-card)] p-3 shadow-[var(--shadow-card)]"
         data-tour="binder:pockets"
@@ -875,6 +885,7 @@ export function BinderView({
               isPublic={settings.isPublic || settings.forTrade}
               cover={settings.cover}
               onChange={paint}
+              isDefault={binder.isDefault}
             />
           </Sheet>
         </>

@@ -43,10 +43,7 @@ export function CreateBinderSheet({
   visible,
   onClose,
   onCreated,
-  forTradeAtFirst = false,
 }: {
-  /** Opened from Nearby's "Put a binder up for trade": the switch on. */
-  forTradeAtFirst?: boolean;
   visible: boolean;
   onClose: () => void;
   /** The new binder's id, once the server has it. */
@@ -55,7 +52,7 @@ export function CreateBinderSheet({
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [cover, setCover] = useState<BinderCoverId>(DEFAULT_BINDER_COVER);
-  const [forTrade, setForTrade] = useState(forTradeAtFirst);
+  const [forTrade, setForTrade] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

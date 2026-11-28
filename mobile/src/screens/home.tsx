@@ -1,5 +1,4 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { CreateBinderSheet } from "../create-binder-sheet";
 import { openOfferThread } from "../view-offer";
 import { toTab } from "../to-tab";
 import { useTabReset } from "../tab-reset";
@@ -679,7 +678,6 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
   const [guest, setGuest] = useState(false);
   /* Your binders up for trade: Nearby's "Yours" (NearbyYours). */
   const [tradeBinders, setTradeBinders] = useState<BinderSummary[]>([]);
-  const [makingBinder, setMakingBinder] = useState(false);
   const readTradeBinders = useCallback(() => {
     if (guest) return;
     listBinders()
@@ -2127,10 +2125,16 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
                 /* Nobody trading near either: the one empty state for the
                    whole tab. Traders showing above: only the Flares'. */
                 nobodyAtAll={!UI_EXPERIMENT || tradersCount === 0}
-                /* "Put a binder up" opened the Profile and stopped there
-                   (the founder: "doesn't work"). It makes the binder now,
-                   for trade from the start; gone once you have one. */
-                onBinder={tradeBinders.length === 0 ? () => setMakingBinder(true) : undefined}
+                /* Every account has a Trades binder (binder.ts): an empty
+                   one is the next step here, and nothing is made. */
+                onTrades={(() => {
+                  const empty = tradeBinders.find(
+                    (binder) => binder.isDefault && binder.count === 0,
+                  );
+                  return empty
+                    ? () => navigation.navigate("Binder", { binderId: empty.id })
+                    : undefined;
+                })()}
                 onWider={
                   (nearbyMiles ?? 50) < 100
                     ? () => {
@@ -2349,17 +2353,6 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
         {sharing ? (
           <SharePostSheet post={sharing} onClose={() => setSharing(null)} />
         ) : null}
-        {/* Nearby's "Put a binder up for trade": made here, for trade. */}
-        <CreateBinderSheet
-          visible={makingBinder}
-          forTradeAtFirst
-          onClose={() => setMakingBinder(false)}
-          onCreated={(binderId) => {
-            setMakingBinder(false);
-            readTradeBinders();
-            navigation.navigate("Binder", { binderId });
-          }}
-        />
         <FlareCardsSheet
           open={cardsSheet}
           picks={cardsSheet ? picksFor(cardsSheet.postId) : NO_PICKS}
@@ -2402,13 +2395,13 @@ export function HomeScreen({ mode = "following" }: { mode?: "following" | "nearb
 function NearbyEmpty({
   miles,
   nobodyAtAll,
-  onBinder,
+  onTrades,
   onWider,
 }: {
   miles: number;
   nobodyAtAll: boolean;
-  /** Absent once you have a trade binder. */
-  onBinder?: () => void;
+  /** Your Trades binder, while it is empty: the next step. */
+  onTrades?: () => void;
   onWider?: () => void;
 }) {
   return (
@@ -2431,12 +2424,20 @@ function NearbyEmpty({
       <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
         {`When players within ${miles} miles post Flares or put binders up for trade, they show up here.`}
       </Text>
-      {/* No "Post a Flare": the + is always on screen, and what you post
-          shows above, under Yours. */}
-      {onBinder ? (
-        <View style={{ alignSelf: "stretch", marginTop: spacing(2) }}>
-          <Button label="Put a binder up for trade" variant="secondary" onPress={onBinder} />
-        </View>
+      {/* No "Post a Flare" (the + is always on screen, and what you post
+          shows above, under Yours), and nothing to make: every account has
+          a Trades binder. While it is empty, the way to it. */}
+      {onTrades ? (
+        <>
+          <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 21, textAlign: "center" }}>
+            Cards in your Trades binder are matched with players near you who are hunting them.
+          </Text>
+          <Tap onPress={onTrades} accessibilityRole="button" hitSlop={8}>
+            <Text style={{ color: colors.accent, fontSize: 14, fontWeight: "700" }}>
+              Add cards to your Trades binder
+            </Text>
+          </Tap>
+        </>
       ) : null}
       {onWider ? (
         <Tap onPress={onWider} accessibilityRole="button" hitSlop={8}>
@@ -2488,7 +2489,11 @@ function NearbyYours({
           <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 15, fontWeight: "600" }} numberOfLines={1}>
             {binder.name}
           </Text>
-          <Muted>{`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}</Muted>
+          <Muted>
+            {binder.count === 0
+              ? "Add cards"
+              : `${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
+          </Muted>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </Tap>
       ))}

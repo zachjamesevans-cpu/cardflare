@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { binderSessionFor } from "@/lib/lists/haves";
 import {
@@ -49,6 +50,8 @@ export const MAX_BINDERS = 20;
 export const MAX_BINDER_CARDS = 200;
 /** What the migration named the binder that holds an existing Have list. */
 export const FIRST_BINDER_NAME = "Trade binder";
+/** The binder every account starts with, up for trade (ensureTradeBinder). */
+export const DEFAULT_TRADE_BINDER_NAME = "Trades";
 
 export interface BinderCard {
   entryId: string;
@@ -91,12 +94,16 @@ export interface Binder {
   shareCode: string | null;
   count: number;
   onYourHunts: number;
+  /** The account's own Trades binder: always for trade, never deleted. */
+  isDefault: boolean;
 }
 
 /** What a profile needs about a binder, without the cards. */
 export interface BinderSummary {
   id: string;
   name: string;
+  /** The account's own Trades binder: always for trade, never deleted. */
+  isDefault: boolean;
   forTrade: boolean;
   isPublic: boolean;
   count: number;
@@ -129,7 +136,77 @@ export function shownToOthers(row: {
 
 export type BinderWriteResult =
   | { ok: true }
-  | { ok: false; reason: "at-cap" | "unavailable" | "not-yours" | "invalid" };
+  | {
+      ok: false;
+      reason: "at-cap" | "unavailable" | "not-yours" | "invalid" | "default-trade";
+    };
+
+/*
+ * EVERY ACCOUNT HAS A TRADES BINDER. The founder (2026-11-27): "every
+ * cardflare account should have a base trade binder on their account
+ * marked as trades, makes it dead simple for people to understand".
+ * Its cards are matched with Flares near you, like any binder up for
+ * trade. It is the account's OLDEST binder up for trade (so somebody who
+ * already had one keeps theirs as it), made the first time the owner's
+ * binders are read when there is none, never deleted, and always for
+ * trade. Others do not see it while it is empty.
+ */
+
+/** The account's default trade binder among its rows: the oldest up for trade. */
+export function defaultTradeBinderId(
+  rows: readonly Pick<BinderRow, "id" | "for_trade" | "created_at">[],
+): string | null {
+  let best: { id: string; at: string } | null = null;
+  for (const row of rows) {
+    if (!row.for_trade) continue;
+    if (!best || row.created_at < best.at) best = { id: row.id, at: row.created_at };
+  }
+  return best?.id ?? null;
+}
+
+/**
+ * The made binder's id, the same for the account every time: two reads
+ * at once (the Profile and Nearby open together) both try the insert, and
+ * the second fails on the primary key instead of making a second binder.
+ */
+function defaultTradeBinderUuid(playerId: string): string {
+  const hex = createHash("sha1").update(`cardflare:trades:${playerId}`).digest("hex");
+  return [
+    hex.slice(0, 8),
+    hex.slice(8, 12),
+    `5${hex.slice(13, 16)}`,
+    `${((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16)}${hex.slice(18, 20)}`,
+    hex.slice(20, 32),
+  ].join("-");
+}
+
+/** The owner's rows, with a Trades binder made first when none is up for trade. */
+async function withTradeBinder(
+  ownerId: string,
+  rows: BinderRow[],
+): Promise<BinderRow[]> {
+  if (rows.some((row) => row.for_trade)) return rows;
+  const { error } = await getSupabaseAdmin()
+    .from("binders")
+    .insert({
+      id: defaultTradeBinderUuid(ownerId),
+      player_id: ownerId,
+      name: DEFAULT_TRADE_BINDER_NAME,
+      cover: DEFAULT_BINDER_COVER,
+      layout: DEFAULT_BINDER_LAYOUT,
+      is_public: true,
+      for_trade: true,
+      position: rows.length,
+      share_code: newShareCode(),
+    });
+  /* 23505: made a moment ago by the other read. Anything else: the page
+     still draws, without it, and the next read tries again. */
+  if (error && error.code !== "23505") {
+    console.error("Could not make the Trades binder", error);
+    return rows;
+  }
+  return binderRows(ownerId);
+}
 
 /* ------------------------------------------------------------------ */
 /* Reads                                                               */
@@ -378,6 +455,7 @@ async function assemble(
     shareCode: row.share_code ?? null,
     count: cards.length,
     onYourHunts: cards.filter((card) => card.onYourHunt).length,
+    isDefault: false,
   };
 }
 
@@ -396,7 +474,12 @@ export async function readBinder(
     binderRow(ownerId, binderId),
   ]);
   if (!name || !row) return null;
-  return assemble(row, name, viewerId);
+  const binder = await assemble(row, name, viewerId);
+  if (!binder || !row.for_trade) return binder;
+  return {
+    ...binder,
+    isDefault: defaultTradeBinderId(await binderRows(ownerId)) === row.id,
+  };
 }
 
 /**
@@ -474,9 +557,10 @@ export async function listBinders(
   ownerId: string,
   viewerId: string | null,
 ): Promise<BinderSummary[]> {
-  const [name, rows] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
+  const [name, read] = await Promise.all([ownerName(ownerId), binderRows(ownerId)]);
   if (!name) return [];
   const yours = viewerId === ownerId;
+  const rows = yours ? await withTradeBinder(ownerId, read) : read;
   const visible = rows.filter((row) => yours || shownToOthers(row));
   if (visible.length === 0) return [];
 
@@ -490,7 +574,17 @@ export async function listBinders(
     binderCardIds(visible.map((row) => row.id)),
     yours ? Promise.resolve(new Set<string>()) : wantedCardIds(viewerId),
   ]);
-  return summarizeBinders(visible, cards, wanted);
+  const defaultId = defaultTradeBinderId(rows);
+  const summaries = summarizeBinders(visible, cards, wanted).map((summary) => ({
+    ...summary,
+    isDefault: summary.id === defaultId,
+  }));
+  /* An empty binder up for trade is nothing to show anybody else: the
+     Trades binder every account has would otherwise read "0 cards" on
+     every profile. */
+  return yours
+    ? summaries
+    : summaries.filter((summary) => summary.count > 0 || !summary.forTrade);
 }
 
 /** Every card id in these binders, by binder. Paged past the row limit. */
@@ -532,6 +626,7 @@ export function summarizeBinders(
   return rows.map((row) => ({
     id: row.id,
     name: row.name,
+    isDefault: false,
     forTrade: row.for_trade,
     isPublic: shownToOthers(row),
     count: counts.get(row.id)?.count ?? 0,
@@ -812,6 +907,10 @@ export async function deleteBinder(
   if (!isSupabaseConfigured()) return { ok: false, reason: "unavailable" };
   const row = await binderRow(playerId, binderId);
   if (!row) return { ok: false, reason: "not-yours" };
+  /* The Trades binder stays: emptied, renamed, recovered, never deleted. */
+  if (row.for_trade && defaultTradeBinderId(await binderRows(playerId)) === row.id) {
+    return { ok: false, reason: "default-trade" };
+  }
   const cards = row.for_trade ? await cardRows(binderId) : [];
   const { error } = await getSupabaseAdmin()
     .from("binders")
@@ -848,6 +947,14 @@ export async function saveBinderSettings(
   let forTrade = patch.forTrade ?? before.for_trade;
   let isPublic = patch.isPublic ?? before.is_public;
   if (patch.isPublic === false) forTrade = false;
+  /* The Trades binder is always for trade, so always public too. */
+  if (
+    before.for_trade &&
+    !forTrade &&
+    defaultTradeBinderId(await binderRows(playerId)) === before.id
+  ) {
+    return { ok: false, reason: "default-trade" };
+  }
   if (forTrade) isPublic = true;
   if (forTrade !== before.for_trade) row.for_trade = forTrade;
   if (isPublic !== before.is_public) row.is_public = isPublic;

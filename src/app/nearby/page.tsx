@@ -8,7 +8,6 @@ import {
   HowItWorks,
   LiveRoomBanner,
 } from "@/components/feed/feed-list";
-import { CreateBinder } from "@/components/binder/create-binder";
 import { NotificationBell } from "@/components/feed/notification-bell";
 import { PostalAsk } from "@/components/feed/postal-ask";
 import { CodeSheet } from "@/components/nights/code-sheet";
@@ -163,6 +162,10 @@ export default async function NearbyPage() {
     .filter((item) => item.kind === "hunt" && item.yours && !item.completed)
     .slice(0, 3);
   const tradeBinders = binders.filter((binder) => binder.forTrade);
+  /* Every account has one (binder.ts): an empty one is Nearby's next step. */
+  const emptyTrades = tradeBinders.find(
+    (binder) => binder.isDefault && binder.count === 0,
+  );
   const showsYours = !plan.ask && (mine.length > 0 || tradeBinders.length > 0);
 
   return (
@@ -213,7 +216,9 @@ export default async function NearbyPage() {
                 {binder.name}
               </span>
               <span className="text-sm text-text-muted">
-                {`${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
+                {binder.count === 0
+                  ? "Add cards"
+                  : `${binder.count} ${binder.count === 1 ? "card" : "cards"}`}
               </span>
               <ChevronRight className="size-4 text-text-muted" aria-hidden="true" />
             </Link>
@@ -249,15 +254,21 @@ export default async function NearbyPage() {
           <p className="max-w-sm text-[15px] text-text-secondary">
             {`When players within ${miles ?? 50} miles post Flares or put binders up for trade, they show up here.`}
           </p>
-          {/* No "Post a Flare": the + is always on screen, and what you
-              post shows above, under Yours. "Put a binder up" opened the
-              profile and stopped there (the founder: "doesn't work"); it
-              makes the binder now, for trade, and is gone once you have
-              one. */}
-          {tradeBinders.length === 0 && (
-            <div className="mt-2 flex w-full max-w-sm flex-col gap-2">
-              <CreateBinder trigger="trade" />
-            </div>
+          {emptyTrades && (
+            <p className="max-w-sm text-[15px] text-text-secondary">
+              Cards in your Trades binder are matched with players near you who are
+              hunting them.
+            </p>
+          )}
+          {/* No buttons to make anything: every account has a Trades
+              binder (binder.ts), and an empty one is the next step. */}
+          {emptyTrades && (
+            <Link
+              href={`/profile/binders/${emptyTrades.id}`}
+              className="text-sm font-bold text-accent hover:text-accent-hover"
+            >
+              Add cards to your Trades binder
+            </Link>
           )}
           {(miles ?? 50) < 100 && <LookFurtherButton />}
         </div>
