@@ -410,11 +410,13 @@ export interface HuntItem {
    */
   yours: boolean;
   /**
-   * Posted by somebody near you whom you do not follow: the Nearby
-   * tab's "Flares near you". The founder: "let's bring back nearby as
-   * a kinda flares near me vibe".
+   * Posted by somebody near you: the Nearby tab's "Flares near you". The
+   * founder: "let's bring back nearby as a kinda flares near me vibe".
+   * Everyone in reach, people you follow included (2026-11-27).
    */
   around?: boolean;
+  /** On Nearby, from somebody you follow: a "Following" tag by the name. */
+  followed?: boolean;
   /**
    * A post from somebody you do not follow, shown to a new player so the
    * Feed is not empty on day one, with why: "Popular in One Piece". The
@@ -3149,16 +3151,27 @@ export async function listFeed(
        They belong to no store, so they are read once here rather than
        per-local like everything else. */
     areaHuntsFor(authors, playerId, held, origin),
-    /* And the posts of people near you whom you do not follow, for the
-       Nearby tab: the same builder, fed the authors found by distance. */
-    nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)
+    /*
+     * And the posts of EVERYONE near you, for the Nearby tab: the same
+     * builder, fed the authors found by distance. People you follow are
+     * in it too. They were left out, and the founder found a friend nine
+     * miles away posting a Flare that never reached his Nearby: "she
+     * turned on location and posted a flare, yet, it didnt show in
+     * nearby for me." Their posts show on both tabs, each a filter of its
+     * own, and on Nearby they wear a "Following" tag.
+     */
+    nearbyAuthorsFor(playerId, origin, new Set<string>(), reach)
       .then((around) => areaHuntsFor(around, playerId, held, origin))
       .then((hunts) =>
         hunts
           /* An author is found by one post near you, but the builder reads
              all of theirs: only the posts inside the reach stay. */
           .filter((hunt) => hunt.milesAway !== null && hunt.milesAway <= reach)
-          .map((hunt) => ({ ...hunt, around: true })),
+          .map((hunt) => ({
+            ...hunt,
+            around: true,
+            followed: hunt.playerId ? followed.has(hunt.playerId) : false,
+          })),
       ),
     /* A new player's first two weeks: real posts in their games, so the
        Feed has something in it before they follow anybody. */

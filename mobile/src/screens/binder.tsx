@@ -914,6 +914,25 @@ export function BinderScreen({
           <Tour id="binder" when={binder.yours && binder.count === 0} />
         </View>
 
+        {/* What a binder up for trade does, said where the cards go in:
+            the founder (2026-11-27), the Trades binder "is where we will
+            explain that." The website's binder says the same. */}
+        {binder.yours && binder.forTrade ? (
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: 14,
+              lineHeight: 20,
+              textAlign: "center",
+              paddingHorizontal: spacing(4),
+            }}
+          >
+            {binder.count === 0
+              ? "Cards you add here are matched with players near you who are hunting them."
+              : "Matched with players near you who are hunting these cards."}
+          </Text>
+        ) : null}
+
         {/* The chips: a visitor whose hunts this binder answers can
             look at only those. The owner has no chips. */}
         {!yours && binder.onYourHunts > 0 ? (
@@ -2313,6 +2332,15 @@ function BinderSettings({
       {/* Public, then for trade: you can show a binder without putting
           its cards up, but anything up for trade is shown, so the first
           switch holds on while the second is on. */}
+      {binder.isDefault ? (
+        /* The Trades binder every account has: no switches to turn
+           (binder.ts), the one line instead. The website says the same. */
+        <Text style={{ color: colors.textSecondary, fontSize: 14, lineHeight: 20 }}>
+          Your Trades binder is always up for trade. Cards you add here are matched with
+          players near you who are hunting them.
+        </Text>
+      ) : (
+        <>
       <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(3) }}>
         <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
           <Text style={{ color: colors.textPrimary, fontWeight: "600", fontSize: 15 }}>
@@ -2353,6 +2381,8 @@ function BinderSettings({
           accessibilityLabel="Up for trade"
         />
       </View>
+        </>
+      )}
 
       <View style={{ gap: spacing(2) }}>
         <Text style={{ color: colors.textPrimary, fontWeight: "700", fontSize: 13 }}>
@@ -2397,15 +2427,17 @@ function BinderSettings({
         </ScrollView>
       </View>
 
-      <Tap
-        onPress={onDelete}
-        accessibilityLabel="Delete binder"
-        style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
-      >
-        <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 14 }}>
-          Delete binder
-        </Text>
-      </Tap>
+      {binder.isDefault ? null : (
+        <Tap
+          onPress={onDelete}
+          accessibilityLabel="Delete binder"
+          style={{ alignSelf: "flex-start", paddingVertical: spacing(1) }}
+        >
+          <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 14 }}>
+            Delete binder
+          </Text>
+        </Tap>
+      )}
     </View>
   );
 }

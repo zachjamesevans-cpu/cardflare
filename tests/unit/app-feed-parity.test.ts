@@ -150,7 +150,7 @@ describe("the home screen's furniture", () => {
     /* One list for both tabs on the website, as the app's one screen is. */
     expect(webPage).toContain("<FeedList shown={shown} view={view} />");
     expect(read("src/app/nearby/page.tsx")).toContain(
-      "<FeedList shown={plan.items} view={view} headings />",
+      "<FeedList shown={plan.items} view={view} headings={!showsYours} />",
     );
   });
 

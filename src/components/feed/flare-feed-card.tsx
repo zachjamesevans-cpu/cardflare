@@ -298,6 +298,13 @@ export function FlareFeedCard({
                     Your Flare
                   </span>
                 )}
+                {/* On Nearby, somebody you follow: their post is here and
+                    on Following, so the tag says which kind of near. */}
+                {item.followed && !item.yours && (
+                  <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-text-muted uppercase">
+                    Following
+                  </span>
+                )}
                 {/* Not somebody you follow: a new player's suggestion,
                     with why in its title ("Popular in One Piece"). */}
                 {item.suggested && !item.yours && (
@@ -311,7 +318,12 @@ export function FlareFeedCard({
               </Link>
               <span className="shrink-0 text-[13px] text-text-muted">
                 · {agoFrom(item.postedAt)}
-                {typeof item.milesAway === "number" &&
+                {/* How far, on Nearby only: the founder (2026-11-27), the
+                    Feed "is for people you follow, dont really need to
+                    know how close they are to you." */}
+                {"tab" in item &&
+                  item.tab === "nearby" &&
+                  typeof item.milesAway === "number" &&
                   ` · ${awayLabel(item.milesAway)}`}
               </span>
             </span>

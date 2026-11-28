@@ -44,7 +44,10 @@ export function BinderSettings({
   isPublic,
   cover,
   onChange,
+  isDefault = false,
 }: {
+  /** The account's Trades binder: always for trade, never deleted. */
+  isDefault?: boolean;
   binderId: string;
   /** The binder's name, as the page holds it. */
   name: string;
@@ -126,19 +129,29 @@ export function BinderSettings({
         />
       </label>
 
-      <PublicSwitch
-        on={isPublic}
-        forTrade={forTrade}
-        disabled={pending}
-        onChange={(on) => save({ isPublic: on })}
-      />
-      <ForTradeSwitch
-        on={forTrade}
-        disabled={pending}
-        onChange={(on) =>
-          save(on ? { forTrade: true, isPublic: true } : { forTrade: false })
-        }
-      />
+      {isDefault ? (
+        /* The Trades binder: no switches to turn, the one line instead. */
+        <p className="text-sm text-text-secondary">
+          Your Trades binder is always up for trade. Cards you add here are matched with
+          players near you who are hunting them.
+        </p>
+      ) : (
+        <>
+          <PublicSwitch
+            on={isPublic}
+            forTrade={forTrade}
+            disabled={pending}
+            onChange={(on) => save({ isPublic: on })}
+          />
+          <ForTradeSwitch
+            on={forTrade}
+            disabled={pending}
+            onChange={(on) =>
+              save(on ? { forTrade: true, isPublic: true } : { forTrade: false })
+            }
+          />
+        </>
+      )}
 
       <div className="flex flex-col gap-2">
         <p className="text-sm font-semibold text-text-primary">Cover</p>
@@ -187,17 +200,19 @@ export function BinderSettings({
         </p>
       )}
 
-      <Button
-        type="button"
-        variant="danger"
-        size="sm"
-        className="w-fit"
-        disabled={pending}
-        onClick={() => setConfirming(true)}
-      >
-        <Trash2 className="size-4" aria-hidden="true" />
-        Delete binder
-      </Button>
+      {!isDefault && (
+        <Button
+          type="button"
+          variant="danger"
+          size="sm"
+          className="w-fit"
+          disabled={pending}
+          onClick={() => setConfirming(true)}
+        >
+          <Trash2 className="size-4" aria-hidden="true" />
+          Delete binder
+        </Button>
+      )}
 
       <Sheet
         open={confirming}

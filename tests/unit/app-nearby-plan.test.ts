@@ -56,7 +56,8 @@ describe("the Nearby tab is a trade room", () => {
     expect(home).toContain(
       'const plan = tab === "nearby" && !guest ? planNearby(all) : null;',
     );
-    expect(home).toContain("const shown = plan ? plan.items : all;");
+    /* Yours first (2026-11-27): your open Flares, then the room. */
+    expect(home).toContain("const shown = plan ? [...mine, ...plan.items] : all;");
     expect(home).toContain("<NearbyHeader");
     expect(home).toContain("void setLocalRadius(miles)");
     /* Posts near you are drawn by the same branch as Following's, so
@@ -64,7 +65,7 @@ describe("the Nearby tab is a trade room", () => {
     expect(home.match(/view === "compact" \?/g)).toHaveLength(1);
     /* One unboxed empty state (NearbyEmpty), not a Card. */
     expect(home).toContain(
-      '{nobodyAtAll ? "Nothing near you yet" : "No Flares near you yet"}',
+      '{nobodyAtAll ? "No other players nearby yet" : "No Flares near you yet"}',
     );
     expect(home).not.toContain("<StoreRow");
     expect(home).not.toContain("All nights ›");
@@ -74,11 +75,22 @@ describe("the Nearby tab is a trade room", () => {
 describe("Flares near you, from the server", () => {
   const repo = read("src/lib/feed/repository.ts");
 
-  it("files posts by people near you that you do not follow under around", () => {
+  /* Everyone near you, people you follow included (2026-11-27): a
+     friend nine miles away "didnt show in nearby for me". */
+  it("files posts by everyone near you under around, follows tagged", () => {
     expect(repo).toContain('item.around\n          ? "around"');
     expect(repo).toContain('around: "Flares near you",');
     expect(repo).toContain(
-      "nearbyAuthorsFor(playerId, origin, new Set(authors.keys()), reach)",
+      "nearbyAuthorsFor(playerId, origin, new Set<string>(), reach)",
+    );
+    expect(repo).toContain(
+      "followed: hunt.playerId ? followed.has(hunt.playerId) : false,",
+    );
+    expect(read("mobile/src/flare-feed-card.tsx")).toContain(
+      "{item.followed && !item.yours ? (",
+    );
+    expect(read("src/components/feed/flare-feed-card.tsx")).toContain(
+      "{item.followed && !item.yours && (",
     );
   });
 

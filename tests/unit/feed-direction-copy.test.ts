@@ -165,7 +165,7 @@ describe("the Feed page", () => {
     expect(page.match(/shown\.length === 0/g)).toHaveLength(1);
     expect(page).toContain("Nothing from people yet");
     expect(nearby.match(/plan\.posts === 0/g)).toHaveLength(1);
-    expect(nearby).toContain("Nothing near you yet");
+    expect(nearby).toContain("No other players nearby yet");
     for (const source of [page, nearby]) {
       expect(source).not.toContain("No Flares of yours yet");
       expect(source).not.toContain("You have not posted yet");

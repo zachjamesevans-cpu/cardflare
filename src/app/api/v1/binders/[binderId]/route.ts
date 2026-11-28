@@ -62,7 +62,13 @@ export async function PATCH(request: Request, { params }: Params): Promise<Respo
       { error: saved.reason },
       {
         status:
-          saved.reason === "not-yours" ? 404 : saved.reason === "invalid" ? 400 : 503,
+          saved.reason === "not-yours"
+            ? 404
+            : saved.reason === "invalid"
+              ? 400
+              : saved.reason === "default-trade"
+                ? 409
+                : 503,
       },
     );
   }
@@ -80,7 +86,14 @@ export async function DELETE(request: Request, { params }: Params): Promise<Resp
   if (!result.ok) {
     return Response.json(
       { error: result.reason },
-      { status: result.reason === "not-yours" ? 404 : 503 },
+      {
+        status:
+          result.reason === "not-yours"
+            ? 404
+            : result.reason === "default-trade"
+              ? 409
+              : 503,
+      },
     );
   }
   return Response.json({ ok: true });

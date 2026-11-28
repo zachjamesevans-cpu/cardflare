@@ -107,8 +107,8 @@ describe("the Room tile answers a card through the zoom sheet only", () => {
 describe("the Following tab is one timeline", () => {
   it("draws no section headings there", () => {
     /* Nor over a guest's sample, which is one list with no tabs. */
-    expect(read("screens/home.tsx")).toContain(
-      'guest || tab === "following" ? null : sectionHeading(item.section);',
+    expect(read("screens/home.tsx")).toMatch(
+      /: guest \|\| tab === "following"\s*\? null\s*: sectionHeading\(item\.section\);/,
     );
   });
 });

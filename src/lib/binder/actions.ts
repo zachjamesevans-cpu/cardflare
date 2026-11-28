@@ -94,7 +94,9 @@ export async function saveBinderSettingsAction(
           ? `A name, up to ${BINDER_NAME_MAX} characters.`
           : result.reason === "not-yours"
             ? NO_SUCH
-            : "Could not save that. Try again in a moment.",
+            : result.reason === "default-trade"
+              ? DEFAULT_TRADE_LINE
+              : "Could not save that. Try again in a moment.",
     };
   }
   repaint(player.id, which);
@@ -351,10 +353,19 @@ export async function deleteBinderAction(binderId: string): Promise<Outcome> {
   const which = binderIdOf(binderId);
   if (!which) return { ok: false, message: NO_SUCH };
   const result = await deleteBinder(player.id, player.name, which);
-  if (!result.ok) return { ok: false, message: NO_SUCH };
+  if (!result.ok) {
+    return {
+      ok: false,
+      message: result.reason === "default-trade" ? DEFAULT_TRADE_LINE : NO_SUCH,
+    };
+  }
   repaint(player.id, which);
   return { ok: true };
 }
+
+/** Said when the Trades binder is asked to stop trading or to go. */
+const DEFAULT_TRADE_LINE =
+  "Your Trades binder is always up for trade. Empty it instead, or rename it.";
 
 const offerSchema = z.object({
   items: z

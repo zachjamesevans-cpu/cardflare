@@ -2675,6 +2675,8 @@ export interface BinderCard {
 export interface Binder {
   /** The binder's uuid. */
   id: string;
+  /** The account's Trades binder: always for trade, never deleted. */
+  isDefault?: boolean;
   /** What the owner called it. */
   name: string;
   /** Up for trade: public, and its cards are there to be traded. */
@@ -2703,6 +2705,8 @@ export interface Binder {
 export interface BinderSummary {
   id: string;
   name: string;
+  /** The account's Trades binder: always for trade, never deleted. */
+  isDefault?: boolean;
   forTrade: boolean;
   isPublic: boolean;
   count: number;
@@ -4162,6 +4166,8 @@ export type FeedItem =
       /** A suggested post for a new player, with why: "Popular in One
           Piece". Drawn as a "Suggested" label in the header. */
       suggested?: string | null;
+      /** On Nearby, from somebody you follow: a "Following" tag. */
+      followed?: boolean;
       storeId?: string | null;
       /** What the poster will do for it: the Trade and Cash chips. */
       acceptsTrade?: boolean;
